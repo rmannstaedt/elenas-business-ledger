@@ -37,4 +37,5 @@ dotnet test ElenaSmallBusinessLedger.sln -nodeReuse:false
 - The app stores issued invoice PDFs in a configurable invoices folder.
 - The initial UI recommendation is WPF + .NET 10.
 - The initial database recommendation is SQLite.
+- Database access uses EF Core SQLite.
 - The initial PDF recommendation is QuestPDF.

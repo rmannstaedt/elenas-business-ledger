@@ -27,7 +27,7 @@ tests/
 ## Persistence and storage
 
 Database: SQLite
-Database access: decide EF Core vs direct SQLite before persistence implementation
+Database access: EF Core SQLite
 Invoice PDFs: stored as files, not BLOBs
 Backup: no automated backup in version 1.0; keep persistence design compatible with later manual backup/export
 

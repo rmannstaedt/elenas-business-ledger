@@ -176,17 +176,17 @@ dotnet format ElenaSmallBusinessLedger.sln --verify-no-changes
 
 ## Open Questions
 
-- [ ] Confirm project profile solution shape update.
+- [x] Confirm project profile solution shape update.
   - Recommended/default answer: Use App/Core/Infrastructure as described in this plan.
   - Alternatives: Keep App/Application/Domain/Infrastructure, or collapse to a single WPF project plus tests.
   - Why it matters: This decides dependency boundaries and file organization before scaffolding.
   - Exact answer needed: "Use App/Core/Infrastructure" or the exact alternative shape.
 
-- [ ] Choose SQLite access approach.
+- [x] Choose SQLite access approach.
   - Recommended/default answer: EF Core with SQLite provider for v1 because migrations, mapping, and test setup are straightforward for a small relational app.
   - Alternatives: Direct `Microsoft.Data.Sqlite` repositories for less abstraction and more explicit SQL.
   - Why it matters: This affects dependencies, migrations, repository tests, and schema evolution.
-  - Exact answer needed: "Use EF Core SQLite" or "Use direct SQLite".
+  - Exact answer received: Use EF Core SQLite.
 
 - [ ] Confirm PDF dependency.
   - Recommended/default answer: Use QuestPDF if the license is acceptable for this app.
@@ -194,11 +194,12 @@ dotnet format ElenaSmallBusinessLedger.sln --verify-no-changes
   - Why it matters: Invoice PDF generation is safety-critical and production dependency choice must be deliberate.
   - Exact answer needed: "Use QuestPDF" or name the selected alternative.
 
-- [ ] Decide invoice issue staging semantics.
-  - Recommended/default answer: Render PDF to a staging path, verify it, persist issued invoice metadata, then publish/move the PDF to final path; if any step fails, show failure and do not display the invoice as issued.
+- [x] Decide invoice issue staging semantics.
+  - Accepted answer: Render PDF to a staging path, verify it, publish/move the PDF to the final path, persist issued invoice metadata only after final PDF storage succeeds, then request print. If any pre-persistence step fails, show failure and do not display the invoice as issued.
+  - Original recommended/default answer: Render PDF to a staging path, verify it, persist issued invoice metadata, then publish/move the PDF to final path; if any step fails, show failure and do not display the invoice as issued.
   - Alternatives: Save final PDF first, then persist invoice data; or persist draft first, then save final PDF, then mark issued.
   - Why it matters: SQLite transactions cannot include filesystem writes, so false success and orphan PDFs must be handled deliberately.
-  - Exact answer needed: Confirm the recommended staged workflow or choose one alternative.
+  - Exact answer received: Use the staged workflow; implementation orders final PDF publish before issued metadata persistence to preserve the hard requirement that a final stored PDF exists before the invoice is marked issued.
 
 - [ ] Decide how much Google Calendar UI is embedded.
   - Recommended/default answer: Open Google Calendar in the user's browser for v1; revisit embedded pane later only if technically easy and reliable.
@@ -464,7 +465,7 @@ Runner may continue automatically after this stage: yes.
 ### Stage 4: Add Core Use Cases And Ports
 
 Type: implementation / test
-Status: Not started
+Status: Completed 2026-06-16
 
 Goal:
 
@@ -486,20 +487,20 @@ Affected files/classes/schemas/commands/UI surfaces:
 
 Concrete steps:
 
-- [ ] Write tests for startup dashboard query using fake repositories and fake calendar gateway.
-- [ ] Implement query result for current student, previous/current/next month lessons, and student invoices.
-- [ ] Write tests for editing an uninvoiced lesson: calendar gateway succeeds, returned lesson list reflects Calendar state.
-- [ ] Write tests for editing an uninvoiced lesson: calendar gateway fails, result reports failure and no local lesson is written.
-- [ ] Implement lesson edit/add/delete use cases.
-- [ ] Write tests for Write Invoice candidate selection: students with lessons today and no invoice this month are listed; current-time student is preselected.
-- [ ] Implement invoice candidate selection.
-- [ ] Write tests for invoice preview creation from Google Calendar entries.
-- [ ] Implement invoice preview use case.
-- [ ] Write tests for invoice issue safety: if PDF save fails, invoice repository is not called and printer is not called.
-- [ ] Write tests for invoice issue success: PDF is saved, invoice data is saved, print is requested, result includes invoice id/status.
-- [ ] Implement invoice issue use case with current staged workflow decision.
-- [ ] Write tests for paid/outstanding toggle including confirmation requirement for paid to outstanding.
-- [ ] Implement invoice payment status use case.
+- [x] Write tests for startup dashboard query using fake repositories and fake calendar gateway.
+- [x] Implement query result for current student, previous/current/next month lessons, and student invoices.
+- [x] Write tests for editing an uninvoiced lesson: calendar gateway succeeds, returned lesson list reflects Calendar state.
+- [x] Write tests for editing an uninvoiced lesson: calendar gateway fails, result reports failure and no local lesson is written.
+- [x] Implement lesson edit/add/delete use cases.
+- [x] Write tests for Write Invoice candidate selection: students with lessons today and no invoice this month are listed; current-time student is preselected.
+- [x] Implement invoice candidate selection.
+- [x] Write tests for invoice preview creation from Google Calendar entries.
+- [x] Implement invoice preview use case.
+- [x] Write tests for invoice issue safety: if PDF save fails, invoice repository is not called and printer is not called.
+- [x] Write tests for invoice issue success: PDF is saved, invoice data is saved, print is requested, result includes invoice id/status.
+- [x] Implement invoice issue use case with current staged workflow decision.
+- [x] Write tests for paid/outstanding toggle including confirmation requirement for paid to outstanding.
+- [x] Implement invoice payment status use case.
 
 Behavior that must remain unchanged:
 
@@ -541,7 +542,7 @@ Runner may continue automatically after this stage: no. Blocking action required
 ### Stage 5: Implement SQLite Persistence
 
 Type: implementation / test
-Status: Not started
+Status: Completed 2026-06-16
 
 Goal:
 
@@ -555,16 +556,16 @@ Affected files/classes/schemas/commands/UI surfaces:
 
 Concrete steps:
 
-- [ ] Apply the SQLite access decision from Open Questions.
-- [ ] Add approved SQLite packages to `ElenaSmallBusinessLedger.Infrastructure`.
-- [ ] Create persistence models/schema for company profile, students, plan periods, issued invoices, invoice lines, and payment status.
-- [ ] Implement repository interfaces from Core.
-- [ ] Add deterministic test database setup using a per-test temporary directory.
-- [ ] Write save/load tests for company profile.
-- [ ] Write save/load tests for student with plan history.
-- [ ] Write save/load tests for issued invoice with lines and PDF path.
-- [ ] Write tests that issued invoice data is not updated by student/plan edits.
-- [ ] Write tests for paid/outstanding state persistence.
+- [x] Apply the SQLite access decision from Open Questions.
+- [x] Add approved SQLite packages to `ElenaSmallBusinessLedger.Infrastructure`.
+- [x] Create persistence models/schema for company profile, students, plan periods, issued invoices, invoice lines, and payment status.
+- [x] Implement repository interfaces from Core.
+- [x] Add deterministic test database setup using a per-test temporary directory.
+- [x] Write save/load tests for company profile.
+- [x] Write save/load tests for student with plan history.
+- [x] Write save/load tests for issued invoice with lines and PDF path.
+- [x] Write tests that issued invoice data is not updated by student/plan edits.
+- [x] Write tests for paid/outstanding state persistence.
 
 Behavior that must remain unchanged:
 
@@ -601,7 +602,7 @@ Follow-on actions:
 
 - Implement Calendar adapter and PDF adapter.
 
-Runner may continue automatically after this stage: yes.
+Runner may continue automatically after this stage: no. Blocking action required: confirm Google Calendar dependency/authentication/token-storage approach before Stage 6.
 
 ### Stage 6: Implement Google Calendar Gateway
 
@@ -1165,6 +1166,26 @@ Cleanup/reset instructions:
 - Delete the test SQLite database or use an app reset command if implemented.
 
 ## Completion Log
+
+- 2026-06-16:
+  - Stage: Stage 5 - Implement SQLite Persistence
+  - Files changed: `src/ElenaSmallBusinessLedger.Infrastructure/ElenaSmallBusinessLedger.Infrastructure.csproj`, `src/ElenaSmallBusinessLedger.Infrastructure/Persistence/*`, `tests/ElenaSmallBusinessLedger.Tests/Infrastructure/Persistence/SqlitePersistenceTests.cs`, `.ai/project-profile.md`, `README.md`, `.ai/implementation-plans/active/2026-06-16-v1-invoice-printer.md`
+  - Summary: Added EF Core SQLite persistence for company profile, students, plan periods, issued invoice snapshots, invoice lines, PDF paths, and paid/outstanding state. The invoice lesson timestamp schema was cleaned up to one ISO 8601 round-trip text value instead of storing both a readable value and duplicate UTC ticks.
+  - Tests/verification run: Red check: `dotnet test tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~Persistence" -nodeReuse:false` failed before persistence types existed. Additional red checks caught SQLite cleanup friction from pooled test connections, SQLite/EF translation limits for `DateTimeOffset` filtering, and the unwanted duplicate `LessonDateTimeUtcTicks` schema field. Green checks: `dotnet test tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~Persistence" -nodeReuse:false`; `dotnet build ElenaSmallBusinessLedger.sln -nodeReuse:false`; `dotnet test ElenaSmallBusinessLedger.sln -nodeReuse:false`.
+  - Results: Persistence tests passed: 6 passed, 0 failed. Full build passed with 0 warnings and 0 errors. Full test suite passed: 36 passed, 0 failed.
+  - Deviations: No EF migration was generated yet; the schema is verified through EF model configuration and per-test SQLite databases while there is no production data. Lesson date/time values are stored as a single round-trip text value and parsed back to the original `DateTimeOffset`.
+  - Review notes: Code-review pass found no required Stage 5 fixes after the timestamp cleanup. Remaining low-risk note: invoice number allocation is suitable for the current single-user desktop shape, but would need stronger serialization if multiple app instances could issue invoices concurrently.
+  - Risks/open questions: Stage 6 is now blocked on the Google Calendar package/authentication/token-storage approach. PDF dependency and Google Calendar UI approach remain open for their later stages.
+
+- 2026-06-16:
+  - Stage: Stage 4 - Add Core Use Cases And Ports
+  - Files changed: `src/ElenaSmallBusinessLedger.Core/Common/OperationResult.cs`, `src/ElenaSmallBusinessLedger.Core/Calendar/CalendarLesson.cs`, `src/ElenaSmallBusinessLedger.Core/Lessons/LessonState.cs`, `src/ElenaSmallBusinessLedger.Core/Time/IClock.cs`, `src/ElenaSmallBusinessLedger.Core/Ports/*`, `src/ElenaSmallBusinessLedger.Core/UseCases/*`, `src/ElenaSmallBusinessLedger.Core/Invoices/InvoiceLessonStatus.cs`, `src/ElenaSmallBusinessLedger.Core/Invoices/IssuedInvoiceSummary.cs`, `tests/ElenaSmallBusinessLedger.Tests/Core/UseCases/UseCaseTests.cs`, `.ai/implementation-plans/active/2026-06-16-v1-invoice-printer.md`
+  - Summary: Added Core ports and use-case contracts for startup dashboard data, Google Calendar-backed lesson add/edit/delete, invoice candidate selection, invoice preview creation, staged invoice issue, and paid/outstanding status changes. The staged invoice issue contract creates a staging path, writes PDF, verifies staged PDF, publishes to final path, saves issued invoice metadata only after final PDF storage succeeds, and then requests print.
+  - Tests/verification run: Red check: `dotnet test tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~UseCases" -nodeReuse:false` failed because planned Core ports/use-case namespaces/types did not exist. Additional red check: `dotnet test tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~InvoicePreviewFailsWhenCalendarLessonHasNoActivePlan" -nodeReuse:false` failed because invoice preview silently succeeded when a lesson had no active plan. Green checks: `dotnet test tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~UseCases" -nodeReuse:false`; `dotnet test tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~InvoicePreviewFailsWhenCalendarLessonHasNoActivePlan" -nodeReuse:false`; `dotnet build ElenaSmallBusinessLedger.sln -nodeReuse:false`; `dotnet test ElenaSmallBusinessLedger.sln -nodeReuse:false`.
+  - Results: Use-case tests passed: 11 passed, 0 failed. Targeted no-active-plan regression passed: 1 passed, 0 failed. Full build passed with 0 warnings and 0 errors. Full test suite passed: 30 passed, 0 failed.
+  - Deviations: The implemented staged issue order publishes the verified PDF to its final path before saving issued invoice metadata, rather than saving metadata before final publish. This keeps the existing hard requirement precise: the app must not mark an invoice issued unless final PDF storage has already succeeded.
+  - Review notes: Code-review pass found and fixed one safety issue before completion: invoice preview now fails closed when a Google Calendar lesson has no active student plan instead of silently omitting that lesson from the draft.
+  - Risks/open questions: Stage 5 remains blocked by the SQLite access decision. PDF dependency and Google Calendar UI approach remain open for their later stages. Later Infrastructure should add recovery/cleanup behavior for any final PDF published immediately before a database save failure.
 
 - 2026-06-16:
   - Stage: Stage 3 - Build Core Domain Model And Pure Business Rules
