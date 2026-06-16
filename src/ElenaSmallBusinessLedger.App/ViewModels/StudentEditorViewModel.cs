@@ -10,7 +10,6 @@ namespace ElenaSmallBusinessLedger.App.ViewModels;
 
 public sealed class StudentEditorViewModel : ViewModelBase
 {
-    private const string DateFormat = "dd-MM-yyyy";
     private readonly IStudentEditorService studentEditorService;
     private string shortName = string.Empty;
     private string fullName = string.Empty;
@@ -18,19 +17,17 @@ public sealed class StudentEditorViewModel : ViewModelBase
     private string phone = string.Empty;
     private string email = string.Empty;
     private AgeBracket ageBracket = AgeBracket.Standard;
-    private string birthdateText = string.Empty;
+    private DateTime? birthdateDate;
     private bool isActive = true;
     private string planName = "Standard";
-    private string planPriceWithoutVatText = string.Empty;
+    private decimal planPriceWithoutVat = 400m;
     private LessonsPerWeek lessonsPerWeek = LessonsPerWeek.One;
-    private string planDurationMinutesText = "60";
+    private int planDurationMinutes = 60;
     private PlanFlexibility planFlexibility = PlanFlexibility.MoveOrCancelByAgreement;
-    private string planNumberOfStudentsText = "1";
-    private string planEffectiveDateText = DateOnly.FromDateTime(DateTime.Today).ToString(DateFormat, CultureInfo.InvariantCulture);
-    private string planStartsOnText = DateOnly.FromDateTime(DateTime.Today).ToString(DateFormat, CultureInfo.InvariantCulture);
-    private string planEndsOnText = string.Empty;
-    private DayOfWeek newScheduleWeekday = DayOfWeek.Tuesday;
-    private string newScheduleTimeText = "15:00";
+    private int planNumberOfStudents = 1;
+    private DateTime planEffectiveDate = new DateOnly(2026, 1, 1).ToDateTime(TimeOnly.MinValue);
+    private DateTime planStartsOnDate = new DateOnly(2026, 1, 1).ToDateTime(TimeOnly.MinValue);
+    private DateTime? planEndsOnDate;
     private string? errorMessage;
     private bool isBusy;
 
@@ -38,18 +35,8 @@ public sealed class StudentEditorViewModel : ViewModelBase
     {
         this.studentEditorService = studentEditorService;
         SaveCommand = new AsyncRelayCommand(SaveAsync, () => !IsBusy);
-        AddScheduleCommand = new AsyncRelayCommand(AddScheduleAsync, () => !IsBusy);
-        RemoveScheduleCommand = new AsyncRelayCommand(
-            parameter =>
-            {
-                if (parameter is ScheduleEntryDisplayModel schedule)
-                {
-                    Schedule.Remove(schedule);
-                }
-
-                return Task.CompletedTask;
-            },
-            parameter => parameter is ScheduleEntryDisplayModel && !IsBusy);
+        AddPlanCommand = new AsyncRelayCommand(ShowAddPlanPlaceholderAsync, () => !IsBusy);
+        RefreshSchedulePlacements();
     }
 
     public event EventHandler<bool?>? CloseRequested;
@@ -69,7 +56,7 @@ public sealed class StudentEditorViewModel : ViewModelBase
             Phone = snapshot.Phone,
             Email = snapshot.Email,
             AgeBracket = snapshot.AgeBracket,
-            BirthdateText = snapshot.Birthdate?.ToString(DateFormat, CultureInfo.InvariantCulture) ?? string.Empty,
+            BirthdateDate = snapshot.Birthdate?.ToDateTime(TimeOnly.MinValue),
             IsActive = snapshot.IsActive
         };
 
@@ -79,37 +66,36 @@ public sealed class StudentEditorViewModel : ViewModelBase
         if (currentPlan is not null)
         {
             viewModel.PlanName = currentPlan.PlanName;
-            viewModel.PlanPriceWithoutVatText = currentPlan.PriceWithoutVat.ToString(CultureInfo.InvariantCulture);
+            viewModel.PlanPriceWithoutVat = currentPlan.PriceWithoutVat;
             viewModel.LessonsPerWeek = currentPlan.LessonsPerWeek;
-            viewModel.PlanDurationMinutesText = currentPlan.DurationMinutes.ToString(CultureInfo.InvariantCulture);
+            viewModel.PlanDurationMinutes = currentPlan.DurationMinutes;
             viewModel.PlanFlexibility = currentPlan.Flexibility;
-            viewModel.PlanNumberOfStudentsText = currentPlan.NumberOfStudents.ToString(CultureInfo.InvariantCulture);
-            viewModel.PlanEffectiveDateText = DateOnly.FromDateTime(currentPlan.PlanEffectiveFrom.Date).ToString(DateFormat, CultureInfo.InvariantCulture);
-            viewModel.PlanStartsOnText = currentPlan.StartsOn.ToString(DateFormat, CultureInfo.InvariantCulture);
-            viewModel.PlanEndsOnText = currentPlan.EndsOn?.ToString(DateFormat, CultureInfo.InvariantCulture) ?? string.Empty;
+            viewModel.PlanNumberOfStudents = currentPlan.NumberOfStudents;
+            viewModel.PlanEffectiveDate = currentPlan.PlanEffectiveFrom.Date;
+            viewModel.PlanStartsOnDate = currentPlan.StartsOn.ToDateTime(TimeOnly.MinValue);
+            viewModel.PlanEndsOnDate = currentPlan.EndsOn?.ToDateTime(TimeOnly.MinValue);
         }
 
-        foreach (var schedule in snapshot.Schedule)
-        {
-            viewModel.Schedule.Add(new ScheduleEntryDisplayModel(schedule.Weekday, schedule.StartsAt));
-        }
-
+        viewModel.ApplySchedule(snapshot.Schedule);
         return viewModel;
     }
 
     public IReadOnlyList<AgeBracket> AgeBracketOptions { get; } =
         [AgeBracket.Standard, AgeBracket.Young];
 
-    public IReadOnlyList<LessonsPerWeek> LessonsPerWeekOptions { get; } =
-        [LessonsPerWeek.One, LessonsPerWeek.Two, LessonsPerWeek.ByAppointment];
+    public IReadOnlyList<WeekdayOption> WeekdayOptions { get; } =
+        [
+            WeekdayOption.Unspecified,
+            new("Monday", DayOfWeek.Monday),
+            new("Tuesday", DayOfWeek.Tuesday),
+            new("Wednesday", DayOfWeek.Wednesday),
+            new("Thursday", DayOfWeek.Thursday),
+            new("Friday", DayOfWeek.Friday),
+            new("Saturday", DayOfWeek.Saturday),
+            new("Sunday", DayOfWeek.Sunday)
+        ];
 
-    public IReadOnlyList<PlanFlexibility> PlanFlexibilityOptions { get; } =
-        [PlanFlexibility.MoveOrCancelByAgreement, PlanFlexibility.None];
-
-    public IReadOnlyList<DayOfWeek> WeekdayOptions { get; } =
-        [DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday, DayOfWeek.Friday, DayOfWeek.Saturday, DayOfWeek.Sunday];
-
-    public ObservableCollection<ScheduleEntryDisplayModel> Schedule { get; } = [];
+    public ObservableCollection<SchedulePlacementViewModel> SchedulePlacements { get; } = [];
 
     public string ShortName
     {
@@ -147,10 +133,10 @@ public sealed class StudentEditorViewModel : ViewModelBase
         set => SetProperty(ref ageBracket, value);
     }
 
-    public string BirthdateText
+    public DateTime? BirthdateDate
     {
-        get => birthdateText;
-        set => SetProperty(ref birthdateText, value);
+        get => birthdateDate;
+        set => SetProperty(ref birthdateDate, value);
     }
 
     public bool IsActive
@@ -165,64 +151,104 @@ public sealed class StudentEditorViewModel : ViewModelBase
         set => SetProperty(ref planName, value);
     }
 
-    public string PlanPriceWithoutVatText
+    public decimal PlanPriceWithoutVat
     {
-        get => planPriceWithoutVatText;
-        set => SetProperty(ref planPriceWithoutVatText, value);
+        get => planPriceWithoutVat;
+        set
+        {
+            if (SetProperty(ref planPriceWithoutVat, value))
+            {
+                OnPropertyChanged(nameof(PlanPriceWithoutVatText));
+            }
+        }
     }
+
+    public string PlanPriceWithoutVatText => PlanPriceWithoutVat.ToString("0.##", CultureInfo.InvariantCulture);
 
     public LessonsPerWeek LessonsPerWeek
     {
         get => lessonsPerWeek;
-        set => SetProperty(ref lessonsPerWeek, value);
+        set
+        {
+            if (SetProperty(ref lessonsPerWeek, value))
+            {
+                OnPropertyChanged(nameof(LessonsPerWeekText));
+                RefreshSchedulePlacements();
+            }
+        }
     }
 
-    public string PlanDurationMinutesText
+    public string LessonsPerWeekText => LessonsPerWeek switch
     {
-        get => planDurationMinutesText;
-        set => SetProperty(ref planDurationMinutesText, value);
+        LessonsPerWeek.One => "One lesson per week",
+        LessonsPerWeek.Two => "Two lessons per week",
+        LessonsPerWeek.ByAppointment => "By appointment",
+        _ => LessonsPerWeek.ToString()
+    };
+
+    public int PlanDurationMinutes
+    {
+        get => planDurationMinutes;
+        set
+        {
+            if (SetProperty(ref planDurationMinutes, value))
+            {
+                OnPropertyChanged(nameof(PlanDurationMinutesText));
+            }
+        }
     }
+
+    public string PlanDurationMinutesText => PlanDurationMinutes.ToString(CultureInfo.InvariantCulture);
 
     public PlanFlexibility PlanFlexibility
     {
         get => planFlexibility;
-        set => SetProperty(ref planFlexibility, value);
+        set
+        {
+            if (SetProperty(ref planFlexibility, value))
+            {
+                OnPropertyChanged(nameof(PlanFlexibilityText));
+            }
+        }
     }
 
-    public string PlanNumberOfStudentsText
+    public string PlanFlexibilityText => PlanFlexibility switch
     {
-        get => planNumberOfStudentsText;
-        set => SetProperty(ref planNumberOfStudentsText, value);
+        PlanFlexibility.None => "No moving or cancellation agreement",
+        PlanFlexibility.MoveOrCancelByAgreement => "Move or cancel by agreement",
+        _ => PlanFlexibility.ToString()
+    };
+
+    public int PlanNumberOfStudents
+    {
+        get => planNumberOfStudents;
+        set
+        {
+            if (SetProperty(ref planNumberOfStudents, value))
+            {
+                OnPropertyChanged(nameof(PlanNumberOfStudentsText));
+            }
+        }
     }
 
-    public string PlanEffectiveDateText
+    public string PlanNumberOfStudentsText => PlanNumberOfStudents.ToString(CultureInfo.InvariantCulture);
+
+    public DateTime PlanEffectiveDate
     {
-        get => planEffectiveDateText;
-        set => SetProperty(ref planEffectiveDateText, value);
+        get => planEffectiveDate;
+        set => SetProperty(ref planEffectiveDate, value);
     }
 
-    public string PlanStartsOnText
+    public DateTime PlanStartsOnDate
     {
-        get => planStartsOnText;
-        set => SetProperty(ref planStartsOnText, value);
+        get => planStartsOnDate;
+        set => SetProperty(ref planStartsOnDate, value);
     }
 
-    public string PlanEndsOnText
+    public DateTime? PlanEndsOnDate
     {
-        get => planEndsOnText;
-        set => SetProperty(ref planEndsOnText, value);
-    }
-
-    public DayOfWeek NewScheduleWeekday
-    {
-        get => newScheduleWeekday;
-        set => SetProperty(ref newScheduleWeekday, value);
-    }
-
-    public string NewScheduleTimeText
-    {
-        get => newScheduleTimeText;
-        set => SetProperty(ref newScheduleTimeText, value);
+        get => planEndsOnDate;
+        set => SetProperty(ref planEndsOnDate, value);
     }
 
     public string? ErrorMessage
@@ -247,8 +273,7 @@ public sealed class StudentEditorViewModel : ViewModelBase
             if (SetProperty(ref isBusy, value))
             {
                 SaveCommand.RaiseCanExecuteChanged();
-                AddScheduleCommand.RaiseCanExecuteChanged();
-                RemoveScheduleCommand.RaiseCanExecuteChanged();
+                AddPlanCommand.RaiseCanExecuteChanged();
             }
         }
     }
@@ -257,24 +282,11 @@ public sealed class StudentEditorViewModel : ViewModelBase
 
     public AsyncRelayCommand SaveCommand { get; }
 
-    public AsyncRelayCommand AddScheduleCommand { get; }
+    public AsyncRelayCommand AddPlanCommand { get; }
 
-    public AsyncRelayCommand RemoveScheduleCommand { get; }
-
-    private Task AddScheduleAsync()
+    private Task ShowAddPlanPlaceholderAsync()
     {
-        if (!TimeOnly.TryParseExact(NewScheduleTimeText, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var startsAt))
-        {
-            ErrorMessage = "Schedule time must use HH:mm.";
-            return Task.CompletedTask;
-        }
-
-        if (!Schedule.Any(entry => entry.Weekday == NewScheduleWeekday && entry.StartsAt == startsAt))
-        {
-            Schedule.Add(new ScheduleEntryDisplayModel(NewScheduleWeekday, startsAt));
-        }
-
-        ErrorMessage = null;
+        ErrorMessage = "Adding a new plan will be implemented with the plan administration workflow.";
         return Task.CompletedTask;
     }
 
@@ -308,16 +320,21 @@ public sealed class StudentEditorViewModel : ViewModelBase
 
     private SaveStudentRequest? CreateRequest()
     {
-        if (!TryParseOptionalDate(BirthdateText, out var birthdate) ||
-            !TryParseDate(PlanEffectiveDateText, "Plan effective date", out var effectiveDate) ||
-            !TryParseDate(PlanStartsOnText, "Plan start date", out var startsOn) ||
-            !TryParseOptionalDate(PlanEndsOnText, out var endsOn) ||
-            !decimal.TryParse(PlanPriceWithoutVatText, NumberStyles.Number, CultureInfo.InvariantCulture, out var priceWithoutVat) ||
-            !int.TryParse(PlanDurationMinutesText, NumberStyles.Integer, CultureInfo.InvariantCulture, out var durationMinutes) ||
-            !int.TryParse(PlanNumberOfStudentsText, NumberStyles.Integer, CultureInfo.InvariantCulture, out var numberOfStudents))
+        var schedule = new List<StudentScheduleInput>();
+        foreach (var placement in SchedulePlacements)
         {
-            ErrorMessage ??= "Please check the plan fields.";
-            return null;
+            if (placement.SelectedWeekday.Weekday is null)
+            {
+                continue;
+            }
+
+            if (!TimeOnly.TryParseExact(placement.TimeText, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var startsAt))
+            {
+                ErrorMessage = $"{placement.Label} time must use HH:mm.";
+                return null;
+            }
+
+            schedule.Add(new StudentScheduleInput(placement.SelectedWeekday.Weekday.Value, startsAt));
         }
 
         ErrorMessage = null;
@@ -328,49 +345,59 @@ public sealed class StudentEditorViewModel : ViewModelBase
             Phone,
             Email,
             AgeBracket,
-            birthdate,
+            BirthdateDate is null ? null : DateOnly.FromDateTime(BirthdateDate.Value),
             IsActive,
             [
                 new StudentPlanPeriodInput(
                     PlanName,
-                    priceWithoutVat,
+                    PlanPriceWithoutVat,
                     LessonsPerWeek,
-                    durationMinutes,
+                    PlanDurationMinutes,
                     PlanFlexibility,
-                    numberOfStudents,
-                    new DateTimeOffset(effectiveDate.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero),
-                    startsOn,
-                    endsOn)
+                    PlanNumberOfStudents,
+                    new DateTimeOffset(PlanEffectiveDate.Date, TimeSpan.Zero),
+                    DateOnly.FromDateTime(PlanStartsOnDate),
+                    PlanEndsOnDate is null ? null : DateOnly.FromDateTime(PlanEndsOnDate.Value))
             ],
-            Schedule.Select(entry => new StudentScheduleInput(entry.Weekday, entry.StartsAt)).ToArray());
+            schedule);
     }
 
-    private bool TryParseDate(string text, string fieldName, out DateOnly date)
+    private void ApplySchedule(IReadOnlyList<StudentScheduleInput> schedule)
     {
-        if (DateOnly.TryParseExact(text, DateFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out date))
+        RefreshSchedulePlacements();
+        for (var index = 0; index < SchedulePlacements.Count; index++)
         {
-            return true;
-        }
+            if (index >= schedule.Count)
+            {
+                break;
+            }
 
-        ErrorMessage = $"{fieldName} must use dd-MM-yyyy.";
-        return false;
+            var entry = schedule[index];
+            SchedulePlacements[index].SelectedWeekday =
+                WeekdayOptions.First(option => option.Weekday == entry.Weekday);
+            SchedulePlacements[index].TimeText = entry.StartsAt.ToString("HH\\:mm", CultureInfo.InvariantCulture);
+        }
     }
 
-    private bool TryParseOptionalDate(string text, out DateOnly? date)
+    private void RefreshSchedulePlacements()
     {
-        date = null;
-        if (string.IsNullOrWhiteSpace(text))
+        var placementCount = LessonsPerWeek switch
         {
-            return true;
+            LessonsPerWeek.One => 1,
+            LessonsPerWeek.Two => 2,
+            _ => 0
+        };
+
+        while (SchedulePlacements.Count > placementCount)
+        {
+            SchedulePlacements.RemoveAt(SchedulePlacements.Count - 1);
         }
 
-        if (DateOnly.TryParseExact(text, DateFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsed))
+        while (SchedulePlacements.Count < placementCount)
         {
-            date = parsed;
-            return true;
+            SchedulePlacements.Add(new SchedulePlacementViewModel(
+                SchedulePlacements.Count == 0 ? "Lesson 1" : "Lesson 2",
+                WeekdayOptions));
         }
-
-        ErrorMessage = "Dates must use dd-MM-yyyy.";
-        return false;
     }
 }

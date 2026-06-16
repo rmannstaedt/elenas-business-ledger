@@ -853,10 +853,17 @@ Concrete steps:
 - [x] Add new lesson command for Google Calendar.
 - [x] Display immediate failure when Calendar update fails.
 - [x] Preserve user input after validation failure.
+- [x] Refine student editor to use date selectors, read-only Plan-owned fields, human-readable plan flexibility, and fixed schedule placement rows.
+- [x] Replace double-click lesson editor with inline planned-lesson date/time editing and row delete action.
+- [x] Add dismissible inline message banner and clear it on row selection changes.
+- [x] Persist main and subwindow size/position inside the visible screen area.
+- [x] Polish inline lesson controls: quieter delete action, first-click date selector behavior, editable time selector, and manual Planned/Completed state toggling.
+- [x] Stop treating past uninvoiced lessons as automatically completed; completion is a manual user action.
 
 Behavior that must remain unchanged:
 
 - Invoiced lessons cannot be edited.
+- Completed lessons cannot be edited or deleted; the only allowed completed-lesson action is confirmation-gated return to Planned.
 - Calendar remains source of truth before invoicing.
 
 Tests to add/update:
@@ -1166,6 +1173,55 @@ Cleanup/reset instructions:
 - Delete the test SQLite database or use an app reset command if implemented.
 
 ## Completion Log
+
+- 2026-06-16:
+  - Stage: Stage 9 feedback refinement - inline Add Lesson row
+  - Files changed: `docs/business-requirements-and-logic.md`, `src/ElenaSmallBusinessLedger.App/ViewModels/LessonDisplayModel.cs`, `src/ElenaSmallBusinessLedger.App/ViewModels/MainWindowViewModel.cs`, `tests/ElenaSmallBusinessLedger.Tests/App/ViewModels/MainWindowViewModelTests.cs`, `.ai/implementation-plans/active/2026-06-16-v1-invoice-printer.md`
+  - Summary: Changed Add Lesson so it no longer opens the old Lesson dialog. The command now inserts an editable draft row for the current student with empty date/time fields. When the user fills in a valid date and time, the inline save path calls the Calendar add service and marks the draft as a saved lesson.
+  - Tests/verification run: Red check: `dotnet test tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~AddLessonAddsEditableDraftRowWithoutOpeningDialog|FullyQualifiedName~SavingCompleteDraftLessonAddsCalendarLesson" -nodeReuse:false` failed before the draft-row model existed. Green checks: same command; `dotnet test tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~MainWindowViewModelTests" -nodeReuse:false`; `dotnet build ElenaSmallBusinessLedger.sln -nodeReuse:false`; `dotnet test ElenaSmallBusinessLedger.sln -nodeReuse:false`.
+  - Results: Add Lesson focused tests passed: 2 passed, 0 failed. MainWindowViewModel tests passed: 18 passed, 0 failed. Full build passed with 0 warnings and 0 errors. Full test suite passed: 76 passed, 0 failed.
+  - Dependencies added: None.
+  - Risks/open questions: Visual/manual confirmation is still useful to ensure the new draft row is easy to spot and edit in the WPF grid.
+
+- 2026-06-16:
+  - Stage: Stage 9 bug fix - lesson delete visibility
+  - Files changed: `src/ElenaSmallBusinessLedger.App/ViewModels/MainWindowViewModel.cs`, `tests/ElenaSmallBusinessLedger.Tests/App/ViewModels/MainWindowViewModelTests.cs`, `.ai/implementation-plans/active/2026-06-16-v1-invoice-printer.md`
+  - Summary: Fixed the row delete interaction reported by Ruben. A successful delete now removes the lesson from the visible dashboard collection instead of immediately refreshing from the sample dashboard and reintroducing the hard-coded row.
+  - Tests/verification run: Red check: `dotnet test tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~SuccessfulLessonDeleteRemovesVisibleLesson" -nodeReuse:false` failed with the deleted row still visible. Green checks: same command; `dotnet test tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~MainWindowViewModelTests" -nodeReuse:false`; `dotnet build ElenaSmallBusinessLedger.sln -nodeReuse:false`; `dotnet test ElenaSmallBusinessLedger.sln -nodeReuse:false`.
+  - Results: Targeted delete regression passed: 1 passed, 0 failed. MainWindowViewModel tests passed: 16 passed, 0 failed. Full build passed with 0 warnings and 0 errors. Full test suite passed: 74 passed, 0 failed.
+  - Dependencies added: None.
+  - Risks/open questions: This keeps the sample WPF shell visually truthful after deletion. Real Google Calendar composition should eventually refresh from actual Calendar data, where the deleted event should naturally be absent.
+
+- 2026-06-16:
+  - Stage: Stage 9 bug fix - lesson state race and DatePicker popup behavior
+  - Files changed: `src/ElenaSmallBusinessLedger.App/MainWindow.xaml`, `src/ElenaSmallBusinessLedger.App/MainWindow.xaml.cs`, `src/ElenaSmallBusinessLedger.App/ViewModels/MainWindowViewModel.cs`, `tests/ElenaSmallBusinessLedger.Tests/App/ViewModels/MainWindowViewModelTests.cs`, `.ai/implementation-plans/active/2026-06-16-v1-invoice-printer.md`
+  - Summary: Fixed two Stage 9 interaction bugs reported by Ruben. Confirmation dialogs now suppress activation refresh while the command is in progress, preventing a refresh from replacing the visible lesson row before Completed -> Planned is applied. The DatePicker no longer has a broad first-click mouse handler, so clicking the date field should focus/edit the field without opening the calendar popup, while the native calendar button owns popup opening.
+  - Tests/verification run: Red check: `dotnet test tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~CompletedLessonReturnToPlannedIsNotLostWhenConfirmationReactivatesWindow" -nodeReuse:false` failed with visible row still `Completed`; green checks: same command, `dotnet test tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~MainWindowViewModelTests" -nodeReuse:false`, `dotnet build ElenaSmallBusinessLedger.sln -nodeReuse:false`, `dotnet test ElenaSmallBusinessLedger.sln -nodeReuse:false`.
+  - Results: Targeted regression passed: 1 passed, 0 failed. MainWindowViewModel tests passed: 15 passed, 0 failed. Full build passed with 0 warnings and 0 errors. Full test suite passed: 73 passed, 0 failed.
+  - Dependencies added: None.
+  - Risks/open questions: The DatePicker popup behavior still needs Ruben-side visual confirmation in the running WPF app because it is control-template/input-device behavior, not fully covered by ViewModel tests.
+
+- 2026-06-16:
+  - Stage: Stage 9 feedback refinement - lesson state and inline picker polish
+  - Files changed: `docs/business-requirements-and-logic.md`, `src/ElenaSmallBusinessLedger.Core/UseCases/Startup/StartupDashboardQuery.cs`, `src/ElenaSmallBusinessLedger.App/App.xaml.cs`, `src/ElenaSmallBusinessLedger.App/MainWindow.xaml`, `src/ElenaSmallBusinessLedger.App/MainWindow.xaml.cs`, `src/ElenaSmallBusinessLedger.App/Services/IConfirmationService.cs`, `src/ElenaSmallBusinessLedger.App/Services/MessageBoxConfirmationService.cs`, `src/ElenaSmallBusinessLedger.App/Services/ILessonStateService.cs`, `src/ElenaSmallBusinessLedger.App/Services/SampleLessonStateService.cs`, `src/ElenaSmallBusinessLedger.App/ViewModels/LessonDisplayModel.cs`, `src/ElenaSmallBusinessLedger.App/ViewModels/MainWindowViewModel.cs`, `tests/ElenaSmallBusinessLedger.Tests/App/ViewModels/MainWindowViewModelTests.cs`, `tests/ElenaSmallBusinessLedger.Tests/Core/UseCases/UseCaseTests.cs`, `.ai/implementation-plans/active/2026-06-16-v1-invoice-printer.md`
+  - Summary: Applied Ruben's follow-up UI feedback: the row delete action is now a quiet icon-style button; inline date controls open their selector on first click; time editing uses an editable selector with quarter-hour choices; Planned/Completed state is now a manual row action; completed lessons may return to Planned only after confirmation; completed lessons remain locked for date/time edits and deletion; uninvoiced past lessons are no longer automatically marked Completed by the startup query.
+  - Tests/verification run: Red check: `dotnet test tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~MainWindowViewModelTests" -nodeReuse:false` failed before `ILessonStateService` existed. Focused green check: `dotnet test tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~MainWindowViewModelTests|FullyQualifiedName~StartupDashboardDoesNotCompleteUninvoicedLessonsByDate" -nodeReuse:false`. Full checks: `dotnet build ElenaSmallBusinessLedger.sln -nodeReuse:false`; `dotnet test ElenaSmallBusinessLedger.sln -nodeReuse:false`.
+  - Results: Focused tests passed: 15 passed, 0 failed. Full build passed with 0 warnings and 0 errors. Full test suite passed: 72 passed, 0 failed.
+  - Dependencies added: None.
+  - Deviations: `Write Invoice` still remains Stage 10 scope. Manual lesson-state persistence is currently represented by the app-level lesson-state service seam and sample implementation; durable real persistence/composition should be revisited when replacing sample services with production wiring.
+  - Review notes: The business requirements now distinguish schedule changes saved to Google Calendar from manual Planned/Completed state changes.
+  - Risks/open questions: Visual/manual confirmation is still needed for the first-click date selector, time selector, and state toggle behavior in the running WPF app.
+
+- 2026-06-16:
+  - Stage: Stage 9 feedback refinement - Student/lesson UI corrections
+  - Files changed: `docs/business-requirements-and-logic.md`, `.ai/project-profile.md`, `.ai/standards/ui-design-standards.md`, `src/ElenaSmallBusinessLedger.App/MainWindow.xaml`, `src/ElenaSmallBusinessLedger.App/MainWindow.xaml.cs`, `src/ElenaSmallBusinessLedger.App/ViewModels/MainWindowViewModel.cs`, `src/ElenaSmallBusinessLedger.App/ViewModels/LessonDisplayModel.cs`, `src/ElenaSmallBusinessLedger.App/ViewModels/StudentEditorViewModel.cs`, `src/ElenaSmallBusinessLedger.App/ViewModels/SchedulePlacementViewModel.cs`, `src/ElenaSmallBusinessLedger.App/Views/StudentEditorView.xaml`, `src/ElenaSmallBusinessLedger.App/Services/IConfirmationService.cs`, `src/ElenaSmallBusinessLedger.App/Services/MessageBoxConfirmationService.cs`, `src/ElenaSmallBusinessLedger.App/Services/WindowPlacementStore.cs`, `src/ElenaSmallBusinessLedger.App/App.xaml.cs`, `src/ElenaSmallBusinessLedger.App/Views/StudentEditorView.xaml.cs`, `src/ElenaSmallBusinessLedger.App/Views/LessonEditorView.xaml.cs`, `tests/ElenaSmallBusinessLedger.Tests/App/ViewModels/EditorViewModelTests.cs`, `tests/ElenaSmallBusinessLedger.Tests/App/ViewModels/MainWindowViewModelTests.cs`, `.ai/implementation-plans/active/2026-06-16-v1-invoice-printer.md`
+  - Summary: Applied Ruben's Stage 9 UI feedback: student and plan dates now use date selectors; Plan-owned fields are displayed read-only except student-specific Starts on/Ends on; plan flexibility is human-readable; schedule editing uses fixed placement rows with an Unspecified option instead of Add/Remove; main/subwindow placement is persisted and clamped to the visible desktop; lesson editing moved from a separate double-click dialog to inline planned-lesson date/time controls plus a row-level delete button with confirmation; completed/invoiced lessons cannot be edited or deleted; the inline message banner can be dismissed and clears when row selection changes.
+  - Tests/verification run: `dotnet test tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~EditorViewModel|FullyQualifiedName~MainWindowViewModel|FullyQualifiedName~StudentUseCase" -nodeReuse:false`; `dotnet build ElenaSmallBusinessLedger.sln -nodeReuse:false`; `dotnet test ElenaSmallBusinessLedger.sln -nodeReuse:false`.
+  - Results: Focused tests passed: 18 passed, 0 failed. Full build passed with 0 warnings and 0 errors. Full test suite passed: 68 passed, 0 failed.
+  - Dependencies added: None.
+  - Deviations: `Add Plan` is present as a visible command but currently reports that plan administration will be implemented with the plan administration workflow; a real implementation needs a Plan catalog/selection workflow so Plan remains the owner of Plan fields. `Write Invoice` remains Stage 10 scope.
+  - Review notes: The reusable UI standard now records Ruben's default rule that desktop main windows and subwindows preserve size/position while restoring inside the current visible screen area.
+  - Risks/open questions: Visual/manual confirmation still needed for the refined student editor layout and inline lesson-edit behavior in Visual Studio.
 
 - 2026-06-16:
   - Stage: Stage 9 - Implement Student Add/Edit And Lesson Editing UI

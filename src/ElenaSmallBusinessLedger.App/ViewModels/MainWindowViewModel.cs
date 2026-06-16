@@ -3,6 +3,8 @@ using System.Globalization;
 using ElenaSmallBusinessLedger.App.Commands;
 using ElenaSmallBusinessLedger.App.Services;
 using ElenaSmallBusinessLedger.Core.Invoices;
+using ElenaSmallBusinessLedger.Core.Lessons;
+using ElenaSmallBusinessLedger.Core.UseCases.Lessons;
 using ElenaSmallBusinessLedger.Core.UseCases.Startup;
 
 namespace ElenaSmallBusinessLedger.App.ViewModels;
@@ -16,12 +18,15 @@ public sealed class MainWindowViewModel : ViewModelBase
     private readonly ICalendarLauncher calendarLauncher;
     private readonly IStudentEditorLauncher studentEditorLauncher;
     private readonly ILessonEditorLauncher lessonEditorLauncher;
+    private readonly ILessonEditorService lessonEditorService;
+    private readonly ILessonStateService lessonStateService;
     private readonly IUiClock clock;
     private DateTimeOffset? lastRefreshAt;
     private string? currentStudentShortName;
     private string[] studentShortNames = [];
     private DateOnly displayMonth;
     private bool isBusy;
+    private int activationRefreshSuspendCount;
     private string? errorMessage;
 
     public MainWindowViewModel(
@@ -31,6 +36,8 @@ public sealed class MainWindowViewModel : ViewModelBase
         ICalendarLauncher calendarLauncher,
         IStudentEditorLauncher studentEditorLauncher,
         ILessonEditorLauncher lessonEditorLauncher,
+        ILessonEditorService lessonEditorService,
+        ILessonStateService lessonStateService,
         IUiClock clock)
     {
         this.dashboardService = dashboardService;
@@ -39,6 +46,8 @@ public sealed class MainWindowViewModel : ViewModelBase
         this.calendarLauncher = calendarLauncher;
         this.studentEditorLauncher = studentEditorLauncher;
         this.lessonEditorLauncher = lessonEditorLauncher;
+        this.lessonEditorService = lessonEditorService;
+        this.lessonStateService = lessonStateService;
         this.clock = clock;
         displayMonth = new DateOnly(clock.Now.Year, clock.Now.Month, 1);
 
@@ -58,9 +67,20 @@ public sealed class MainWindowViewModel : ViewModelBase
         AddStudentCommand = new AsyncRelayCommand(AddStudentAsync, () => !IsBusy);
         EditStudentCommand = new AsyncRelayCommand(EditStudentAsync, () => !IsBusy && CurrentStudentShortName is not null);
         AddLessonCommand = new AsyncRelayCommand(AddLessonAsync, () => !IsBusy && CurrentStudentShortName is not null);
-        EditLessonCommand = new AsyncRelayCommand(
-            parameter => EditLessonAsync((LessonDisplayModel)parameter!),
+        SaveLessonCommand = new AsyncRelayCommand(
+            parameter => SaveLessonAsync((LessonDisplayModel)parameter!),
             parameter => parameter is LessonDisplayModel && !IsBusy);
+        DeleteLessonCommand = new AsyncRelayCommand(
+            parameter => DeleteLessonAsync((LessonDisplayModel)parameter!),
+            parameter => parameter is LessonDisplayModel lesson && lesson.CanEdit && !IsBusy);
+        ToggleLessonStateCommand = new AsyncRelayCommand(
+            parameter => ToggleLessonStateAsync((LessonDisplayModel)parameter!),
+            parameter => parameter is LessonDisplayModel lesson && lesson.CanToggleState && !IsBusy);
+        DismissErrorCommand = new AsyncRelayCommand(() =>
+        {
+            ErrorMessage = null;
+            return Task.CompletedTask;
+        });
     }
 
     public ObservableCollection<LessonDisplayModel> Lessons { get; } = [];
@@ -137,12 +157,23 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     public AsyncRelayCommand AddLessonCommand { get; }
 
-    public AsyncRelayCommand EditLessonCommand { get; }
+    public AsyncRelayCommand SaveLessonCommand { get; }
+
+    public AsyncRelayCommand DeleteLessonCommand { get; }
+
+    public AsyncRelayCommand ToggleLessonStateCommand { get; }
+
+    public AsyncRelayCommand DismissErrorCommand { get; }
 
     public Task LoadAsync() => RefreshAsync();
 
     public async Task RefreshAfterActivationAsync()
     {
+        if (activationRefreshSuspendCount > 0)
+        {
+            return;
+        }
+
         if (lastRefreshAt is not null && clock.Now - lastRefreshAt.Value < ActivationRefreshMinimumInterval)
         {
             return;
@@ -202,7 +233,8 @@ public sealed class MainWindowViewModel : ViewModelBase
         var confirmMarkOutstanding = false;
         if (invoice.PaymentStatus == PaymentStatus.Paid)
         {
-            confirmMarkOutstanding = await confirmationService.ConfirmMarkInvoiceOutstandingAsync(invoice, CancellationToken.None);
+            confirmMarkOutstanding = await RunWithActivationRefreshSuspendedAsync(
+                () => confirmationService.ConfirmMarkInvoiceOutstandingAsync(invoice, CancellationToken.None));
             if (!confirmMarkOutstanding)
             {
                 return;
@@ -243,36 +275,189 @@ public sealed class MainWindowViewModel : ViewModelBase
         }
     }
 
-    private async Task AddLessonAsync()
+    private Task AddLessonAsync()
     {
         if (CurrentStudentShortName is null)
+        {
+            return Task.CompletedTask;
+        }
+
+        Lessons.Add(LessonDisplayModel.CreateDraft(CurrentStudentShortName, clock.Now.Offset));
+        RaiseCommandAvailabilityChanged();
+        return Task.CompletedTask;
+    }
+
+    public void ClearError()
+    {
+        ErrorMessage = null;
+    }
+
+    private async Task SaveLessonAsync(LessonDisplayModel lesson)
+    {
+        if (!lesson.CanEdit)
+        {
+            ErrorMessage = lesson.State == LessonState.Completed
+                ? "Completed lessons cannot be edited."
+                : "Invoiced lessons cannot be edited.";
+            return;
+        }
+
+        if (!lesson.TryGetStartsAt(out var startsAt))
+        {
+            ErrorMessage = null;
+            return;
+        }
+
+        if (lesson.IsDraft)
+        {
+            await SaveDraftLessonAsync(lesson, startsAt);
+            return;
+        }
+
+        if (!lesson.HasDateTimeChange)
+        {
+            ErrorMessage = null;
+            return;
+        }
+
+        var result = await lessonEditorService.EditAsync(
+            new LessonEditRequest(lesson.Id, lesson.StudentShortName, startsAt),
+            DisplayMonth,
+            CancellationToken.None);
+        if (!result.Succeeded)
+        {
+            ErrorMessage = result.Errors.FirstOrDefault()?.Message ?? "Google Calendar lesson update failed.";
+            return;
+        }
+
+        ErrorMessage = null;
+        lesson.AcceptDateTimeChange();
+        await RefreshAsync();
+    }
+
+    private async Task SaveDraftLessonAsync(LessonDisplayModel lesson, DateTimeOffset startsAt)
+    {
+        var result = await lessonEditorService.AddAsync(
+            new LessonAddRequest(lesson.StudentShortName, startsAt),
+            DisplayMonth,
+            CancellationToken.None);
+        if (!result.Succeeded)
+        {
+            ErrorMessage = result.Errors.FirstOrDefault()?.Message ?? "Google Calendar lesson creation failed.";
+            return;
+        }
+
+        var createdLesson = result.Value!
+            .FirstOrDefault(created =>
+                StringComparer.OrdinalIgnoreCase.Equals(created.StudentShortName, lesson.StudentShortName) &&
+                created.StartsAt == startsAt);
+        if (createdLesson is not null)
+        {
+            lesson.AcceptCreatedLesson(createdLesson);
+        }
+        else
+        {
+            lesson.AcceptDateTimeChange();
+        }
+
+        ErrorMessage = null;
+    }
+
+    private async Task DeleteLessonAsync(LessonDisplayModel lesson)
+    {
+        if (!lesson.CanEdit)
+        {
+            ErrorMessage = lesson.State == LessonState.Completed
+                ? "Completed lessons cannot be deleted."
+                : "Invoiced lessons cannot be deleted.";
+            return;
+        }
+
+        if (lesson.IsDraft)
+        {
+            Lessons.Remove(lesson);
+            ErrorMessage = null;
+            RaiseCommandAvailabilityChanged();
+            return;
+        }
+
+        var confirmed = await RunWithActivationRefreshSuspendedAsync(
+            () => confirmationService.ConfirmDeleteLessonAsync(lesson, CancellationToken.None));
+        if (!confirmed)
         {
             return;
         }
 
-        var saved = await lessonEditorLauncher.ShowAddLessonAsync(
-            CurrentStudentShortName,
-            clock.Now,
-            DisplayMonth,
-            CancellationToken.None);
-        if (saved)
+        var result = await lessonEditorService.DeleteAsync(lesson.Id, DisplayMonth, CancellationToken.None);
+        if (!result.Succeeded)
         {
-            await RefreshAsync();
+            ErrorMessage = result.Errors.FirstOrDefault()?.Message ?? "Google Calendar lesson deletion failed.";
+            return;
         }
+
+        ErrorMessage = null;
+        Lessons.Remove(lesson);
+        RaiseCommandAvailabilityChanged();
+    }
+
+    private async Task ToggleLessonStateAsync(LessonDisplayModel lesson)
+    {
+        if (lesson.IsInvoiced)
+        {
+            ErrorMessage = "Invoiced lessons cannot be changed.";
+            return;
+        }
+
+        var confirmReturnToPlanned = false;
+        if (lesson.State == LessonState.Completed)
+        {
+            confirmReturnToPlanned = await RunWithActivationRefreshSuspendedAsync(
+                () => confirmationService.ConfirmMarkLessonPlannedAsync(lesson, CancellationToken.None));
+            if (!confirmReturnToPlanned)
+            {
+                return;
+            }
+        }
+
+        var result = await lessonStateService.ToggleAsync(
+            lesson.Id,
+            lesson.State,
+            confirmReturnToPlanned,
+            CancellationToken.None);
+        if (!result.Succeeded)
+        {
+            ErrorMessage = result.Errors.FirstOrDefault()?.Message ?? "Could not update lesson status.";
+            return;
+        }
+
+        lesson.State = result.Value;
+        ErrorMessage = null;
+        RaiseCommandAvailabilityChanged();
     }
 
     private async Task EditLessonAsync(LessonDisplayModel lesson)
     {
-        if (lesson.IsInvoiced)
+        if (!lesson.CanEdit)
         {
-            ErrorMessage = "Invoiced lessons cannot be edited.";
+            ErrorMessage = lesson.State == LessonState.Completed
+                ? "Completed lessons cannot be edited."
+                : "Invoiced lessons cannot be edited.";
             return;
         }
 
-        var saved = await lessonEditorLauncher.ShowEditLessonAsync(lesson, DisplayMonth, CancellationToken.None);
-        if (saved)
+        await SaveLessonAsync(lesson);
+    }
+
+    private async Task<T> RunWithActivationRefreshSuspendedAsync<T>(Func<Task<T>> action)
+    {
+        activationRefreshSuspendCount++;
+        try
         {
-            await RefreshAsync();
+            return await action();
+        }
+        finally
+        {
+            activationRefreshSuspendCount--;
         }
     }
 
@@ -315,6 +500,8 @@ public sealed class MainWindowViewModel : ViewModelBase
         AddStudentCommand.RaiseCanExecuteChanged();
         EditStudentCommand.RaiseCanExecuteChanged();
         AddLessonCommand.RaiseCanExecuteChanged();
-        EditLessonCommand.RaiseCanExecuteChanged();
+        SaveLessonCommand.RaiseCanExecuteChanged();
+        DeleteLessonCommand.RaiseCanExecuteChanged();
+        ToggleLessonStateCommand.RaiseCanExecuteChanged();
     }
 }

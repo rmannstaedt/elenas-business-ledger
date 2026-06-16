@@ -48,7 +48,7 @@ public sealed class StartupDashboardQuery
             .Select(lesson =>
             {
                 var isInvoiced = statusLookup.TryGetValue((lesson.StudentShortName, lesson.StartsAt), out var paymentStatus);
-                var state = lesson.StartsAt <= clock.Now ? LessonState.Completed : LessonState.Planned;
+                var state = isInvoiced ? LessonState.Completed : LessonState.Planned;
                 return new DashboardLesson(lesson.Id, lesson.StudentShortName, lesson.StartsAt, state, isInvoiced, isInvoiced ? paymentStatus : null);
             })
             .ToArray();

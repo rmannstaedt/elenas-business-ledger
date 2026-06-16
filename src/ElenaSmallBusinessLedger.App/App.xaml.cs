@@ -19,6 +19,8 @@ public partial class App : Application
             new ExternalBrowserCalendarLauncher(),
             new StudentEditorWindowLauncher(studentEditorService),
             new LessonEditorWindowLauncher(lessonEditorService),
+            lessonEditorService,
+            new SampleLessonStateService(),
             new SystemUiClock());
 
         var window = new MainWindow(viewModel);

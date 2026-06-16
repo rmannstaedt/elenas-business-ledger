@@ -48,6 +48,7 @@ WPF + MVVM
 No business logic in code-behind
 Danish user-facing invoice text
 Elena-facing UI must stay simple
+Desktop windows must remember size and position, including subwindows, and restore inside the current visible screen area
 
 ## Test policy
 

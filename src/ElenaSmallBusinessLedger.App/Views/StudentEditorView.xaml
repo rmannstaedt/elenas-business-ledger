@@ -71,79 +71,84 @@
                               SelectedItem="{Binding AgeBracket}"
                               Margin="0,3,0,8" />
                     <TextBlock Text="Birthdate" />
-                    <TextBox Text="{Binding BirthdateText, UpdateSourceTrigger=PropertyChanged}"
-                             Margin="0,3,0,8" />
+                    <DatePicker SelectedDate="{Binding BirthdateDate, UpdateSourceTrigger=PropertyChanged}"
+                                Margin="0,3,0,8" />
                     <CheckBox Content="Active"
                               IsChecked="{Binding IsActive}"
                               Margin="0,4,0,0" />
                 </StackPanel>
 
                 <StackPanel Grid.Column="2">
-                    <TextBlock Text="Current Plan"
-                               FontSize="18"
-                               FontWeight="SemiBold"
-                               Margin="0,0,0,10" />
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Current Plan"
+                                   FontSize="18"
+                                   FontWeight="SemiBold" />
+                        <Button Grid.Column="1"
+                                Content="Add Plan"
+                                Command="{Binding AddPlanCommand}"
+                                MinWidth="82"
+                                Height="28" />
+                    </Grid>
+
                     <TextBlock Text="Plan name" />
-                    <TextBox Text="{Binding PlanName, UpdateSourceTrigger=PropertyChanged}"
-                             Margin="0,3,0,8" />
+                    <TextBlock Text="{Binding PlanName}"
+                               Margin="0,3,0,8"
+                               FontWeight="SemiBold" />
                     <TextBlock Text="Price without VAT" />
-                    <TextBox Text="{Binding PlanPriceWithoutVatText, UpdateSourceTrigger=PropertyChanged}"
-                             Margin="0,3,0,8" />
+                    <TextBlock Text="{Binding PlanPriceWithoutVatText}"
+                               Margin="0,3,0,8" />
                     <TextBlock Text="Lessons per week" />
-                    <ComboBox ItemsSource="{Binding LessonsPerWeekOptions}"
-                              SelectedItem="{Binding LessonsPerWeek}"
-                              Margin="0,3,0,8" />
+                    <TextBlock Text="{Binding LessonsPerWeekText}"
+                               Margin="0,3,0,8" />
                     <TextBlock Text="Duration minutes" />
-                    <TextBox Text="{Binding PlanDurationMinutesText, UpdateSourceTrigger=PropertyChanged}"
-                             Margin="0,3,0,8" />
+                    <TextBlock Text="{Binding PlanDurationMinutesText}"
+                               Margin="0,3,0,8" />
                     <TextBlock Text="Flexibility" />
-                    <ComboBox ItemsSource="{Binding PlanFlexibilityOptions}"
-                              SelectedItem="{Binding PlanFlexibility}"
-                              Margin="0,3,0,8" />
+                    <TextBlock Text="{Binding PlanFlexibilityText}"
+                               Margin="0,3,0,8" />
                     <TextBlock Text="Number of students" />
-                    <TextBox Text="{Binding PlanNumberOfStudentsText, UpdateSourceTrigger=PropertyChanged}"
-                             Margin="0,3,0,8" />
+                    <TextBlock Text="{Binding PlanNumberOfStudentsText}"
+                               Margin="0,3,0,8" />
                     <TextBlock Text="Effective date" />
-                    <TextBox Text="{Binding PlanEffectiveDateText, UpdateSourceTrigger=PropertyChanged}"
-                             Margin="0,3,0,8" />
+                    <TextBlock Text="{Binding PlanEffectiveDate, StringFormat={}{0:dd-MM-yyyy}}"
+                               Margin="0,3,0,8" />
                     <TextBlock Text="Starts on" />
-                    <TextBox Text="{Binding PlanStartsOnText, UpdateSourceTrigger=PropertyChanged}"
-                             Margin="0,3,0,8" />
+                    <DatePicker SelectedDate="{Binding PlanStartsOnDate, UpdateSourceTrigger=PropertyChanged}"
+                                Margin="0,3,0,8" />
                     <TextBlock Text="Ends on" />
-                    <TextBox Text="{Binding PlanEndsOnText, UpdateSourceTrigger=PropertyChanged}"
-                             Margin="0,3,0,12" />
+                    <DatePicker SelectedDate="{Binding PlanEndsOnDate, UpdateSourceTrigger=PropertyChanged}"
+                                Margin="0,3,0,12" />
 
                     <TextBlock Text="Schedule"
                                FontSize="18"
                                FontWeight="SemiBold"
                                Margin="0,2,0,10" />
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="8" />
-                            <ColumnDefinition Width="84" />
-                            <ColumnDefinition Width="8" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <ComboBox ItemsSource="{Binding WeekdayOptions}"
-                                  SelectedItem="{Binding NewScheduleWeekday}" />
-                        <TextBox Grid.Column="2"
-                                 Text="{Binding NewScheduleTimeText, UpdateSourceTrigger=PropertyChanged}" />
-                        <Button Grid.Column="4"
-                                Content="Add"
-                                Command="{Binding AddScheduleCommand}"
-                                MinWidth="64" />
-                    </Grid>
-                    <ListBox x:Name="ScheduleList"
-                             ItemsSource="{Binding Schedule}"
-                             DisplayMemberPath="DisplayText"
-                             Height="82"
-                             Margin="0,8,0,8" />
-                    <Button Content="Remove Selected"
-                            Command="{Binding RemoveScheduleCommand}"
-                            CommandParameter="{Binding SelectedItem, ElementName=ScheduleList}"
-                            HorizontalAlignment="Left"
-                            MinWidth="120" />
+                    <ItemsControl ItemsSource="{Binding SchedulePlacements}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="70" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="8" />
+                                        <ColumnDefinition Width="84" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="{Binding Label}"
+                                               VerticalAlignment="Center" />
+                                    <ComboBox Grid.Column="1"
+                                              ItemsSource="{Binding WeekdayOptions}"
+                                              DisplayMemberPath="Label"
+                                              SelectedItem="{Binding SelectedWeekday}" />
+                                    <TextBox Grid.Column="3"
+                                             Text="{Binding TimeText, UpdateSourceTrigger=PropertyChanged}" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
                 </StackPanel>
             </Grid>
         </ScrollViewer>

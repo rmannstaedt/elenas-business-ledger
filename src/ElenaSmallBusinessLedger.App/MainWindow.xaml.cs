@@ -1,5 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
+using ElenaSmallBusinessLedger.App.Services;
 using ElenaSmallBusinessLedger.App.ViewModels;
 
 namespace ElenaSmallBusinessLedger.App;
@@ -12,6 +14,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         DataContext = viewModel;
+        WindowPlacementStore.Attach(this, nameof(MainWindow));
     }
 
     private MainWindowViewModel ViewModel => (MainWindowViewModel)DataContext;
@@ -45,11 +48,43 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void OnLessonDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    private void OnGridSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (sender is DataGrid { SelectedItem: LessonDisplayModel lesson })
+        ViewModel.ClearError();
+    }
+
+    private async void OnLessonEditCommitted(object sender, RoutedEventArgs e)
+    {
+        await CommitLessonEditAsync(sender);
+    }
+
+    private async void OnLessonCalendarClosed(object? sender, EventArgs e)
+    {
+        await CommitLessonEditAsync(sender);
+    }
+
+    private async void OnLessonTimeDropDownClosed(object? sender, EventArgs e)
+    {
+        await CommitLessonEditAsync(sender);
+    }
+
+    private async Task CommitLessonEditAsync(object? sender)
+    {
+        if (sender is FrameworkElement { DataContext: LessonDisplayModel lesson })
         {
-            await ViewModel.EditLessonCommand.ExecuteAsync(lesson);
+            await ViewModel.SaveLessonCommand.ExecuteAsync(lesson);
         }
+    }
+
+    private void OnLessonTimeSelectorPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not ComboBox comboBox || !comboBox.IsEnabled || comboBox.IsKeyboardFocusWithin)
+        {
+            return;
+        }
+
+        e.Handled = true;
+        comboBox.Focus();
+        comboBox.IsDropDownOpen = true;
     }
 }

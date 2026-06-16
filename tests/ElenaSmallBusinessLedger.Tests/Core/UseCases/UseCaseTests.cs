@@ -56,6 +56,27 @@ public sealed class UseCaseTests
     }
 
     [Fact]
+    public async Task StartupDashboardDoesNotCompleteUninvoicedLessonsByDate()
+    {
+        var clock = new FakeClock(new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.Zero));
+        var students = new FakeStudentRepository([CreateStudentRecord("Anna")]);
+        var calendar = new FakeCalendarGateway(
+        [
+            new CalendarLesson("past-uninvoiced", "Anna", new DateTimeOffset(2026, 6, 1, 15, 0, 0, TimeSpan.Zero))
+        ]);
+        var invoices = new FakeInvoiceRepository();
+        var query = new StartupDashboardQuery(students, calendar, invoices, clock);
+
+        var result = await query.ExecuteAsync(new DateOnly(2026, 6, 1), "Anna", CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        Assert.Contains(result.Value!.Lessons, lesson =>
+            lesson.Id == "past-uninvoiced" &&
+            lesson.State == LessonState.Planned &&
+            !lesson.IsInvoiced);
+    }
+
+    [Fact]
     public async Task EditingUninvoicedLessonRefreshesFromCalendarAfterCalendarUpdateSucceeds()
     {
         var updatedLesson = new CalendarLesson("lesson-1", "Anna", new DateTimeOffset(2026, 6, 17, 15, 0, 0, TimeSpan.Zero));

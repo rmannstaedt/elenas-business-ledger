@@ -1,4 +1,5 @@
 using System.Windows;
+using ElenaSmallBusinessLedger.App.Services;
 using ElenaSmallBusinessLedger.App.ViewModels;
 
 namespace ElenaSmallBusinessLedger.App.Views;
@@ -10,6 +11,7 @@ public partial class LessonEditorView : Window
         InitializeComponent();
         DataContext = viewModel;
         viewModel.CloseRequested += OnCloseRequested;
+        WindowPlacementStore.Attach(this, nameof(LessonEditorView));
     }
 
     private void OnCloseRequested(object? sender, bool? dialogResult)

@@ -13,6 +13,38 @@
         Activated="OnActivated">
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+        <Style x:Key="QuietIconButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Foreground" Value="#8A1F1F" />
+            <Setter Property="FontSize" Value="15" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="3">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#FFF0F0" />
+                                <Setter Property="BorderBrush" Value="#D18B8B" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter Property="BorderBrush" Value="#7AA7D9" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
     <DockPanel Background="#F6F7F9">
@@ -79,9 +111,23 @@
                     Padding="10"
                     Margin="0,0,0,14"
                     Visibility="{Binding HasError, Converter={StaticResource BooleanToVisibilityConverter}}">
-                <TextBlock Text="{Binding ErrorMessage}"
-                           Foreground="#5F370E"
-                           TextWrapping="Wrap" />
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="{Binding ErrorMessage}"
+                               Foreground="#5F370E"
+                               TextWrapping="Wrap" />
+                    <Button Grid.Column="1"
+                            Content="×"
+                            Command="{Binding DismissErrorCommand}"
+                            Style="{StaticResource QuietIconButtonStyle}"
+                            Width="24"
+                            Height="22"
+                            Margin="10,0,0,0"
+                            AutomationProperties.Name="Dismiss message" />
+                </Grid>
             </Border>
 
             <Grid Grid.Row="2">
@@ -142,28 +188,78 @@
                               AutoGenerateColumns="False"
                               CanUserAddRows="False"
                               CanUserDeleteRows="False"
-                              IsReadOnly="True"
+                              IsReadOnly="False"
                               HeadersVisibility="Column"
                               GridLinesVisibility="Horizontal"
                               SelectionMode="Single"
-                              MouseDoubleClick="OnLessonDoubleClick"
+                              SelectionChanged="OnGridSelectionChanged"
                               AutomationProperties.Name="Lesson list">
                         <DataGrid.Columns>
-                            <DataGridTextColumn Header="Date/time"
-                                                Binding="{Binding StartsAtText}"
-                                                Width="160" />
+                            <DataGridTemplateColumn Header="Date/time" Width="220">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <StackPanel Orientation="Horizontal">
+                                            <DatePicker SelectedDate="{Binding StartsOnDate, UpdateSourceTrigger=PropertyChanged}"
+                                                        IsEnabled="{Binding CanEdit}"
+                                                        CalendarClosed="OnLessonCalendarClosed"
+                                                        LostFocus="OnLessonEditCommitted"
+                                                        Width="125" />
+                                            <ComboBox Text="{Binding StartsAtTimeText, UpdateSourceTrigger=PropertyChanged}"
+                                                      ItemsSource="{Binding TimeOptions}"
+                                                      IsEnabled="{Binding CanEdit}"
+                                                      IsEditable="True"
+                                                      IsTextSearchEnabled="False"
+                                                      StaysOpenOnEdit="True"
+                                                      PreviewMouseLeftButtonDown="OnLessonTimeSelectorPreviewMouseLeftButtonDown"
+                                                      DropDownClosed="OnLessonTimeDropDownClosed"
+                                                      LostFocus="OnLessonEditCommitted"
+                                                      Width="72"
+                                                      Margin="6,0,0,0" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
                             <DataGridTextColumn Header="Student"
                                                 Binding="{Binding StudentShortName}"
+                                                IsReadOnly="True"
                                                 Width="120" />
-                            <DataGridTextColumn Header="State"
-                                                Binding="{Binding StateText}"
-                                                Width="110" />
+                            <DataGridTemplateColumn Header="State" Width="118">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Button Content="{Binding StateText}"
+                                                Command="{Binding DataContext.ToggleLessonStateCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                CommandParameter="{Binding}"
+                                                IsEnabled="{Binding CanToggleState}"
+                                                ToolTip="{Binding StateToggleToolTip}"
+                                                MinWidth="92"
+                                                Height="25"
+                                                AutomationProperties.Name="{Binding StateToggleToolTip}" />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
                             <DataGridTextColumn Header="Invoiced"
                                                 Binding="{Binding InvoicedText}"
+                                                IsReadOnly="True"
                                                 Width="110" />
                             <DataGridTextColumn Header="Payment"
                                                 Binding="{Binding PaymentStatusText}"
+                                                IsReadOnly="True"
                                                 Width="*" />
+                            <DataGridTemplateColumn Header="" Width="44">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Button Content="×"
+                                                Command="{Binding DataContext.DeleteLessonCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                CommandParameter="{Binding}"
+                                                Visibility="{Binding CanEdit, Converter={StaticResource BooleanToVisibilityConverter}}"
+                                                Style="{StaticResource QuietIconButtonStyle}"
+                                                ToolTip="Delete lesson"
+                                                Width="28"
+                                                Height="24"
+                                                AutomationProperties.Name="Delete lesson" />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
                         </DataGrid.Columns>
                     </DataGrid>
                 </Grid>
@@ -186,6 +282,7 @@
                               IsReadOnly="True"
                               HeadersVisibility="Column"
                               GridLinesVisibility="Horizontal"
+                              SelectionChanged="OnGridSelectionChanged"
                               MouseDoubleClick="OnInvoiceDoubleClick"
                               AutomationProperties.Name="Student invoices">
                         <DataGrid.Columns>

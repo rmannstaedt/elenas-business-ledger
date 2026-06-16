@@ -110,6 +110,8 @@ Each lesson in the list contains:
   - invoiced: yes / no
   - paid: yes / outstanding (only if invoiced)
 
+Lesson state does not change automatically merely because the lesson date/time has passed. The user marks a Planned lesson as Completed manually.
+
 The main application window does not display student prices or monthly payment amounts. Prices belong in invoice preparation/printing and later administration views, not on the everyday lesson screen where students may see the display.
 
 The application also opens Google Calendar in a separate browser window on the screen.
@@ -133,14 +135,20 @@ Double-clicking on an Invoice opens it in the Invoice Viewer.
 The application also contains a button:
   * Write Invoice
 
-Lessons that are invoiced:yes CAN NOT be edited.
+Lessons that are completed or invoiced:yes CAN NOT be edited or deleted in the main lesson list.
 
-The invoiced:no entries in the lesson list may be edited directly:
+The only allowed operation on a Completed lesson is to mark it back to Planned. This requires an explicit confirmation prompt. Once a Completed lesson has been marked back to Planned, and provided it is still invoiced:no, it can again be edited as a planned lesson.
+
+The planned and invoiced:no entries in the lesson list may be edited directly in the main window:
   * date/time may be changed
   * lesson may be cancelled (deleted)
   * new lesson may be added
 
-All changes to the lessons in the lesson list are saved directly in Google Calendar.
+Adding a lesson creates a new empty planned row for the current student in the main lesson list. The user fills in the date/time directly in that row.
+
+Lesson date editing uses a date selector. Lesson time editing provides a time selector while still allowing typed time input. Lesson cancellation uses an explicit delete action with a confirmation prompt.
+
+Schedule changes to the lessons in the lesson list are saved directly in Google Calendar.
 If the update of Google Calendar fails, the user is notified immediately so they can take corrective action.
 
 ### Write and Print an Invoice

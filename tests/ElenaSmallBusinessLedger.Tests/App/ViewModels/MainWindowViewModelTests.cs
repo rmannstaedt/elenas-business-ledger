@@ -160,6 +160,8 @@ public sealed class MainWindowViewModelTests
             new FakeCalendarLauncher(),
             studentEditor,
             new FakeLessonEditorLauncher(),
+            new FakeLessonEditorService(),
+            new FakeLessonStateService(),
             new FakeUiClock(new DateTimeOffset(2026, 6, 16, 12, 0, 0, TimeSpan.Zero)));
         await viewModel.LoadAsync();
 
@@ -167,6 +169,49 @@ public sealed class MainWindowViewModelTests
 
         Assert.True(studentEditor.AddWasShown);
         Assert.Equal(2, dashboard.LoadCount);
+    }
+
+    [Fact]
+    public async Task AddLessonAddsEditableDraftRowWithoutOpeningDialog()
+    {
+        var lessonEditorLauncher = new FakeLessonEditorLauncher();
+        var viewModel = CreateViewModel(
+            dashboard: new FakeDashboardService { LessonState = LessonState.Planned, LessonIsInvoiced = false, LessonPaymentStatus = null },
+            lessonEditorLauncher: lessonEditorLauncher);
+        await viewModel.LoadAsync();
+
+        await viewModel.AddLessonCommand.ExecuteAsync();
+
+        Assert.False(lessonEditorLauncher.AddWasShown);
+        Assert.Equal(2, viewModel.Lessons.Count);
+        var draft = viewModel.Lessons[1];
+        Assert.True(draft.IsDraft);
+        Assert.Equal("Anna", draft.StudentShortName);
+        Assert.Null(draft.StartsOnDate);
+        Assert.Equal(string.Empty, draft.StartsAtTimeText);
+        Assert.True(draft.CanEdit);
+    }
+
+    [Fact]
+    public async Task SavingCompleteDraftLessonAddsCalendarLesson()
+    {
+        var lessonEditor = new FakeLessonEditorService();
+        var viewModel = CreateViewModel(
+            dashboard: new FakeDashboardService { LessonState = LessonState.Planned, LessonIsInvoiced = false, LessonPaymentStatus = null },
+            lessonEditorService: lessonEditor);
+        await viewModel.LoadAsync();
+        await viewModel.AddLessonCommand.ExecuteAsync();
+        var draft = viewModel.Lessons[1];
+        draft.StartsOnDate = new DateTime(2026, 6, 24);
+        draft.StartsAtTimeText = "15:30";
+
+        await viewModel.SaveLessonCommand.ExecuteAsync(draft);
+
+        Assert.True(lessonEditor.AddWasCalled);
+        Assert.Equal("Anna", lessonEditor.LastAddRequest?.StudentShortName);
+        Assert.Equal(new DateTimeOffset(2026, 6, 24, 15, 30, 0, TimeSpan.Zero), lessonEditor.LastAddRequest?.StartsAt);
+        Assert.False(draft.IsDraft);
+        Assert.False(viewModel.HasError);
     }
 
     [Fact]
@@ -180,13 +225,102 @@ public sealed class MainWindowViewModelTests
             new FakeCalendarLauncher(),
             new FakeStudentEditorLauncher(),
             lessonEditor,
+            new FakeLessonEditorService(),
+            new FakeLessonStateService(),
             new FakeUiClock(new DateTimeOffset(2026, 6, 16, 12, 0, 0, TimeSpan.Zero)));
         await viewModel.LoadAsync();
 
-        await viewModel.EditLessonCommand.ExecuteAsync(viewModel.Lessons[0]);
+        await viewModel.SaveLessonCommand.ExecuteAsync(viewModel.Lessons[0]);
 
         Assert.False(lessonEditor.EditWasShown);
         Assert.True(viewModel.HasError);
+    }
+
+    [Fact]
+    public async Task PlannedLessonCanBeMarkedCompletedManually()
+    {
+        var lessonStates = new FakeLessonStateService();
+        var viewModel = CreateViewModel(
+            dashboard: new FakeDashboardService { LessonState = LessonState.Planned, LessonIsInvoiced = false, LessonPaymentStatus = null },
+            lessonStates: lessonStates);
+        await viewModel.LoadAsync();
+
+        await viewModel.ToggleLessonStateCommand.ExecuteAsync(viewModel.Lessons[0]);
+
+        Assert.Equal("lesson-1", lessonStates.LastLessonId);
+        Assert.Equal(LessonState.Planned, lessonStates.LastCurrentState);
+        Assert.Equal("Completed", viewModel.Lessons[0].StateText);
+        Assert.False(viewModel.Lessons[0].CanEdit);
+    }
+
+    [Fact]
+    public async Task CompletedLessonRequiresConfirmationBeforeReturningToPlanned()
+    {
+        var confirmation = new FakeConfirmationService { NextAnswer = true };
+        var lessonStates = new FakeLessonStateService();
+        var viewModel = CreateViewModel(
+            dashboard: new FakeDashboardService { LessonState = LessonState.Completed, LessonIsInvoiced = false, LessonPaymentStatus = null },
+            confirmation: confirmation,
+            lessonStates: lessonStates);
+        await viewModel.LoadAsync();
+
+        await viewModel.ToggleLessonStateCommand.ExecuteAsync(viewModel.Lessons[0]);
+
+        Assert.True(confirmation.MarkLessonPlannedWasAsked);
+        Assert.Equal(LessonState.Completed, lessonStates.LastCurrentState);
+        Assert.Equal("Planned", viewModel.Lessons[0].StateText);
+        Assert.True(viewModel.Lessons[0].CanEdit);
+    }
+
+    [Fact]
+    public async Task CompletedLessonReturnToPlannedIsNotLostWhenConfirmationReactivatesWindow()
+    {
+        var clock = new FakeUiClock(new DateTimeOffset(2026, 6, 16, 12, 0, 0, TimeSpan.Zero));
+        var confirmation = new FakeConfirmationService { NextAnswer = true };
+        var viewModel = CreateViewModel(
+            dashboard: new FakeDashboardService { LessonState = LessonState.Completed, LessonIsInvoiced = false, LessonPaymentStatus = null },
+            confirmation: confirmation,
+            clock: clock);
+        confirmation.OnMarkLessonPlannedAsync = () => viewModel.RefreshAfterActivationAsync();
+        await viewModel.LoadAsync();
+        clock.Now = clock.Now.AddSeconds(11);
+
+        await viewModel.ToggleLessonStateCommand.ExecuteAsync(viewModel.Lessons[0]);
+
+        Assert.Equal("Planned", viewModel.Lessons[0].StateText);
+        Assert.True(viewModel.Lessons[0].CanEdit);
+    }
+
+    [Fact]
+    public async Task CompletedLessonEditIsBlocked()
+    {
+        var lessonEditor = new FakeLessonEditorService();
+        var viewModel = CreateViewModel(
+            dashboard: new FakeDashboardService { LessonState = LessonState.Completed, LessonIsInvoiced = false, LessonPaymentStatus = null },
+            lessonEditorService: lessonEditor);
+        await viewModel.LoadAsync();
+
+        await viewModel.SaveLessonCommand.ExecuteAsync(viewModel.Lessons[0]);
+
+        Assert.False(lessonEditor.EditWasCalled);
+        Assert.True(viewModel.HasError);
+        Assert.Equal("Completed lessons cannot be edited.", viewModel.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task SuccessfulLessonDeleteRemovesVisibleLesson()
+    {
+        var lessonEditor = new FakeLessonEditorService();
+        var viewModel = CreateViewModel(
+            dashboard: new FakeDashboardService { LessonState = LessonState.Planned, LessonIsInvoiced = false, LessonPaymentStatus = null },
+            lessonEditorService: lessonEditor);
+        await viewModel.LoadAsync();
+
+        await viewModel.DeleteLessonCommand.ExecuteAsync(viewModel.Lessons[0]);
+
+        Assert.True(lessonEditor.DeleteWasCalled);
+        Assert.Empty(viewModel.Lessons);
+        Assert.False(viewModel.HasError);
     }
 
     private static MainWindowViewModel CreateViewModel(
@@ -194,6 +328,9 @@ public sealed class MainWindowViewModelTests
         FakePaymentService? payments = null,
         FakeConfirmationService? confirmation = null,
         FakeCalendarLauncher? calendar = null,
+        FakeLessonEditorLauncher? lessonEditorLauncher = null,
+        FakeLessonEditorService? lessonEditorService = null,
+        FakeLessonStateService? lessonStates = null,
         FakeUiClock? clock = null) =>
         new(
             dashboard ?? new FakeDashboardService(),
@@ -201,7 +338,9 @@ public sealed class MainWindowViewModelTests
             confirmation ?? new FakeConfirmationService(),
             calendar ?? new FakeCalendarLauncher(),
             new FakeStudentEditorLauncher(),
-            new FakeLessonEditorLauncher(),
+            lessonEditorLauncher ?? new FakeLessonEditorLauncher(),
+            lessonEditorService ?? new FakeLessonEditorService(),
+            lessonStates ?? new FakeLessonStateService(),
             clock ?? new FakeUiClock(new DateTimeOffset(2026, 6, 16, 12, 0, 0, TimeSpan.Zero)));
 
     private static void RunOnStaThread(Action action)
@@ -241,6 +380,12 @@ public sealed class MainWindowViewModelTests
 
         public OperationResult<StartupDashboardResult>? NextResult { get; set; }
 
+        public LessonState LessonState { get; init; } = LessonState.Completed;
+
+        public bool LessonIsInvoiced { get; init; } = true;
+
+        public PaymentStatus? LessonPaymentStatus { get; init; } = PaymentStatus.Outstanding;
+
         public Task<OperationResult<StartupDashboardResult>> LoadAsync(
             DateOnly month,
             string? selectedStudentShortName,
@@ -260,9 +405,9 @@ public sealed class MainWindowViewModelTests
                             "lesson-1",
                             currentStudent,
                             new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.FromHours(2)),
-                            LessonState.Completed,
-                            IsInvoiced: true,
-                            PaymentStatus.Outstanding)
+                            LessonState,
+                            LessonIsInvoiced,
+                            LessonPaymentStatus)
                     ],
                     [
                         new IssuedInvoiceSummary(
@@ -302,10 +447,33 @@ public sealed class MainWindowViewModelTests
 
         public bool WasAsked { get; private set; }
 
+        public bool MarkLessonPlannedWasAsked { get; private set; }
+
+        public Func<Task>? OnMarkLessonPlannedAsync { get; set; }
+
         public Task<bool> ConfirmMarkInvoiceOutstandingAsync(InvoiceDisplayModel invoice, CancellationToken cancellationToken)
         {
             WasAsked = true;
             return Task.FromResult(NextAnswer);
+        }
+
+        public Task<bool> ConfirmDeleteLessonAsync(LessonDisplayModel lesson, CancellationToken cancellationToken) =>
+            Task.FromResult(NextAnswer);
+
+        public Task<bool> ConfirmMarkLessonPlannedAsync(LessonDisplayModel lesson, CancellationToken cancellationToken)
+        {
+            MarkLessonPlannedWasAsked = true;
+            return ConfirmMarkLessonPlannedCoreAsync();
+        }
+
+        private async Task<bool> ConfirmMarkLessonPlannedCoreAsync()
+        {
+            if (OnMarkLessonPlannedAsync is not null)
+            {
+                await OnMarkLessonPlannedAsync();
+            }
+
+            return NextAnswer;
         }
     }
 
@@ -338,14 +506,19 @@ public sealed class MainWindowViewModelTests
 
     private sealed class FakeLessonEditorLauncher : ILessonEditorLauncher
     {
+        public bool AddWasShown { get; private set; }
+
         public bool EditWasShown { get; private set; }
 
         public Task<bool> ShowAddLessonAsync(
             string studentShortName,
             DateTimeOffset startsAt,
             DateOnly refreshMonth,
-            CancellationToken cancellationToken) =>
-            Task.FromResult(false);
+            CancellationToken cancellationToken)
+        {
+            AddWasShown = true;
+            return Task.FromResult(false);
+        }
 
         public Task<bool> ShowEditLessonAsync(
             LessonDisplayModel lesson,
@@ -354,6 +527,65 @@ public sealed class MainWindowViewModelTests
         {
             EditWasShown = true;
             return Task.FromResult(false);
+        }
+    }
+
+    private sealed class FakeLessonEditorService : ILessonEditorService
+    {
+        public bool AddWasCalled { get; private set; }
+
+        public bool EditWasCalled { get; private set; }
+
+        public bool DeleteWasCalled { get; private set; }
+
+        public ElenaSmallBusinessLedger.Core.UseCases.Lessons.LessonAddRequest? LastAddRequest { get; private set; }
+
+        public Task<OperationResult<IReadOnlyList<ElenaSmallBusinessLedger.Core.Calendar.CalendarLesson>>> AddAsync(
+            ElenaSmallBusinessLedger.Core.UseCases.Lessons.LessonAddRequest request,
+            DateOnly refreshMonth,
+            CancellationToken cancellationToken)
+        {
+            AddWasCalled = true;
+            LastAddRequest = request;
+            return Task.FromResult(OperationResult<IReadOnlyList<ElenaSmallBusinessLedger.Core.Calendar.CalendarLesson>>.Success(
+                [new ElenaSmallBusinessLedger.Core.Calendar.CalendarLesson("new-lesson", request.StudentShortName, request.StartsAt)]));
+        }
+
+        public Task<OperationResult<IReadOnlyList<ElenaSmallBusinessLedger.Core.Calendar.CalendarLesson>>> EditAsync(
+            ElenaSmallBusinessLedger.Core.UseCases.Lessons.LessonEditRequest request,
+            DateOnly refreshMonth,
+            CancellationToken cancellationToken)
+        {
+            EditWasCalled = true;
+            return Task.FromResult(OperationResult<IReadOnlyList<ElenaSmallBusinessLedger.Core.Calendar.CalendarLesson>>.Success([]));
+        }
+
+        public Task<OperationResult<IReadOnlyList<ElenaSmallBusinessLedger.Core.Calendar.CalendarLesson>>> DeleteAsync(
+            string lessonId,
+            DateOnly refreshMonth,
+            CancellationToken cancellationToken)
+        {
+            DeleteWasCalled = true;
+            return Task.FromResult(OperationResult<IReadOnlyList<ElenaSmallBusinessLedger.Core.Calendar.CalendarLesson>>.Success([]));
+        }
+    }
+
+    private sealed class FakeLessonStateService : ILessonStateService
+    {
+        public string? LastLessonId { get; private set; }
+
+        public LessonState? LastCurrentState { get; private set; }
+
+        public Task<OperationResult<LessonState>> ToggleAsync(
+            string lessonId,
+            LessonState currentState,
+            bool confirmReturnToPlanned,
+            CancellationToken cancellationToken)
+        {
+            LastLessonId = lessonId;
+            LastCurrentState = currentState;
+            var nextState = currentState == LessonState.Planned ? LessonState.Completed : LessonState.Planned;
+            return Task.FromResult(OperationResult<LessonState>.Success(nextState));
         }
     }
 
