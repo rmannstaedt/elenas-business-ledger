@@ -45,6 +45,7 @@ public sealed class UseCaseTests
 
         Assert.True(result.Succeeded);
         Assert.Equal("Anna", result.Value!.CurrentStudentShortName);
+        Assert.Equal(["Anna"], result.Value.StudentShortNames);
         Assert.Equal(3, result.Value.Lessons.Count);
         Assert.Contains(result.Value.Lessons, lesson =>
             lesson.Id == "past" &&

@@ -11,7 +11,7 @@
 Status: Active
 Created: 2026-06-16
 Last updated: 2026-06-16
-Owner/context: Ruben and Codex; implementation has not started yet.
+Owner/context: Ruben and Codex; stages 1-8 are implemented, with Stage 8 awaiting Ruben-side visual UI confirmation before continuing.
 
 ## Related Docs And Standards
 
@@ -201,11 +201,11 @@ dotnet format ElenaSmallBusinessLedger.sln --verify-no-changes
   - Why it matters: SQLite transactions cannot include filesystem writes, so false success and orphan PDFs must be handled deliberately.
   - Exact answer received: Use the staged workflow; implementation orders final PDF publish before issued metadata persistence to preserve the hard requirement that a final stored PDF exists before the invoice is marked issued.
 
-- [ ] Decide how much Google Calendar UI is embedded.
+- [x] Decide how much Google Calendar UI is embedded.
   - Recommended/default answer: Open Google Calendar in the user's browser for v1; revisit embedded pane later only if technically easy and reliable.
   - Alternatives: Embedded WebView2 pane inside the WPF app.
   - Why it matters: Embedded browser adds dependency, auth/session, layout, and support complexity.
-  - Exact answer needed: "External browser" or "Embedded WebView2".
+  - Exact answer received: Use the external browser for v1, with app activation refresh when focus returns to the ledger plus a manual Refresh button.
 
 ## Staged Implementation Plan
 
@@ -750,7 +750,7 @@ Runner may continue automatically after this stage: no. Blocking action required
 ### Stage 8: Implement WPF Shell And Startup Dashboard
 
 Type: implementation / test / UI
-Status: Not started
+Status: Completed 2026-06-16
 
 Goal:
 
@@ -767,20 +767,20 @@ Affected files/classes/schemas/commands/UI surfaces:
 
 Concrete steps:
 
-- [ ] Add dependency injection composition in App startup.
-- [ ] Create main window with current student short name.
-- [ ] Show lesson list for previous/current/next month.
-- [ ] Show each lesson's date/time, planned/completed state, invoiced flag, and paid/outstanding when invoiced.
-- [ ] Add Previous/Next student commands based on lesson date/time.
-- [ ] Add Previous/Next month commands.
-- [ ] Add Student menu with Add Student and Edit Student.
-- [ ] Add Student Invoices pane with Paid/Outstanding flag.
-- [ ] Implement Outstanding to Paid direct toggle.
-- [ ] Implement Paid to Outstanding confirmation dialog.
-- [ ] Add double-click invoice open command.
-- [ ] Add Write Invoice button.
-- [ ] Add inline error display for Google Calendar update failures.
-- [ ] Add ViewModel tests for command availability and state transitions.
+- [x] Add dependency injection composition in App startup.
+- [x] Create main window with current student short name.
+- [x] Show lesson list for previous/current/next month.
+- [x] Show each lesson's date/time, planned/completed state, invoiced flag, and paid/outstanding when invoiced.
+- [x] Add Previous/Next student commands based on the dashboard student list.
+- [x] Add Previous/Next month commands.
+- [x] Add Student menu with Add Student and Edit Student.
+- [x] Add Student Invoices pane with Paid/Outstanding flag.
+- [x] Implement Outstanding to Paid direct toggle.
+- [x] Implement Paid to Outstanding confirmation dialog.
+- [x] Add double-click invoice open command.
+- [x] Add Write Invoice button.
+- [x] Add inline error display for Google Calendar update failures.
+- [x] Add ViewModel tests for command availability and state transitions.
 
 Behavior that must remain unchanged:
 
@@ -1166,6 +1166,17 @@ Cleanup/reset instructions:
 - Delete the test SQLite database or use an app reset command if implemented.
 
 ## Completion Log
+
+- 2026-06-16:
+  - Stage: Stage 8 - Implement WPF Shell And Startup Dashboard
+  - Files changed: `src/ElenaSmallBusinessLedger.App/App.xaml`, `src/ElenaSmallBusinessLedger.App/App.xaml.cs`, `src/ElenaSmallBusinessLedger.App/MainWindow.xaml`, `src/ElenaSmallBusinessLedger.App/MainWindow.xaml.cs`, `src/ElenaSmallBusinessLedger.App/Commands/*`, `src/ElenaSmallBusinessLedger.App/Services/*`, `src/ElenaSmallBusinessLedger.App/ViewModels/*`, `src/ElenaSmallBusinessLedger.Core/UseCases/Startup/StartupDashboardResult.cs`, `src/ElenaSmallBusinessLedger.Core/UseCases/Startup/StartupDashboardQuery.cs`, `tests/ElenaSmallBusinessLedger.Tests/ElenaSmallBusinessLedger.Tests.csproj`, `tests/ElenaSmallBusinessLedger.Tests/App/ViewModels/MainWindowViewModelTests.cs`, `tests/ElenaSmallBusinessLedger.Tests/Core/UseCases/UseCaseTests.cs`, `.ai/implementation-plans/active/2026-06-16-v1-invoice-printer.md`
+  - Summary: Added the WPF main shell with sample dashboard composition, current student/month header, Google Calendar open/refresh buttons, lesson list, student navigation, month navigation, student menu entries, student invoice pane, paid/outstanding toggle behavior, paid-to-outstanding confirmation, inline refresh/update errors, app-activation refresh debounce, and a self-contained main-window resource setup for tests.
+  - Tests/verification run: Red check: `dotnet test tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~ViewModels" -nodeReuse:false` failed before planned App ViewModel/window types existed. Additional red check: the WPF smoke test failed because `MainWindow` depended on an app-level `BooleanToVisibilityConverter`; fixed by making the window resource self-contained. Green checks: `dotnet test tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~ViewModels" -nodeReuse:false`; `dotnet test tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~StartupDashboard" -nodeReuse:false`; `dotnet build ElenaSmallBusinessLedger.sln -nodeReuse:false`; `dotnet test ElenaSmallBusinessLedger.sln -nodeReuse:false`.
+  - Results: ViewModel/window tests passed: 9 passed, 0 failed. StartupDashboard filtered tests passed: 1 passed, 0 failed. Full build passed with 0 warnings and 0 errors. Full test suite passed: 59 passed, 0 failed.
+  - Dependencies added: None.
+  - Deviations: Previous/Next student navigation now uses an explicit active-student list from the startup dashboard result instead of inferring students from currently visible lesson rows. This is more reliable once the dashboard filters lessons to the selected student. The test project now targets `net10.0-windows` and references the WPF App project so ViewModel/window tests can compile and instantiate WPF surfaces.
+  - Review notes: Focused UI/state review found and fixed the weak student navigation contract and the window resource dependency. The dashboard remains bound to sample services until Stage 9/10 wire real student editing and invoice workflows.
+  - Risks/open questions: The WPF executable was launched and the process stayed responding, but the tool session could not enumerate a visible top-level desktop window for it. Ruben should visually confirm the dashboard shell opens with sample data before moving past the Stage 8 UI-review gate.
 
 - 2026-06-16:
   - Stage: Stage 7 - Implement PDF Storage, Invoice Rendering, And Printing

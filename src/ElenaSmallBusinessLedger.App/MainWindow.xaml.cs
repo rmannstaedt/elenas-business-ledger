@@ -1,23 +1,47 @@
-﻿using System.Text;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
+using ElenaSmallBusinessLedger.App.ViewModels;
 
 namespace ElenaSmallBusinessLedger.App;
 
-/// <summary>
-/// Interaction logic for MainWindow.xaml
-/// </summary>
 public partial class MainWindow : Window
 {
-    public MainWindow()
+    private bool hasLoaded;
+
+    public MainWindow(MainWindowViewModel viewModel)
     {
         InitializeComponent();
+        DataContext = viewModel;
+    }
+
+    private MainWindowViewModel ViewModel => (MainWindowViewModel)DataContext;
+
+    private async void OnLoaded(object sender, RoutedEventArgs e)
+    {
+        if (hasLoaded)
+        {
+            return;
+        }
+
+        hasLoaded = true;
+        await ViewModel.LoadAsync();
+    }
+
+    private async void OnActivated(object? sender, EventArgs e)
+    {
+        if (!hasLoaded)
+        {
+            return;
+        }
+
+        await ViewModel.RefreshAfterActivationAsync();
+    }
+
+    private async void OnInvoiceDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        if (sender is DataGrid { SelectedItem: InvoiceDisplayModel invoice })
+        {
+            await ViewModel.OpenInvoiceCommand.ExecuteAsync(invoice);
+        }
     }
 }

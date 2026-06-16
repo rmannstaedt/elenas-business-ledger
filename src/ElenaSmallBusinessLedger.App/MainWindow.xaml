@@ -1,12 +1,208 @@
-﻿<Window x:Class="ElenaSmallBusinessLedger.App.MainWindow"
+<Window x:Class="ElenaSmallBusinessLedger.App.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        xmlns:local="clr-namespace:ElenaSmallBusinessLedger.App"
         mc:Ignorable="d"
-        Title="MainWindow" Height="450" Width="800">
-    <Grid>
+        Title="Elena's Small Business Ledger"
+        Height="720"
+        Width="1120"
+        MinHeight="620"
+        MinWidth="960"
+        Loaded="OnLoaded"
+        Activated="OnActivated">
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+    </Window.Resources>
 
-    </Grid>
+    <DockPanel Background="#F6F7F9">
+        <Menu DockPanel.Dock="Top" Background="#FFFFFF">
+            <MenuItem Header="_Student">
+                <MenuItem Header="_Add Student"
+                          Command="{Binding AddStudentCommand}" />
+                <MenuItem Header="_Edit Student"
+                          Command="{Binding EditStudentCommand}" />
+            </MenuItem>
+        </Menu>
+
+        <Grid Margin="20">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <Grid Grid.Row="0" Margin="0,0,0,14">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel>
+                    <TextBlock Text="{Binding CurrentStudentShortName, TargetNullValue=No student selected}"
+                               FontSize="30"
+                               FontWeight="SemiBold"
+                               Foreground="#15191F" />
+                    <TextBlock Text="{Binding DisplayMonthText}"
+                               FontSize="15"
+                               Foreground="#5B6472"
+                               Margin="0,4,0,0" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="1"
+                            Orientation="Horizontal"
+                            VerticalAlignment="Center">
+                    <Button Content="Open Calendar"
+                            Command="{Binding OpenCalendarCommand}"
+                            MinWidth="112"
+                            Height="34"
+                            Margin="0,0,8,0"
+                            AutomationProperties.Name="Open Google Calendar" />
+                    <Button Content="Refresh"
+                            Command="{Binding RefreshCommand}"
+                            MinWidth="86"
+                            Height="34"
+                            Margin="0,0,8,0"
+                            AutomationProperties.Name="Refresh lessons" />
+                    <Button Content="Write Invoice"
+                            Command="{Binding WriteInvoiceCommand}"
+                            MinWidth="112"
+                            Height="34"
+                            AutomationProperties.Name="Write invoice" />
+                </StackPanel>
+            </Grid>
+
+            <Border Grid.Row="1"
+                    Background="#FFF4E5"
+                    BorderBrush="#D58512"
+                    BorderThickness="1"
+                    Padding="10"
+                    Margin="0,0,0,14"
+                    Visibility="{Binding HasError, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <TextBlock Text="{Binding ErrorMessage}"
+                           Foreground="#5F370E"
+                           TextWrapping="Wrap" />
+            </Border>
+
+            <Grid Grid.Row="2">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="2*" />
+                    <ColumnDefinition Width="20" />
+                    <ColumnDefinition Width="1*" />
+                </Grid.ColumnDefinitions>
+
+                <Grid Grid.Column="0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <Button Grid.Column="0"
+                                Content="Previous Student"
+                                Command="{Binding PreviousStudentCommand}"
+                                MinWidth="126"
+                                Height="32"
+                                Margin="0,0,8,0" />
+                        <Button Grid.Column="1"
+                                Content="Next Student"
+                                Command="{Binding NextStudentCommand}"
+                                MinWidth="108"
+                                Height="32" />
+                        <Button Grid.Column="3"
+                                Content="Previous Month"
+                                Command="{Binding PreviousMonthCommand}"
+                                MinWidth="118"
+                                Height="32"
+                                Margin="0,0,8,0" />
+                        <Button Grid.Column="4"
+                                Content="Next Month"
+                                Command="{Binding NextMonthCommand}"
+                                MinWidth="100"
+                                Height="32" />
+                    </Grid>
+
+                    <DataGrid Grid.Row="1"
+                              ItemsSource="{Binding Lessons}"
+                              AutoGenerateColumns="False"
+                              CanUserAddRows="False"
+                              CanUserDeleteRows="False"
+                              IsReadOnly="True"
+                              HeadersVisibility="Column"
+                              GridLinesVisibility="Horizontal"
+                              SelectionMode="Single"
+                              AutomationProperties.Name="Lesson list">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Date/time"
+                                                Binding="{Binding StartsAtText}"
+                                                Width="160" />
+                            <DataGridTextColumn Header="Student"
+                                                Binding="{Binding StudentShortName}"
+                                                Width="120" />
+                            <DataGridTextColumn Header="State"
+                                                Binding="{Binding StateText}"
+                                                Width="110" />
+                            <DataGridTextColumn Header="Invoiced"
+                                                Binding="{Binding InvoicedText}"
+                                                Width="110" />
+                            <DataGridTextColumn Header="Payment"
+                                                Binding="{Binding PaymentStatusText}"
+                                                Width="*" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+
+                <Grid Grid.Column="2">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Text="Student Invoices"
+                               FontSize="18"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,10" />
+                    <DataGrid Grid.Row="1"
+                              ItemsSource="{Binding Invoices}"
+                              AutoGenerateColumns="False"
+                              CanUserAddRows="False"
+                              CanUserDeleteRows="False"
+                              IsReadOnly="True"
+                              HeadersVisibility="Column"
+                              GridLinesVisibility="Horizontal"
+                              MouseDoubleClick="OnInvoiceDoubleClick"
+                              AutomationProperties.Name="Student invoices">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Invoice"
+                                                Binding="{Binding InvoiceNumberText}"
+                                                Width="90" />
+                            <DataGridTextColumn Header="Date"
+                                                Binding="{Binding InvoiceDateText}"
+                                                Width="100" />
+                            <DataGridTemplateColumn Header="Status" Width="*">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Button Content="{Binding PaymentStatusText}"
+                                                Command="{Binding DataContext.ToggleInvoicePaymentStatusCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                CommandParameter="{Binding}"
+                                                MinWidth="104"
+                                                Height="28"
+                                                AutomationProperties.Name="{Binding PaymentStatusText}" />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </Grid>
+            </Grid>
+        </Grid>
+    </DockPanel>
 </Window>

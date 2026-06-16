@@ -57,7 +57,13 @@ public sealed class StartupDashboardQuery
             ? []
             : await invoiceRepository.ListInvoicesForStudentAsync(currentStudent, cancellationToken);
 
-        return OperationResult<StartupDashboardResult>.Success(new StartupDashboardResult(currentStudent, lessons, invoices));
+        var studentShortNames = students
+            .Select(student => student.Student.ShortName)
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        return OperationResult<StartupDashboardResult>.Success(
+            new StartupDashboardResult(currentStudent, studentShortNames, lessons, invoices));
     }
 
     private string? PickCurrentStudent(IReadOnlyList<CalendarLesson> calendarLessons, IReadOnlyList<StudentRecord> students)
