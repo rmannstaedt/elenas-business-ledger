@@ -117,6 +117,13 @@
                                 Command="{Binding NextStudentCommand}"
                                 MinWidth="108"
                                 Height="32" />
+                        <Button Grid.Column="2"
+                                Content="Add Lesson"
+                                Command="{Binding AddLessonCommand}"
+                                MinWidth="96"
+                                Height="32"
+                                HorizontalAlignment="Left"
+                                Margin="12,0,0,0" />
                         <Button Grid.Column="3"
                                 Content="Previous Month"
                                 Command="{Binding PreviousMonthCommand}"
@@ -139,6 +146,7 @@
                               HeadersVisibility="Column"
                               GridLinesVisibility="Horizontal"
                               SelectionMode="Single"
+                              MouseDoubleClick="OnLessonDoubleClick"
                               AutomationProperties.Name="Lesson list">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="Date/time"

@@ -14,6 +14,8 @@ public sealed class MainWindowViewModel : ViewModelBase
     private readonly IInvoicePaymentStatusService paymentStatusService;
     private readonly IConfirmationService confirmationService;
     private readonly ICalendarLauncher calendarLauncher;
+    private readonly IStudentEditorLauncher studentEditorLauncher;
+    private readonly ILessonEditorLauncher lessonEditorLauncher;
     private readonly IUiClock clock;
     private DateTimeOffset? lastRefreshAt;
     private string? currentStudentShortName;
@@ -27,12 +29,16 @@ public sealed class MainWindowViewModel : ViewModelBase
         IInvoicePaymentStatusService paymentStatusService,
         IConfirmationService confirmationService,
         ICalendarLauncher calendarLauncher,
+        IStudentEditorLauncher studentEditorLauncher,
+        ILessonEditorLauncher lessonEditorLauncher,
         IUiClock clock)
     {
         this.dashboardService = dashboardService;
         this.paymentStatusService = paymentStatusService;
         this.confirmationService = confirmationService;
         this.calendarLauncher = calendarLauncher;
+        this.studentEditorLauncher = studentEditorLauncher;
+        this.lessonEditorLauncher = lessonEditorLauncher;
         this.clock = clock;
         displayMonth = new DateOnly(clock.Now.Year, clock.Now.Month, 1);
 
@@ -49,8 +55,12 @@ public sealed class MainWindowViewModel : ViewModelBase
             () => !IsBusy);
         WriteInvoiceCommand = new AsyncRelayCommand(() => Task.CompletedTask, () => !IsBusy);
         OpenInvoiceCommand = new AsyncRelayCommand(_ => Task.CompletedTask, parameter => parameter is InvoiceDisplayModel);
-        AddStudentCommand = new AsyncRelayCommand(() => Task.CompletedTask, () => !IsBusy);
-        EditStudentCommand = new AsyncRelayCommand(() => Task.CompletedTask, () => !IsBusy);
+        AddStudentCommand = new AsyncRelayCommand(AddStudentAsync, () => !IsBusy);
+        EditStudentCommand = new AsyncRelayCommand(EditStudentAsync, () => !IsBusy && CurrentStudentShortName is not null);
+        AddLessonCommand = new AsyncRelayCommand(AddLessonAsync, () => !IsBusy && CurrentStudentShortName is not null);
+        EditLessonCommand = new AsyncRelayCommand(
+            parameter => EditLessonAsync((LessonDisplayModel)parameter!),
+            parameter => parameter is LessonDisplayModel && !IsBusy);
     }
 
     public ObservableCollection<LessonDisplayModel> Lessons { get; } = [];
@@ -124,6 +134,10 @@ public sealed class MainWindowViewModel : ViewModelBase
     public AsyncRelayCommand AddStudentCommand { get; }
 
     public AsyncRelayCommand EditStudentCommand { get; }
+
+    public AsyncRelayCommand AddLessonCommand { get; }
+
+    public AsyncRelayCommand EditLessonCommand { get; }
 
     public Task LoadAsync() => RefreshAsync();
 
@@ -206,6 +220,62 @@ public sealed class MainWindowViewModel : ViewModelBase
         ErrorMessage = null;
     }
 
+    private async Task AddStudentAsync()
+    {
+        var saved = await studentEditorLauncher.ShowAddStudentAsync(CancellationToken.None);
+        if (saved)
+        {
+            await RefreshAsync();
+        }
+    }
+
+    private async Task EditStudentAsync()
+    {
+        if (CurrentStudentShortName is null)
+        {
+            return;
+        }
+
+        var saved = await studentEditorLauncher.ShowEditStudentAsync(CurrentStudentShortName, CancellationToken.None);
+        if (saved)
+        {
+            await RefreshAsync();
+        }
+    }
+
+    private async Task AddLessonAsync()
+    {
+        if (CurrentStudentShortName is null)
+        {
+            return;
+        }
+
+        var saved = await lessonEditorLauncher.ShowAddLessonAsync(
+            CurrentStudentShortName,
+            clock.Now,
+            DisplayMonth,
+            CancellationToken.None);
+        if (saved)
+        {
+            await RefreshAsync();
+        }
+    }
+
+    private async Task EditLessonAsync(LessonDisplayModel lesson)
+    {
+        if (lesson.IsInvoiced)
+        {
+            ErrorMessage = "Invoiced lessons cannot be edited.";
+            return;
+        }
+
+        var saved = await lessonEditorLauncher.ShowEditLessonAsync(lesson, DisplayMonth, CancellationToken.None);
+        if (saved)
+        {
+            await RefreshAsync();
+        }
+    }
+
     private void ApplyDashboard(StartupDashboardResult dashboard)
     {
         CurrentStudentShortName = dashboard.CurrentStudentShortName;
@@ -244,5 +314,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         WriteInvoiceCommand.RaiseCanExecuteChanged();
         AddStudentCommand.RaiseCanExecuteChanged();
         EditStudentCommand.RaiseCanExecuteChanged();
+        AddLessonCommand.RaiseCanExecuteChanged();
+        EditLessonCommand.RaiseCanExecuteChanged();
     }
 }

@@ -148,6 +148,47 @@ public sealed class MainWindowViewModelTests
         Assert.True(calendar.WasOpened);
     }
 
+    [Fact]
+    public async Task AddStudentRefreshesDashboardAfterDialogSave()
+    {
+        var dashboard = new FakeDashboardService();
+        var studentEditor = new FakeStudentEditorLauncher { NextResult = true };
+        var viewModel = new MainWindowViewModel(
+            dashboard,
+            new FakePaymentService(),
+            new FakeConfirmationService(),
+            new FakeCalendarLauncher(),
+            studentEditor,
+            new FakeLessonEditorLauncher(),
+            new FakeUiClock(new DateTimeOffset(2026, 6, 16, 12, 0, 0, TimeSpan.Zero)));
+        await viewModel.LoadAsync();
+
+        await viewModel.AddStudentCommand.ExecuteAsync();
+
+        Assert.True(studentEditor.AddWasShown);
+        Assert.Equal(2, dashboard.LoadCount);
+    }
+
+    [Fact]
+    public async Task InvoicedLessonEditIsBlockedWithoutOpeningDialog()
+    {
+        var lessonEditor = new FakeLessonEditorLauncher();
+        var viewModel = new MainWindowViewModel(
+            new FakeDashboardService(),
+            new FakePaymentService(),
+            new FakeConfirmationService(),
+            new FakeCalendarLauncher(),
+            new FakeStudentEditorLauncher(),
+            lessonEditor,
+            new FakeUiClock(new DateTimeOffset(2026, 6, 16, 12, 0, 0, TimeSpan.Zero)));
+        await viewModel.LoadAsync();
+
+        await viewModel.EditLessonCommand.ExecuteAsync(viewModel.Lessons[0]);
+
+        Assert.False(lessonEditor.EditWasShown);
+        Assert.True(viewModel.HasError);
+    }
+
     private static MainWindowViewModel CreateViewModel(
         FakeDashboardService? dashboard = null,
         FakePaymentService? payments = null,
@@ -159,6 +200,8 @@ public sealed class MainWindowViewModelTests
             payments ?? new FakePaymentService(),
             confirmation ?? new FakeConfirmationService(),
             calendar ?? new FakeCalendarLauncher(),
+            new FakeStudentEditorLauncher(),
+            new FakeLessonEditorLauncher(),
             clock ?? new FakeUiClock(new DateTimeOffset(2026, 6, 16, 12, 0, 0, TimeSpan.Zero)));
 
     private static void RunOnStaThread(Action action)
@@ -274,6 +317,43 @@ public sealed class MainWindowViewModelTests
         {
             WasOpened = true;
             return Task.CompletedTask;
+        }
+    }
+
+    private sealed class FakeStudentEditorLauncher : IStudentEditorLauncher
+    {
+        public bool NextResult { get; init; }
+
+        public bool AddWasShown { get; private set; }
+
+        public Task<bool> ShowAddStudentAsync(CancellationToken cancellationToken)
+        {
+            AddWasShown = true;
+            return Task.FromResult(NextResult);
+        }
+
+        public Task<bool> ShowEditStudentAsync(string studentShortName, CancellationToken cancellationToken) =>
+            Task.FromResult(NextResult);
+    }
+
+    private sealed class FakeLessonEditorLauncher : ILessonEditorLauncher
+    {
+        public bool EditWasShown { get; private set; }
+
+        public Task<bool> ShowAddLessonAsync(
+            string studentShortName,
+            DateTimeOffset startsAt,
+            DateOnly refreshMonth,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(false);
+
+        public Task<bool> ShowEditLessonAsync(
+            LessonDisplayModel lesson,
+            DateOnly refreshMonth,
+            CancellationToken cancellationToken)
+        {
+            EditWasShown = true;
+            return Task.FromResult(false);
         }
     }
 

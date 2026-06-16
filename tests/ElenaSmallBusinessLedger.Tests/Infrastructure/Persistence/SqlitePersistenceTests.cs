@@ -62,6 +62,9 @@ public sealed class SqlitePersistenceTests
         Assert.Equal(new DateOnly(2026, 5, 31), loaded.PlanPeriods[0].EndsOn);
         Assert.Equal("Standard", loaded.PlanPeriods[1].Plan.Name);
         Assert.Null(loaded.PlanPeriods[1].EndsOn);
+        Assert.Single(loaded.Schedule);
+        Assert.Equal(DayOfWeek.Tuesday, loaded.Schedule[0].Weekday);
+        Assert.Equal(new TimeOnly(15, 0), loaded.Schedule[0].StartsAt);
     }
 
     [Fact]
@@ -174,6 +177,9 @@ public sealed class SqlitePersistenceTests
                         effectiveFrom: new DateTimeOffset(2026, 6, 1, 0, 0, 0, TimeSpan.Zero)),
                     new DateOnly(2026, 6, 1),
                     EndsOn: null)
+            ],
+            [
+                new StudentScheduleEntry(DayOfWeek.Tuesday, new TimeOnly(15, 0))
             ]);
     }
 

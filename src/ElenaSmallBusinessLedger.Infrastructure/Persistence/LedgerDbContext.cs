@@ -17,6 +17,8 @@ public sealed class LedgerDbContext : DbContext
 
     public DbSet<StudentPlanPeriodEntity> StudentPlanPeriods => Set<StudentPlanPeriodEntity>();
 
+    public DbSet<StudentScheduleEntryEntity> StudentScheduleEntries => Set<StudentScheduleEntryEntity>();
+
     public DbSet<IssuedInvoiceEntity> IssuedInvoices => Set<IssuedInvoiceEntity>();
 
     public DbSet<IssuedInvoiceLineEntity> IssuedInvoiceLines => Set<IssuedInvoiceLineEntity>();
@@ -56,6 +58,10 @@ public sealed class LedgerDbContext : DbContext
                 .WithOne(plan => plan.Student)
                 .HasForeignKey(plan => plan.StudentId)
                 .OnDelete(DeleteBehavior.Cascade);
+            entity.HasMany(student => student.ScheduleEntries)
+                .WithOne(schedule => schedule.Student)
+                .HasForeignKey(schedule => schedule.StudentId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<StudentPlanPeriodEntity>(entity =>
@@ -64,6 +70,13 @@ public sealed class LedgerDbContext : DbContext
             entity.Property(plan => plan.PlanName).HasMaxLength(200).IsRequired();
             entity.Property(plan => plan.LessonsPerWeek).HasConversion<string>().HasMaxLength(50).IsRequired();
             entity.Property(plan => plan.Flexibility).HasConversion<string>().HasMaxLength(100).IsRequired();
+        });
+
+        modelBuilder.Entity<StudentScheduleEntryEntity>(entity =>
+        {
+            entity.HasKey(schedule => schedule.Id);
+            entity.Property(schedule => schedule.Weekday).HasConversion<string>().HasMaxLength(20).IsRequired();
+            entity.HasIndex(schedule => new { schedule.StudentId, schedule.Weekday, schedule.StartsAt }).IsUnique();
         });
 
         modelBuilder.Entity<IssuedInvoiceEntity>(entity =>

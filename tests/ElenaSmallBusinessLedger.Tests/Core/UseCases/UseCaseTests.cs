@@ -294,7 +294,10 @@ public sealed class UseCaseTests
             numberOfStudents: 1,
             effectiveFrom: new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
 
-        return new StudentRecord(student, [new StudentPlanPeriod(plan, new DateOnly(2026, 1, 1), EndsOn: null)]);
+        return new StudentRecord(
+            student,
+            [new StudentPlanPeriod(plan, new DateOnly(2026, 1, 1), EndsOn: null)],
+            [new StudentScheduleEntry(DayOfWeek.Tuesday, new TimeOnly(15, 0))]);
     }
 
     private sealed class FakeClock(DateTimeOffset now) : IClock
@@ -309,6 +312,9 @@ public sealed class UseCaseTests
 
         public Task<StudentRecord?> GetByShortNameAsync(string shortName, CancellationToken cancellationToken) =>
             Task.FromResult(students.FirstOrDefault(student => student.Student.ShortName == shortName));
+
+        public Task<OperationResult<StudentRecord>> SaveAsync(StudentRecord student, CancellationToken cancellationToken) =>
+            Task.FromResult(OperationResult<StudentRecord>.Success(student));
     }
 
     private sealed class FakeCompanyProfileRepository : ICompanyProfileRepository

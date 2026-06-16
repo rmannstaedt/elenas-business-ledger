@@ -56,6 +56,8 @@ public sealed class StudentEntity
     public bool IsActive { get; set; }
 
     public List<StudentPlanPeriodEntity> PlanPeriods { get; } = [];
+
+    public List<StudentScheduleEntryEntity> ScheduleEntries { get; } = [];
 }
 
 public sealed class StudentPlanPeriodEntity
@@ -83,6 +85,19 @@ public sealed class StudentPlanPeriodEntity
     public DateOnly StartsOn { get; set; }
 
     public DateOnly? EndsOn { get; set; }
+}
+
+public sealed class StudentScheduleEntryEntity
+{
+    public int Id { get; set; }
+
+    public int StudentId { get; set; }
+
+    public StudentEntity Student { get; set; } = null!;
+
+    public DayOfWeek Weekday { get; set; }
+
+    public TimeOnly StartsAt { get; set; }
 }
 
 public sealed class IssuedInvoiceEntity

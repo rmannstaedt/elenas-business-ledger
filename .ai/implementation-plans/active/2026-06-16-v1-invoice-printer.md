@@ -828,7 +828,7 @@ Runner may continue automatically after this stage: no. Blocking action required
 ### Stage 9: Implement Student Add/Edit And Lesson Editing UI
 
 Type: implementation / test / UI
-Status: Not started
+Status: Completed 2026-06-16
 
 Goal:
 
@@ -844,15 +844,15 @@ Affected files/classes/schemas/commands/UI surfaces:
 
 Concrete steps:
 
-- [ ] Add student create/edit dialog with short name, full name, address, phone, email, age bracket, optional/required birthdate, active flag.
-- [ ] Add plan fields: name, price without VAT, lessons per week, duration, flexibility, number of students, effective date.
-- [ ] Add schedule fields: weekday/time list.
-- [ ] Enforce one active plan per student at any date through Core use case.
-- [ ] Add direct lesson edit for uninvoiced lessons.
-- [ ] Add lesson cancellation/delete for uninvoiced lessons.
-- [ ] Add new lesson command for Google Calendar.
-- [ ] Display immediate failure when Calendar update fails.
-- [ ] Preserve user input after validation failure.
+- [x] Add student create/edit dialog with short name, full name, address, phone, email, age bracket, optional/required birthdate, active flag.
+- [x] Add plan fields: name, price without VAT, lessons per week, duration, flexibility, number of students, effective date.
+- [x] Add schedule fields: weekday/time list.
+- [x] Enforce one active plan per student at any date through Core use case.
+- [x] Add direct lesson edit for uninvoiced lessons.
+- [x] Add lesson cancellation/delete for uninvoiced lessons.
+- [x] Add new lesson command for Google Calendar.
+- [x] Display immediate failure when Calendar update fails.
+- [x] Preserve user input after validation failure.
 
 Behavior that must remain unchanged:
 
@@ -1166,6 +1166,17 @@ Cleanup/reset instructions:
 - Delete the test SQLite database or use an app reset command if implemented.
 
 ## Completion Log
+
+- 2026-06-16:
+  - Stage: Stage 9 - Implement Student Add/Edit And Lesson Editing UI
+  - Files changed: `docs/business-requirements-and-logic.md`, `src/ElenaSmallBusinessLedger.Core/Students/StudentScheduleEntry.cs`, `src/ElenaSmallBusinessLedger.Core/Ports/IStudentRepository.cs`, `src/ElenaSmallBusinessLedger.Core/Ports/StudentRecord.cs`, `src/ElenaSmallBusinessLedger.Core/UseCases/Students/*`, `src/ElenaSmallBusinessLedger.Infrastructure/Persistence/Entities.cs`, `src/ElenaSmallBusinessLedger.Infrastructure/Persistence/LedgerDbContext.cs`, `src/ElenaSmallBusinessLedger.Infrastructure/Persistence/SqliteStudentRepository.cs`, `src/ElenaSmallBusinessLedger.App/App.xaml.cs`, `src/ElenaSmallBusinessLedger.App/MainWindow.xaml`, `src/ElenaSmallBusinessLedger.App/MainWindow.xaml.cs`, `src/ElenaSmallBusinessLedger.App/Services/*Editor*`, `src/ElenaSmallBusinessLedger.App/ViewModels/*Editor*`, `src/ElenaSmallBusinessLedger.App/Views/*Editor*`, `tests/ElenaSmallBusinessLedger.Tests/App/ViewModels/EditorViewModelTests.cs`, `tests/ElenaSmallBusinessLedger.Tests/App/ViewModels/MainWindowViewModelTests.cs`, `tests/ElenaSmallBusinessLedger.Tests/Core/UseCases/StudentUseCaseTests.cs`, `tests/ElenaSmallBusinessLedger.Tests/Core/UseCases/UseCaseTests.cs`, `tests/ElenaSmallBusinessLedger.Tests/Infrastructure/Persistence/SqlitePersistenceTests.cs`, `.ai/implementation-plans/active/2026-06-16-v1-invoice-printer.md`
+  - Summary: Added Core student save request/use case with one-active-plan-period validation, student schedule entries, SQLite persistence for schedule entries, student add/edit and lesson add/edit/cancel ViewModels, WPF editor dialogs, sample editor services for the current shell, Core-backed editor service adapters, main-window Add Lesson and double-click lesson editing, and documented the deliberate no-prices-on-main-screen decision.
+  - Tests/verification run: Red check: `dotnet test tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~StudentUseCase|FullyQualifiedName~EditorViewModel" -nodeReuse:false` failed because the planned student use-case contracts, editor services, and editor ViewModels did not exist. Green checks: same targeted command; `dotnet test tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~StudentUseCase|FullyQualifiedName~EditorViewModel|FullyQualifiedName~MainWindowViewModel" -nodeReuse:false`; `dotnet build ElenaSmallBusinessLedger.sln -nodeReuse:false`; `dotnet test ElenaSmallBusinessLedger.sln -nodeReuse:false`.
+  - Results: Targeted Stage 9 tests passed: 17 passed, 0 failed. Full build passed with 0 warnings and 0 errors. Full test suite passed: 67 passed, 0 failed.
+  - Dependencies added: None.
+  - Deviations: The current app startup still uses sample editor services so Ruben can safely exercise dialogs without real Google Calendar writes. Core-backed editor adapters are present for real composition in a later wiring stage. The main screen continues not to show prices by design; price fields appear only in the student editor/admin-style surface and invoice flow.
+  - Review notes: Tests cover student save validation, overlapping plan rejection, schedule persistence round trip, editor validation input preservation, Calendar update failure truthfulness, blocked invoiced lesson editing, and dashboard refresh after a saved student dialog.
+  - Risks/open questions: Visual/manual check still needed in Visual Studio for the new dialogs: Add Student, Edit Student, Add Lesson, and double-click an uninvoiced lesson. Stage 10 remains the next implementation stage.
 
 - 2026-06-16:
   - Stage: Stage 8 - Implement WPF Shell And Startup Dashboard

@@ -1,6 +1,7 @@
 using ElenaSmallBusinessLedger.Core.Plans;
 using ElenaSmallBusinessLedger.Core.Ports;
 using ElenaSmallBusinessLedger.Core.Students;
+using ElenaSmallBusinessLedger.Core.Common;
 using Microsoft.EntityFrameworkCore;
 
 namespace ElenaSmallBusinessLedger.Infrastructure.Persistence;
@@ -20,6 +21,7 @@ public sealed class SqliteStudentRepository : IStudentRepository
         var students = await context.Students
             .AsNoTracking()
             .Include(student => student.PlanPeriods)
+            .Include(student => student.ScheduleEntries)
             .Where(student => student.IsActive)
             .OrderBy(student => student.ShortName)
             .ToArrayAsync(cancellationToken);
@@ -33,16 +35,18 @@ public sealed class SqliteStudentRepository : IStudentRepository
         var student = await context.Students
             .AsNoTracking()
             .Include(entity => entity.PlanPeriods)
+            .Include(entity => entity.ScheduleEntries)
             .SingleOrDefaultAsync(entity => entity.ShortName == shortName, cancellationToken);
 
         return student is null ? null : ToDomain(student);
     }
 
-    public async Task SaveAsync(StudentRecord student, CancellationToken cancellationToken)
+    public async Task<OperationResult<StudentRecord>> SaveAsync(StudentRecord student, CancellationToken cancellationToken)
     {
         await using var context = createContext();
         var entity = await context.Students
             .Include(storedStudent => storedStudent.PlanPeriods)
+            .Include(storedStudent => storedStudent.ScheduleEntries)
             .SingleOrDefaultAsync(storedStudent => storedStudent.ShortName == student.Student.ShortName, cancellationToken);
 
         if (entity is null)
@@ -60,6 +64,7 @@ public sealed class SqliteStudentRepository : IStudentRepository
         entity.Birthdate = student.Student.Birthdate;
         entity.IsActive = student.Student.IsActive;
         entity.PlanPeriods.Clear();
+        entity.ScheduleEntries.Clear();
 
         foreach (var planPeriod in student.PlanPeriods)
         {
@@ -77,7 +82,17 @@ public sealed class SqliteStudentRepository : IStudentRepository
             });
         }
 
+        foreach (var scheduleEntry in student.Schedule)
+        {
+            entity.ScheduleEntries.Add(new StudentScheduleEntryEntity
+            {
+                Weekday = scheduleEntry.Weekday,
+                StartsAt = scheduleEntry.StartsAt
+            });
+        }
+
         await context.SaveChangesAsync(cancellationToken);
+        return OperationResult<StudentRecord>.Success(student);
     }
 
     private static StudentRecord ToDomain(StudentEntity entity)
@@ -107,6 +122,12 @@ public sealed class SqliteStudentRepository : IStudentRepository
                 plan.EndsOn))
             .ToArray();
 
-        return new StudentRecord(student, plans);
+        var schedule = entity.ScheduleEntries
+            .OrderBy(entry => entry.Weekday)
+            .ThenBy(entry => entry.StartsAt)
+            .Select(entry => new StudentScheduleEntry(entry.Weekday, entry.StartsAt))
+            .ToArray();
+
+        return new StudentRecord(student, plans, schedule);
     }
 }

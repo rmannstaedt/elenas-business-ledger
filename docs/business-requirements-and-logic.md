@@ -110,6 +110,8 @@ Each lesson in the list contains:
   - invoiced: yes / no
   - paid: yes / outstanding (only if invoiced)
 
+The main application window does not display student prices or monthly payment amounts. Prices belong in invoice preparation/printing and later administration views, not on the everyday lesson screen where students may see the display.
+
 The application also opens Google Calendar in a separate browser window on the screen.
 (if we technically can open Google Calendar as a separate pane in the application, that may be preferable)
 

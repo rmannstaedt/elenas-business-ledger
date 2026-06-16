@@ -44,4 +44,12 @@ public partial class MainWindow : Window
             await ViewModel.OpenInvoiceCommand.ExecuteAsync(invoice);
         }
     }
+
+    private async void OnLessonDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+    {
+        if (sender is DataGrid { SelectedItem: LessonDisplayModel lesson })
+        {
+            await ViewModel.EditLessonCommand.ExecuteAsync(lesson);
+        }
+    }
 }
