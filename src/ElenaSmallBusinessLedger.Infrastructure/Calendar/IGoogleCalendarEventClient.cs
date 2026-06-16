@@ -1,3 +1,5 @@
+using ElenaSmallBusinessLedger.Core.Lessons;
+
 namespace ElenaSmallBusinessLedger.Infrastructure.Calendar;
 
 public interface IGoogleCalendarEventClient
@@ -24,5 +26,11 @@ public interface IGoogleCalendarEventClient
     Task DeleteEventAsync(
         string calendarId,
         string eventId,
+        CancellationToken cancellationToken);
+
+    Task UpdateLessonStateAsync(
+        string calendarId,
+        string eventId,
+        LessonState state,
         CancellationToken cancellationToken);
 }

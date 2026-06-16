@@ -58,6 +58,7 @@
 ### Google Calendar Entry
   student short name
   date/time
+  lesson state marker, when completed
   
 ## Business Logic
 
@@ -91,6 +92,11 @@ Relevant Google Calendar entries are identified by their first line, which may b
   $<student short name>
 
 Google Calendar entries that are *NOT* identified as relevant by their first line are *ALWAYS* ignored.
+
+The first line remains the ownership/matching marker. A completed uninvoiced lesson may additionally contain this later line in the Google Calendar entry:
+  Status: Completed
+
+If that later status line is absent, the lesson is treated as Planned.
 
 When an Invoice is printed, it is added to the Invoice table and the Lessons table is updated with the Lessons noted on the Invoice.
 The Lessons table is only ever updated when invoices are printed.

@@ -17,7 +17,13 @@ public sealed class SqliteCompanyProfileRepository : ICompanyProfileRepository
     public async Task<CompanyProfile> GetAsync(CancellationToken cancellationToken)
     {
         await using var context = createContext();
-        var entity = await context.CompanyProfiles.AsNoTracking().SingleAsync(cancellationToken);
+        var entity = await context.CompanyProfiles.AsNoTracking().SingleOrDefaultAsync(cancellationToken);
+        if (entity is null)
+        {
+            throw new InvalidOperationException(
+                "Company profile is not configured. Open Application > Settings before writing invoices.");
+        }
+
         return ToDomain(entity);
     }
 

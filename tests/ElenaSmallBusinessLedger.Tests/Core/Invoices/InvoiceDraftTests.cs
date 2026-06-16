@@ -26,6 +26,20 @@ public sealed class InvoiceDraftTests
     }
 
     [Fact]
+    public void CreateRejectsInvoiceWithoutLessonLines()
+    {
+        var result = InvoiceDraft.TryCreate(
+            invoiceDate: new DateOnly(2026, 6, 16),
+            companySnapshot: new CompanySnapshot("Maple Key Studio", "Musikvej 1", null),
+            studentSnapshot: new StudentSnapshot("Anna", "Anna Andersen", "Testvej 1"),
+            lines: [],
+            priceAdjustment: null);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Errors, error => error.Code == "Invoice.NoLines");
+    }
+
+    [Fact]
     public void IssueCreatesImmutableInvoiceSnapshot()
     {
         var draft = InvoiceDraft.Create(

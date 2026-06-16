@@ -1,4 +1,5 @@
 using ElenaSmallBusinessLedger.Core.Calendar;
+using ElenaSmallBusinessLedger.Core.Lessons;
 
 namespace ElenaSmallBusinessLedger.Tests.Core.Calendar;
 
@@ -33,5 +34,28 @@ public sealed class CalendarLessonEntryTests
 
         Assert.False(parsed);
         Assert.Null(entry);
+    }
+
+    [Fact]
+    public void TryParseReadsCompletedStateFromLaterSummaryLine()
+    {
+        var parsed = CalendarLessonEntry.TryParse(
+            "$ Anna\nStatus: Completed",
+            new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.Zero),
+            out var entry);
+
+        Assert.True(parsed);
+        Assert.NotNull(entry);
+        Assert.Equal(LessonState.Completed, entry.State);
+    }
+
+    [Fact]
+    public void WithStatePreservesFirstLineMarkerAndRemovesCompletedMarkerForPlannedState()
+    {
+        var completed = CalendarLessonEntry.WithState("$ Anna\nTeacher note", LessonState.Completed);
+        var planned = CalendarLessonEntry.WithState(completed, LessonState.Planned);
+
+        Assert.Equal("$ Anna\nTeacher note\nStatus: Completed", completed);
+        Assert.Equal("$ Anna\nTeacher note", planned);
     }
 }

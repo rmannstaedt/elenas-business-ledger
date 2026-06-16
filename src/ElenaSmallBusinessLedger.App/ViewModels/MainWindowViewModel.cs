@@ -20,6 +20,8 @@ public sealed class MainWindowViewModel : ViewModelBase
     private readonly ILessonEditorLauncher lessonEditorLauncher;
     private readonly ILessonEditorService lessonEditorService;
     private readonly ILessonStateService lessonStateService;
+    private readonly IInvoiceWorkflowLauncher invoiceWorkflowLauncher;
+    private readonly ISettingsLauncher settingsLauncher;
     private readonly IUiClock clock;
     private DateTimeOffset? lastRefreshAt;
     private string? currentStudentShortName;
@@ -38,6 +40,8 @@ public sealed class MainWindowViewModel : ViewModelBase
         ILessonEditorLauncher lessonEditorLauncher,
         ILessonEditorService lessonEditorService,
         ILessonStateService lessonStateService,
+        IInvoiceWorkflowLauncher invoiceWorkflowLauncher,
+        ISettingsLauncher settingsLauncher,
         IUiClock clock)
     {
         this.dashboardService = dashboardService;
@@ -48,6 +52,8 @@ public sealed class MainWindowViewModel : ViewModelBase
         this.lessonEditorLauncher = lessonEditorLauncher;
         this.lessonEditorService = lessonEditorService;
         this.lessonStateService = lessonStateService;
+        this.invoiceWorkflowLauncher = invoiceWorkflowLauncher;
+        this.settingsLauncher = settingsLauncher;
         this.clock = clock;
         displayMonth = new DateOnly(clock.Now.Year, clock.Now.Month, 1);
 
@@ -62,10 +68,13 @@ public sealed class MainWindowViewModel : ViewModelBase
         OpenCalendarCommand = new AsyncRelayCommand(
             () => calendarLauncher.OpenAsync(CancellationToken.None),
             () => !IsBusy);
-        WriteInvoiceCommand = new AsyncRelayCommand(() => Task.CompletedTask, () => !IsBusy);
-        OpenInvoiceCommand = new AsyncRelayCommand(_ => Task.CompletedTask, parameter => parameter is InvoiceDisplayModel);
+        WriteInvoiceCommand = new AsyncRelayCommand(WriteInvoiceAsync, () => !IsBusy);
+        OpenInvoiceCommand = new AsyncRelayCommand(
+            parameter => OpenInvoiceAsync((InvoiceDisplayModel)parameter!),
+            parameter => parameter is InvoiceDisplayModel && !IsBusy);
         AddStudentCommand = new AsyncRelayCommand(AddStudentAsync, () => !IsBusy);
         EditStudentCommand = new AsyncRelayCommand(EditStudentAsync, () => !IsBusy && CurrentStudentShortName is not null);
+        OpenSettingsCommand = new AsyncRelayCommand(OpenSettingsAsync, () => !IsBusy);
         AddLessonCommand = new AsyncRelayCommand(AddLessonAsync, () => !IsBusy && CurrentStudentShortName is not null);
         SaveLessonCommand = new AsyncRelayCommand(
             parameter => SaveLessonAsync((LessonDisplayModel)parameter!),
@@ -154,6 +163,8 @@ public sealed class MainWindowViewModel : ViewModelBase
     public AsyncRelayCommand AddStudentCommand { get; }
 
     public AsyncRelayCommand EditStudentCommand { get; }
+
+    public AsyncRelayCommand OpenSettingsCommand { get; }
 
     public AsyncRelayCommand AddLessonCommand { get; }
 
@@ -274,6 +285,27 @@ public sealed class MainWindowViewModel : ViewModelBase
             await RefreshAsync();
         }
     }
+
+    private async Task OpenSettingsAsync()
+    {
+        var saved = await settingsLauncher.ShowSettingsAsync(CancellationToken.None);
+        if (saved)
+        {
+            await RefreshAsync();
+        }
+    }
+
+    private async Task WriteInvoiceAsync()
+    {
+        var issued = await invoiceWorkflowLauncher.ShowWriteInvoiceAsync(DisplayMonth, CancellationToken.None);
+        if (issued)
+        {
+            await RefreshAsync();
+        }
+    }
+
+    private Task OpenInvoiceAsync(InvoiceDisplayModel invoice) =>
+        invoiceWorkflowLauncher.ShowInvoiceViewerAsync(invoice.InvoiceNumber, CancellationToken.None);
 
     private Task AddLessonAsync()
     {
@@ -499,6 +531,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         WriteInvoiceCommand.RaiseCanExecuteChanged();
         AddStudentCommand.RaiseCanExecuteChanged();
         EditStudentCommand.RaiseCanExecuteChanged();
+        OpenSettingsCommand.RaiseCanExecuteChanged();
         AddLessonCommand.RaiseCanExecuteChanged();
         SaveLessonCommand.RaiseCanExecuteChanged();
         DeleteLessonCommand.RaiseCanExecuteChanged();

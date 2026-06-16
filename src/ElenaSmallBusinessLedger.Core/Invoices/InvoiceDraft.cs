@@ -49,6 +49,13 @@ public sealed class InvoiceDraft
         IReadOnlyList<InvoiceLineDraft> lines,
         PriceAdjustment? priceAdjustment)
     {
+        if (lines.Count == 0)
+        {
+            return ValidationResult<InvoiceDraft>.Failure(new ValidationError(
+                "Invoice.NoLines",
+                "An invoice requires at least one lesson."));
+        }
+
         if (priceAdjustment is not null && string.IsNullOrWhiteSpace(priceAdjustment.Reason))
         {
             return ValidationResult<InvoiceDraft>.Failure(new ValidationError(

@@ -33,12 +33,17 @@ Invoice PDF generation: QuestPDF
 Invoice PDF safety: write to staging, verify PDF bytes, publish without overwriting, then persist invoice metadata and request print
 Google Calendar account tokens: stored locally with Windows user data protection, never in SQLite or plaintext config
 Google Calendar selected calendar/account label: stored in SQLite app settings
+Runtime app data folder: `%LOCALAPPDATA%\ElenaSmallBusinessLedger`
+Runtime SQLite database path: `%LOCALAPPDATA%\ElenaSmallBusinessLedger\ledger.db`
+Google OAuth client secrets path: `%LOCALAPPDATA%\ElenaSmallBusinessLedger\google-client-secrets.json`
+Google OAuth protected token folder: `%LOCALAPPDATA%\ElenaSmallBusinessLedger\GoogleTokens`
 Backup: no automated backup in version 1.0; keep persistence design compatible with later manual backup/export
 
 ## External integrations
 
 Google Calendar API: official Google Calendar .NET client
 Google authentication: external browser OAuth
+Google Calendar completed-lesson marker: keep the first line as `$ <student short name>` or `$<student short name>`; Completed is represented by a later `Status: Completed` summary line, and absence of that line means Planned
 Calendar availability: invoice issue must rely on the accepted invoice preview/snapshot rather than requiring a fresh Google Calendar read at the final print/save moment
 PDF generation: QuestPDF Community license accepted for v1
 
@@ -48,7 +53,15 @@ WPF + MVVM
 No business logic in code-behind
 Danish user-facing invoice text
 Elena-facing UI must stay simple
+Company profile, invoice folder, Google Calendar ID/account label, and Google OAuth client secrets are configured from `Application > Settings`
 Desktop windows must remember size and position, including subwindows, and restore inside the current visible screen area
+
+## Build and test commands
+
+```powershell
+dotnet build ElenaSmallBusinessLedger.sln -nodeReuse:false
+dotnet test ElenaSmallBusinessLedger.sln -nodeReuse:false
+```
 
 ## Test policy
 
@@ -65,6 +78,7 @@ Use fake Google Calendar client for calendar integration tests
 - Do not charge VAT when business profile says NotRegistered.
 - Do not store CPR numbers.
 - Ignore Google Calendar entries that do not use the documented first-line `$` student marker.
+- Preserve the first-line Google Calendar marker when adding/removing app-owned lesson status lines.
 - Notify the user immediately when a Google Calendar lesson update fails.
 - Do not make Google Calendar sync failure corrupt local data.
 - Do not persist OAuth access or refresh tokens in plaintext.

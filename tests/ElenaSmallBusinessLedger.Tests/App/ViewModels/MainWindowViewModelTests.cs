@@ -149,6 +149,46 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task WriteInvoiceLaunchesWorkflowAndRefreshesAfterIssue()
+    {
+        var dashboard = new FakeDashboardService();
+        var invoices = new FakeInvoiceWorkflowLauncher { NextWriteResult = true };
+        var viewModel = CreateViewModel(dashboard: dashboard, invoiceWorkflowLauncher: invoices);
+        await viewModel.LoadAsync();
+
+        await viewModel.WriteInvoiceCommand.ExecuteAsync();
+
+        Assert.True(invoices.WriteWasShown);
+        Assert.Equal(2, dashboard.LoadCount);
+    }
+
+    [Fact]
+    public async Task SettingsRefreshesDashboardAfterSave()
+    {
+        var dashboard = new FakeDashboardService();
+        var settings = new FakeSettingsLauncher { NextResult = true };
+        var viewModel = CreateViewModel(dashboard: dashboard, settingsLauncher: settings);
+        await viewModel.LoadAsync();
+
+        await viewModel.OpenSettingsCommand.ExecuteAsync();
+
+        Assert.True(settings.WasShown);
+        Assert.Equal(2, dashboard.LoadCount);
+    }
+
+    [Fact]
+    public async Task OpenInvoiceLaunchesViewerForSelectedInvoice()
+    {
+        var invoices = new FakeInvoiceWorkflowLauncher();
+        var viewModel = CreateViewModel(invoiceWorkflowLauncher: invoices);
+        await viewModel.LoadAsync();
+
+        await viewModel.OpenInvoiceCommand.ExecuteAsync(viewModel.Invoices[0]);
+
+        Assert.Equal(new InvoiceNumber(1), invoices.LastViewedInvoiceNumber);
+    }
+
+    [Fact]
     public async Task AddStudentRefreshesDashboardAfterDialogSave()
     {
         var dashboard = new FakeDashboardService();
@@ -162,6 +202,8 @@ public sealed class MainWindowViewModelTests
             new FakeLessonEditorLauncher(),
             new FakeLessonEditorService(),
             new FakeLessonStateService(),
+            new FakeInvoiceWorkflowLauncher(),
+            new FakeSettingsLauncher(),
             new FakeUiClock(new DateTimeOffset(2026, 6, 16, 12, 0, 0, TimeSpan.Zero)));
         await viewModel.LoadAsync();
 
@@ -227,6 +269,8 @@ public sealed class MainWindowViewModelTests
             lessonEditor,
             new FakeLessonEditorService(),
             new FakeLessonStateService(),
+            new FakeInvoiceWorkflowLauncher(),
+            new FakeSettingsLauncher(),
             new FakeUiClock(new DateTimeOffset(2026, 6, 16, 12, 0, 0, TimeSpan.Zero)));
         await viewModel.LoadAsync();
 
@@ -331,6 +375,8 @@ public sealed class MainWindowViewModelTests
         FakeLessonEditorLauncher? lessonEditorLauncher = null,
         FakeLessonEditorService? lessonEditorService = null,
         FakeLessonStateService? lessonStates = null,
+        FakeInvoiceWorkflowLauncher? invoiceWorkflowLauncher = null,
+        FakeSettingsLauncher? settingsLauncher = null,
         FakeUiClock? clock = null) =>
         new(
             dashboard ?? new FakeDashboardService(),
@@ -341,6 +387,8 @@ public sealed class MainWindowViewModelTests
             lessonEditorLauncher ?? new FakeLessonEditorLauncher(),
             lessonEditorService ?? new FakeLessonEditorService(),
             lessonStates ?? new FakeLessonStateService(),
+            invoiceWorkflowLauncher ?? new FakeInvoiceWorkflowLauncher(),
+            settingsLauncher ?? new FakeSettingsLauncher(),
             clock ?? new FakeUiClock(new DateTimeOffset(2026, 6, 16, 12, 0, 0, TimeSpan.Zero)));
 
     private static void RunOnStaThread(Action action)
@@ -586,6 +634,40 @@ public sealed class MainWindowViewModelTests
             LastCurrentState = currentState;
             var nextState = currentState == LessonState.Planned ? LessonState.Completed : LessonState.Planned;
             return Task.FromResult(OperationResult<LessonState>.Success(nextState));
+        }
+    }
+
+    private sealed class FakeInvoiceWorkflowLauncher : IInvoiceWorkflowLauncher
+    {
+        public bool NextWriteResult { get; init; }
+
+        public bool WriteWasShown { get; private set; }
+
+        public InvoiceNumber? LastViewedInvoiceNumber { get; private set; }
+
+        public Task<bool> ShowWriteInvoiceAsync(DateOnly displayMonth, CancellationToken cancellationToken)
+        {
+            WriteWasShown = true;
+            return Task.FromResult(NextWriteResult);
+        }
+
+        public Task ShowInvoiceViewerAsync(InvoiceNumber invoiceNumber, CancellationToken cancellationToken)
+        {
+            LastViewedInvoiceNumber = invoiceNumber;
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class FakeSettingsLauncher : ISettingsLauncher
+    {
+        public bool NextResult { get; init; }
+
+        public bool WasShown { get; private set; }
+
+        public Task<bool> ShowSettingsAsync(CancellationToken cancellationToken)
+        {
+            WasShown = true;
+            return Task.FromResult(NextResult);
         }
     }
 

@@ -49,6 +49,10 @@
 
     <DockPanel Background="#F6F7F9">
         <Menu DockPanel.Dock="Top" Background="#FFFFFF">
+            <MenuItem Header="_Application">
+                <MenuItem Header="_Settings"
+                          Command="{Binding OpenSettingsCommand}" />
+            </MenuItem>
             <MenuItem Header="_Student">
                 <MenuItem Header="_Add Student"
                           Command="{Binding AddStudentCommand}" />

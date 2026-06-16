@@ -1,4 +1,5 @@
 using ElenaSmallBusinessLedger.Core.Common;
+using ElenaSmallBusinessLedger.Core.Lessons;
 using ElenaSmallBusinessLedger.Core.UseCases.Lessons;
 using ElenaSmallBusinessLedger.Infrastructure.Calendar;
 using Google.Apis.Util.Store;
@@ -26,9 +27,28 @@ public sealed class GoogleCalendarGatewayTests
 
         Assert.Equal(["lesson-1", "lesson-2"], lessons.Select(lesson => lesson.Id));
         Assert.Equal(["Anna", "Bo"], lessons.Select(lesson => lesson.StudentShortName));
+        Assert.All(lessons, lesson => Assert.Equal(LessonState.Planned, lesson.State));
         Assert.Equal("primary", client.LastListCalendarId);
         Assert.Equal(new DateTimeOffset(2026, 6, 1, 0, 0, 0, TimeSpan.FromHours(2)), client.LastListFromInclusive);
         Assert.Equal(new DateTimeOffset(2026, 7, 1, 0, 0, 0, TimeSpan.FromHours(2)), client.LastListToExclusive);
+    }
+
+    [Fact]
+    public async Task ListLessonsReadsCompletedStateFromMarkedEvent()
+    {
+        var client = new FakeGoogleCalendarEventClient
+        {
+            Events =
+            [
+                new GoogleCalendarEvent("lesson-1", "$ Anna\nStatus: Completed", new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.FromHours(2)))
+            ]
+        };
+
+        var gateway = new GoogleCalendarGateway(client, CreateOptions());
+        var lessons = await gateway.ListLessonsAsync(new DateOnly(2026, 6, 1), new DateOnly(2026, 6, 30), CancellationToken.None);
+
+        Assert.Single(lessons);
+        Assert.Equal(LessonState.Completed, lessons[0].State);
     }
 
     [Fact]
@@ -95,6 +115,19 @@ public sealed class GoogleCalendarGatewayTests
         Assert.True(result.Succeeded);
         Assert.Equal("lesson-1", client.DeletedEventId);
         Assert.Contains(result.Value!, lesson => lesson.Id == "lesson-2");
+    }
+
+    [Fact]
+    public async Task UpdateLessonStateUpdatesCalendarEventSummary()
+    {
+        var client = new FakeGoogleCalendarEventClient();
+        var gateway = new GoogleCalendarGateway(client, CreateOptions());
+
+        var result = await gateway.UpdateLessonStateAsync("lesson-1", LessonState.Completed, CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal("lesson-1", client.StateUpdatedEventId);
+        Assert.Equal(LessonState.Completed, client.StateUpdatedState);
     }
 
     [Fact]
@@ -202,6 +235,10 @@ public sealed class GoogleCalendarGatewayTests
 
         public string? DeletedEventId { get; private set; }
 
+        public string? StateUpdatedEventId { get; private set; }
+
+        public LessonState? StateUpdatedState { get; private set; }
+
         public Task<IReadOnlyList<GoogleCalendarEvent>> ListEventsAsync(
             string calendarId,
             DateTimeOffset fromInclusive,
@@ -261,6 +298,22 @@ public sealed class GoogleCalendarGatewayTests
             }
 
             DeletedEventId = eventId;
+            return Task.CompletedTask;
+        }
+
+        public Task UpdateLessonStateAsync(
+            string calendarId,
+            string eventId,
+            LessonState state,
+            CancellationToken cancellationToken)
+        {
+            if (WriteException is not null)
+            {
+                throw WriteException;
+            }
+
+            StateUpdatedEventId = eventId;
+            StateUpdatedState = state;
             return Task.CompletedTask;
         }
     }

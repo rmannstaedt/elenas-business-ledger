@@ -1,5 +1,6 @@
 using ElenaSmallBusinessLedger.Core.Calendar;
 using ElenaSmallBusinessLedger.Core.Common;
+using ElenaSmallBusinessLedger.Core.Lessons;
 using ElenaSmallBusinessLedger.Core.Ports;
 using ElenaSmallBusinessLedger.Core.UseCases.Lessons;
 
@@ -35,7 +36,7 @@ public sealed class GoogleCalendarGateway : IGoogleCalendarGateway
             .Select(calendarEvent =>
             {
                 CalendarLessonEntry.TryParse(calendarEvent.Summary, calendarEvent.StartsAt, out var entry);
-                return new CalendarLesson(calendarEvent.Id, entry!.StudentShortName, entry.StartsAt);
+                return new CalendarLesson(calendarEvent.Id, entry!.StudentShortName, entry.StartsAt, entry.State);
             })
             .OrderBy(lesson => lesson.StartsAt)
             .ToArray();
@@ -95,6 +96,27 @@ public sealed class GoogleCalendarGateway : IGoogleCalendarGateway
         }
 
         return await RefreshAfterSuccessfulWriteAsync(refreshMonth, cancellationToken);
+    }
+
+    public async Task<OperationResult<LessonState>> UpdateLessonStateAsync(
+        string lessonId,
+        LessonState state,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await eventClient.UpdateLessonStateAsync(options.CalendarId, lessonId, state, cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return OperationResult<LessonState>.Failure(
+                state,
+                new ValidationError(
+                    "Calendar.UpdateFailed",
+                    "Google Calendar could not be updated. Refresh Calendar and try again."));
+        }
+
+        return OperationResult<LessonState>.Success(state);
     }
 
     private static OperationResult<IReadOnlyList<CalendarLesson>> CalendarUpdateFailure() =>

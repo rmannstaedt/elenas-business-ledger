@@ -142,6 +142,36 @@ public sealed class UseCaseTests
     }
 
     [Fact]
+    public async Task LessonStateToggleUpdatesCalendarAndRequiresConfirmationWhenReturningCompletedToPlanned()
+    {
+        var calendar = new FakeCalendarGateway([]);
+        var useCase = new ToggleLessonStateUseCase(calendar);
+
+        var completed = await useCase.ExecuteAsync(
+            "lesson-1",
+            LessonState.Planned,
+            confirmReturnToPlanned: false,
+            CancellationToken.None);
+        var unconfirmedPlanned = await useCase.ExecuteAsync(
+            "lesson-1",
+            LessonState.Completed,
+            confirmReturnToPlanned: false,
+            CancellationToken.None);
+        var confirmedPlanned = await useCase.ExecuteAsync(
+            "lesson-1",
+            LessonState.Completed,
+            confirmReturnToPlanned: true,
+            CancellationToken.None);
+
+        Assert.True(completed.Succeeded);
+        Assert.Equal(LessonState.Completed, completed.Value);
+        Assert.True(unconfirmedPlanned.RequiresConfirmation);
+        Assert.True(confirmedPlanned.Succeeded);
+        Assert.Equal(LessonState.Planned, confirmedPlanned.Value);
+        Assert.Equal([LessonState.Completed, LessonState.Planned], calendar.SavedLessonStates);
+    }
+
+    [Fact]
     public async Task InvoiceCandidateSelectionListsTodayStudentsWithoutInvoiceAndPreselectsCurrentTimeStudent()
     {
         var students = new FakeStudentRepository([CreateStudentRecord("Anna"), CreateStudentRecord("Bo")]);
@@ -350,6 +380,9 @@ public sealed class UseCaseTests
                 vatRegistrationDate: null,
                 VatStatus.NotRegistered,
                 "C:\\Invoices"));
+
+        public Task SaveAsync(CompanyProfile profile, CancellationToken cancellationToken) =>
+            Task.CompletedTask;
     }
 
     private sealed class FakeCalendarGateway(IReadOnlyList<CalendarLesson> lessons) : IGoogleCalendarGateway
@@ -358,6 +391,8 @@ public sealed class UseCaseTests
             OperationResult<IReadOnlyList<CalendarLesson>>.Success(lessons);
 
         public bool UpdateCalled { get; private set; }
+
+        public List<LessonState> SavedLessonStates { get; } = [];
 
         public Task<IReadOnlyList<CalendarLesson>> ListLessonsAsync(DateOnly from, DateOnly to, CancellationToken cancellationToken)
         {
@@ -380,6 +415,15 @@ public sealed class UseCaseTests
 
         public Task<OperationResult<IReadOnlyList<CalendarLesson>>> DeleteLessonAsync(string lessonId, DateOnly refreshMonth, CancellationToken cancellationToken) =>
             Task.FromResult(UpdateResult);
+
+        public Task<OperationResult<LessonState>> UpdateLessonStateAsync(
+            string lessonId,
+            LessonState state,
+            CancellationToken cancellationToken)
+        {
+            SavedLessonStates.Add(state);
+            return Task.FromResult(OperationResult<LessonState>.Success(state));
+        }
     }
 
     private sealed class FakeInvoiceRepository : IInvoiceRepository
@@ -415,6 +459,9 @@ public sealed class UseCaseTests
             SaveIssuedCalled = true;
             return Task.FromResult(OperationResult<IssuedInvoice>.Success(invoice));
         }
+
+        public Task<IssuedInvoice?> GetIssuedInvoiceAsync(InvoiceNumber invoiceNumber, CancellationToken cancellationToken) =>
+            Task.FromResult<IssuedInvoice?>(null);
 
         public Task<PaymentStatus> GetPaymentStatusAsync(InvoiceNumber invoiceNumber, CancellationToken cancellationToken) =>
             Task.FromResult(CurrentPaymentStatus);

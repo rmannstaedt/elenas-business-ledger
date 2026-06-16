@@ -1,5 +1,6 @@
 using ElenaSmallBusinessLedger.Core.Calendar;
 using ElenaSmallBusinessLedger.Core.Common;
+using ElenaSmallBusinessLedger.Core.Lessons;
 using ElenaSmallBusinessLedger.Core.UseCases.Lessons;
 
 namespace ElenaSmallBusinessLedger.Core.Ports;
@@ -21,5 +22,10 @@ public interface IGoogleCalendarGateway
     Task<OperationResult<IReadOnlyList<CalendarLesson>>> DeleteLessonAsync(
         string lessonId,
         DateOnly refreshMonth,
+        CancellationToken cancellationToken);
+
+    Task<OperationResult<LessonState>> UpdateLessonStateAsync(
+        string lessonId,
+        LessonState state,
         CancellationToken cancellationToken);
 }

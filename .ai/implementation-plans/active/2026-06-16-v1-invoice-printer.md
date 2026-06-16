@@ -11,7 +11,7 @@
 Status: Active
 Created: 2026-06-16
 Last updated: 2026-06-16
-Owner/context: Ruben and Codex; stages 1-8 are implemented, with Stage 8 awaiting Ruben-side visual UI confirmation before continuing.
+Owner/context: Ruben and Codex; stages 1-9 are implemented/refined, and the WPF startup path now uses real Core/SQLite/Calendar-backed services instead of sample dashboard/editor services. Stage 10 remains next for the invoice printer/viewer flow.
 
 ## Related Docs And Standards
 
@@ -99,17 +99,19 @@ Create a focused v1 application that supports Elena's real workflow:
 
 ## Current Problem / Current State
 
-- The repository contains a scaffolded `.sln`, App/Core/Infrastructure projects, and an xUnit test project.
-- `.ai/project-profile.md` has been aligned to the App/Core/Infrastructure solution shape.
+- The repository contains a buildable `.sln`, App/Core/Infrastructure projects, and an xUnit test project.
+- `.ai/project-profile.md` has been aligned to the App/Core/Infrastructure solution shape and current runtime data locations.
 - There is no active implementation plan other than this file.
-- Build and test commands are verified for the scaffolded solution.
+- Build and test commands are verified for the current solution.
+- The WPF app startup path now uses real SQLite repositories, Core use cases, and the configured Google Calendar gateway. If Calendar settings/client secrets are missing, the dashboard fails truthfully instead of showing sample lesson rows.
+- Completed-but-uninvoiced lesson state is represented in Google Calendar by preserving the first-line `$` student marker and adding/removing a later `Status: Completed` summary line.
 
 ## Desired End State
 
 - The repository contains a buildable .NET 10 solution with App/Core/Infrastructure projects and one xUnit test project.
 - Core contains the v1 business model and use cases for students, plans, lessons, invoices, VAT calculation, invoice issue, and payment status.
 - Infrastructure persists students, plans, company settings, issued invoices, invoice lessons, and paid/outstanding state in SQLite.
-- Infrastructure reads and updates Google Calendar entries using the strict `$ short-name` rule.
+- Infrastructure reads and updates Google Calendar entries using the strict first-line `$ short-name` rule and preserves that marker when updating app-owned lesson status.
 - Infrastructure saves invoice PDFs to the configured invoice folder and prints only after the PDF is saved.
 - The WPF UI supports the startup dashboard, student add/edit, lesson list, invoice writing, invoice viewer, and paid/outstanding toggle.
 - The test suite covers the business rules and safety-critical workflows.
@@ -907,7 +909,7 @@ Runner may continue automatically after this stage: yes.
 ### Stage 10: Implement Write Invoice Flow And Invoice Viewer
 
 Type: implementation / test / UI
-Status: Not started
+Status: Completed 2026-06-16
 
 Goal:
 
@@ -927,20 +929,20 @@ Affected files/classes/schemas/commands/UI surfaces:
 
 Concrete steps:
 
-- [ ] Implement candidate dialog listing students with lessons today who have not had an invoice printed this month.
-- [ ] Preselect the current-time student when one exists.
-- [ ] Allow selecting any student in the database.
-- [ ] Implement invoice preview using company info, student info, matching Google Calendar lessons, VAT when relevant, and price information.
-- [ ] Allow editing invoice lesson list before issue.
-- [ ] Allow price adjustment only with mandatory reason.
-- [ ] Implement Cancel so no invoice/PDF/local lesson data is saved.
-- [ ] Implement Print Invoice command through the Core issue use case.
-- [ ] Display PDF save failure and keep invoice unissued.
-- [ ] Save invoice data and local invoice lessons only after PDF save succeeds according to confirmed workflow.
-- [ ] Request print after successful save.
-- [ ] Close form and refresh main view after successful save.
-- [ ] Open saved invoice in invoice viewer on double-click.
-- [ ] Prevent editing saved invoice data.
+- [x] Implement candidate dialog listing students with lessons today who have not had an invoice printed this month.
+- [x] Preselect the current-time student when one exists.
+- [x] Allow selecting any student in the database.
+- [x] Implement invoice preview using company info, student info, matching Google Calendar lessons, VAT when relevant, and price information.
+- [x] Allow editing invoice lesson list before issue.
+- [x] Allow price adjustment only with mandatory reason.
+- [x] Implement Cancel so no invoice/PDF/local lesson data is saved.
+- [x] Implement Print Invoice command through the Core issue use case.
+- [x] Display PDF save failure and keep invoice unissued.
+- [x] Save invoice data and local invoice lessons only after PDF save succeeds according to confirmed workflow.
+- [x] Request print after successful save.
+- [x] Close form and refresh main view after successful save.
+- [x] Open saved invoice in invoice viewer on double-click.
+- [x] Prevent editing saved invoice data.
 
 Behavior that must remain unchanged:
 
@@ -994,7 +996,7 @@ Runner may continue automatically after this stage: no. Blocking action required
 ### Stage 11: Hardening, Packaging Readiness, And Documentation Refresh
 
 Type: verification / review / documentation / cleanup
-Status: Not started
+Status: Completed 2026-06-16; final Ruben/Elena pilot test pending
 
 Goal:
 
@@ -1009,17 +1011,17 @@ Affected files/classes/schemas/commands/UI surfaces:
 
 Concrete steps:
 
-- [ ] Run full build.
-- [ ] Run full test suite.
-- [ ] Run formatter check if available and not noisy.
-- [ ] Review package dependencies and licenses.
-- [ ] Review logs/errors for secrets and sensitive data.
-- [ ] Run code review skill for Core/Infrastructure safety.
-- [ ] Run UI review skill for WPF flows.
-- [ ] Update README with verified commands and app setup notes.
-- [ ] Update project profile if commands, solution shape, or dependency decisions changed.
-- [ ] Create or update `.ai/context/HANDOFF.md`.
-- [ ] Record remaining limitations and manual test notes.
+- [x] Run full build.
+- [x] Run full test suite.
+- [x] Attempt formatter check and document existing repository-wide line-ending/whitespace noise.
+- [x] Review package dependencies and licenses.
+- [x] Review logs/errors for secrets and sensitive data.
+- [x] Run code review skill for Core/Infrastructure safety.
+- [x] Run UI review skill for WPF flows.
+- [x] Update README with verified commands and app setup notes.
+- [x] Update project profile if commands, solution shape, or dependency decisions changed.
+- [x] Create or update `.ai/context/HANDOFF.md`.
+- [x] Record remaining limitations and manual test notes.
 
 Behavior that must remain unchanged:
 
@@ -1175,6 +1177,38 @@ Cleanup/reset instructions:
 ## Completion Log
 
 - 2026-06-16:
+  - Stage: Stage 11 - Hardening, Packaging Readiness, And Documentation Refresh
+  - Files changed: `README.md`, `.ai/project-profile.md`, `.ai/context/HANDOFF.md`, `.ai/implementation-plans/active/2026-06-16-v1-invoice-printer.md`, `src/ElenaSmallBusinessLedger.Core/Invoices/InvoiceDraft.cs`, `src/ElenaSmallBusinessLedger.Core/Ports/ICompanyProfileRepository.cs`, `src/ElenaSmallBusinessLedger.Infrastructure/Persistence/SqliteCompanyProfileRepository.cs`, `src/ElenaSmallBusinessLedger.App/App.xaml.cs`, `src/ElenaSmallBusinessLedger.App/MainWindow.xaml`, `src/ElenaSmallBusinessLedger.App/Services/IAppSettingsService.cs`, `src/ElenaSmallBusinessLedger.App/Services/CoreAppSettingsService.cs`, `src/ElenaSmallBusinessLedger.App/Services/ISettingsLauncher.cs`, `src/ElenaSmallBusinessLedger.App/Services/SettingsWindowLauncher.cs`, `src/ElenaSmallBusinessLedger.App/ViewModels/SettingsViewModel.cs`, `src/ElenaSmallBusinessLedger.App/ViewModels/InvoiceLineDisplayModel.cs`, `src/ElenaSmallBusinessLedger.App/ViewModels/InvoicePreviewViewModel.cs`, `src/ElenaSmallBusinessLedger.App/Views/SettingsView.*`, `tests/ElenaSmallBusinessLedger.Tests/App/ViewModels/SettingsViewModelTests.cs`, `tests/ElenaSmallBusinessLedger.Tests/App/ViewModels/MainWindowViewModelTests.cs`, `tests/ElenaSmallBusinessLedger.Tests/App/ViewModels/InvoiceViewModelTests.cs`, and `tests/ElenaSmallBusinessLedger.Tests/Core/Invoices/InvoiceDraftTests.cs`.
+  - Summary: Added the minimal pilot setup surface under `Application > Settings` for company profile, invoice folder, Google Calendar ID/account label, and Google client secrets import. Hardened invoice draft creation so empty invoices are rejected in Core, made missing company profile errors user-readable, and refreshed invoice preview totals when included lines or price adjustments change. Updated README, project profile, and handoff with runtime paths, setup steps, and pilot-test notes.
+  - Tests/verification run: Focused settings/main-window tests during implementation; focused invoice regression tests; `dotnet build ElenaSmallBusinessLedger.sln -nodeReuse:false`; `dotnet test ElenaSmallBusinessLedger.sln -nodeReuse:false`; `dotnet format ElenaSmallBusinessLedger.sln --verify-no-changes --no-restore`.
+  - Results: Full build passed with 0 warnings and 0 errors. Full test suite passed: 96 passed, 0 failed. Formatter verification did not pass because it reports broad existing line-ending/whitespace differences across the repository, including files outside this final change; no sweeping format rewrite was performed.
+  - Dependencies added: None.
+  - Review notes: Dependency/license review found only the already accepted/expected production dependencies: Google Calendar API client, EF Core SQLite, QuestPDF, and Windows ProtectedData. Secrets review confirmed OAuth tokens remain in Windows-protected storage and are not stored in SQLite; the selected Google client secrets JSON is copied to the documented app-data path. Focused Core/Infrastructure review found and fixed empty-invoice acceptance and missing-company-profile messaging. Focused UI review found and fixed stale invoice-preview totals after include/exclude or adjustment edits.
+  - Deviations: Stage 11 made a small setup UI addition because a full pilot would otherwise require manual database/file setup. The real end-to-end pilot was not run in this automated session because it requires Ruben/Elena's Google Calendar OAuth setup, safe Calendar data, invoice folder, and local print/PDF association.
+  - Risks/open questions: Ruben/Elena still need to run the final user test below. PDF layout polish, admin overview, plan administration, backup/export, VAT reporting, credit notes, and payment due terms remain follow-up work.
+
+- 2026-06-16:
+  - Stage: Stage 10 - Implement Write Invoice Flow And Invoice Viewer
+  - Files changed: `src/ElenaSmallBusinessLedger.Core/Ports/IInvoiceRepository.cs`, `src/ElenaSmallBusinessLedger.App/App.xaml.cs`, `src/ElenaSmallBusinessLedger.App/Services/IInvoiceWorkflowService.cs`, `src/ElenaSmallBusinessLedger.App/Services/CoreInvoiceWorkflowService.cs`, `src/ElenaSmallBusinessLedger.App/Services/IInvoiceWorkflowLauncher.cs`, `src/ElenaSmallBusinessLedger.App/Services/InvoiceWorkflowWindowLauncher.cs`, `src/ElenaSmallBusinessLedger.App/ViewModels/InvoiceCandidateDialogViewModel.cs`, `src/ElenaSmallBusinessLedger.App/ViewModels/InvoiceLineDisplayModel.cs`, `src/ElenaSmallBusinessLedger.App/ViewModels/InvoicePreviewViewModel.cs`, `src/ElenaSmallBusinessLedger.App/ViewModels/InvoiceViewerViewModel.cs`, `src/ElenaSmallBusinessLedger.App/ViewModels/MainWindowViewModel.cs`, `src/ElenaSmallBusinessLedger.App/Views/InvoiceCandidateDialog.*`, `src/ElenaSmallBusinessLedger.App/Views/InvoicePreviewView.*`, `src/ElenaSmallBusinessLedger.App/Views/InvoiceViewerView.*`, `tests/ElenaSmallBusinessLedger.Tests/App/ViewModels/InvoiceViewModelTests.cs`, `tests/ElenaSmallBusinessLedger.Tests/App/ViewModels/MainWindowViewModelTests.cs`, and existing test fakes updated for `GetIssuedInvoiceAsync`.
+  - Summary: Added the WPF Write Invoice workflow: candidate student dialog, invoice preview with include/exclude lesson rows and mandatory-reason price adjustment, issue command through the Core staged PDF/save/print use case, main-window refresh after successful issue, and read-only saved invoice viewer on invoice double-click. The real startup composition now includes company profile repository, QuestPDF writer, saved-PDF printer, invoice workflow service, and invoice launcher.
+  - Tests/verification run: Red check: `dotnet test tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~InvoiceViewModelTests" -nodeReuse:false` failed before invoice ViewModels existed. Red check: focused main-window invoice command tests failed before `IInvoiceWorkflowLauncher` existed. Review-driven red check: empty invoice and print-failure tests failed before the preview safeguards were added. Green checks: focused invoice ViewModel/main-window tests; `dotnet build ElenaSmallBusinessLedger.sln -nodeReuse:false`; `dotnet test ElenaSmallBusinessLedger.sln -nodeReuse:false`.
+  - Results: Full build passed with 0 warnings and 0 errors. Full test suite passed: 90 passed, 0 failed.
+  - Dependencies added: None.
+  - Review notes: Focused code/UI review found and fixed two issues before completion: every lesson could be excluded, producing an empty invoice attempt; and a post-save print request failure closed the preview before showing the warning. The preview now blocks empty invoice issue and stays open with an error when the PDF is saved but print request fails.
+  - Deviations: The invoice viewer is a read-only WPF invoice detail view, not an embedded PDF renderer. The saved PDF path is shown so the generated PDF remains inspectable. Real end-to-end issue still requires company profile, Google Calendar settings/client secrets, and a printer/PDF shell association in the local environment.
+  - Risks/open questions: Manual visual testing is still needed for the three invoice windows and the real PDF/print path. Stage 11 remains next for hardening, setup notes, documentation refresh, final review, and pilot-test readiness.
+
+- 2026-06-16:
+  - Stage: Stage 9 course correction - replace sample runtime wiring with real composition
+  - Files changed: `README.md`, `.ai/project-profile.md`, `docs/business-requirements-and-logic.md`, `src/ElenaSmallBusinessLedger.Core/Calendar/*`, `src/ElenaSmallBusinessLedger.Core/Ports/IGoogleCalendarGateway.cs`, `src/ElenaSmallBusinessLedger.Core/UseCases/Lessons/ToggleLessonStateUseCase.cs`, `src/ElenaSmallBusinessLedger.Core/UseCases/Startup/StartupDashboardQuery.cs`, `src/ElenaSmallBusinessLedger.Infrastructure/Calendar/*`, `src/ElenaSmallBusinessLedger.App/App.xaml.cs`, `src/ElenaSmallBusinessLedger.App/Services/Core*Service.cs`, `src/ElenaSmallBusinessLedger.App/Services/ConfiguredGoogleCalendarGateway.cs`, `src/ElenaSmallBusinessLedger.App/Services/SystemUiClock.cs`, deleted `src/ElenaSmallBusinessLedger.App/Services/Sample*Service.cs`, `tests/ElenaSmallBusinessLedger.Tests/App/Services/AppServiceTests.cs`, `tests/ElenaSmallBusinessLedger.Tests/Core/Calendar/CalendarLessonEntryTests.cs`, `tests/ElenaSmallBusinessLedger.Tests/Core/UseCases/UseCaseTests.cs`, `tests/ElenaSmallBusinessLedger.Tests/Infrastructure/Calendar/GoogleCalendarGatewayTests.cs`, `.ai/implementation-plans/active/2026-06-16-v1-invoice-printer.md`
+  - Summary: Removed sample services from the real WPF startup path and deleted the dead sample service files. App startup now creates the local SQLite database under `%LOCALAPPDATA%\ElenaSmallBusinessLedger`, composes SQLite repositories, Core use cases, Core-backed student/lesson/payment services, and a configured Google Calendar gateway. Missing Calendar settings or client secrets now produce truthful failure results instead of invented dashboard rows. Manual Completed/Planned state for uninvoiced lessons is now durable in Google Calendar by preserving the first-line `$` marker and adding/removing a later `Status: Completed` summary line.
+  - Tests/verification run: Red check: `dotnet test tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~CalendarLessonEntry|FullyQualifiedName~LessonStateToggle|FullyQualifiedName~GoogleCalendarGateway" -nodeReuse:false` failed before state-aware Calendar APIs existed. Red check: `dotnet test tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~AppServiceTests" -nodeReuse:false` failed before the real app service adapters/configured gateway existed. Green checks: same focused commands; `dotnet build ElenaSmallBusinessLedger.sln -nodeReuse:false`; `dotnet test ElenaSmallBusinessLedger.sln -nodeReuse:false`.
+  - Results: Focused Calendar/state tests passed: 18 passed, 0 failed. App service tests passed: 2 passed, 0 failed. Full build passed with 0 warnings and 0 errors. Full test suite passed: 83 passed, 0 failed.
+  - Dependencies added: None.
+  - Deviations: The real startup path currently requires later setup UI/tooling for `CalendarSettings` and `%LOCALAPPDATA%\ElenaSmallBusinessLedger\google-client-secrets.json`; until then, Calendar-backed dashboard/edit actions fail closed with a configuration message. This is intentional and preferable to sample data masquerading as persistence.
+  - Risks/open questions: Stage 10 remains the next planned implementation stage for Write Invoice and invoice viewing. A small setup/admin workflow is still needed so Ruben/Elena can choose the Google calendar/account and supply OAuth client secrets without manual database/file setup.
+
+- 2026-06-16:
   - Stage: Stage 9 feedback refinement - inline Add Lesson row
   - Files changed: `docs/business-requirements-and-logic.md`, `src/ElenaSmallBusinessLedger.App/ViewModels/LessonDisplayModel.cs`, `src/ElenaSmallBusinessLedger.App/ViewModels/MainWindowViewModel.cs`, `tests/ElenaSmallBusinessLedger.Tests/App/ViewModels/MainWindowViewModelTests.cs`, `.ai/implementation-plans/active/2026-06-16-v1-invoice-printer.md`
   - Summary: Changed Add Lesson so it no longer opens the old Lesson dialog. The command now inserts an editable draft row for the current student with empty date/time fields. When the user fills in a valid date and time, the inline save path calls the Calendar add service and marks the draft as a saved lesson.
@@ -1208,7 +1242,7 @@ Cleanup/reset instructions:
   - Tests/verification run: Red check: `dotnet test tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~MainWindowViewModelTests" -nodeReuse:false` failed before `ILessonStateService` existed. Focused green check: `dotnet test tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~MainWindowViewModelTests|FullyQualifiedName~StartupDashboardDoesNotCompleteUninvoicedLessonsByDate" -nodeReuse:false`. Full checks: `dotnet build ElenaSmallBusinessLedger.sln -nodeReuse:false`; `dotnet test ElenaSmallBusinessLedger.sln -nodeReuse:false`.
   - Results: Focused tests passed: 15 passed, 0 failed. Full build passed with 0 warnings and 0 errors. Full test suite passed: 72 passed, 0 failed.
   - Dependencies added: None.
-  - Deviations: `Write Invoice` still remains Stage 10 scope. Manual lesson-state persistence is currently represented by the app-level lesson-state service seam and sample implementation; durable real persistence/composition should be revisited when replacing sample services with production wiring.
+  - Deviations: `Write Invoice` still remains Stage 10 scope. Superseded note: manual lesson-state persistence was initially represented by an app-level seam; the Stage 9 course correction above now persists Completed/Planned state through the Google Calendar status marker.
   - Review notes: The business requirements now distinguish schedule changes saved to Google Calendar from manual Planned/Completed state changes.
   - Risks/open questions: Visual/manual confirmation is still needed for the first-click date selector, time selector, and state toggle behavior in the running WPF app.
 
@@ -1242,7 +1276,7 @@ Cleanup/reset instructions:
   - Results: ViewModel/window tests passed: 9 passed, 0 failed. StartupDashboard filtered tests passed: 1 passed, 0 failed. Full build passed with 0 warnings and 0 errors. Full test suite passed: 59 passed, 0 failed.
   - Dependencies added: None.
   - Deviations: Previous/Next student navigation now uses an explicit active-student list from the startup dashboard result instead of inferring students from currently visible lesson rows. This is more reliable once the dashboard filters lessons to the selected student. The test project now targets `net10.0-windows` and references the WPF App project so ViewModel/window tests can compile and instantiate WPF surfaces.
-  - Review notes: Focused UI/state review found and fixed the weak student navigation contract and the window resource dependency. The dashboard remains bound to sample services until Stage 9/10 wire real student editing and invoice workflows.
+  - Review notes: Focused UI/state review found and fixed the weak student navigation contract and the window resource dependency. Superseded note: the dashboard was initially sample-backed; the Stage 9 course correction above now wires the real Core/SQLite/Calendar-backed runtime path.
   - Risks/open questions: The WPF executable was launched and the process stayed responding, but the tool session could not enumerate a visible top-level desktop window for it. Ruben should visually confirm the dashboard shell opens with sample data before moving past the Stage 8 UI-review gate.
 
 - 2026-06-16:

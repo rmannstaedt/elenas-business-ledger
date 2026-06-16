@@ -1,3 +1,5 @@
+using ElenaSmallBusinessLedger.Core.Calendar;
+using ElenaSmallBusinessLedger.Core.Lessons;
 using Google.Apis.Calendar.v3;
 using Google.Apis.Calendar.v3.Data;
 
@@ -74,6 +76,20 @@ public sealed class GoogleCalendarServiceEventClient : IGoogleCalendarEventClien
 
     public Task DeleteEventAsync(string calendarId, string eventId, CancellationToken cancellationToken) =>
         calendarService.Events.Delete(calendarId, eventId).ExecuteAsync(cancellationToken);
+
+    public async Task UpdateLessonStateAsync(
+        string calendarId,
+        string eventId,
+        LessonState state,
+        CancellationToken cancellationToken)
+    {
+        var getRequest = calendarService.Events.Get(calendarId, eventId);
+        var existing = await getRequest.ExecuteAsync(cancellationToken);
+        existing.Summary = CalendarLessonEntry.WithState(existing.Summary ?? string.Empty, state);
+
+        var updateRequest = calendarService.Events.Update(existing, calendarId, eventId);
+        await updateRequest.ExecuteAsync(cancellationToken);
+    }
 
     private EventDateTime CreateEventDateTime(DateTimeOffset value) =>
         new()
