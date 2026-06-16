@@ -607,7 +607,7 @@ Runner may continue automatically after this stage: no. Blocking action required
 ### Stage 6: Implement Google Calendar Gateway
 
 Type: implementation / test
-Status: Not started
+Status: Completed 2026-06-16
 
 Goal:
 
@@ -621,16 +621,16 @@ Affected files/classes/schemas/commands/UI surfaces:
 
 Concrete steps:
 
-- [ ] Add approved Google Calendar packages after dependency review.
-- [ ] Implement OAuth/token storage using Windows secure credential storage or an approved secure local mechanism.
-- [ ] Implement selected-calendar configuration storage through existing settings/persistence.
-- [ ] Implement calendar read for previous/current/next month window.
-- [ ] Ignore every event whose first line does not match `$ <short name>` or `$<short name>`.
-- [ ] Implement event update for date/time changes.
-- [ ] Implement event delete for lesson cancellation.
-- [ ] Implement event create for new lesson.
-- [ ] Map Calendar/API failures into Core result failures that the UI can display immediately.
-- [ ] Add fake gateway tests in Core and adapter tests around marker parsing/request mapping.
+- [x] Add approved Google Calendar packages after dependency review.
+- [x] Implement OAuth/token storage using Windows secure credential storage or an approved secure local mechanism.
+- [x] Implement selected-calendar configuration storage through existing settings/persistence.
+- [x] Implement calendar read for previous/current/next month window.
+- [x] Ignore every event whose first line does not match `$ <short name>` or `$<short name>`.
+- [x] Implement event update for date/time changes.
+- [x] Implement event delete for lesson cancellation.
+- [x] Implement event create for new lesson.
+- [x] Map Calendar/API failures into Core result failures that the UI can display immediately.
+- [x] Add fake gateway tests in Core and adapter tests around marker parsing/request mapping.
 
 Behavior that must remain unchanged:
 
@@ -1166,6 +1166,17 @@ Cleanup/reset instructions:
 - Delete the test SQLite database or use an app reset command if implemented.
 
 ## Completion Log
+
+- 2026-06-16:
+  - Stage: Stage 6 - Implement Google Calendar Gateway
+  - Files changed: `src/ElenaSmallBusinessLedger.Infrastructure/ElenaSmallBusinessLedger.Infrastructure.csproj`, `src/ElenaSmallBusinessLedger.Infrastructure/Calendar/*`, `src/ElenaSmallBusinessLedger.Infrastructure/Persistence/Entities.cs`, `src/ElenaSmallBusinessLedger.Infrastructure/Persistence/LedgerDbContext.cs`, `src/ElenaSmallBusinessLedger.Infrastructure/Persistence/CalendarSettings.cs`, `src/ElenaSmallBusinessLedger.Infrastructure/Persistence/SqliteCalendarSettingsRepository.cs`, `tests/ElenaSmallBusinessLedger.Tests/Infrastructure/Calendar/GoogleCalendarGatewayTests.cs`, `tests/ElenaSmallBusinessLedger.Tests/Infrastructure/Persistence/SqlitePersistenceTests.cs`, `.ai/project-profile.md`, `README.md`, `.ai/implementation-plans/active/2026-06-16-v1-invoice-printer.md`
+  - Summary: Added the Google Calendar Infrastructure adapter behind the Core gateway port. The implementation uses the official `Google.Apis.Calendar.v3` package, external browser OAuth through Google's installed-app flow, Windows DPAPI-protected local token storage, SQLite storage for selected calendar/account labels, strict first-line `$` marker filtering, event create/update/delete mapping, and Core failure results for Calendar write failures.
+  - Tests/verification run: Red check: `dotnet test tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~Calendar|FullyQualifiedName~CalendarSettings" -nodeReuse:false` failed because the planned Stage 6 Infrastructure types did not exist. Additional red check: `dotnet test tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~RefreshFailureAfterSuccessfulCalendarWriteIsReportedTruthfully" -nodeReuse:false` failed because a successful Google write followed by refresh failure was reported as `Calendar.UpdateFailed`. Green checks: same targeted refresh-failure test; Calendar/CalendarSettings filtered tests; `dotnet build ElenaSmallBusinessLedger.sln -nodeReuse:false`; `dotnet test ElenaSmallBusinessLedger.sln -nodeReuse:false`.
+  - Results: Calendar/CalendarSettings filtered tests passed: 20 passed, 0 failed. Full build passed with 0 warnings and 0 errors. Full test suite passed: 44 passed, 0 failed.
+  - Dependencies added: `Google.Apis.Calendar.v3` 1.74.0.4154; `System.Security.Cryptography.ProtectedData` 10.0.9.
+  - Deviations: Real Google account authorization was not manually exercised in this stage. Event creation uses a configurable default lesson duration because the current Core add-lesson request carries student/start time but not a plan-derived duration.
+  - Review notes: Code-review pass found and fixed one truthful-state issue: if Google accepts a write but the subsequent refresh fails, the result is now `Calendar.RefreshFailed` rather than falsely claiming the Calendar update failed.
+  - Risks/open questions: Stage 7 is blocked by the PDF dependency decision. Google Calendar read/list failures still surface as exceptions through the current Core list contract; before WPF wiring, consider whether startup/invoice-preview read failures should use explicit Core failure results.
 
 - 2026-06-16:
   - Stage: Stage 5 - Implement SQLite Persistence

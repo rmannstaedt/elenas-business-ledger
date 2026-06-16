@@ -34,6 +34,7 @@ dotnet test ElenaSmallBusinessLedger.sln -nodeReuse:false
 - Under-30 teaching support remains in the data model because future students may require it (but out of scope for version 1.0).
 - Lønsumsafgift is out of scope for version 1.0.
 - Google Calendar is the operational lesson schedule, with two-way sync.
+- Google Calendar integration uses the official Google Calendar API client, external browser OAuth, and Windows-protected local token storage.
 - The app stores issued invoice PDFs in a configurable invoices folder.
 - The initial UI recommendation is WPF + .NET 10.
 - The initial database recommendation is SQLite.

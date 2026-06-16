@@ -33,6 +33,19 @@ public sealed class SqlitePersistenceTests
     }
 
     [Fact]
+    public async Task CalendarSettingsCanBeSavedAndLoaded()
+    {
+        using var database = await TestDatabase.CreateAsync();
+        var repository = new SqliteCalendarSettingsRepository(database.CreateContext);
+        var settings = new CalendarSettings("primary", "elena@example.test");
+
+        await repository.SaveAsync(settings, CancellationToken.None);
+
+        var loaded = await repository.GetAsync(CancellationToken.None);
+        Assert.Equal(settings, loaded);
+    }
+
+    [Fact]
     public async Task StudentWithPlanHistoryCanBeSavedAndLoaded()
     {
         using var database = await TestDatabase.CreateAsync();

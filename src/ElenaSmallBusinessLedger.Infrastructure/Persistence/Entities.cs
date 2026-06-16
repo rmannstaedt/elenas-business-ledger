@@ -26,6 +26,15 @@ public sealed class CompanyProfileEntity
     public string InvoiceFolderPath { get; set; } = string.Empty;
 }
 
+public sealed class CalendarSettingsEntity
+{
+    public int Id { get; set; }
+
+    public string SelectedCalendarId { get; set; } = string.Empty;
+
+    public string GoogleAccountEmail { get; set; } = string.Empty;
+}
+
 public sealed class StudentEntity
 {
     public int Id { get; set; }

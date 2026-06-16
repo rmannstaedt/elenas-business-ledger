@@ -29,7 +29,15 @@ tests/
 Database: SQLite
 Database access: EF Core SQLite
 Invoice PDFs: stored as files, not BLOBs
+Google Calendar account tokens: stored locally with Windows user data protection, never in SQLite or plaintext config
+Google Calendar selected calendar/account label: stored in SQLite app settings
 Backup: no automated backup in version 1.0; keep persistence design compatible with later manual backup/export
+
+## External integrations
+
+Google Calendar API: official Google Calendar .NET client
+Google authentication: external browser OAuth
+Calendar availability: invoice issue must rely on the accepted invoice preview/snapshot rather than requiring a fresh Google Calendar read at the final print/save moment
 
 ## UI policy
 
@@ -54,3 +62,4 @@ Use fake Google Calendar client for calendar integration tests
 - Ignore Google Calendar entries that do not use the documented first-line `$` student marker.
 - Notify the user immediately when a Google Calendar lesson update fails.
 - Do not make Google Calendar sync failure corrupt local data.
+- Do not persist OAuth access or refresh tokens in plaintext.

@@ -11,6 +11,8 @@ public sealed class LedgerDbContext : DbContext
 
     public DbSet<CompanyProfileEntity> CompanyProfiles => Set<CompanyProfileEntity>();
 
+    public DbSet<CalendarSettingsEntity> CalendarSettings => Set<CalendarSettingsEntity>();
+
     public DbSet<StudentEntity> Students => Set<StudentEntity>();
 
     public DbSet<StudentPlanPeriodEntity> StudentPlanPeriods => Set<StudentPlanPeriodEntity>();
@@ -31,6 +33,13 @@ public sealed class LedgerDbContext : DbContext
             entity.Property(profile => profile.Cvr).HasMaxLength(50);
             entity.Property(profile => profile.VatStatus).HasConversion<string>().HasMaxLength(50).IsRequired();
             entity.Property(profile => profile.InvoiceFolderPath).HasMaxLength(1000).IsRequired();
+        });
+
+        modelBuilder.Entity<CalendarSettingsEntity>(entity =>
+        {
+            entity.HasKey(settings => settings.Id);
+            entity.Property(settings => settings.SelectedCalendarId).HasMaxLength(500).IsRequired();
+            entity.Property(settings => settings.GoogleAccountEmail).HasMaxLength(200).IsRequired();
         });
 
         modelBuilder.Entity<StudentEntity>(entity =>
