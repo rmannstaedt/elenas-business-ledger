@@ -20,11 +20,13 @@ public sealed class SettingsViewModelTests
                     "12345678",
                     "elena@example.test",
                     "12345678",
-                    new DateOnly(2026, 7, 1),
-                    VatStatus.Registered,
-                    @"C:\Invoices"),
+                new DateOnly(2026, 7, 1),
+                VatStatus.Registered,
+                @"C:\Invoices"),
                 new CalendarSettings("primary", "studio@example.test"),
-                HasGoogleClientSecrets: true)
+                HasGoogleClientSecrets: true,
+                AppDataFolderPath: @"C:\Users\ExampleUser\AppData\Local\ElenaSmallBusinessLedger",
+                DatabasePath: @"C:\Users\ExampleUser\AppData\Local\ElenaSmallBusinessLedger\ledger.db")
         };
         var viewModel = new SettingsViewModel(service);
 
@@ -34,6 +36,9 @@ public sealed class SettingsViewModelTests
         Assert.Equal("primary", viewModel.CalendarId);
         Assert.True(viewModel.IsVatRegistered);
         Assert.True(viewModel.HasGoogleClientSecrets);
+        Assert.Equal("Google login setup file saved: Yes", viewModel.GoogleLoginSetupFileStatusText);
+        Assert.Equal(@"C:\Users\ExampleUser\AppData\Local\ElenaSmallBusinessLedger", viewModel.AppDataFolderPath);
+        Assert.Equal(@"C:\Users\ExampleUser\AppData\Local\ElenaSmallBusinessLedger\ledger.db", viewModel.DatabasePath);
     }
 
     [Fact]

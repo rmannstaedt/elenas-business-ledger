@@ -20,6 +20,8 @@ public sealed class SettingsViewModel : ViewModelBase
     private string googleAccountEmail = string.Empty;
     private string googleClientSecretsSourcePath = string.Empty;
     private bool hasGoogleClientSecrets;
+    private string appDataFolderPath = string.Empty;
+    private string databasePath = string.Empty;
     private string? errorMessage;
 
     public SettingsViewModel(IAppSettingsService settingsService)
@@ -57,7 +59,28 @@ public sealed class SettingsViewModel : ViewModelBase
     public bool HasGoogleClientSecrets
     {
         get => hasGoogleClientSecrets;
-        private set => SetProperty(ref hasGoogleClientSecrets, value);
+        private set
+        {
+            if (SetProperty(ref hasGoogleClientSecrets, value))
+            {
+                OnPropertyChanged(nameof(GoogleLoginSetupFileStatusText));
+            }
+        }
+    }
+
+    public string GoogleLoginSetupFileStatusText =>
+        HasGoogleClientSecrets ? "Google login setup file saved: Yes" : "Google login setup file saved: No";
+
+    public string AppDataFolderPath
+    {
+        get => appDataFolderPath;
+        private set => SetProperty(ref appDataFolderPath, value);
+    }
+
+    public string DatabasePath
+    {
+        get => databasePath;
+        private set => SetProperty(ref databasePath, value);
     }
 
     public string? ErrorMessage
@@ -102,6 +125,8 @@ public sealed class SettingsViewModel : ViewModelBase
         }
 
         HasGoogleClientSecrets = snapshot.HasGoogleClientSecrets;
+        AppDataFolderPath = snapshot.AppDataFolderPath;
+        DatabasePath = snapshot.DatabasePath;
     }
 
     private async Task SaveAsync()

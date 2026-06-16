@@ -17,24 +17,18 @@ namespace ElenaSmallBusinessLedger.App;
 
 public partial class App : Application
 {
-    private const string ApplicationFolderName = "ElenaSmallBusinessLedger";
-    private const string DatabaseFileName = "ledger.db";
-    private const string GoogleClientSecretsFileName = "google-client-secrets.json";
     private static readonly TimeSpan DefaultLessonDuration = TimeSpan.FromMinutes(60);
 
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
 
-        var appDataPath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            ApplicationFolderName);
-        Directory.CreateDirectory(appDataPath);
+        var appPaths = AppPaths.CreateDefault();
+        Directory.CreateDirectory(appPaths.AppDataFolderPath);
 
-        var databasePath = Path.Combine(appDataPath, DatabaseFileName);
         LedgerDbContext CreateContext()
         {
-            var connectionString = new SqliteConnectionStringBuilder { DataSource = databasePath }.ToString();
+            var connectionString = new SqliteConnectionStringBuilder { DataSource = appPaths.DatabasePath }.ToString();
             var options = new DbContextOptionsBuilder<LedgerDbContext>()
                 .UseSqlite(connectionString)
                 .Options;
@@ -51,7 +45,7 @@ public partial class App : Application
         var companyProfileRepository = new SqliteCompanyProfileRepository(CreateContext);
         var calendarSettingsRepository = new SqliteCalendarSettingsRepository(CreateContext);
         var calendarGateway = new ConfiguredGoogleCalendarGateway(
-            cancellationToken => LoadConfiguredCalendarClientAsync(appDataPath, calendarSettingsRepository, cancellationToken),
+            cancellationToken => LoadConfiguredCalendarClientAsync(appPaths, calendarSettingsRepository, cancellationToken),
             TimeZoneInfo.Local,
             DefaultLessonDuration);
         var systemClock = new SystemUiClock();
@@ -72,7 +66,7 @@ public partial class App : Application
         var settingsService = new CoreAppSettingsService(
             companyProfileRepository,
             calendarSettingsRepository,
-            appDataPath);
+            appPaths);
 
         var viewModel = new MainWindowViewModel(
             new CoreStartupDashboardService(new StartupDashboardQuery(
@@ -97,7 +91,7 @@ public partial class App : Application
     }
 
     private static async Task<ConfiguredGoogleCalendarClient?> LoadConfiguredCalendarClientAsync(
-        string appDataPath,
+        AppPaths appPaths,
         SqliteCalendarSettingsRepository calendarSettingsRepository,
         CancellationToken cancellationToken)
     {
@@ -109,15 +103,14 @@ public partial class App : Application
             return null;
         }
 
-        var secretsPath = Path.Combine(appDataPath, GoogleClientSecretsFileName);
-        if (!File.Exists(secretsPath))
+        if (!File.Exists(appPaths.GoogleClientSecretsPath))
         {
             return null;
         }
 
-        await using var secretsStream = File.OpenRead(secretsPath);
+        await using var secretsStream = File.OpenRead(appPaths.GoogleClientSecretsPath);
         var clientSecrets = GoogleClientSecrets.FromStream(secretsStream).Secrets;
-        var tokenStore = new WindowsProtectedFileDataStore(Path.Combine(appDataPath, "GoogleTokens"));
+        var tokenStore = new WindowsProtectedFileDataStore(appPaths.GoogleTokenFolderPath);
         var credentialFactory = new GoogleCalendarCredentialFactory(
             clientSecrets,
             tokenStore,

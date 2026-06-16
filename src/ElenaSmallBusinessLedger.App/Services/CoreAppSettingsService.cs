@@ -10,16 +10,24 @@ public sealed class CoreAppSettingsService : IAppSettingsService
 {
     private readonly ICompanyProfileRepository companyProfileRepository;
     private readonly SqliteCalendarSettingsRepository calendarSettingsRepository;
-    private readonly string googleClientSecretsPath;
+    private readonly AppPaths appPaths;
 
     public CoreAppSettingsService(
         ICompanyProfileRepository companyProfileRepository,
         SqliteCalendarSettingsRepository calendarSettingsRepository,
         string appDataPath)
+        : this(companyProfileRepository, calendarSettingsRepository, AppPaths.FromAppDataFolder(appDataPath))
+    {
+    }
+
+    public CoreAppSettingsService(
+        ICompanyProfileRepository companyProfileRepository,
+        SqliteCalendarSettingsRepository calendarSettingsRepository,
+        AppPaths appPaths)
     {
         this.companyProfileRepository = companyProfileRepository;
         this.calendarSettingsRepository = calendarSettingsRepository;
-        googleClientSecretsPath = Path.Combine(appDataPath, "google-client-secrets.json");
+        this.appPaths = appPaths;
     }
 
     public async Task<AppSettingsSnapshot> LoadAsync(CancellationToken cancellationToken)
@@ -35,7 +43,7 @@ public sealed class CoreAppSettingsService : IAppSettingsService
         }
 
         var calendarSettings = await calendarSettingsRepository.GetAsync(cancellationToken);
-        return new AppSettingsSnapshot(companyProfile, calendarSettings, File.Exists(googleClientSecretsPath));
+        return CreateSnapshot(companyProfile, calendarSettings);
     }
 
     public async Task<OperationResult<AppSettingsSnapshot>> SaveAsync(
@@ -52,20 +60,17 @@ public sealed class CoreAppSettingsService : IAppSettingsService
                 if (!File.Exists(sourcePath))
                 {
                     return OperationResult<AppSettingsSnapshot>.Failure(
-                        new ValidationError("Settings.GoogleClientSecretsMissing", "The Google client secrets file was not found."));
+                        new ValidationError("Settings.GoogleClientSecretsMissing", "The Google Calendar login setup file was not found."));
                 }
 
-                Directory.CreateDirectory(Path.GetDirectoryName(googleClientSecretsPath)!);
-                File.Copy(sourcePath, googleClientSecretsPath, overwrite: true);
+                Directory.CreateDirectory(Path.GetDirectoryName(appPaths.GoogleClientSecretsPath)!);
+                File.Copy(sourcePath, appPaths.GoogleClientSecretsPath, overwrite: true);
             }
 
             await companyProfileRepository.SaveAsync(companyProfile, cancellationToken);
             await calendarSettingsRepository.SaveAsync(calendarSettings, cancellationToken);
             return OperationResult<AppSettingsSnapshot>.Success(
-                new AppSettingsSnapshot(
-                    companyProfile,
-                    calendarSettings,
-                    File.Exists(googleClientSecretsPath)));
+                CreateSnapshot(companyProfile, calendarSettings));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -73,4 +78,16 @@ public sealed class CoreAppSettingsService : IAppSettingsService
                 new ValidationError("Settings.SaveFailed", ex.Message));
         }
     }
+
+    private AppSettingsSnapshot CreateSnapshot(
+        CompanyProfile? companyProfile,
+        CalendarSettings? calendarSettings) =>
+        new(
+            companyProfile,
+            calendarSettings,
+            File.Exists(appPaths.GoogleClientSecretsPath),
+            appPaths.AppDataFolderPath,
+            appPaths.DatabasePath,
+            appPaths.GoogleClientSecretsPath,
+            appPaths.GoogleTokenFolderPath);
 }

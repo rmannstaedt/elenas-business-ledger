@@ -34,7 +34,7 @@ public partial class SettingsView : Window
         var dialog = new OpenFileDialog
         {
             Filter = "JSON files (*.json)|*.json|All files (*.*)|*.*",
-            Title = "Select Google client secrets file"
+            Title = "Select Google Calendar login setup file"
         };
 
         if (dialog.ShowDialog(this) == true)

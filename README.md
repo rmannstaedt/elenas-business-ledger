@@ -41,15 +41,15 @@ On first setup, open `Application > Settings` and configure:
 
 - company name, address, VAT status, and invoice folder;
 - Google Calendar ID and account label/email;
-- Google OAuth client secrets JSON file.
+- Google Calendar login setup file, which is the Google-downloaded OAuth JSON file.
 
-The app copies the selected Google client secrets file to `%LOCALAPPDATA%\ElenaSmallBusinessLedger\google-client-secrets.json`.
+The app copies the selected Google Calendar login setup file to `%LOCALAPPDATA%\ElenaSmallBusinessLedger\google-client-secrets.json`.
 Google OAuth access/refresh tokens are stored separately with Windows user data protection.
 
 Runtime data lives under `%LOCALAPPDATA%\ElenaSmallBusinessLedger`:
 
 - `ledger.db` - local SQLite database;
-- `google-client-secrets.json` - copied Google OAuth client configuration;
+- `google-client-secrets.json` - copied Google Calendar login setup file;
 - `GoogleTokens\` - Windows-protected Google OAuth token store.
 
 The invoice folder is configured in Settings and may be outside the app data folder.

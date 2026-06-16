@@ -35,7 +35,7 @@ Google Calendar account tokens: stored locally with Windows user data protection
 Google Calendar selected calendar/account label: stored in SQLite app settings
 Runtime app data folder: `%LOCALAPPDATA%\ElenaSmallBusinessLedger`
 Runtime SQLite database path: `%LOCALAPPDATA%\ElenaSmallBusinessLedger\ledger.db`
-Google OAuth client secrets path: `%LOCALAPPDATA%\ElenaSmallBusinessLedger\google-client-secrets.json`
+Google Calendar login setup file path: `%LOCALAPPDATA%\ElenaSmallBusinessLedger\google-client-secrets.json`
 Google OAuth protected token folder: `%LOCALAPPDATA%\ElenaSmallBusinessLedger\GoogleTokens`
 Backup: no automated backup in version 1.0; keep persistence design compatible with later manual backup/export
 
@@ -53,7 +53,7 @@ WPF + MVVM
 No business logic in code-behind
 Danish user-facing invoice text
 Elena-facing UI must stay simple
-Company profile, invoice folder, Google Calendar ID/account label, and Google OAuth client secrets are configured from `Application > Settings`
+Company profile, invoice folder, Google Calendar ID/account label, Google Calendar login setup file, and read-only app data/database paths are configured or shown from `Application > Settings`
 Desktop windows must remember size and position, including subwindows, and restore inside the current visible screen area
 
 ## Build and test commands

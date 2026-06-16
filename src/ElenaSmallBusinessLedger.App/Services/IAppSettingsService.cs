@@ -7,7 +7,11 @@ namespace ElenaSmallBusinessLedger.App.Services;
 public sealed record AppSettingsSnapshot(
     CompanyProfile? CompanyProfile,
     CalendarSettings? CalendarSettings,
-    bool HasGoogleClientSecrets);
+    bool HasGoogleClientSecrets,
+    string AppDataFolderPath = "",
+    string DatabasePath = "",
+    string GoogleClientSecretsPath = "",
+    string GoogleTokenFolderPath = "");
 
 public interface IAppSettingsService
 {
