@@ -188,11 +188,11 @@ dotnet format ElenaSmallBusinessLedger.sln --verify-no-changes
   - Why it matters: This affects dependencies, migrations, repository tests, and schema evolution.
   - Exact answer received: Use EF Core SQLite.
 
-- [ ] Confirm PDF dependency.
+- [x] Confirm PDF dependency.
   - Recommended/default answer: Use QuestPDF if the license is acceptable for this app.
   - Alternatives: PdfSharp/MigraDoc or another approved PDF library.
   - Why it matters: Invoice PDF generation is safety-critical and production dependency choice must be deliberate.
-  - Exact answer needed: "Use QuestPDF" or name the selected alternative.
+  - Exact answer received: Use QuestPDF; license accepted.
 
 - [x] Decide invoice issue staging semantics.
   - Accepted answer: Render PDF to a staging path, verify it, publish/move the PDF to the final path, persist issued invoice metadata only after final PDF storage succeeds, then request print. If any pre-persistence step fails, show failure and do not display the invoice as issued.
@@ -675,7 +675,7 @@ Runner may continue automatically after this stage: no. Blocking action required
 ### Stage 7: Implement PDF Storage, Invoice Rendering, And Printing
 
 Type: implementation / test
-Status: Not started
+Status: Completed 2026-06-16
 
 Goal:
 
@@ -690,17 +690,17 @@ Affected files/classes/schemas/commands/UI surfaces:
 
 Concrete steps:
 
-- [ ] Apply the PDF dependency decision from Open Questions.
-- [ ] Add approved PDF package.
-- [ ] Implement Danish invoice rendering from immutable invoice preview/snapshot data.
-- [ ] Implement invoice folder validation.
-- [ ] Implement stable file naming with sanitized student short/full name and invoice number.
-- [ ] Implement no-silent-overwrite behavior.
-- [ ] Implement staged PDF save according to the confirmed issue workflow.
-- [ ] Implement printer adapter that prints only saved PDFs.
-- [ ] Write tests for PDF save failure blocking invoice save.
-- [ ] Write tests for file name collision handling.
-- [ ] Write a PDF smoke test that verifies a file is created and non-empty.
+- [x] Apply the PDF dependency decision from Open Questions.
+- [x] Add approved PDF package.
+- [x] Implement Danish invoice rendering from immutable invoice preview/snapshot data.
+- [x] Implement invoice folder validation.
+- [x] Implement stable file naming with sanitized student short/full name and invoice number.
+- [x] Implement no-silent-overwrite behavior.
+- [x] Implement staged PDF save according to the confirmed issue workflow.
+- [x] Implement printer adapter that prints only saved PDFs.
+- [x] Write tests for PDF save failure blocking invoice save.
+- [x] Write tests for file name collision handling.
+- [x] Write a PDF smoke test that verifies a file is created and non-empty.
 
 Behavior that must remain unchanged:
 
@@ -1166,6 +1166,17 @@ Cleanup/reset instructions:
 - Delete the test SQLite database or use an app reset command if implemented.
 
 ## Completion Log
+
+- 2026-06-16:
+  - Stage: Stage 7 - Implement PDF Storage, Invoice Rendering, And Printing
+  - Files changed: `src/ElenaSmallBusinessLedger.Infrastructure/ElenaSmallBusinessLedger.Infrastructure.csproj`, `src/ElenaSmallBusinessLedger.Infrastructure/Invoices/Pdf/*`, `src/ElenaSmallBusinessLedger.Infrastructure/Invoices/Printing/*`, `tests/ElenaSmallBusinessLedger.Tests/Infrastructure/Invoices/InvoiceInfrastructureTests.cs`, `.ai/project-profile.md`, `README.md`, `.ai/implementation-plans/active/2026-06-16-v1-invoice-printer.md`
+  - Summary: Added QuestPDF invoice rendering, local staged invoice PDF storage, staged PDF verification, stable sanitized final filenames, fail-closed no-overwrite publishing, and a printer adapter that only requests printing for an existing saved PDF.
+  - Tests/verification run: Red check: `dotnet test tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~Invoice" -nodeReuse:false` failed because planned PDF/file/printing Infrastructure types did not exist. Green checks: same invoice-filtered command; `dotnet build ElenaSmallBusinessLedger.sln -nodeReuse:false`; `dotnet test ElenaSmallBusinessLedger.sln -nodeReuse:false`; targeted sample-PDF smoke test with `ELENA_LEDGER_KEEP_SAMPLE_PDF`; rendered `tmp\pdfs\stage7-sample-invoice.pdf` to `tmp\pdfs\stage7-sample-invoice.png` using `pypdfium2` and visually inspected the output.
+  - Results: Invoice-filtered tests passed: 26 passed, 0 failed. Full build passed with 0 warnings and 0 errors. Full test suite passed: 50 passed, 0 failed. Visual PDF check showed required Danish invoice sections, company/student information, lesson row, VAT/totals, and footer with no clipping or overlap.
+  - Dependencies added: `QuestPDF` 2026.6.0.
+  - Deviations: The printer adapter can prove only that the OS print request was launched for an existing PDF; it cannot prove paper was physically printed. Final file collision handling fails closed instead of generating a suffix, because issued invoice PDFs must not be silently overwritten.
+  - Review notes: Focused code-review pass found no blocking artifact-safety issues after implementation. Current tests cover staged PDF verification, final filename sanitization, no-overwrite behavior, PDF smoke generation, missing-PDF print refusal, and print request dispatch for an existing PDF.
+  - Risks/open questions: Manual PDF review by Ruben/Elena is still the Stage 7 gate before proceeding to WPF wiring. The sample files are under `tmp\pdfs\` and can be deleted after review.
 
 - 2026-06-16:
   - Stage: Stage 6 - Implement Google Calendar Gateway

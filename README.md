@@ -36,7 +36,8 @@ dotnet test ElenaSmallBusinessLedger.sln -nodeReuse:false
 - Google Calendar is the operational lesson schedule, with two-way sync.
 - Google Calendar integration uses the official Google Calendar API client, external browser OAuth, and Windows-protected local token storage.
 - The app stores issued invoice PDFs in a configurable invoices folder.
+- Invoice PDFs are generated with QuestPDF, staged and verified before final storage, and never silently overwritten.
 - The initial UI recommendation is WPF + .NET 10.
 - The initial database recommendation is SQLite.
 - Database access uses EF Core SQLite.
-- The initial PDF recommendation is QuestPDF.
+- The PDF dependency is QuestPDF.

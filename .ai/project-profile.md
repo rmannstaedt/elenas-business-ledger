@@ -29,6 +29,8 @@ tests/
 Database: SQLite
 Database access: EF Core SQLite
 Invoice PDFs: stored as files, not BLOBs
+Invoice PDF generation: QuestPDF
+Invoice PDF safety: write to staging, verify PDF bytes, publish without overwriting, then persist invoice metadata and request print
 Google Calendar account tokens: stored locally with Windows user data protection, never in SQLite or plaintext config
 Google Calendar selected calendar/account label: stored in SQLite app settings
 Backup: no automated backup in version 1.0; keep persistence design compatible with later manual backup/export
@@ -38,6 +40,7 @@ Backup: no automated backup in version 1.0; keep persistence design compatible w
 Google Calendar API: official Google Calendar .NET client
 Google authentication: external browser OAuth
 Calendar availability: invoice issue must rely on the accepted invoice preview/snapshot rather than requiring a fresh Google Calendar read at the final print/save moment
+PDF generation: QuestPDF Community license accepted for v1
 
 ## UI policy
 
@@ -56,6 +59,7 @@ Use fake Google Calendar client for calendar integration tests
 ## Hard requirements
 
 - Do not mark invoice issued unless PDF storage succeeds.
+- Do not silently overwrite an existing issued invoice PDF.
 - Do not silently edit issued invoices.
 - Do not charge VAT when business profile says NotRegistered.
 - Do not store CPR numbers.
