@@ -3,7 +3,7 @@
 Status: Active
 Created: 2026-06-17
 Last updated: 2026-06-17
-Owner/context: Ruben and Codex; Ruben wants Plans to be managed independently from Students through a `Plan > Manage Plans` menu. Plans must be immutable once published, with a Draft -> Active -> Archived lifecycle, so the foundation for lessons and invoicing stays stable.
+Owner/context: Ruben and Codex; Ruben wants Plans to be managed independently from Students through a `Plan > Manage Plans` menu. Plans must be immutable once published, with a Draft -> Active -> Retired lifecycle, so the foundation for lessons and invoicing stays stable.
 
 ## Related Docs And Standards
 
@@ -28,14 +28,14 @@ Owner/context: Ruben and Codex; Ruben wants Plans to be managed independently fr
 
 ## Goal
 
-Add an independent immutable Plan catalog and a `Plan > Manage Plans` WPF workflow for adding draft plans, publishing active plans, archiving active plans, republishing archived plans, and deleting only draft plans, while preserving copied plan data on existing student plan periods and invoices.
+Add an independent immutable Plan catalog and a `Plan > Manage Plans` WPF workflow for adding draft plans, publishing draft plans, retiring active plans, reactivating retired plans, and deleting only draft plans, while preserving copied plan data on existing student plan periods and invoices.
 
 ## Non-Goals
 
 - Do not mutate existing `StudentPlanPeriod` rows when a catalog plan changes lifecycle state.
-- Do not rename archive to delete in the user interface.
-- Do not allow editing active or archived plan fields.
-- Do not allow assigning draft or archived plans to students.
+- Do not rename retire to delete in the user interface.
+- Do not allow editing active or retired plan fields.
+- Do not allow assigning draft or retired plans to students.
 - Do not add automatic price changes to active students.
 - Do not build a full plan versioning/history UI in this plan.
 - Do not add public Google Calendar, invoice, or VAT behavior changes.
@@ -47,8 +47,8 @@ Add an independent immutable Plan catalog and a `Plan > Manage Plans` WPF workfl
 - A student plan period remains a snapshot of plan name, price, lesson count, duration, flexibility, number of students, and effective date at assignment time.
 - Draft plans may be edited and truly deleted because they have never been assignment-eligible.
 - Publishing a draft plan makes it active and immutable.
-- Active plans may only be archived; their fields cannot be edited.
-- Archived plans may only be republished; their fields cannot be edited and they cannot be assigned while archived.
+- Active plans may only be retired; their fields cannot be edited.
+- Retired plans may only be reactivated; their fields cannot be edited and they cannot be assigned while retired.
 - Existing student editor may continue to show the current plan as read-only until plan assignment is redesigned in a later stage of this plan.
 - The current app uses `EnsureCreated`; adding catalog persistence means updating EF entities/model and tests carefully, with migration policy to be revisited before broader distribution.
 
@@ -64,13 +64,13 @@ Add an independent immutable Plan catalog and a `Plan > Manage Plans` WPF workfl
 ## Desired End State
 
 - Main menu contains a top-level `Plan` menu with `Manage Plans`.
-- `Manage Plans` opens a WPF window listing all known plans grouped or filterable by state: Draft, Active, Archived.
+- `Manage Plans` opens a WPF window listing all known plans grouped or filterable by state: Draft, Active, Retired.
 - The selected plan appears in a detail pane where fields are editable only for Draft plans.
 - Draft plans support `Delete` and `Publish`; they cannot be assigned to students.
-- Active plans support `Archive` only; they cannot be edited except by changing lifecycle state to Archived.
-- Archived plans support `Publish` only; they cannot be edited and cannot be assigned to students while archived.
+- Active plans support `Retire` only; they cannot be edited except by changing lifecycle state to Retired.
+- Retired plans support `Reactivate` only; they cannot be edited and cannot be assigned to students while retired.
 - Only Active plans are offered for student assignment.
-- Existing student plan periods and issued invoice lines remain unchanged after plan publish/archive/republish or draft edits/deletes.
+- Existing student plan periods and issued invoice lines remain unchanged after plan publish/retire/reactivate or draft edits/deletes.
 - Automated tests prove lifecycle transitions, command availability, assignment eligibility, persistence, and student plan snapshot immutability.
 
 ## Behavior-Preserving Boundary
@@ -88,10 +88,10 @@ The following must remain unchanged unless this plan explicitly says otherwise:
 
 - Add a `Plan > Manage Plans` menu path.
 - Add a durable plan catalog.
-- Add a durable Plan lifecycle state machine: Draft, Active, Archived.
+- Add a durable Plan lifecycle state machine: Draft, Active, Retired.
 - Add Draft-only editing and true Draft-only deletion.
-- Add Publish from Draft to Active and from Archived to Active.
-- Add Archive from Active to Archived.
+- Add Publish from Draft to Active and Reactivate from Retired to Active.
+- Add Retire from Active to Retired.
 - Restrict assignment eligibility to Active plans.
 - Remove or de-emphasize the student editor's current placeholder `Add Plan` path once plan assignment has a clearer catalog-backed follow-up.
 
@@ -138,18 +138,18 @@ Expected docs/context:
 Database/schema:
 
 - Add a `PlanCatalog` / `Plans` table with durable columns for plan fields and lifecycle state.
-- Add created/published/archived timestamps if useful for traceability.
+- Add created/published/retired timestamps if useful for traceability.
 - Add a uniqueness rule for non-deleted plan names if feasible.
 - Keep `StudentPlanPeriodEntity` fields unchanged to preserve snapshot behavior.
 
 ## Risks And Mitigations
 
-- Risk: Active or archived plan fields are edited accidentally, weakening plan immutability.
+- Risk: Active or retired plan fields are edited accidentally, weakening plan immutability.
   - Mitigation: Core use cases reject field changes outside Draft; ViewModel disables fields unless selected plan is Draft; tests cover command availability and service validation.
-- Risk: Draft deletion is confused with archive.
-  - Mitigation: Use `Delete` only for Draft plans and `Archive` only for Active plans; hide irrelevant buttons by state.
+- Risk: Draft deletion is confused with retire.
+  - Mitigation: Use `Delete` only for Draft plans and `Retire` only for Active plans; hide irrelevant buttons by state.
 - Risk: Catalog lifecycle changes accidentally update existing student plan periods.
-  - Mitigation: Keep student periods as copied fields; add tests that publish/archive/republish plans and assert existing student periods and issued invoice lines are unchanged.
+  - Mitigation: Keep student periods as copied fields; add tests that publish/retire/reactivate plans and assert existing student periods and issued invoice lines are unchanged.
 - Risk: EF `EnsureCreated` makes schema evolution awkward for real pilot data.
   - Mitigation: Add tests around new table creation and document migration risk; consider introducing explicit EF migrations in a separate stage if needed.
 - Risk: Student editor still feels awkward if it cannot assign catalog plans after Manage Plans is added.
@@ -159,17 +159,17 @@ Database/schema:
 
 ## Open Questions
 
-- [x] Question: Should the user-facing destructive operation be `Delete` or `Archive`?
-  - Recommended/default answer: Archive.
+- [x] Question: Should the user-facing destructive operation be `Delete` or `Retire`?
+  - Recommended/default answer: Retire.
   - Alternatives: True delete for unused plans only; soft delete named Delete; no removal operation.
   - Why it matters: The plan catalog is durable business memory, and "delete" suggests removing history.
-  - Exact answer received: Active plans use `Archive`; it should not be named delete. Draft-only deletion is allowed by the later lifecycle decision because Draft plans were never assignment-eligible.
+  - Exact answer received: Active plans use `Retire`; it should not be named delete. Draft-only deletion is allowed by the later lifecycle decision because Draft plans were never assignment-eligible.
 
 - [x] Question: Should published Plans be mutable catalog records or immutable lifecycle records?
   - Recommended/default answer: Immutable lifecycle records.
   - Alternatives: Editable catalog with copied student snapshots; full versioned plans; soft-edit active plans with audit log.
   - Why it matters: Student lessons and invoicing need a stable foundation.
-  - Exact answer received: Plans should be immutable with Draft, Active, and Archived states.
+  - Exact answer received: Plans should be immutable with Draft, Active, and Retired states.
 
 ## Staged Implementation Plan
 
@@ -185,7 +185,7 @@ Introduce Core-owned plan catalog models, lifecycle state, repository port, and 
 Affected files/classes/schemas/commands/UI surfaces:
 
 - Create Core plan catalog model, lifecycle enum, and repository port.
-- Create use cases for listing plans, creating draft plans, saving draft fields, deleting drafts, publishing drafts/archived plans, and archiving active plans.
+- Create use cases for listing plans, creating draft plans, saving draft fields, deleting drafts, publishing drafts, reactivating retired plans, and retiring active plans.
 - Create focused Core tests.
 
 Concrete steps:
@@ -194,11 +194,11 @@ Concrete steps:
 - Write failing tests that Draft plans can be edited and deleted.
 - Write failing tests that Draft plans can be published into Active state.
 - Write failing tests that Active plans cannot have fields edited or be deleted.
-- Write failing tests that Active plans can be archived into Archived state.
-- Write failing tests that Archived plans cannot have fields edited or be deleted, but can be published into Active state.
+- Write failing tests that Active plans can be retired into Retired state.
+- Write failing tests that Retired plans cannot have fields edited or be deleted, but can be reactivated into Active state.
 - Write failing tests that only Active plans are assignment eligible.
 - Add a catalog model with plan fields plus `PlanCatalogState`.
-- Add repository port methods for listing all plans, listing active assignable plans, creating drafts, saving draft fields, deleting drafts, publishing, and archiving.
+- Add repository port methods for listing all plans, listing active assignable plans, creating drafts, saving draft fields, deleting drafts, publishing, retiring, and reactivating.
 - Add use cases that validate plan values, enforce lifecycle transitions, and never touch students or invoices.
 - Run focused Core plan tests.
 
@@ -209,7 +209,7 @@ Behavior that must remain unchanged:
 
 Tests to add/update:
 
-- `PlanCatalogUseCaseTests` for validation, draft edit/delete, publish, archive, republish, immutable active/archived states, and active assignment filtering.
+- `PlanCatalogUseCaseTests` for validation, draft edit/delete, publish, retire, reactivate, immutable active/retired states, and active assignment filtering.
 
 Verification commands/manual checks:
 
@@ -261,10 +261,10 @@ Concrete steps:
 - Add a plan catalog entity/table with plan fields and lifecycle state.
 - Configure required fields, max lengths, enum conversions, and active-name uniqueness or equivalent validation.
 - Implement repository mapping between EF entity and Core catalog model.
-- Add persistence tests proving Draft, Active, and Archived plans all appear in all-plan list.
+- Add persistence tests proving Draft, Active, and Retired plans all appear in all-plan list.
 - Add persistence tests proving only Active plans appear in assignable/active list.
 - Add persistence tests proving Draft deletion removes only Draft records.
-- Add a persistence test proving publish/archive/republish does not alter existing `StudentPlanPeriodEntity` rows.
+- Add a persistence test proving publish/retire/reactivate does not alter existing `StudentPlanPeriodEntity` rows.
 
 Behavior that must remain unchanged:
 
@@ -321,24 +321,24 @@ Affected files/classes/schemas/commands/UI surfaces:
 Concrete steps:
 
 - Write failing MainWindow/ViewModel test that `OpenManagePlansCommand` calls a plan catalog launcher.
-- Write failing ViewModel tests for loading all plans grouped or filterable by Draft, Active, and Archived state.
+- Write failing ViewModel tests for loading all plans grouped or filterable by Draft, Active, and Retired state.
 - Write failing ViewModel tests that selected Draft plans expose editable fields plus `Delete` and `Publish`.
-- Write failing ViewModel tests that selected Active plans expose read-only fields plus `Archive`.
-- Write failing ViewModel tests that selected Archived plans expose read-only fields plus `Publish`.
+- Write failing ViewModel tests that selected Active plans expose read-only fields plus `Retire`.
+- Write failing ViewModel tests that selected Retired plans expose read-only fields plus `Publish`.
 - Write failing ViewModel tests that irrelevant buttons are hidden or disabled for each state.
 - Add `Plan > Manage Plans` to `MainWindow.xaml`.
 - Add `IPlanCatalogLauncher` and `PlanCatalogWindowLauncher`.
-- Add `PlanCatalogViewModel` with commands for Add Draft, Save Draft, Delete Draft, Publish, Archive, Cancel/Close, and reload.
+- Add `PlanCatalogViewModel` with commands for Add Draft, Save Draft, Delete Draft, Publish Draft, Save Retire On, Retire, Reactivate, and reload.
 - Add `PlanCatalogView.xaml` with a list grouped by state and a selected-plan detail pane.
-- Bind field editability to selected plan state; Draft editable, Active/Archived read-only.
-- Use user-facing label `Archive` only for Active plans and `Delete` only for Draft plans.
+- Bind field editability to selected plan state; Draft editable, Active/Retired read-only.
+- Use user-facing label `Retire` only for Active plans and `Delete` only for Draft plans.
 - Wire repository/service/launcher in `App.xaml.cs`.
 
 Behavior that must remain unchanged:
 
 - Existing dashboard commands and menus continue to work.
 - State transitions require explicit user intent in the Manage Plans window.
-- UI state must mirror Core lifecycle rules and never imply active/archived plans are editable.
+- UI state must mirror Core lifecycle rules and never imply active/retired plans are editable.
 
 Tests to add/update:
 
@@ -391,8 +391,8 @@ Affected files/classes/schemas/commands/UI surfaces:
 Concrete steps:
 
 - Write failing tests that selecting an Active catalog plan for a student copies all plan fields into `SaveStudentRequest.PlanPeriods`.
-- Write failing tests that Draft and Archived plans are not offered for assignment.
-- Write failing tests that publishing/archive/republishing a catalog plan later does not alter the saved student plan period.
+- Write failing tests that Draft and Retired plans are not offered for assignment.
+- Write failing tests that publishing/retiring/reactivating a catalog plan later does not alter the saved student plan period.
 - Replace the placeholder `Add Plan` behavior with catalog-backed selection or a scoped assignment flow.
 - Ensure only Active plans are offered for new assignment.
 - Preserve current plan display and schedule behavior.
@@ -452,7 +452,7 @@ Affected files/classes/schemas/commands/UI surfaces:
 
 Concrete steps:
 
-- Update docs to describe `Plan > Manage Plans`, Draft/Active/Archived lifecycle, Draft-only editing/deletion, Active-only assignment, Active archive, Archived publish, and assigned-plan snapshots.
+- Update docs to describe `Plan > Manage Plans`, Draft/Active/Retired lifecycle, Draft-only editing/deletion, Active-only assignment, Active retire, Retired reactivate, and assigned-plan snapshots.
 - Search for stale `Add Plan` placeholder references.
 - Run focused `code-review` for use-case/persistence behavior.
 - Run focused `ui-review` for Manage Plans.
@@ -461,7 +461,7 @@ Concrete steps:
 Behavior that must remain unchanged:
 
 - Docs must not claim catalog lifecycle changes update existing students.
-- Docs must only use delete for Draft plans and archive for Active plans.
+- Docs must only use delete for Draft plans and retire for Active plans.
 
 Tests to add/update:
 
@@ -485,7 +485,7 @@ Rollback point:
 
 Stop/review criteria:
 
-- Stop if reviews find snapshot mutation risk or misleading archive UI.
+- Stop if reviews find snapshot mutation risk or misleading retire UI.
 
 Documentation impact:
 
@@ -508,7 +508,7 @@ dotnet build MySmallBusinessLedger.sln -nodeReuse:false
 dotnet test MySmallBusinessLedger.sln -nodeReuse:false
 ```
 
-- Use manual WPF checks for menu placement, Manage Plans layout, keyboard/tab flow, state grouping, read-only field behavior, Draft `Delete`/`Publish`, Active `Archive`, Archived `Publish`, and student assignment clarity.
+- Use manual WPF checks for menu placement, Manage Plans layout, keyboard/tab flow, state grouping, read-only field behavior, Draft `Delete`/`Publish`, Active `Retire`, Retired `Publish`, and student assignment clarity.
 
 ## Follow-On Review And Documentation
 
@@ -548,41 +548,44 @@ Exact user actions or commands:
 4. Edit the Draft plan and save it.
 5. Delete a separate Draft test plan and confirm it is removed.
 6. Publish the kept Draft plan and confirm it becomes Active.
-7. Confirm Active plan fields are read-only and only `Archive` is available.
-8. Archive the Active plan and confirm it becomes Archived.
-9. Confirm Archived plan fields are read-only and only `Publish` is available.
-10. Publish the Archived plan and confirm it becomes Active again.
-11. Confirm only Active plans appear in the student assignment list/default assignment flow.
-12. Open an existing student and confirm their already assigned plan data is unchanged.
-13. Assign an Active catalog plan to a test student if Stage 4 is complete.
-14. Write or preview an invoice for a student with an existing assigned plan and confirm pricing comes from the assigned snapshot, not from later plan lifecycle changes.
+7. Confirm Active plan fields are read-only except `Retire on`, and only `Save retire date` / `Retire` actions are available.
+8. Set a future `Retire on` date on the Active plan and confirm it saves.
+9. Retire the Active plan and confirm it becomes Retired.
+10. Confirm Retired plan fields are read-only and only `Reactivate` is available.
+11. Reactivate the Retired plan and confirm it becomes Active again with no `Retire on` date.
+12. Confirm the Manage Plans list columns appear as `Plan`, `Price`, `Duration`, `Lessons`, `Students`, `State`.
+13. Resize the Manage Plans window and list columns, close/reopen it, and confirm size/placement and column widths are remembered.
+14. Confirm only Active plans appear in the student assignment list/default assignment flow.
+15. Open an existing student and confirm their already assigned plan data is unchanged.
+16. Assign an Active catalog plan to a test student if Stage 4 is complete.
+17. Write or preview an invoice for a student with an existing assigned plan and confirm pricing comes from the assigned snapshot, not from later plan lifecycle changes.
 
 Expected successful result:
 
 - Manage Plans opens from the Plan menu.
 - Draft plans can be edited, deleted, and published.
-- Active plans are read-only and can only be archived.
-- Archived plans are read-only and can only be published.
+- Active plans are read-only except `Retire on`, and can only be retired.
+- Retired plans are read-only and can only be reactivated.
 - Only Active plans can be assigned to students.
 - Existing student plan periods and invoice data remain unchanged after plan lifecycle changes.
 
 Expected failure/safety result, if relevant:
 
 - Invalid Draft plan data shows validation and does not save.
-- Active and Archived plan edit attempts are rejected even if triggered outside the UI.
-- Draft and Archived plans are hidden from normal future assignment.
+- Active plan content edits and Retired plan edit attempts are rejected even if triggered outside the UI.
+- Draft and Retired plans are hidden from normal future assignment.
 - Catalog persistence failure reports an error without changing student plan data.
 
 Where to inspect artifacts, reports, logs, database state, or UI state:
 
-- Manage Plans window Draft/Active/Archived plan display.
+- Manage Plans window Draft/Active/Retired plan display.
 - Student editor current plan display.
 - `%APPDATA%\visualtech.dk\MySmallBusinessLedger\ledger.db` for durable catalog data.
 - Invoice preview/issued invoice lines for assigned plan snapshot values.
 
 Cleanup/reset instructions:
 
-- Archive Active test catalog plans rather than deleting database rows.
+- Retire Active test catalog plans rather than deleting database rows.
 - Delete only throwaway Draft plans.
 - Use a disposable test database if repeated catalog experiments become noisy.
 
@@ -591,7 +594,7 @@ Cleanup/reset instructions:
 - 2026-06-17:
   - Stage: Plan creation
   - Files changed: `.ai/implementation-plans/active/2026-06-17-plan-catalog-management.md`
-  - Summary: Created initial plan for independent Plan catalog management; later revised to the stricter Draft/Active/Archived immutable lifecycle.
+  - Summary: Created initial plan for independent Plan catalog management; later revised to the stricter Draft/Active/Retired immutable lifecycle.
   - Tests/verification run: Not run; planning-only change.
   - Results: Plan ready for execution.
   - Deviations: None.
@@ -599,7 +602,7 @@ Cleanup/reset instructions:
 - 2026-06-17:
   - Stage: Plan lifecycle revision
   - Files changed: `.ai/implementation-plans/active/2026-06-17-plan-catalog-management.md`
-  - Summary: Revised plan to make Plans immutable after publishing, with Draft, Active, and Archived states. Draft plans can be edited/deleted/published; Active plans can only be archived; Archived plans can only be published; only Active plans can be assigned to students.
+  - Summary: Revised plan to make Plans immutable after publishing, with Draft, Active, and Retired states. Draft plans can be edited/deleted/published; Active plans can only be retired; Retired plans can only be published; only Active plans can be assigned to students.
   - Tests/verification run: Not run; planning-only change.
   - Results: Plan updated for lifecycle-driven implementation.
   - Deviations: Replaced prior editable catalog plan model with a stricter lifecycle state machine.
@@ -607,7 +610,7 @@ Cleanup/reset instructions:
 - 2026-06-17:
   - Stage: Stage 1 Core plan lifecycle contracts
   - Files changed: `src/MySmallBusinessLedger.Core/Plans/PlanCatalogState.cs`, `src/MySmallBusinessLedger.Core/Plans/PlanCatalogItem.cs`, `src/MySmallBusinessLedger.Core/Ports/IPlanCatalogRepository.cs`, `src/MySmallBusinessLedger.Core/UseCases/Plans/*`, `tests/MySmallBusinessLedger.Tests/Core/UseCases/PlanCatalogUseCaseTests.cs`
-  - Summary: Added Core plan catalog lifecycle types and use cases for Draft creation/edit/delete, Draft/Archived publish, Active archive, active-only assignment listing, and immutable Active/Archived state enforcement.
+  - Summary: Added Core plan catalog lifecycle types and use cases for Draft creation/edit/delete, Draft publish, Retired reactivate, Active retire, active-only assignment listing, and immutable Active/Retired state enforcement.
   - Tests/verification run: `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~PlanCatalog" -nodeReuse:false`
   - Results: Passed 9/9 focused plan catalog tests.
   - Deviations: Added `ListPlansUseCase` alongside `ListAssignablePlansUseCase` for Stage 3 use.
@@ -623,7 +626,7 @@ Cleanup/reset instructions:
 - 2026-06-17:
   - Stage: Stage 3 state-aware Manage Plans window and menu entry
   - Files changed: `src/MySmallBusinessLedger.App/Services/IPlanCatalogService.cs`, `src/MySmallBusinessLedger.App/Services/CorePlanCatalogService.cs`, `src/MySmallBusinessLedger.App/Services/IPlanCatalogLauncher.cs`, `src/MySmallBusinessLedger.App/Services/PlanCatalogWindowLauncher.cs`, `src/MySmallBusinessLedger.App/ViewModels/PlanCatalogDisplayModel.cs`, `src/MySmallBusinessLedger.App/ViewModels/PlanCatalogViewModel.cs`, `src/MySmallBusinessLedger.App/Views/PlanCatalogView.xaml`, `src/MySmallBusinessLedger.App/Views/PlanCatalogView.xaml.cs`, `src/MySmallBusinessLedger.App/MainWindow.xaml`, `src/MySmallBusinessLedger.App/ViewModels/MainWindowViewModel.cs`, `src/MySmallBusinessLedger.App/App.xaml.cs`, `tests/MySmallBusinessLedger.Tests/App/ViewModels/MainWindowViewModelTests.cs`, `tests/MySmallBusinessLedger.Tests/App/ViewModels/PlanCatalogViewModelTests.cs`
-  - Summary: Added `Plan > Manage Plans`, a launcher/service boundary, and a state-aware WPF catalog view where Draft plans are editable/deletable/publishable, Active plans are read-only/archive-only, and Archived plans are read-only/publishable.
+  - Summary: Added `Plan > Manage Plans`, a launcher/service boundary, and a state-aware WPF catalog view where Draft plans are editable/deletable/publishable, Active plans are read-only/retire-only, and Retired plans are read-only/publishable.
   - Tests/verification run: `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~PlanCatalogViewModelTests|FullyQualifiedName~ManagePlansCommand" -nodeReuse:false`
   - Results: Passed 10/10 focused Manage Plans tests.
   - Deviations: Used one cohesive `PlanCatalogViewModel` rather than adding a separate `PlanEditorViewModel`; the state gating is still split into display model fields, command availability, and Core use-case validation.
@@ -641,6 +644,14 @@ Cleanup/reset instructions:
   - Files changed: `README.md`, `.ai/project-profile.md`, `.ai/context/HANDOFF.md`, `docs/business-requirements-and-logic.md`, `.ai/implementation-plans/active/2026-06-17-plan-catalog-management.md`, plus Stage 1-4 source and test files.
   - Summary: Refreshed durable docs/context for Plan catalog lifecycle, Active-only assignment, and copied student plan snapshots. Performed a focused code/UI review, found one new-student fallback issue, and fixed it so new students require an Active catalog plan before save.
   - Tests/verification run: `rg -n "Add Plan.*placeholder|plan administration will be implemented|plan administration,|delete plan" README.md .ai docs src tests`; `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~EditorViewModelTests" -nodeReuse:false`; `dotnet build MySmallBusinessLedger.sln -nodeReuse:false`; `dotnet test MySmallBusinessLedger.sln -nodeReuse:false`
-  - Results: Stale live-source/docs references were clean; historical implementation-plan references remain as archival context. Editor tests passed 12/12. Full build passed with 0 warnings and 0 errors. Full test suite passed 148/148.
+  - Results: Stale live-source/docs references were clean; historical implementation-plan references remained as historical context at the time. Editor tests passed 12/12. Full build passed with 0 warnings and 0 errors. Full test suite passed 148/148.
   - Deviations: Plan remains under `active/` until Ruben completes the manual UI test instructions.
   - Risks/open questions: Manual WPF layout/keyboard review and final user test are still recommended; explicit EF migrations remain a possible future improvement before broader distribution.
+- 2026-06-17:
+  - Stage: Stage 6 Retire language, Retire on scheduling, and Manage Plans polish
+  - Files changed: `src/MySmallBusinessLedger.Core/Plans/PlanCatalogState.cs`, `src/MySmallBusinessLedger.Core/Plans/PlanCatalogItem.cs`, `src/MySmallBusinessLedger.Core/UseCases/Plans/*`, `src/MySmallBusinessLedger.Infrastructure/Persistence/Entities.cs`, `src/MySmallBusinessLedger.Infrastructure/Persistence/SqlitePlanCatalogRepository.cs`, `src/MySmallBusinessLedger.Infrastructure/Persistence/SqliteSchemaInitializer.cs`, `src/MySmallBusinessLedger.App/App.xaml.cs`, `src/MySmallBusinessLedger.App/Services/*PlanCatalog*`, `src/MySmallBusinessLedger.App/Services/DataGridColumnWidthStore.cs`, `src/MySmallBusinessLedger.App/ViewModels/PlanCatalog*`, `src/MySmallBusinessLedger.App/Views/PlanCatalogView.*`, `tests/MySmallBusinessLedger.Tests/**/*PlanCatalog*`, `tests/MySmallBusinessLedger.Tests/Infrastructure/Persistence/SqlitePersistenceTests.cs`, `tests/MySmallBusinessLedger.Tests/App/ViewModels/EditorViewModelTests.cs`, `README.md`, `.ai/project-profile.md`, `.ai/context/HANDOFF.md`, `docs/business-requirements-and-logic.md`
+  - Summary: Standardized plan lifecycle user and domain language on Retire/Retired and Reactivate. Added nullable `RetireOn`, active-only due retirement at app startup with a visible warning if persistence rejects the update, active-plan retire-date updates, Reactivate clearing `RetireOn`, Retired assignment exclusion, Manage Plans column order, polished action labels, remembered Manage Plans column widths, and compatibility handling for existing databases that still store the legacy state value.
+  - Tests/verification run: terminology scan for legacy plan API and UI wording; `dotnet build MySmallBusinessLedger.sln -nodeReuse:false`; `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~PlanCatalog" -nodeReuse:false`; `dotnet test MySmallBusinessLedger.sln -nodeReuse:false`
+  - Results: Search returns only intentional legacy database compatibility literals/test names. Build passed with 0 warnings and 0 errors. Focused PlanCatalog tests passed 26/26. Full test suite passed 153/153.
+  - Deviations: Kept the legacy pre-rename state literal only inside schema compatibility code/tests so pilot databases created before this rename can still open.
+  - Risks/open questions: Manual WPF check still recommended for the exact Manage Plans layout, remembered column widths, and startup due-retirement behavior against Ruben's real database.

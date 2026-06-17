@@ -77,6 +77,7 @@ public sealed class SqlitePlanCatalogRepository : IPlanCatalogRepository
         entity.Flexibility = plan.Flexibility;
         entity.NumberOfStudents = plan.NumberOfStudents;
         entity.EffectiveFrom = plan.EffectiveFrom;
+        entity.RetireOn = plan.RetireOn;
         entity.State = plan.State;
 
         try
@@ -118,5 +119,6 @@ public sealed class SqlitePlanCatalogRepository : IPlanCatalogRepository
             entity.Flexibility,
             entity.NumberOfStudents,
             entity.EffectiveFrom,
+            entity.RetireOn,
             entity.State);
 }

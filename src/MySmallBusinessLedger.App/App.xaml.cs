@@ -41,6 +41,18 @@ public partial class App : Application
         var companyProfileRepository = new SqliteCompanyProfileRepository(CreateContext);
         var calendarSettingsRepository = new SqliteCalendarSettingsRepository(CreateContext);
         var planCatalogRepository = new SqlitePlanCatalogRepository(CreateContext);
+        var systemClock = new SystemUiClock();
+        var planCatalogService = new CorePlanCatalogService(planCatalogRepository);
+        var retireDueResult = planCatalogService.RetireDueAsync(systemClock.Now, CancellationToken.None).GetAwaiter().GetResult();
+        if (!retireDueResult.Succeeded)
+        {
+            MessageBox.Show(
+                retireDueResult.Errors.FirstOrDefault()?.Message ?? "Scheduled plan retirement could not be completed.",
+                "Plan retirement failed",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+
         var googleOAuthClientConfigurationProvider = new GoogleOAuthClientConfigurationProvider(
             GoogleOAuthClientConfigurationProvider.CreateDefaultConfigurationPath());
         var googleCalendarClientFactory = new GoogleCalendarClientFactory(
@@ -53,8 +65,6 @@ public partial class App : Application
             googleCalendarClientFactory.CreateAsync,
             TimeZoneInfo.Local,
             DefaultLessonDuration);
-        var systemClock = new SystemUiClock();
-
         var studentEditorService = new CoreStudentEditorService(studentRepository);
         var lessonEditorService = new CoreLessonEditorService(
             new AddLessonUseCase(calendarGateway),
@@ -68,7 +78,6 @@ public partial class App : Application
             new QuestPdfInvoicePdfWriter(),
             new SavedPdfPrinter(new ShellPrintProcessLauncher()));
         var invoiceWorkflowLauncher = new InvoiceWorkflowWindowLauncher(invoiceWorkflowService, systemClock);
-        var planCatalogService = new CorePlanCatalogService(planCatalogRepository);
         var settingsService = new CoreAppSettingsService(
             companyProfileRepository,
             calendarSettingsRepository,

@@ -9,6 +9,31 @@
         WindowStartupLocation="CenterOwner">
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+        <Style x:Key="PlanActionButtonStyle"
+               TargetType="Button">
+            <Setter Property="MinWidth"
+                    Value="88" />
+            <Setter Property="Height"
+                    Value="28" />
+            <Setter Property="Padding"
+                    Value="10,0" />
+            <Setter Property="Margin"
+                    Value="0,0,8,8" />
+        </Style>
+        <Style x:Key="TopPlanActionButtonStyle"
+               TargetType="Button"
+               BasedOn="{StaticResource PlanActionButtonStyle}">
+            <Setter Property="HorizontalAlignment"
+                    Value="Right" />
+            <Setter Property="Margin"
+                    Value="8,0,0,10" />
+        </Style>
+        <Style x:Key="RightPlanActionButtonStyle"
+               TargetType="Button"
+               BasedOn="{StaticResource PlanActionButtonStyle}">
+            <Setter Property="Margin"
+                    Value="8,0,0,8" />
+        </Style>
     </Window.Resources>
 
     <DockPanel Margin="16">
@@ -44,25 +69,17 @@
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
-                <Grid Margin="0,0,0,10">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Text="Plans"
-                               FontSize="18"
-                               FontWeight="SemiBold"
-                               VerticalAlignment="Center" />
-                    <Button Grid.Column="1"
-                            Content="Add Plan"
-                            Command="{Binding AddDraftPlanCommand}"
-                            MinWidth="88"
-                            Height="28" />
-                </Grid>
+                <TextBlock Text="Plans"
+                           FontSize="18"
+                           FontWeight="SemiBold"
+                           VerticalAlignment="Center"
+                           Margin="0,0,0,10" />
 
-                <DataGrid Grid.Row="1"
+                <DataGrid x:Name="PlansGrid"
+                          Grid.Row="1"
                           ItemsSource="{Binding PlansView}"
                           SelectedItem="{Binding SelectedPlan}"
                           AutoGenerateColumns="False"
@@ -84,82 +101,130 @@
                         </GroupStyle>
                     </DataGrid.GroupStyle>
                     <DataGrid.Columns>
-                        <DataGridTextColumn Header="Name"
+                        <DataGridTextColumn Header="Plan"
                                             Binding="{Binding Name}"
                                             Width="*" />
                         <DataGridTextColumn Header="Price"
                                             Binding="{Binding PriceWithoutVatText}"
+                                            Width="90" />
+                        <DataGridTextColumn Header="Duration"
+                                            Binding="{Binding DurationMinutesText}"
+                                            Width="90" />
+                        <DataGridTextColumn Header="Lessons"
+                                            Binding="{Binding LessonsPerWeekText}"
+                                            Width="120" />
+                        <DataGridTextColumn Header="Students"
+                                            Binding="{Binding NumberOfStudentsText}"
                                             Width="90" />
                         <DataGridTextColumn Header="State"
                                             Binding="{Binding StateText}"
                                             Width="100" />
                     </DataGrid.Columns>
                 </DataGrid>
+
+                <Button Grid.Row="2"
+                        Grid.Column="0"
+                        Content="Add Plan"
+                        Command="{Binding AddDraftPlanCommand}"
+                        MinWidth="88"
+                        Height="28"
+                        HorizontalAlignment="Left"
+                        Margin="0,14,0,0" />
             </Grid>
 
-            <StackPanel Grid.Column="2">
-                <TextBlock Text="Selected Plan"
-                           FontSize="18"
-                           FontWeight="SemiBold"
-                           Margin="0,0,0,10" />
-                <TextBlock Text="Name" />
-                <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
-                         IsEnabled="{Binding CanEditSelectedPlanFields}"
-                         Margin="0,3,0,8" />
-                <TextBlock Text="Price without VAT" />
-                <TextBox Text="{Binding PriceWithoutVat, UpdateSourceTrigger=PropertyChanged}"
-                         IsEnabled="{Binding CanEditSelectedPlanFields}"
-                         Margin="0,3,0,8" />
-                <TextBlock Text="Lessons per week" />
-                <ComboBox ItemsSource="{Binding LessonsPerWeekOptions}"
-                          SelectedItem="{Binding LessonsPerWeek}"
-                          IsEnabled="{Binding CanEditSelectedPlanFields}"
-                          Margin="0,3,0,8" />
-                <TextBlock Text="Duration minutes" />
-                <TextBox Text="{Binding DurationMinutes, UpdateSourceTrigger=PropertyChanged}"
-                         IsEnabled="{Binding CanEditSelectedPlanFields}"
-                         Margin="0,3,0,8" />
-                <TextBlock Text="Flexibility" />
-                <ComboBox ItemsSource="{Binding FlexibilityOptions}"
-                          SelectedItem="{Binding Flexibility}"
-                          IsEnabled="{Binding CanEditSelectedPlanFields}"
-                          Margin="0,3,0,8" />
-                <TextBlock Text="Number of students" />
-                <TextBox Text="{Binding NumberOfStudents, UpdateSourceTrigger=PropertyChanged}"
-                         IsEnabled="{Binding CanEditSelectedPlanFields}"
-                         Margin="0,3,0,8" />
-                <TextBlock Text="Effective date" />
-                <DatePicker SelectedDate="{Binding EffectiveDate, UpdateSourceTrigger=PropertyChanged}"
-                            IsEnabled="{Binding CanEditSelectedPlanFields}"
-                            Margin="0,3,0,14" />
+            <Grid Grid.Column="2">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
 
-                <WrapPanel>
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Selected Plan"
+                               FontSize="18"
+                               FontWeight="SemiBold"
+                               VerticalAlignment="Center"
+                               Margin="0,0,0,10" />
+                    <Button Grid.Column="1"
+                            Content="Publish draft"
+                            Command="{Binding PublishDraftPlanCommand}"
+                            Visibility="{Binding CanPublishDraftSelectedPlan, Converter={StaticResource BooleanToVisibilityConverter}}"
+                            Style="{StaticResource TopPlanActionButtonStyle}" />
+                    <Button Grid.Column="1"
+                            Content="Reactivate"
+                            Command="{Binding ReactivatePlanCommand}"
+                            Visibility="{Binding CanReactivateSelectedPlan, Converter={StaticResource BooleanToVisibilityConverter}}"
+                            Style="{StaticResource TopPlanActionButtonStyle}" />
+                </Grid>
+
+                <StackPanel Grid.Row="1">
+                    <TextBlock Text="Name" />
+                    <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
+                             IsEnabled="{Binding CanEditSelectedPlanFields}"
+                             Margin="0,3,0,8" />
+                    <TextBlock Text="Price without VAT" />
+                    <TextBox Text="{Binding PriceWithoutVat, UpdateSourceTrigger=PropertyChanged}"
+                             IsEnabled="{Binding CanEditSelectedPlanFields}"
+                             Margin="0,3,0,8" />
+                    <TextBlock Text="Lessons per week" />
+                    <ComboBox ItemsSource="{Binding LessonsPerWeekOptions}"
+                              SelectedItem="{Binding LessonsPerWeek}"
+                              IsEnabled="{Binding CanEditSelectedPlanFields}"
+                              Margin="0,3,0,8" />
+                    <TextBlock Text="Duration minutes" />
+                    <TextBox Text="{Binding DurationMinutes, UpdateSourceTrigger=PropertyChanged}"
+                             IsEnabled="{Binding CanEditSelectedPlanFields}"
+                             Margin="0,3,0,8" />
+                    <TextBlock Text="Flexibility" />
+                    <ComboBox ItemsSource="{Binding FlexibilityOptions}"
+                              SelectedItem="{Binding Flexibility}"
+                              IsEnabled="{Binding CanEditSelectedPlanFields}"
+                              Margin="0,3,0,8" />
+                    <TextBlock Text="Number of students" />
+                    <TextBox Text="{Binding NumberOfStudents, UpdateSourceTrigger=PropertyChanged}"
+                             IsEnabled="{Binding CanEditSelectedPlanFields}"
+                             Margin="0,3,0,8" />
+                    <TextBlock Text="Effective date" />
+                    <DatePicker SelectedDate="{Binding EffectiveDate, UpdateSourceTrigger=PropertyChanged}"
+                                IsEnabled="{Binding CanEditSelectedPlanFields}"
+                                Margin="0,3,0,8" />
+                    <TextBlock Text="Retire on" />
+                    <DatePicker SelectedDate="{Binding RetireOnDate, UpdateSourceTrigger=PropertyChanged}"
+                                IsEnabled="{Binding CanEditSelectedPlanRetireOn}"
+                                Margin="0,3,0,14" />
+                </StackPanel>
+
+                <Grid Grid.Row="2">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
                     <Button Content="Save Draft"
                             Command="{Binding SaveDraftPlanCommand}"
                             Visibility="{Binding CanEditSelectedPlanFields, Converter={StaticResource BooleanToVisibilityConverter}}"
-                            MinWidth="90"
-                            Height="28"
-                            Margin="0,0,8,8" />
-                    <Button Content="Delete"
+                            HorizontalAlignment="Left"
+                            Style="{StaticResource PlanActionButtonStyle}" />
+                    <Button Content="Save retire date"
+                            Command="{Binding SaveRetireOnCommand}"
+                            Visibility="{Binding CanSaveSelectedPlanRetireOn, Converter={StaticResource BooleanToVisibilityConverter}}"
+                            HorizontalAlignment="Left"
+                            Style="{StaticResource PlanActionButtonStyle}" />
+                    <Button Grid.Column="1"
+                            Content="Delete draft"
                             Command="{Binding DeleteDraftPlanCommand}"
                             Visibility="{Binding CanDeleteSelectedPlan, Converter={StaticResource BooleanToVisibilityConverter}}"
-                            MinWidth="78"
-                            Height="28"
-                            Margin="0,0,8,8" />
-                    <Button Content="Publish"
-                            Command="{Binding PublishPlanCommand}"
-                            Visibility="{Binding CanPublishSelectedPlan, Converter={StaticResource BooleanToVisibilityConverter}}"
-                            MinWidth="78"
-                            Height="28"
-                            Margin="0,0,8,8" />
-                    <Button Content="Archive"
-                            Command="{Binding ArchivePlanCommand}"
-                            Visibility="{Binding CanArchiveSelectedPlan, Converter={StaticResource BooleanToVisibilityConverter}}"
-                            MinWidth="78"
-                            Height="28"
-                            Margin="0,0,8,8" />
-                </WrapPanel>
-            </StackPanel>
+                            Style="{StaticResource RightPlanActionButtonStyle}" />
+                    <Button Grid.Column="1"
+                            Content="Retire"
+                            Command="{Binding RetirePlanCommand}"
+                            Visibility="{Binding CanRetireSelectedPlan, Converter={StaticResource BooleanToVisibilityConverter}}"
+                            Style="{StaticResource RightPlanActionButtonStyle}" />
+                </Grid>
+            </Grid>
         </Grid>
     </DockPanel>
 </Window>

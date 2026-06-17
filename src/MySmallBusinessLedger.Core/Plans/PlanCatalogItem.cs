@@ -9,9 +9,10 @@ public sealed record PlanCatalogItem(
     PlanFlexibility Flexibility,
     int NumberOfStudents,
     DateTimeOffset EffectiveFrom,
+    DateTimeOffset? RetireOn,
     PlanCatalogState State)
 {
     public bool CanBeAssigned => State == PlanCatalogState.Active;
 
-    public bool IsImmutable => State is PlanCatalogState.Active or PlanCatalogState.Archived;
+    public bool IsImmutable => State is PlanCatalogState.Active or PlanCatalogState.Retired;
 }

@@ -11,6 +11,7 @@ public partial class PlanCatalogView : Window
         InitializeComponent();
         DataContext = viewModel;
         WindowPlacementStore.Attach(this, nameof(PlanCatalogView));
+        DataGridColumnWidthStore.Attach(PlansGrid, nameof(PlanCatalogView) + ".PlansGrid");
     }
 
     private void OnClose(object sender, RoutedEventArgs e)

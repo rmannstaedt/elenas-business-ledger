@@ -70,10 +70,12 @@ The Plan is an agreement between teacher and student and determines how many les
 
 Plan catalog entries have a lifecycle:
   * Draft: editable and deletable, but not assignable to students.
-  * Active: immutable and assignable to students; the only allowed catalog action is Archive.
-  * Archived: immutable and not assignable to students; the only allowed catalog action is Publish.
+  * Active: immutable and assignable to students; the only editable field is `Retire on`, and the allowed catalog action is Retire.
+  * Retired: immutable and not assignable to students; the only allowed catalog action is Reactivate.
 
-Plans are managed independently from Students from the Plan menu. When an Active catalog Plan is assigned to a Student, the Plan fields are copied into that Student's plan period. After that assignment, catalog edits while Draft, publish/archive/republish actions, and future catalog cleanup must not mutate existing Student plan periods or issued invoices.
+Plans are managed independently from Students from the Plan menu. When an Active catalog Plan is assigned to a Student, the Plan fields are copied into that Student's plan period. After that assignment, catalog edits while Draft, publish/retire/reactivate actions, and future catalog cleanup must not mutate existing Student plan periods or issued invoices.
+
+An Active Plan's `Retire on` date is equivalent to choosing Retire on that date. When the application starts, due Active Plans are moved to Retired so they no longer appear for new student assignment. Existing Student plan periods keep their copied Plan data until the Student is explicitly moved to another Active Plan.
 
 Students may be moved to a different Active Plan by creating a new assigned student plan period.
 
@@ -142,7 +144,7 @@ The application contains a Student menu with these entries:
 The application contains a Plan menu with:
   * Manage Plans
 
-Manage Plans lists Draft, Active, and Archived catalog Plans. Draft Plans can be edited, deleted, and published. Active Plans are read-only and can be archived. Archived Plans are read-only and can be published. Only Active Plans appear in the Student editor assignment selector.
+Manage Plans lists Draft, Active, and Retired catalog Plans. Draft Plans can be edited, deleted, and published. Active Plans are read-only except for `Retire on`, and can be retired. Retired Plans are read-only and can be reactivated. Only Active Plans appear in the Student editor assignment selector.
 
 The application window also displays a pane with Student Invoices.
 Each Invoice in the list has a flag: Paid / Outstanding

@@ -4,11 +4,11 @@ using MySmallBusinessLedger.Core.Ports;
 
 namespace MySmallBusinessLedger.Core.UseCases.Plans;
 
-public sealed class ArchivePlanUseCase
+public sealed class RetirePlanUseCase
 {
     private readonly IPlanCatalogRepository planCatalogRepository;
 
-    public ArchivePlanUseCase(IPlanCatalogRepository planCatalogRepository)
+    public RetirePlanUseCase(IPlanCatalogRepository planCatalogRepository)
     {
         this.planCatalogRepository = planCatalogRepository;
     }
@@ -25,9 +25,9 @@ public sealed class ArchivePlanUseCase
         if (plan.State != PlanCatalogState.Active)
         {
             return OperationResult<PlanCatalogItem>.Failure(
-                new ValidationError("Plan.ArchiveRequiresActive", "Only active plans can be archived."));
+                new ValidationError("Plan.RetireRequiresActive", "Only active plans can be retired."));
         }
 
-        return await planCatalogRepository.SaveAsync(plan with { State = PlanCatalogState.Archived }, cancellationToken);
+        return await planCatalogRepository.SaveAsync(plan with { State = PlanCatalogState.Retired }, cancellationToken);
     }
 }

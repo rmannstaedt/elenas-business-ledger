@@ -13,7 +13,10 @@ public sealed class CorePlanCatalogService : IPlanCatalogService
     private readonly UpdateDraftPlanUseCase updateDraftPlanUseCase;
     private readonly DeleteDraftPlanUseCase deleteDraftPlanUseCase;
     private readonly PublishPlanUseCase publishPlanUseCase;
-    private readonly ArchivePlanUseCase archivePlanUseCase;
+    private readonly RetirePlanUseCase retirePlanUseCase;
+    private readonly ReactivatePlanUseCase reactivatePlanUseCase;
+    private readonly UpdatePlanRetireOnUseCase updatePlanRetireOnUseCase;
+    private readonly RetireDuePlansUseCase retireDuePlansUseCase;
 
     public CorePlanCatalogService(IPlanCatalogRepository planCatalogRepository)
     {
@@ -23,7 +26,10 @@ public sealed class CorePlanCatalogService : IPlanCatalogService
         updateDraftPlanUseCase = new UpdateDraftPlanUseCase(planCatalogRepository);
         deleteDraftPlanUseCase = new DeleteDraftPlanUseCase(planCatalogRepository);
         publishPlanUseCase = new PublishPlanUseCase(planCatalogRepository);
-        archivePlanUseCase = new ArchivePlanUseCase(planCatalogRepository);
+        retirePlanUseCase = new RetirePlanUseCase(planCatalogRepository);
+        reactivatePlanUseCase = new ReactivatePlanUseCase(planCatalogRepository);
+        updatePlanRetireOnUseCase = new UpdatePlanRetireOnUseCase(planCatalogRepository);
+        retireDuePlansUseCase = new RetireDuePlansUseCase(planCatalogRepository);
     }
 
     public async Task<IReadOnlyList<PlanCatalogItem>> ListAsync(CancellationToken cancellationToken)
@@ -52,9 +58,21 @@ public sealed class CorePlanCatalogService : IPlanCatalogService
     public Task<OperationResult<bool>> DeleteDraftAsync(int planId, CancellationToken cancellationToken) =>
         deleteDraftPlanUseCase.ExecuteAsync(planId, cancellationToken);
 
-    public Task<OperationResult<PlanCatalogItem>> PublishAsync(int planId, CancellationToken cancellationToken) =>
+    public Task<OperationResult<PlanCatalogItem>> PublishDraftAsync(int planId, CancellationToken cancellationToken) =>
         publishPlanUseCase.ExecuteAsync(planId, cancellationToken);
 
-    public Task<OperationResult<PlanCatalogItem>> ArchiveAsync(int planId, CancellationToken cancellationToken) =>
-        archivePlanUseCase.ExecuteAsync(planId, cancellationToken);
+    public Task<OperationResult<PlanCatalogItem>> RetireAsync(int planId, CancellationToken cancellationToken) =>
+        retirePlanUseCase.ExecuteAsync(planId, cancellationToken);
+
+    public Task<OperationResult<PlanCatalogItem>> ReactivateAsync(int planId, CancellationToken cancellationToken) =>
+        reactivatePlanUseCase.ExecuteAsync(planId, cancellationToken);
+
+    public Task<OperationResult<PlanCatalogItem>> UpdateRetireOnAsync(
+        int planId,
+        DateTimeOffset? retireOn,
+        CancellationToken cancellationToken) =>
+        updatePlanRetireOnUseCase.ExecuteAsync(planId, retireOn, cancellationToken);
+
+    public Task<OperationResult<int>> RetireDueAsync(DateTimeOffset now, CancellationToken cancellationToken) =>
+        retireDuePlansUseCase.ExecuteAsync(now, cancellationToken);
 }

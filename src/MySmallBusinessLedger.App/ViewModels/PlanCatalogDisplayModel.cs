@@ -21,9 +21,21 @@ public sealed class PlanCatalogDisplayModel
     {
         PlanCatalogState.Draft => "Draft",
         PlanCatalogState.Active => "Active",
-        PlanCatalogState.Archived => "Archived",
+        PlanCatalogState.Retired => "Retired",
         _ => "Unknown"
     };
 
     public string PriceWithoutVatText => Plan.PriceWithoutVat.ToString("0.##");
+
+    public string DurationMinutesText => Plan.DurationMinutes.ToString();
+
+    public string LessonsPerWeekText => Plan.LessonsPerWeek switch
+    {
+        LessonsPerWeek.One => "1 / week",
+        LessonsPerWeek.Two => "2 / week",
+        LessonsPerWeek.ByAppointment => "By appointment",
+        _ => Plan.LessonsPerWeek.ToString()
+    };
+
+    public string NumberOfStudentsText => Plan.NumberOfStudents.ToString();
 }

@@ -19,6 +19,7 @@ public sealed class PlanCatalogViewModel : ViewModelBase
     private PlanFlexibility flexibility = PlanFlexibility.MoveOrCancelByAgreement;
     private int numberOfStudents = 1;
     private DateTime effectiveDate = new DateOnly(2026, 1, 1).ToDateTime(TimeOnly.MinValue);
+    private DateTime? retireOnDate;
     private string? errorMessage;
 
     public PlanCatalogViewModel(IPlanCatalogService planCatalogService)
@@ -30,8 +31,10 @@ public sealed class PlanCatalogViewModel : ViewModelBase
         AddDraftPlanCommand = new AsyncRelayCommand(AddDraftPlanAsync);
         SaveDraftPlanCommand = new AsyncRelayCommand(SaveDraftPlanAsync, () => CanEditSelectedPlanFields);
         DeleteDraftPlanCommand = new AsyncRelayCommand(DeleteDraftPlanAsync, () => CanDeleteSelectedPlan);
-        PublishPlanCommand = new AsyncRelayCommand(PublishPlanAsync, () => CanPublishSelectedPlan);
-        ArchivePlanCommand = new AsyncRelayCommand(ArchivePlanAsync, () => CanArchiveSelectedPlan);
+        PublishDraftPlanCommand = new AsyncRelayCommand(PublishDraftPlanAsync, () => CanPublishDraftSelectedPlan);
+        SaveRetireOnCommand = new AsyncRelayCommand(SaveRetireOnAsync, () => CanSaveSelectedPlanRetireOn);
+        RetirePlanCommand = new AsyncRelayCommand(RetirePlanAsync, () => CanRetireSelectedPlan);
+        ReactivatePlanCommand = new AsyncRelayCommand(ReactivatePlanAsync, () => CanReactivateSelectedPlan);
     }
 
     public ObservableCollection<PlanCatalogDisplayModel> Plans { get; } = [];
@@ -70,13 +73,21 @@ public sealed class PlanCatalogViewModel : ViewModelBase
 
     public DateTime EffectiveDate { get => effectiveDate; set => SetProperty(ref effectiveDate, value); }
 
+    public DateTime? RetireOnDate { get => retireOnDate; set => SetProperty(ref retireOnDate, value); }
+
     public bool CanEditSelectedPlanFields => SelectedPlan?.State == PlanCatalogState.Draft;
+
+    public bool CanEditSelectedPlanRetireOn => SelectedPlan?.State is PlanCatalogState.Draft or PlanCatalogState.Active;
 
     public bool CanDeleteSelectedPlan => SelectedPlan?.State == PlanCatalogState.Draft;
 
-    public bool CanPublishSelectedPlan => SelectedPlan?.State is PlanCatalogState.Draft or PlanCatalogState.Archived;
+    public bool CanPublishDraftSelectedPlan => SelectedPlan?.State == PlanCatalogState.Draft;
 
-    public bool CanArchiveSelectedPlan => SelectedPlan?.State == PlanCatalogState.Active;
+    public bool CanSaveSelectedPlanRetireOn => SelectedPlan?.State == PlanCatalogState.Active;
+
+    public bool CanRetireSelectedPlan => SelectedPlan?.State == PlanCatalogState.Active;
+
+    public bool CanReactivateSelectedPlan => SelectedPlan?.State == PlanCatalogState.Retired;
 
     public string? ErrorMessage
     {
@@ -98,9 +109,13 @@ public sealed class PlanCatalogViewModel : ViewModelBase
 
     public AsyncRelayCommand DeleteDraftPlanCommand { get; }
 
-    public AsyncRelayCommand PublishPlanCommand { get; }
+    public AsyncRelayCommand PublishDraftPlanCommand { get; }
 
-    public AsyncRelayCommand ArchivePlanCommand { get; }
+    public AsyncRelayCommand SaveRetireOnCommand { get; }
+
+    public AsyncRelayCommand RetirePlanCommand { get; }
+
+    public AsyncRelayCommand ReactivatePlanCommand { get; }
 
     public Task LoadAsync() => ReloadAsync();
 
@@ -114,7 +129,8 @@ public sealed class PlanCatalogViewModel : ViewModelBase
                 DurationMinutes: 60,
                 PlanFlexibility.MoveOrCancelByAgreement,
                 NumberOfStudents: 1,
-                new DateTimeOffset(EffectiveDate.Date, TimeSpan.Zero)),
+                new DateTimeOffset(EffectiveDate.Date, TimeSpan.Zero),
+                RetireOn: null),
             CancellationToken.None);
         if (!result.Succeeded)
         {
@@ -165,17 +181,17 @@ public sealed class PlanCatalogViewModel : ViewModelBase
         await ReloadAsync();
     }
 
-    private async Task PublishPlanAsync()
+    private async Task PublishDraftPlanAsync()
     {
         if (SelectedPlan is null)
         {
             return;
         }
 
-        var result = await planCatalogService.PublishAsync(SelectedPlan.Id, CancellationToken.None);
+        var result = await planCatalogService.PublishDraftAsync(SelectedPlan.Id, CancellationToken.None);
         if (!result.Succeeded)
         {
-            SetError(result.Errors.FirstOrDefault()?.Message ?? "Plan could not be published.");
+            SetError(result.Errors.FirstOrDefault()?.Message ?? "Draft plan could not be published.");
             return;
         }
 
@@ -183,17 +199,56 @@ public sealed class PlanCatalogViewModel : ViewModelBase
         await ReloadAsync(result.Value!.Id);
     }
 
-    private async Task ArchivePlanAsync()
+    private async Task SaveRetireOnAsync()
     {
         if (SelectedPlan is null)
         {
             return;
         }
 
-        var result = await planCatalogService.ArchiveAsync(SelectedPlan.Id, CancellationToken.None);
+        var result = await planCatalogService.UpdateRetireOnAsync(
+            SelectedPlan.Id,
+            ToRetireOn(),
+            CancellationToken.None);
         if (!result.Succeeded)
         {
-            SetError(result.Errors.FirstOrDefault()?.Message ?? "Plan could not be archived.");
+            SetError(result.Errors.FirstOrDefault()?.Message ?? "Retire on could not be saved.");
+            return;
+        }
+
+        ErrorMessage = null;
+        await ReloadAsync(result.Value!.Id);
+    }
+
+    private async Task RetirePlanAsync()
+    {
+        if (SelectedPlan is null)
+        {
+            return;
+        }
+
+        var result = await planCatalogService.RetireAsync(SelectedPlan.Id, CancellationToken.None);
+        if (!result.Succeeded)
+        {
+            SetError(result.Errors.FirstOrDefault()?.Message ?? "Plan could not be retired.");
+            return;
+        }
+
+        ErrorMessage = null;
+        await ReloadAsync(result.Value!.Id);
+    }
+
+    private async Task ReactivatePlanAsync()
+    {
+        if (SelectedPlan is null)
+        {
+            return;
+        }
+
+        var result = await planCatalogService.ReactivateAsync(SelectedPlan.Id, CancellationToken.None);
+        if (!result.Succeeded)
+        {
+            SetError(result.Errors.FirstOrDefault()?.Message ?? "Plan could not be reactivated.");
             return;
         }
 
@@ -229,16 +284,22 @@ public sealed class PlanCatalogViewModel : ViewModelBase
             Flexibility = plan.Flexibility;
             NumberOfStudents = plan.NumberOfStudents;
             EffectiveDate = plan.EffectiveFrom.Date;
+            RetireOnDate = plan.RetireOn?.Date;
         }
 
         OnPropertyChanged(nameof(CanEditSelectedPlanFields));
+        OnPropertyChanged(nameof(CanEditSelectedPlanRetireOn));
         OnPropertyChanged(nameof(CanDeleteSelectedPlan));
-        OnPropertyChanged(nameof(CanPublishSelectedPlan));
-        OnPropertyChanged(nameof(CanArchiveSelectedPlan));
+        OnPropertyChanged(nameof(CanPublishDraftSelectedPlan));
+        OnPropertyChanged(nameof(CanSaveSelectedPlanRetireOn));
+        OnPropertyChanged(nameof(CanRetireSelectedPlan));
+        OnPropertyChanged(nameof(CanReactivateSelectedPlan));
         SaveDraftPlanCommand.RaiseCanExecuteChanged();
         DeleteDraftPlanCommand.RaiseCanExecuteChanged();
-        PublishPlanCommand.RaiseCanExecuteChanged();
-        ArchivePlanCommand.RaiseCanExecuteChanged();
+        PublishDraftPlanCommand.RaiseCanExecuteChanged();
+        SaveRetireOnCommand.RaiseCanExecuteChanged();
+        RetirePlanCommand.RaiseCanExecuteChanged();
+        ReactivatePlanCommand.RaiseCanExecuteChanged();
     }
 
     private PlanDraftInput CreateDraftInput() =>
@@ -249,7 +310,11 @@ public sealed class PlanCatalogViewModel : ViewModelBase
             DurationMinutes,
             Flexibility,
             NumberOfStudents,
-            new DateTimeOffset(EffectiveDate.Date, TimeSpan.Zero));
+            new DateTimeOffset(EffectiveDate.Date, TimeSpan.Zero),
+            ToRetireOn());
+
+    private DateTimeOffset? ToRetireOn() =>
+        RetireOnDate is null ? null : new DateTimeOffset(RetireOnDate.Value.Date, TimeSpan.Zero);
 
     private void SetError(string message)
     {
@@ -261,7 +326,7 @@ public sealed class PlanCatalogViewModel : ViewModelBase
         {
             PlanCatalogState.Draft => 0,
             PlanCatalogState.Active => 1,
-            PlanCatalogState.Archived => 2,
+            PlanCatalogState.Retired => 2,
             _ => 3
         };
 }

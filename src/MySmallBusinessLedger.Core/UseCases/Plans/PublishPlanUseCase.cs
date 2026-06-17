@@ -22,10 +22,10 @@ public sealed class PublishPlanUseCase
                 new ValidationError("Plan.NotFound", "Plan was not found."));
         }
 
-        if (plan.State is not (PlanCatalogState.Draft or PlanCatalogState.Archived))
+        if (plan.State != PlanCatalogState.Draft)
         {
             return OperationResult<PlanCatalogItem>.Failure(
-                new ValidationError("Plan.PublishRequiresDraftOrArchived", "Only draft or archived plans can be published."));
+                new ValidationError("Plan.PublishRequiresDraft", "Only draft plans can be published."));
         }
 
         return await planCatalogRepository.SaveAsync(plan with { State = PlanCatalogState.Active }, cancellationToken);

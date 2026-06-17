@@ -51,6 +51,7 @@ internal static class PlanCatalogValidation
             input.Flexibility,
             input.NumberOfStudents,
             input.EffectiveFrom,
+            input.RetireOn,
             PlanCatalogState.Draft);
 
     public static PlanCatalogItem UpdateDraft(PlanCatalogItem plan, PlanDraftInput input) =>
@@ -62,6 +63,7 @@ internal static class PlanCatalogValidation
             DurationMinutes = input.DurationMinutes,
             Flexibility = input.Flexibility,
             NumberOfStudents = input.NumberOfStudents,
-            EffectiveFrom = input.EffectiveFrom
+            EffectiveFrom = input.EffectiveFrom,
+            RetireOn = input.RetireOn
         };
 }

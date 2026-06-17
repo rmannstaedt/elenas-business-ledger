@@ -53,6 +53,8 @@ public sealed class PlanCatalogEntity
 
     public DateTimeOffset EffectiveFrom { get; set; }
 
+    public DateTimeOffset? RetireOn { get; set; }
+
     public PlanCatalogState State { get; set; }
 }
 

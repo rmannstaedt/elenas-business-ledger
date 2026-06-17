@@ -9,4 +9,5 @@ public sealed record PlanDraftInput(
     int DurationMinutes,
     PlanFlexibility Flexibility,
     int NumberOfStudents,
-    DateTimeOffset EffectiveFrom);
+    DateTimeOffset EffectiveFrom,
+    DateTimeOffset? RetireOn);

@@ -41,32 +41,37 @@ public sealed class PlanCatalogUseCaseTests
     {
         var repository = new FakePlanCatalogRepository();
         var draft = repository.Seed(CreatePlan("Standard", PlanCatalogState.Draft));
+        var retireOn = new DateTimeOffset(2026, 7, 1, 0, 0, 0, TimeSpan.Zero);
         var useCase = new UpdateDraftPlanUseCase(repository);
 
-        var result = await useCase.ExecuteAsync(draft.Id, CreateInput(name: "Premium", priceWithoutVat: 500m), CancellationToken.None);
+        var result = await useCase.ExecuteAsync(
+            draft.Id,
+            CreateInput(name: "Premium", priceWithoutVat: 500m, retireOn: retireOn),
+            CancellationToken.None);
 
         Assert.True(result.Succeeded);
         Assert.Equal("Premium", result.Value!.Name);
         Assert.Equal(500m, result.Value.PriceWithoutVat);
+        Assert.Equal(retireOn, result.Value.RetireOn);
     }
 
     [Fact]
-    public async Task UpdateDraftPlanRejectsActiveAndArchivedPlans()
+    public async Task UpdateDraftPlanRejectsActiveAndRetiredPlans()
     {
         var repository = new FakePlanCatalogRepository();
         var active = repository.Seed(CreatePlan("Standard", PlanCatalogState.Active));
-        var archived = repository.Seed(CreatePlan("Old Standard", PlanCatalogState.Archived));
+        var retired = repository.Seed(CreatePlan("Old Standard", PlanCatalogState.Retired));
         var useCase = new UpdateDraftPlanUseCase(repository);
 
         var activeResult = await useCase.ExecuteAsync(active.Id, CreateInput(name: "Changed"), CancellationToken.None);
-        var archivedResult = await useCase.ExecuteAsync(archived.Id, CreateInput(name: "Changed Again"), CancellationToken.None);
+        var retiredResult = await useCase.ExecuteAsync(retired.Id, CreateInput(name: "Changed Again"), CancellationToken.None);
 
         Assert.False(activeResult.Succeeded);
         Assert.Contains(activeResult.Errors, error => error.Code == "Plan.Immutable");
-        Assert.False(archivedResult.Succeeded);
-        Assert.Contains(archivedResult.Errors, error => error.Code == "Plan.Immutable");
+        Assert.False(retiredResult.Succeeded);
+        Assert.Contains(retiredResult.Errors, error => error.Code == "Plan.Immutable");
         Assert.Equal("Standard", repository.Plans.Single(plan => plan.Id == active.Id).Name);
-        Assert.Equal("Old Standard", repository.Plans.Single(plan => plan.Id == archived.Id).Name);
+        Assert.Equal("Old Standard", repository.Plans.Single(plan => plan.Id == retired.Id).Name);
     }
 
     [Fact]
@@ -88,54 +93,120 @@ public sealed class PlanCatalogUseCaseTests
     }
 
     [Fact]
-    public async Task PublishPlanMovesDraftOrArchivedPlanToActive()
+    public async Task PublishPlanMovesDraftPlanToActive()
     {
         var repository = new FakePlanCatalogRepository();
         var draft = repository.Seed(CreatePlan("Draft", PlanCatalogState.Draft));
-        var archived = repository.Seed(CreatePlan("Archived", PlanCatalogState.Archived));
         var useCase = new PublishPlanUseCase(repository);
 
         var draftResult = await useCase.ExecuteAsync(draft.Id, CancellationToken.None);
-        var archivedResult = await useCase.ExecuteAsync(archived.Id, CancellationToken.None);
 
         Assert.True(draftResult.Succeeded);
         Assert.Equal(PlanCatalogState.Active, draftResult.Value!.State);
         Assert.True(draftResult.Value.IsImmutable);
         Assert.True(draftResult.Value.CanBeAssigned);
-        Assert.True(archivedResult.Succeeded);
-        Assert.Equal(PlanCatalogState.Active, archivedResult.Value!.State);
     }
 
     [Fact]
-    public async Task PublishPlanRejectsAlreadyActivePlan()
+    public async Task PublishPlanRejectsAlreadyActiveAndRetiredPlans()
     {
         var repository = new FakePlanCatalogRepository();
         var active = repository.Seed(CreatePlan("Active", PlanCatalogState.Active));
+        var retired = repository.Seed(CreatePlan("Retired", PlanCatalogState.Retired));
         var useCase = new PublishPlanUseCase(repository);
 
-        var result = await useCase.ExecuteAsync(active.Id, CancellationToken.None);
+        var activeResult = await useCase.ExecuteAsync(active.Id, CancellationToken.None);
+        var retiredResult = await useCase.ExecuteAsync(retired.Id, CancellationToken.None);
 
-        Assert.False(result.Succeeded);
-        Assert.Contains(result.Errors, error => error.Code == "Plan.PublishRequiresDraftOrArchived");
+        Assert.False(activeResult.Succeeded);
+        Assert.Contains(activeResult.Errors, error => error.Code == "Plan.PublishRequiresDraft");
+        Assert.False(retiredResult.Succeeded);
+        Assert.Contains(retiredResult.Errors, error => error.Code == "Plan.PublishRequiresDraft");
     }
 
     [Fact]
-    public async Task ArchivePlanMovesOnlyActivePlanToArchived()
+    public async Task RetirePlanMovesOnlyActivePlanToRetired()
     {
         var repository = new FakePlanCatalogRepository();
         var active = repository.Seed(CreatePlan("Active", PlanCatalogState.Active));
         var draft = repository.Seed(CreatePlan("Draft", PlanCatalogState.Draft));
-        var useCase = new ArchivePlanUseCase(repository);
+        var useCase = new RetirePlanUseCase(repository);
 
         var activeResult = await useCase.ExecuteAsync(active.Id, CancellationToken.None);
         var draftResult = await useCase.ExecuteAsync(draft.Id, CancellationToken.None);
 
         Assert.True(activeResult.Succeeded);
-        Assert.Equal(PlanCatalogState.Archived, activeResult.Value!.State);
+        Assert.Equal(PlanCatalogState.Retired, activeResult.Value!.State);
         Assert.False(activeResult.Value.CanBeAssigned);
         Assert.True(activeResult.Value.IsImmutable);
         Assert.False(draftResult.Succeeded);
-        Assert.Contains(draftResult.Errors, error => error.Code == "Plan.ArchiveRequiresActive");
+        Assert.Contains(draftResult.Errors, error => error.Code == "Plan.RetireRequiresActive");
+    }
+
+    [Fact]
+    public async Task ReactivatePlanMovesRetiredPlanToActiveAndClearsRetireOn()
+    {
+        var repository = new FakePlanCatalogRepository();
+        var retired = repository.Seed(CreatePlan("Retired", PlanCatalogState.Retired) with
+        {
+            RetireOn = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero)
+        });
+        var useCase = new ReactivatePlanUseCase(repository);
+
+        var result = await useCase.ExecuteAsync(retired.Id, CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(PlanCatalogState.Active, result.Value!.State);
+        Assert.Null(result.Value.RetireOn);
+    }
+
+    [Fact]
+    public async Task UpdatePlanRetireOnAllowsDraftAndActiveButRejectsRetired()
+    {
+        var repository = new FakePlanCatalogRepository();
+        var draft = repository.Seed(CreatePlan("Draft", PlanCatalogState.Draft));
+        var active = repository.Seed(CreatePlan("Active", PlanCatalogState.Active));
+        var retired = repository.Seed(CreatePlan("Retired", PlanCatalogState.Retired));
+        var retireOn = new DateTimeOffset(2026, 7, 1, 0, 0, 0, TimeSpan.Zero);
+        var useCase = new UpdatePlanRetireOnUseCase(repository);
+
+        var draftResult = await useCase.ExecuteAsync(draft.Id, retireOn, CancellationToken.None);
+        var activeResult = await useCase.ExecuteAsync(active.Id, retireOn, CancellationToken.None);
+        var retiredResult = await useCase.ExecuteAsync(retired.Id, retireOn, CancellationToken.None);
+
+        Assert.True(draftResult.Succeeded);
+        Assert.Equal(retireOn, draftResult.Value!.RetireOn);
+        Assert.True(activeResult.Succeeded);
+        Assert.Equal(retireOn, activeResult.Value!.RetireOn);
+        Assert.False(retiredResult.Succeeded);
+        Assert.Contains(retiredResult.Errors, error => error.Code == "Plan.RetireOnImmutable");
+    }
+
+    [Fact]
+    public async Task RetireDuePlansRetiresOnlyActivePlansWhoseRetireOnHasArrived()
+    {
+        var repository = new FakePlanCatalogRepository();
+        var dueActive = repository.Seed(CreatePlan("Due", PlanCatalogState.Active) with
+        {
+            RetireOn = new DateTimeOffset(2026, 6, 1, 0, 0, 0, TimeSpan.Zero)
+        });
+        var futureActive = repository.Seed(CreatePlan("Future", PlanCatalogState.Active) with
+        {
+            RetireOn = new DateTimeOffset(2026, 7, 1, 0, 0, 0, TimeSpan.Zero)
+        });
+        var dueDraft = repository.Seed(CreatePlan("Due draft", PlanCatalogState.Draft) with
+        {
+            RetireOn = new DateTimeOffset(2026, 6, 1, 0, 0, 0, TimeSpan.Zero)
+        });
+        var useCase = new RetireDuePlansUseCase(repository);
+
+        var result = await useCase.ExecuteAsync(new DateTimeOffset(2026, 6, 17, 0, 0, 0, TimeSpan.Zero), CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(1, result.Value);
+        Assert.Equal(PlanCatalogState.Retired, repository.Plans.Single(plan => plan.Id == dueActive.Id).State);
+        Assert.Equal(PlanCatalogState.Active, repository.Plans.Single(plan => plan.Id == futureActive.Id).State);
+        Assert.Equal(PlanCatalogState.Draft, repository.Plans.Single(plan => plan.Id == dueDraft.Id).State);
     }
 
     [Fact]
@@ -144,7 +215,7 @@ public sealed class PlanCatalogUseCaseTests
         var repository = new FakePlanCatalogRepository();
         repository.Seed(CreatePlan("Draft", PlanCatalogState.Draft));
         repository.Seed(CreatePlan("Active", PlanCatalogState.Active));
-        repository.Seed(CreatePlan("Archived", PlanCatalogState.Archived));
+        repository.Seed(CreatePlan("Retired", PlanCatalogState.Retired));
         var useCase = new ListAssignablePlansUseCase(repository);
 
         var result = await useCase.ExecuteAsync(CancellationToken.None);
@@ -157,7 +228,8 @@ public sealed class PlanCatalogUseCaseTests
 
     private static PlanDraftInput CreateInput(
         string name = "Standard",
-        decimal priceWithoutVat = 400m) =>
+        decimal priceWithoutVat = 400m,
+        DateTimeOffset? retireOn = null) =>
         new(
             name,
             priceWithoutVat,
@@ -165,7 +237,8 @@ public sealed class PlanCatalogUseCaseTests
             DurationMinutes: 60,
             PlanFlexibility.MoveOrCancelByAgreement,
             NumberOfStudents: 1,
-            new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+            new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
+            retireOn);
 
     private static PlanCatalogItem CreatePlan(string name, PlanCatalogState state) =>
         new(
@@ -177,6 +250,7 @@ public sealed class PlanCatalogUseCaseTests
             PlanFlexibility.MoveOrCancelByAgreement,
             NumberOfStudents: 1,
             EffectiveFrom: new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
+            RetireOn: null,
             state);
 
     private sealed class FakePlanCatalogRepository : IPlanCatalogRepository

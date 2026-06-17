@@ -16,7 +16,16 @@ public interface IPlanCatalogService
 
     Task<OperationResult<bool>> DeleteDraftAsync(int planId, CancellationToken cancellationToken);
 
-    Task<OperationResult<PlanCatalogItem>> PublishAsync(int planId, CancellationToken cancellationToken);
+    Task<OperationResult<PlanCatalogItem>> PublishDraftAsync(int planId, CancellationToken cancellationToken);
 
-    Task<OperationResult<PlanCatalogItem>> ArchiveAsync(int planId, CancellationToken cancellationToken);
+    Task<OperationResult<PlanCatalogItem>> RetireAsync(int planId, CancellationToken cancellationToken);
+
+    Task<OperationResult<PlanCatalogItem>> ReactivateAsync(int planId, CancellationToken cancellationToken);
+
+    Task<OperationResult<PlanCatalogItem>> UpdateRetireOnAsync(
+        int planId,
+        DateTimeOffset? retireOn,
+        CancellationToken cancellationToken);
+
+    Task<OperationResult<int>> RetireDueAsync(DateTimeOffset now, CancellationToken cancellationToken);
 }

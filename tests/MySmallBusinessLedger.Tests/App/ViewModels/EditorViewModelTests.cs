@@ -154,7 +154,7 @@ public sealed class EditorViewModelTests
             [
                 CreateCatalogPlan("Draft", PlanCatalogState.Draft),
                 CreateCatalogPlan("Active", PlanCatalogState.Active),
-                CreateCatalogPlan("Archived", PlanCatalogState.Archived)
+                CreateCatalogPlan("Retired", PlanCatalogState.Retired)
             ]);
 
         var plan = Assert.Single(viewModel.AssignablePlans);
@@ -302,6 +302,7 @@ public sealed class EditorViewModelTests
             Flexibility,
             NumberOfStudents,
             EffectiveFrom ?? new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
+            RetireOn: null,
             state);
 
     private static StudentEditorViewModel CreateNewStudentEditorWithActivePlan(FakeStudentEditorService service) =>

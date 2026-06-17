@@ -30,8 +30,23 @@ public sealed class SqliteSchemaInitializer
                 "Flexibility" TEXT NOT NULL,
                 "NumberOfStudents" INTEGER NOT NULL,
                 "EffectiveFrom" TEXT NOT NULL,
+                "RetireOn" TEXT NULL,
                 "State" TEXT NOT NULL
             );
+            """);
+
+        var existingColumns = context.Database
+            .SqlQueryRaw<string>("SELECT \"name\" AS \"Value\" FROM pragma_table_info('PlanCatalog')")
+            .ToArray();
+        if (!existingColumns.Contains("RetireOn", StringComparer.Ordinal))
+        {
+            context.Database.ExecuteSqlRaw("ALTER TABLE \"PlanCatalog\" ADD COLUMN \"RetireOn\" TEXT NULL;");
+        }
+
+        context.Database.ExecuteSqlRaw("""
+            UPDATE "PlanCatalog"
+            SET "State" = 'Retired'
+            WHERE "State" = 'Archived';
             """);
 
         context.Database.ExecuteSqlRaw("""
@@ -39,4 +54,5 @@ public sealed class SqliteSchemaInitializer
             ON "PlanCatalog" ("Name");
             """);
     }
+
 }

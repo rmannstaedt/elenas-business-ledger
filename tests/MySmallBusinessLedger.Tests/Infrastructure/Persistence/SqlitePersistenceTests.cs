@@ -75,7 +75,10 @@ public sealed class SqlitePersistenceTests
 
         var draft = (await repository.SaveAsync(CreatePlanCatalogItem("Draft", PlanCatalogState.Draft), CancellationToken.None)).Value!;
         var active = (await repository.SaveAsync(CreatePlanCatalogItem("Active", PlanCatalogState.Active), CancellationToken.None)).Value!;
-        var archived = (await repository.SaveAsync(CreatePlanCatalogItem("Archived", PlanCatalogState.Archived), CancellationToken.None)).Value!;
+        var retired = (await repository.SaveAsync(CreatePlanCatalogItem("Retired", PlanCatalogState.Retired) with
+        {
+            RetireOn = new DateTimeOffset(2026, 8, 1, 0, 0, 0, TimeSpan.Zero)
+        }, CancellationToken.None)).Value!;
 
         var allPlans = await repository.ListAllAsync(CancellationToken.None);
         var assignablePlans = await repository.ListAssignableAsync(CancellationToken.None);
@@ -83,13 +86,14 @@ public sealed class SqlitePersistenceTests
         var afterDraftDelete = await repository.ListAllAsync(CancellationToken.None);
 
         Assert.Equal(
-            [PlanCatalogState.Active, PlanCatalogState.Archived, PlanCatalogState.Draft],
+            [PlanCatalogState.Active, PlanCatalogState.Draft, PlanCatalogState.Retired],
             allPlans.Select(plan => plan.State).OrderBy(state => state.ToString(), StringComparer.Ordinal).ToArray());
+        Assert.Equal(new DateTimeOffset(2026, 8, 1, 0, 0, 0, TimeSpan.Zero), allPlans.Single(plan => plan.Id == retired.Id).RetireOn);
         var assignablePlan = Assert.Single(assignablePlans);
         Assert.Equal(active.Id, assignablePlan.Id);
         Assert.DoesNotContain(afterDraftDelete, plan => plan.Id == draft.Id);
         Assert.Contains(afterDraftDelete, plan => plan.Id == active.Id);
-        Assert.Contains(afterDraftDelete, plan => plan.Id == archived.Id);
+        Assert.Contains(afterDraftDelete, plan => plan.Id == retired.Id);
     }
 
     [Fact]
@@ -101,7 +105,7 @@ public sealed class SqlitePersistenceTests
         await students.SaveAsync(CreateStudentRecord("Anna", currentPlanName: "Standard"), CancellationToken.None);
         var catalogPlan = (await plans.SaveAsync(CreatePlanCatalogItem("Standard", PlanCatalogState.Active), CancellationToken.None)).Value!;
 
-        await plans.SaveAsync(catalogPlan with { State = PlanCatalogState.Archived }, CancellationToken.None);
+        await plans.SaveAsync(catalogPlan with { State = PlanCatalogState.Retired }, CancellationToken.None);
 
         var student = await students.GetByShortNameAsync("Anna", CancellationToken.None);
         Assert.NotNull(student);
@@ -128,6 +132,61 @@ public sealed class SqlitePersistenceTests
 
         Assert.True(result.Succeeded);
         Assert.Single(plans);
+    }
+
+    [Fact]
+    public async Task SchemaInitializerAddsRetireOnAndMapsLegacyRetiredState()
+    {
+        using var database = await TestDatabase.CreateAsync();
+        await using (var context = database.CreateContext())
+        {
+            await context.Database.ExecuteSqlRawAsync("DROP TABLE PlanCatalog");
+            await context.Database.ExecuteSqlRawAsync(
+                """
+                CREATE TABLE PlanCatalog (
+                    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    Name TEXT NOT NULL,
+                    PriceWithoutVat TEXT NOT NULL,
+                    LessonsPerWeek TEXT NOT NULL,
+                    DurationMinutes INTEGER NOT NULL,
+                    Flexibility TEXT NOT NULL,
+                    NumberOfStudents INTEGER NOT NULL,
+                    EffectiveFrom TEXT NOT NULL,
+                    State TEXT NOT NULL
+                );
+                """);
+            await context.Database.ExecuteSqlRawAsync(
+                """
+                INSERT INTO PlanCatalog (
+                    Name,
+                    PriceWithoutVat,
+                    LessonsPerWeek,
+                    DurationMinutes,
+                    Flexibility,
+                    NumberOfStudents,
+                    EffectiveFrom,
+                    State
+                ) VALUES (
+                    'Legacy',
+                    '400',
+                    'One',
+                    60,
+                    'MoveOrCancelByAgreement',
+                    1,
+                    '2026-01-01 00:00:00+00:00',
+                    'Archived'
+                );
+                """);
+        }
+
+        new SqliteSchemaInitializer(database.CreateContext).EnsureCreated();
+
+        var repository = new SqlitePlanCatalogRepository(database.CreateContext);
+        var plans = await repository.ListAllAsync(CancellationToken.None);
+
+        var plan = Assert.Single(plans);
+        Assert.Equal(PlanCatalogState.Retired, plan.State);
+        Assert.Null(plan.RetireOn);
     }
 
     [Fact]
@@ -280,6 +339,7 @@ public sealed class SqlitePersistenceTests
             PlanFlexibility.MoveOrCancelByAgreement,
             NumberOfStudents: 1,
             EffectiveFrom: new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
+            RetireOn: null,
             state);
 
     private sealed class TestDatabase : IDisposable

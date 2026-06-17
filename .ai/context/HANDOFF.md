@@ -10,11 +10,11 @@ Date: 2026-06-17
 - Runtime composition uses SQLite under `%APPDATA%\visualtech.dk\MySmallBusinessLedger`, Google Calendar through the official API client, QuestPDF invoice generation, staged PDF storage, invoice metadata persistence, and OS print request after PDF save.
 - `Application > Settings` configures company profile, address plus an unlabeled second address/city line, invoice folder with manual entry or Browse picker, Google calendar/account label, publisher Google sign-in app status, local Google authorization status, and Connect Google Calendar / Forget Google sign-in actions; it also shows read-only app data/database paths. The Google calendar field defaults to `primary`, meaning the signed-in account's main calendar, and its tooltip explains where to find a separate calendar ID.
 - Student editor also uses two stacked address fields; the ViewModel combines them into one multiline student address for existing Core/SQLite/invoice behavior.
-- `Plan > Manage Plans` now manages a durable SQLite plan catalog with Draft, Active, and Archived states. Draft plans can be edited/deleted/published; Active plans are immutable and can be archived; Archived plans are immutable and can be published again.
+- `Plan > Manage Plans` now manages a durable SQLite plan catalog with Draft, Active, and Retired states. Draft plans can be edited/deleted/published; Active plans are immutable except for `Retire on` scheduling and can be retired; Retired plans are immutable and can be reactivated.
 - The student editor offers only Active catalog plans for assignment. Selecting one copies plan fields into the student's saved plan period; existing student plan periods and issued invoices remain copied snapshots and are not rewritten by later catalog lifecycle changes.
 - The main-window Open Calendar action opens Google Calendar in the browser with the configured Google account email as an `authuser` hint, avoiding the old hardcoded `/u/0/` first-browser-account behavior when possible.
 - The app now uses publisher-owned Google Desktop OAuth configuration from `Configuration\google-oauth-client.json` in the app output. The local source file is `src\MySmallBusinessLedger.App\Configuration\google-oauth-client.json`, ignored by Git; the template is committed beside it.
-- Window placement is stored under `%APPDATA%\visualtech.dk\MySmallBusinessLedger\window-placement.json`.
+- Window placement is stored under `%APPDATA%\visualtech.dk\MySmallBusinessLedger\window-placement.json`; Manage Plans column widths are stored under `%APPDATA%\visualtech.dk\MySmallBusinessLedger\grid-column-widths.json`.
 - Completed/Planned lesson state is manual. Google Calendar keeps the first-line `$` student marker and uses a later `Status: Completed` summary line for completed lessons.
 - Write Invoice opens candidate selection, invoice preview, optional price adjustment, staged issue/save/print, dashboard refresh, and read-only invoice viewer.
 
@@ -28,7 +28,7 @@ Date: 2026-06-17
 - Google Calendar write failures must be visible immediately and must not pretend local state changed.
 - OAuth tokens must remain Windows-protected and must not be stored in SQLite or plaintext config.
 - Do not restore the old user-selected Google OAuth JSON setup flow unless Ruben explicitly asks for a migration fallback.
-- Do not allow Draft or Archived catalog plans to be assigned to students.
+- Do not allow Draft or Retired catalog plans to be assigned to students.
 - Do not mutate existing student plan periods or issued invoices when a catalog plan changes lifecycle state.
 
 ## Verification Snapshot

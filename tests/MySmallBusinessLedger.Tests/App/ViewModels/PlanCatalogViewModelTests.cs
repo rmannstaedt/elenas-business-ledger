@@ -5,6 +5,9 @@ using MySmallBusinessLedger.Core.Common;
 using MySmallBusinessLedger.Core.Plans;
 using MySmallBusinessLedger.Core.UseCases.Plans;
 using System.Windows;
+using WpfButton = System.Windows.Controls.Button;
+using WpfDataGrid = System.Windows.Controls.DataGrid;
+using WpfGrid = System.Windows.Controls.Grid;
 
 namespace MySmallBusinessLedger.Tests.App.ViewModels;
 
@@ -16,26 +19,29 @@ public sealed class PlanCatalogViewModelTests
         var service = new FakePlanCatalogService();
         service.Seed(CreatePlan("Draft", PlanCatalogState.Draft));
         service.Seed(CreatePlan("Active", PlanCatalogState.Active));
-        service.Seed(CreatePlan("Archived", PlanCatalogState.Archived));
+        service.Seed(CreatePlan("Retired", PlanCatalogState.Retired));
         var viewModel = new PlanCatalogViewModel(service);
 
         await viewModel.LoadAsync();
 
         Assert.Equal(3, viewModel.Plans.Count);
-        Assert.Equal(["Draft", "Active", "Archived"], viewModel.Plans.Select(plan => plan.StateText).Distinct().ToArray());
+        Assert.Equal(["Draft", "Active", "Retired"], viewModel.Plans.Select(plan => plan.StateText).Distinct().ToArray());
         Assert.Equal("Draft", viewModel.SelectedPlan?.Name);
     }
 
     [Theory]
-    [InlineData(PlanCatalogState.Draft, true, true, true, false)]
-    [InlineData(PlanCatalogState.Active, false, false, false, true)]
-    [InlineData(PlanCatalogState.Archived, false, false, true, false)]
+    [InlineData(PlanCatalogState.Draft, true, true, true, true, false, false, false)]
+    [InlineData(PlanCatalogState.Active, false, true, false, false, true, true, false)]
+    [InlineData(PlanCatalogState.Retired, false, false, false, false, false, false, true)]
     public async Task SelectedPlanExposesOnlyStateRelevantEditingAndActions(
         PlanCatalogState state,
         bool canEditFields,
+        bool canEditRetireOn,
         bool canDelete,
-        bool canPublish,
-        bool canArchive)
+        bool canPublishDraft,
+        bool canSaveRetireOn,
+        bool canRetire,
+        bool canReactivate)
     {
         var service = new FakePlanCatalogService();
         service.Seed(CreatePlan("Selected", state));
@@ -44,9 +50,12 @@ public sealed class PlanCatalogViewModelTests
         await viewModel.LoadAsync();
 
         Assert.Equal(canEditFields, viewModel.CanEditSelectedPlanFields);
+        Assert.Equal(canEditRetireOn, viewModel.CanEditSelectedPlanRetireOn);
         Assert.Equal(canDelete, viewModel.CanDeleteSelectedPlan);
-        Assert.Equal(canPublish, viewModel.CanPublishSelectedPlan);
-        Assert.Equal(canArchive, viewModel.CanArchiveSelectedPlan);
+        Assert.Equal(canPublishDraft, viewModel.CanPublishDraftSelectedPlan);
+        Assert.Equal(canSaveRetireOn, viewModel.CanSaveSelectedPlanRetireOn);
+        Assert.Equal(canRetire, viewModel.CanRetireSelectedPlan);
+        Assert.Equal(canReactivate, viewModel.CanReactivateSelectedPlan);
     }
 
     [Fact]
@@ -60,6 +69,7 @@ public sealed class PlanCatalogViewModelTests
         Assert.NotNull(viewModel.SelectedPlan);
         Assert.Equal(PlanCatalogState.Draft, viewModel.SelectedPlan.State);
         Assert.True(viewModel.CanEditSelectedPlanFields);
+        Assert.True(viewModel.CanEditSelectedPlanRetireOn);
         Assert.True(viewModel.CanDeleteSelectedPlan);
         Assert.Equal("New plan", service.CreatedDraftInput?.Name);
     }
@@ -73,12 +83,14 @@ public sealed class PlanCatalogViewModelTests
         await viewModel.LoadAsync();
         viewModel.Name = "Updated";
         viewModel.PriceWithoutVat = 500m;
+        viewModel.RetireOnDate = new DateTime(2026, 7, 1);
 
         await viewModel.SaveDraftPlanCommand.ExecuteAsync();
 
         Assert.Equal(draft.Id, service.UpdatedPlanId);
         Assert.Equal("Updated", service.UpdatedDraftInput?.Name);
         Assert.Equal(500m, service.UpdatedDraftInput?.PriceWithoutVat);
+        Assert.Equal(new DateTimeOffset(2026, 7, 1, 0, 0, 0, TimeSpan.Zero), service.UpdatedDraftInput?.RetireOn);
     }
 
     [Fact]
@@ -96,20 +108,44 @@ public sealed class PlanCatalogViewModelTests
     }
 
     [Fact]
-    public async Task PublishAndArchiveReloadSelectedPlanState()
+    public async Task RetireAndReactivateReloadSelectedPlanState()
     {
         var service = new FakePlanCatalogService();
-        service.Seed(CreatePlan("Active", PlanCatalogState.Active));
+        service.Seed(CreatePlan("Active", PlanCatalogState.Active) with
+        {
+            RetireOn = new DateTimeOffset(2026, 8, 1, 0, 0, 0, TimeSpan.Zero)
+        });
         var viewModel = new PlanCatalogViewModel(service);
         await viewModel.LoadAsync();
 
-        await viewModel.ArchivePlanCommand.ExecuteAsync();
-        Assert.Equal(PlanCatalogState.Archived, viewModel.SelectedPlan?.State);
-        Assert.True(viewModel.CanPublishSelectedPlan);
+        await viewModel.RetirePlanCommand.ExecuteAsync();
+        Assert.Equal(PlanCatalogState.Retired, viewModel.SelectedPlan?.State);
+        Assert.True(viewModel.CanReactivateSelectedPlan);
 
-        await viewModel.PublishPlanCommand.ExecuteAsync();
+        await viewModel.ReactivatePlanCommand.ExecuteAsync();
         Assert.Equal(PlanCatalogState.Active, viewModel.SelectedPlan?.State);
-        Assert.True(viewModel.CanArchiveSelectedPlan);
+        Assert.True(viewModel.CanRetireSelectedPlan);
+        Assert.NotNull(viewModel.SelectedPlan);
+        Assert.Null(viewModel.SelectedPlan.Plan.RetireOn);
+    }
+
+    [Fact]
+    public async Task SaveRetireOnUpdatesActivePlanWithoutEditingImmutableFields()
+    {
+        var service = new FakePlanCatalogService();
+        var active = service.Seed(CreatePlan("Active", PlanCatalogState.Active));
+        var viewModel = new PlanCatalogViewModel(service);
+        await viewModel.LoadAsync();
+        viewModel.Name = "Should not be saved as a draft";
+        viewModel.RetireOnDate = new DateTime(2026, 9, 15);
+
+        await viewModel.SaveRetireOnCommand.ExecuteAsync();
+
+        Assert.Equal(active.Id, service.UpdatedRetireOnPlanId);
+        Assert.Equal(new DateTimeOffset(2026, 9, 15, 0, 0, 0, TimeSpan.Zero), service.UpdatedRetireOn);
+        Assert.Null(service.UpdatedDraftInput);
+        Assert.Equal("Active", viewModel.SelectedPlan?.Name);
+        Assert.Equal(new DateTimeOffset(2026, 9, 15, 0, 0, 0, TimeSpan.Zero), viewModel.SelectedPlan?.Plan.RetireOn);
     }
 
     [Fact]
@@ -123,6 +159,16 @@ public sealed class PlanCatalogViewModelTests
             Assert.Equal("Manage Plans", window.Title);
             Assert.Same(viewModel, window.DataContext);
             Assert.NotNull(window.Content);
+            var plansGrid = Assert.Single(FindChildren<WpfDataGrid>(window), grid => grid.Name == "PlansGrid");
+            Assert.Equal(["Plan", "Price", "Duration", "Lessons", "Students", "State"], plansGrid.Columns.Select(column => column.Header?.ToString() ?? string.Empty).ToArray());
+
+            var addPlanButton = Assert.Single(FindChildren<WpfButton>(window), button => button.Content?.ToString() == "Add Plan");
+            Assert.Equal(2, WpfGrid.GetRow(addPlanButton));
+            Assert.Equal(0, WpfGrid.GetColumn(addPlanButton));
+
+            var publishDraftButton = Assert.Single(FindChildren<WpfButton>(window), button => button.Content?.ToString() == "Publish draft");
+            Assert.Equal(0, WpfGrid.GetRow(publishDraftButton));
+            Assert.Equal(1, WpfGrid.GetColumn(publishDraftButton));
 
             window.Close();
         });
@@ -138,6 +184,7 @@ public sealed class PlanCatalogViewModelTests
             PlanFlexibility.MoveOrCancelByAgreement,
             NumberOfStudents: 1,
             EffectiveFrom: new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
+            RetireOn: null,
             state);
 
     private sealed class FakePlanCatalogService : IPlanCatalogService
@@ -152,6 +199,10 @@ public sealed class PlanCatalogViewModelTests
         public PlanDraftInput? UpdatedDraftInput { get; private set; }
 
         public bool DeleteWasCalled { get; private set; }
+
+        public int? UpdatedRetireOnPlanId { get; private set; }
+
+        public DateTimeOffset? UpdatedRetireOn { get; private set; }
 
         public PlanCatalogItem Seed(PlanCatalogItem plan)
         {
@@ -185,7 +236,8 @@ public sealed class PlanCatalogViewModelTests
                 DurationMinutes = input.DurationMinutes,
                 Flexibility = input.Flexibility,
                 NumberOfStudents = input.NumberOfStudents,
-                EffectiveFrom = input.EffectiveFrom
+                EffectiveFrom = input.EffectiveFrom,
+                RetireOn = input.RetireOn
             };
             return Task.FromResult(OperationResult<PlanCatalogItem>.Success(plans[index]));
         }
@@ -197,11 +249,35 @@ public sealed class PlanCatalogViewModelTests
             return Task.FromResult(OperationResult<bool>.Success(true));
         }
 
-        public Task<OperationResult<PlanCatalogItem>> PublishAsync(int planId, CancellationToken cancellationToken) =>
+        public Task<OperationResult<PlanCatalogItem>> PublishDraftAsync(int planId, CancellationToken cancellationToken) =>
             ChangeStateAsync(planId, PlanCatalogState.Active);
 
-        public Task<OperationResult<PlanCatalogItem>> ArchiveAsync(int planId, CancellationToken cancellationToken) =>
-            ChangeStateAsync(planId, PlanCatalogState.Archived);
+        public Task<OperationResult<PlanCatalogItem>> RetireAsync(int planId, CancellationToken cancellationToken) =>
+            ChangeStateAsync(planId, PlanCatalogState.Retired);
+
+        public Task<OperationResult<PlanCatalogItem>> ReactivateAsync(int planId, CancellationToken cancellationToken)
+        {
+            var index = plans.FindIndex(plan => plan.Id == planId);
+            plans[index] = plans[index] with { State = PlanCatalogState.Active, RetireOn = null };
+            return Task.FromResult(OperationResult<PlanCatalogItem>.Success(plans[index]));
+        }
+
+        public Task<OperationResult<PlanCatalogItem>> UpdateRetireOnAsync(
+            int planId,
+            DateTimeOffset? retireOn,
+            CancellationToken cancellationToken)
+        {
+            UpdatedRetireOnPlanId = planId;
+            UpdatedRetireOn = retireOn;
+            var index = plans.FindIndex(plan => plan.Id == planId);
+            plans[index] = plans[index] with { RetireOn = retireOn };
+            return Task.FromResult(OperationResult<PlanCatalogItem>.Success(plans[index]));
+        }
+
+        public Task<OperationResult<int>> RetireDueAsync(
+            DateTimeOffset now,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(OperationResult<int>.Success(0));
 
         private Task<OperationResult<PlanCatalogItem>> ChangeStateAsync(int planId, PlanCatalogState state)
         {
@@ -233,5 +309,25 @@ public sealed class PlanCatalogViewModelTests
         {
             throw exception;
         }
+    }
+
+    private static IReadOnlyList<T> FindChildren<T>(DependencyObject root)
+        where T : DependencyObject
+    {
+        var matches = new List<T>();
+        foreach (var child in LogicalTreeHelper.GetChildren(root))
+        {
+            if (child is T typedChild)
+            {
+                matches.Add(typedChild);
+            }
+
+            if (child is DependencyObject dependencyObject)
+            {
+                matches.AddRange(FindChildren<T>(dependencyObject));
+            }
+        }
+
+        return matches;
     }
 }
