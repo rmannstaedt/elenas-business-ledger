@@ -163,8 +163,12 @@ public sealed class PlanCatalogViewModelTests
             Assert.Equal(["Plan", "Price", "Duration", "Lessons", "Students", "State"], plansGrid.Columns.Select(column => column.Header?.ToString() ?? string.Empty).ToArray());
 
             var addPlanButton = Assert.Single(FindChildren<WpfButton>(window), button => button.Content?.ToString() == "Add Plan");
-            Assert.Equal(2, WpfGrid.GetRow(addPlanButton));
+            Assert.Equal(1, WpfGrid.GetRow(addPlanButton));
             Assert.Equal(0, WpfGrid.GetColumn(addPlanButton));
+
+            var closeButton = Assert.Single(FindChildren<WpfButton>(window), button => button.Content?.ToString() == "Close");
+            Assert.Equal(WpfGrid.GetRow(addPlanButton), WpfGrid.GetRow(closeButton));
+            Assert.Equal(2, WpfGrid.GetColumn(closeButton));
 
             var publishDraftButton = Assert.Single(FindChildren<WpfButton>(window), button => button.Content?.ToString() == "Publish draft");
             Assert.Equal(0, WpfGrid.GetRow(publishDraftButton));

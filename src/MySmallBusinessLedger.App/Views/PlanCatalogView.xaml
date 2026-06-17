@@ -37,16 +37,6 @@
     </Window.Resources>
 
     <DockPanel Margin="16">
-        <StackPanel DockPanel.Dock="Bottom"
-                    Orientation="Horizontal"
-                    HorizontalAlignment="Right"
-                    Margin="0,14,0,0">
-            <Button Content="Close"
-                    Click="OnClose"
-                    MinWidth="84"
-                    Height="32" />
-        </StackPanel>
-
         <Border DockPanel.Dock="Top"
                 Background="#FFF4E5"
                 BorderBrush="#D58512"
@@ -59,6 +49,10 @@
         </Border>
 
         <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="2*" />
                 <ColumnDefinition Width="18" />
@@ -69,7 +63,6 @@
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
-                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
                 <TextBlock Text="Plans"
@@ -122,14 +115,6 @@
                     </DataGrid.Columns>
                 </DataGrid>
 
-                <Button Grid.Row="2"
-                        Grid.Column="0"
-                        Content="Add Plan"
-                        Command="{Binding AddDraftPlanCommand}"
-                        MinWidth="88"
-                        Height="28"
-                        HorizontalAlignment="Left"
-                        Margin="0,14,0,0" />
             </Grid>
 
             <Grid Grid.Column="2">
@@ -225,6 +210,23 @@
                             Style="{StaticResource RightPlanActionButtonStyle}" />
                 </Grid>
             </Grid>
+
+            <Button Grid.Row="1"
+                    Grid.Column="0"
+                    Content="Add Plan"
+                    Command="{Binding AddDraftPlanCommand}"
+                    MinWidth="88"
+                    Height="28"
+                    HorizontalAlignment="Left"
+                    Margin="0,14,0,0" />
+            <Button Grid.Row="1"
+                    Grid.Column="2"
+                    Content="Close"
+                    Click="OnClose"
+                    MinWidth="84"
+                    Height="32"
+                    HorizontalAlignment="Right"
+                    Margin="0,14,0,0" />
         </Grid>
     </DockPanel>
 </Window>
