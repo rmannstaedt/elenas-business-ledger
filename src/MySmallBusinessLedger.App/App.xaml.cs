@@ -85,7 +85,7 @@ public partial class App : Application
                 systemClock)),
             new CoreInvoicePaymentStatusService(new ToggleInvoicePaymentStatusUseCase(invoiceRepository)),
             new MessageBoxConfirmationService(),
-            new ExternalBrowserCalendarLauncher(),
+            new ExternalBrowserCalendarLauncher(calendarSettingsRepository.GetAsync),
             new StudentEditorWindowLauncher(studentEditorService),
             new LessonEditorWindowLauncher(lessonEditorService),
             lessonEditorService,

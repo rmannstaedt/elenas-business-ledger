@@ -7,19 +7,21 @@ namespace MySmallBusinessLedger.App.ViewModels;
 
 public sealed class SettingsViewModel : ViewModelBase
 {
+    private const string DefaultCalendarId = "primary";
     private readonly IAppSettingsService settingsService;
     private string companyName = string.Empty;
     private string companyAddress = string.Empty;
+    private string companyAddressLine2 = string.Empty;
     private string companyPhone = string.Empty;
     private string companyEmail = string.Empty;
     private string companyCvr = string.Empty;
     private bool isVatRegistered;
     private DateTime? vatRegistrationDate;
     private string invoiceFolderPath = string.Empty;
-    private string calendarId = string.Empty;
+    private string calendarId = DefaultCalendarId;
     private string googleAccountEmail = string.Empty;
     private GoogleOAuthClientConfigurationStatus googleOAuthAppConfigurationStatus = GoogleOAuthClientConfigurationStatus.Missing;
-    private string googleAuthorizationStatusText = "Google authorization: Not checked";
+    private string googleAuthorizationStatusText = "Google authorization: Not connected";
     private string appDataFolderPath = string.Empty;
     private string databasePath = string.Empty;
     private string? errorMessage;
@@ -36,6 +38,8 @@ public sealed class SettingsViewModel : ViewModelBase
 
     public string CompanyAddress { get => companyAddress; set => SetProperty(ref companyAddress, value); }
 
+    public string CompanyAddressLine2 { get => companyAddressLine2; set => SetProperty(ref companyAddressLine2, value); }
+
     public string CompanyPhone { get => companyPhone; set => SetProperty(ref companyPhone, value); }
 
     public string CompanyEmail { get => companyEmail; set => SetProperty(ref companyEmail, value); }
@@ -49,6 +53,11 @@ public sealed class SettingsViewModel : ViewModelBase
     public string InvoiceFolderPath { get => invoiceFolderPath; set => SetProperty(ref invoiceFolderPath, value); }
 
     public string CalendarId { get => calendarId; set => SetProperty(ref calendarId, value); }
+
+    public string CalendarIdHelpText =>
+        "Use primary for the main calendar of the Google account you sign in with. "
+        + "For a separate calendar, open Google Calendar in a browser, choose the calendar's Settings and sharing, "
+        + "then copy Calendar ID from Integrate calendar.";
 
     public string GoogleAccountEmail { get => googleAccountEmail; set => SetProperty(ref googleAccountEmail, value); }
 
@@ -109,8 +118,10 @@ public sealed class SettingsViewModel : ViewModelBase
         var snapshot = await settingsService.LoadAsync(CancellationToken.None);
         if (snapshot.CompanyProfile is { } company)
         {
+            var addressLines = SplitCompanyAddress(company.Address);
             CompanyName = company.Name;
-            CompanyAddress = company.Address;
+            CompanyAddress = addressLines.Line1;
+            CompanyAddressLine2 = addressLines.Line2;
             CompanyPhone = company.Phone;
             CompanyEmail = company.Email;
             CompanyCvr = company.Cvr ?? string.Empty;
@@ -121,11 +132,14 @@ public sealed class SettingsViewModel : ViewModelBase
 
         if (snapshot.CalendarSettings is { } calendar)
         {
-            CalendarId = calendar.SelectedCalendarId;
+            CalendarId = NormalizeCalendarId(calendar.SelectedCalendarId);
             GoogleAccountEmail = calendar.GoogleAccountEmail;
         }
 
         SetGoogleOAuthAppConfigurationStatus(snapshot.GoogleOAuthAppConfigurationStatus);
+        GoogleAuthorizationStatusText = snapshot.HasGoogleAuthorizationTokens
+            ? "Google authorization: Saved locally. Connect again if Google Calendar access fails."
+            : "Google authorization: Not connected";
         AppDataFolderPath = snapshot.AppDataFolderPath;
         DatabasePath = snapshot.DatabasePath;
     }
@@ -139,14 +153,15 @@ public sealed class SettingsViewModel : ViewModelBase
 
         var profile = CompanyProfile.Create(
             CompanyName.Trim(),
-            CompanyAddress.Trim(),
+            CombineCompanyAddress(CompanyAddress, CompanyAddressLine2),
             CompanyPhone.Trim(),
             CompanyEmail.Trim(),
             string.IsNullOrWhiteSpace(CompanyCvr) ? null : CompanyCvr.Trim(),
             IsVatRegistered && VatRegistrationDate is not null ? DateOnly.FromDateTime(VatRegistrationDate.Value) : null,
             IsVatRegistered ? VatStatus.Registered : VatStatus.NotRegistered,
             InvoiceFolderPath.Trim());
-        var calendarSettings = new CalendarSettings(CalendarId.Trim(), GoogleAccountEmail.Trim());
+        CalendarId = NormalizeCalendarId(CalendarId);
+        var calendarSettings = new CalendarSettings(CalendarId, GoogleAccountEmail.Trim());
 
         var result = await settingsService.SaveAsync(
             profile,
@@ -166,11 +181,7 @@ public sealed class SettingsViewModel : ViewModelBase
 
     private async Task ConnectGoogleCalendarAsync()
     {
-        if (string.IsNullOrWhiteSpace(CalendarId))
-        {
-            ErrorMessage = "Calendar ID is required before connecting Google Calendar.";
-            return;
-        }
+        CalendarId = NormalizeCalendarId(CalendarId);
 
         if (string.IsNullOrWhiteSpace(GoogleAccountEmail))
         {
@@ -179,7 +190,7 @@ public sealed class SettingsViewModel : ViewModelBase
         }
 
         var result = await settingsService.ConnectGoogleCalendarAsync(
-            new CalendarSettings(CalendarId.Trim(), GoogleAccountEmail.Trim()),
+            new CalendarSettings(CalendarId, GoogleAccountEmail.Trim()),
             CancellationToken.None);
         if (!result.Succeeded)
         {
@@ -236,5 +247,31 @@ public sealed class SettingsViewModel : ViewModelBase
         {
             OnPropertyChanged(nameof(GoogleOAuthAppStatusText));
         }
+    }
+
+    private static string NormalizeCalendarId(string value) =>
+        string.IsNullOrWhiteSpace(value) ? DefaultCalendarId : value.Trim();
+
+    private static (string Line1, string Line2) SplitCompanyAddress(string address)
+    {
+        var normalized = address.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n');
+        var separatorIndex = normalized.IndexOf('\n', StringComparison.Ordinal);
+        if (separatorIndex < 0)
+        {
+            return (address, string.Empty);
+        }
+
+        var line1 = normalized[..separatorIndex];
+        var line2 = normalized[(separatorIndex + 1)..].Replace("\n", Environment.NewLine, StringComparison.Ordinal);
+        return (line1, line2);
+    }
+
+    private static string CombineCompanyAddress(string line1, string line2)
+    {
+        var trimmedLine1 = line1.Trim();
+        var trimmedLine2 = line2.Trim();
+        return string.IsNullOrWhiteSpace(trimmedLine2)
+            ? trimmedLine1
+            : trimmedLine1 + Environment.NewLine + trimmedLine2;
     }
 }

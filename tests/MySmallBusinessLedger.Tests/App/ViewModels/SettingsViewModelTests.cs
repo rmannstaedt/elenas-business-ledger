@@ -4,6 +4,8 @@ using MySmallBusinessLedger.App.Views;
 using MySmallBusinessLedger.Core.Common;
 using MySmallBusinessLedger.Core.Company;
 using MySmallBusinessLedger.Infrastructure.Persistence;
+using System.Windows;
+using System.Windows.Controls;
 
 namespace MySmallBusinessLedger.Tests.App.ViewModels;
 
@@ -20,9 +22,20 @@ public sealed class SettingsViewModelTests
             Assert.Equal("Application Settings", window.Title);
             Assert.Same(viewModel, window.DataContext);
             Assert.NotNull(window.Content);
+            Assert.NotNull(FindButtonByContent(window, "Browse..."));
 
             window.Close();
         });
+    }
+
+    [Fact]
+    public void DefaultsCalendarIdToPrimaryAndExplainsWhereToFindAnotherCalendar()
+    {
+        var viewModel = new SettingsViewModel(new FakeAppSettingsService());
+
+        Assert.Equal("primary", viewModel.CalendarId);
+        Assert.Contains("primary", viewModel.CalendarIdHelpText);
+        Assert.Contains("Settings and sharing", viewModel.CalendarIdHelpText);
     }
 
     [Fact]
@@ -56,6 +69,95 @@ public sealed class SettingsViewModelTests
         Assert.Equal("Google sign-in app: Ready", viewModel.GoogleOAuthAppStatusText);
         Assert.Equal(@"C:\Users\ExampleUser\AppData\Roaming\visualtech.dk\MySmallBusinessLedger", viewModel.AppDataFolderPath);
         Assert.Equal(@"C:\Users\ExampleUser\AppData\Roaming\visualtech.dk\MySmallBusinessLedger\ledger.db", viewModel.DatabasePath);
+        Assert.Equal("Google authorization: Not connected", viewModel.GoogleAuthorizationStatusText);
+    }
+
+    [Fact]
+    public async Task LoadSplitsSavedMultilineCompanyAddressAcrossAddressFields()
+    {
+        var service = new FakeAppSettingsService
+        {
+            Snapshot = new AppSettingsSnapshot(
+                CompanyProfile.Create(
+                    "Maple Key Studio",
+                    "18 Example Lane" + Environment.NewLine + "0000 Example City",
+                    "12345678",
+                    "elena@example.test",
+                    null,
+                    null,
+                    VatStatus.NotRegistered,
+                    @"C:\Invoices"),
+                null,
+                GoogleOAuthClientConfigurationStatus.Ready)
+        };
+        var viewModel = new SettingsViewModel(service);
+
+        await viewModel.LoadAsync();
+
+        Assert.Equal("18 Example Lane", viewModel.CompanyAddress);
+        Assert.Equal("0000 Example City", viewModel.CompanyAddressLine2);
+    }
+
+    [Fact]
+    public async Task SaveCombinesCompanyAddressLines()
+    {
+        var service = new FakeAppSettingsService();
+        var viewModel = new SettingsViewModel(service)
+        {
+            CompanyName = "Maple Key Studio",
+            CompanyAddress = "18 Example Lane",
+            CompanyAddressLine2 = "0000 Example City",
+            CompanyPhone = "12345678",
+            CompanyEmail = "elena@example.test",
+            InvoiceFolderPath = @"C:\Invoices",
+            CalendarId = "primary",
+            GoogleAccountEmail = "studio@example.test"
+        };
+
+        await viewModel.SaveCommand.ExecuteAsync();
+
+        Assert.NotNull(service.SavedProfile);
+        Assert.Equal(
+            "18 Example Lane" + Environment.NewLine + "0000 Example City",
+            service.SavedProfile.Address);
+    }
+
+    [Fact]
+    public async Task LoadReportsSavedGoogleAuthorizationWhenLocalTokenFilesExist()
+    {
+        var service = new FakeAppSettingsService
+        {
+            Snapshot = new AppSettingsSnapshot(
+                null,
+                new CalendarSettings("primary", "studio@example.test"),
+                GoogleOAuthClientConfigurationStatus.Ready,
+                HasGoogleAuthorizationTokens: true)
+        };
+        var viewModel = new SettingsViewModel(service);
+
+        await viewModel.LoadAsync();
+
+        Assert.Equal(
+            "Google authorization: Saved locally. Connect again if Google Calendar access fails.",
+            viewModel.GoogleAuthorizationStatusText);
+    }
+
+    [Fact]
+    public async Task LoadKeepsPrimaryCalendarDefaultWhenSavedCalendarIdIsBlank()
+    {
+        var service = new FakeAppSettingsService
+        {
+            Snapshot = new AppSettingsSnapshot(
+                null,
+                new CalendarSettings("", "studio@example.test"),
+                GoogleOAuthClientConfigurationStatus.Ready)
+        };
+        var viewModel = new SettingsViewModel(service);
+
+        await viewModel.LoadAsync();
+
+        Assert.Equal("primary", viewModel.CalendarId);
+        Assert.Equal("studio@example.test", viewModel.GoogleAccountEmail);
     }
 
     [Fact]
@@ -107,7 +209,24 @@ public sealed class SettingsViewModelTests
     }
 
     [Fact]
-    public async Task ConnectGoogleCalendarReportsMissingCalendarSettings()
+    public async Task ConnectGoogleCalendarUsesPrimaryWhenCalendarIdIsBlank()
+    {
+        var service = new FakeAppSettingsService();
+        var viewModel = new SettingsViewModel(service)
+        {
+            CalendarId = "",
+            GoogleAccountEmail = "studio@example.test"
+        };
+
+        await viewModel.ConnectGoogleCalendarCommand.ExecuteAsync();
+
+        Assert.True(service.ConnectGoogleCalendarWasCalled);
+        Assert.Equal("primary", viewModel.CalendarId);
+        Assert.Equal(new CalendarSettings("primary", "studio@example.test"), service.ConnectedCalendarSettings);
+    }
+
+    [Fact]
+    public async Task ConnectGoogleCalendarReportsMissingGoogleAccountEmail()
     {
         var service = new FakeAppSettingsService();
         var viewModel = new SettingsViewModel(service)
@@ -119,7 +238,8 @@ public sealed class SettingsViewModelTests
         await viewModel.ConnectGoogleCalendarCommand.ExecuteAsync();
 
         Assert.False(service.ConnectGoogleCalendarWasCalled);
-        Assert.Contains("Calendar ID", viewModel.ErrorMessage);
+        Assert.Equal("primary", viewModel.CalendarId);
+        Assert.Contains("Google account email", viewModel.ErrorMessage);
     }
 
     [Fact]
@@ -237,5 +357,27 @@ public sealed class SettingsViewModelTests
         {
             throw exception;
         }
+    }
+
+    private static Button? FindButtonByContent(DependencyObject root, string content)
+    {
+        foreach (var child in LogicalTreeHelper.GetChildren(root))
+        {
+            if (child is Button button && string.Equals(button.Content as string, content, StringComparison.Ordinal))
+            {
+                return button;
+            }
+
+            if (child is DependencyObject dependencyObject)
+            {
+                var match = FindButtonByContent(dependencyObject, content);
+                if (match is not null)
+                {
+                    return match;
+                }
+            }
+        }
+
+        return null;
     }
 }

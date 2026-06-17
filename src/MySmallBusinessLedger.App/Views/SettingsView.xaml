@@ -56,6 +56,8 @@
                              Margin="0,3,0,8" />
                     <TextBlock Text="Address" />
                     <TextBox Text="{Binding CompanyAddress, UpdateSourceTrigger=PropertyChanged}"
+                             Margin="0,3,0,4" />
+                    <TextBox Text="{Binding CompanyAddressLine2, UpdateSourceTrigger=PropertyChanged}"
                              Margin="0,3,0,8" />
                     <TextBlock Text="Phone" />
                     <TextBox Text="{Binding CompanyPhone, UpdateSourceTrigger=PropertyChanged}"
@@ -73,8 +75,20 @@
                     <DatePicker SelectedDate="{Binding VatRegistrationDate, UpdateSourceTrigger=PropertyChanged}"
                                 Margin="0,3,0,8" />
                     <TextBlock Text="Invoice folder" />
-                    <TextBox Text="{Binding InvoiceFolderPath, UpdateSourceTrigger=PropertyChanged}"
-                             Margin="0,3,0,8" />
+                    <Grid Margin="0,3,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="8" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox Grid.Column="0"
+                                 Text="{Binding InvoiceFolderPath, UpdateSourceTrigger=PropertyChanged}" />
+                        <Button Grid.Column="2"
+                                Content="Browse..."
+                                Click="OnBrowseInvoiceFolder"
+                                MinWidth="78"
+                                Height="24" />
+                    </Grid>
                 </StackPanel>
 
                 <StackPanel Grid.Column="2">
@@ -82,8 +96,10 @@
                                FontSize="18"
                                FontWeight="SemiBold"
                                Margin="0,0,0,10" />
-                    <TextBlock Text="Calendar ID" />
+                    <TextBlock Text="Google calendar"
+                               ToolTip="{Binding CalendarIdHelpText}" />
                     <TextBox Text="{Binding CalendarId, UpdateSourceTrigger=PropertyChanged}"
+                             ToolTip="{Binding CalendarIdHelpText}"
                              Margin="0,3,0,8" />
                     <TextBlock Text="Google account email" />
                     <TextBox Text="{Binding GoogleAccountEmail, UpdateSourceTrigger=PropertyChanged}"

@@ -1,3 +1,4 @@
+using System.IO;
 using MySmallBusinessLedger.Core.Common;
 using MySmallBusinessLedger.Core.Company;
 using MySmallBusinessLedger.Core.Ports;
@@ -150,5 +151,16 @@ public sealed class CoreAppSettingsService : IAppSettingsService
             googleOAuthClientConfigurationProvider.Load().Status,
             appPaths.AppDataFolderPath,
             appPaths.DatabasePath,
-            appPaths.GoogleTokenFolderPath);
+            appPaths.GoogleTokenFolderPath,
+            HasGoogleAuthorizationTokens());
+
+    private bool HasGoogleAuthorizationTokens()
+    {
+        if (!Directory.Exists(appPaths.GoogleTokenFolderPath))
+        {
+            return false;
+        }
+
+        return Directory.EnumerateFiles(appPaths.GoogleTokenFolderPath).Any();
+    }
 }

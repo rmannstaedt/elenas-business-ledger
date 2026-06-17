@@ -1,12 +1,15 @@
 using MySmallBusinessLedger.App.Services;
 using MySmallBusinessLedger.Core.Calendar;
 using MySmallBusinessLedger.Core.Common;
+using MySmallBusinessLedger.Core.Company;
 using MySmallBusinessLedger.Core.Invoices;
 using MySmallBusinessLedger.Core.Lessons;
 using MySmallBusinessLedger.Core.Ports;
 using MySmallBusinessLedger.Core.Time;
 using MySmallBusinessLedger.Core.UseCases.Lessons;
 using MySmallBusinessLedger.Core.UseCases.Startup;
+using MySmallBusinessLedger.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
 
 namespace MySmallBusinessLedger.Tests.App.Services;
 
@@ -44,6 +47,25 @@ public sealed class AppServiceTests
 
         Assert.False(result.Succeeded);
         Assert.Contains(result.Errors, error => error.Code == "Calendar.NotConfigured");
+    }
+
+    [Fact]
+    public async Task AppSettingsServiceReportsSavedGoogleAuthorizationWhenTokenFolderContainsFiles()
+    {
+        using var database = await TestDatabase.CreateAsync();
+        using var appData = new TemporaryDirectory();
+        var appPaths = AppPaths.FromAppDataFolder(appData.Path);
+        Directory.CreateDirectory(appPaths.GoogleTokenFolderPath);
+        await File.WriteAllBytesAsync(Path.Combine(appPaths.GoogleTokenFolderPath, "token.bin"), [1, 2, 3]);
+        var service = new CoreAppSettingsService(
+            new SqliteCompanyProfileRepository(database.CreateContext),
+            new SqliteCalendarSettingsRepository(database.CreateContext),
+            appPaths,
+            new GoogleOAuthClientConfigurationProvider(Path.Combine(appData.Path, "missing-google-oauth-client.json")));
+
+        var snapshot = await service.LoadAsync(CancellationToken.None);
+
+        Assert.True(snapshot.HasGoogleAuthorizationTokens);
     }
 
     private sealed class EmptyStudentRepository : IStudentRepository
@@ -106,5 +128,57 @@ public sealed class AppServiceTests
     private sealed class FixedClock : IClock
     {
         public DateTimeOffset Now => new(2026, 6, 16, 15, 0, 0, TimeSpan.Zero);
+    }
+
+    private sealed class TestDatabase : IDisposable
+    {
+        private readonly string directory;
+
+        private TestDatabase(string directory)
+        {
+            this.directory = directory;
+            DatabasePath = Path.Combine(directory, "ledger.db");
+        }
+
+        public string DatabasePath { get; }
+
+        public static async Task<TestDatabase> CreateAsync()
+        {
+            var database = new TestDatabase(Path.Combine(Path.GetTempPath(), "MySmallBusinessLedgerAppServiceTests", Guid.NewGuid().ToString("N")));
+            Directory.CreateDirectory(database.directory);
+            await using var context = database.CreateContext();
+            await context.Database.EnsureCreatedAsync();
+            return database;
+        }
+
+        public LedgerDbContext CreateContext()
+        {
+            var options = new DbContextOptionsBuilder<LedgerDbContext>()
+                .UseSqlite($"Data Source={DatabasePath};Pooling=False")
+                .Options;
+
+            return new LedgerDbContext(options);
+        }
+
+        public void Dispose()
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    private sealed class TemporaryDirectory : IDisposable
+    {
+        public TemporaryDirectory()
+        {
+            Path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "MySmallBusinessLedgerAppServiceTests", Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(Path);
+        }
+
+        public string Path { get; }
+
+        public void Dispose()
+        {
+            Directory.Delete(Path, recursive: true);
+        }
     }
 }

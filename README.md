@@ -39,10 +39,10 @@ dotnet run --project src\MySmallBusinessLedger.App\MySmallBusinessLedger.App.csp
 
 On first setup, open `Application > Settings` and configure:
 
-- company name, address, VAT status, and invoice folder;
-- Google Calendar ID and account label/email.
+- company name, address, VAT status, and invoice folder; the invoice folder can be typed or selected with Browse;
+- Google calendar and account label/email. The calendar defaults to `primary`, which means the main calendar of the Google account used at sign-in.
 
-The app uses the publisher Google sign-in configuration bundled with the application. For local development, put the real Desktop OAuth JSON at `src\MySmallBusinessLedger.App\Configuration\google-oauth-client.json`; the file is intentionally ignored by Git and copied to the app output when present. Use `Application > Settings > Connect Google Calendar` to authorize the configured Google account in the browser. Use `Forget Google sign-in` to clear local authorization and force a fresh browser consent flow.
+The app uses the publisher Google sign-in configuration bundled with the application. For local development, put the real Desktop OAuth JSON at `src\MySmallBusinessLedger.App\Configuration\google-oauth-client.json`; the file is intentionally ignored by Git and copied to the app output when present. Use `Application > Settings > Connect Google Calendar` to authorize the configured Google account in the browser. Settings reports whether Google authorization token files are saved locally; use `Forget Google sign-in` to clear local authorization and force a fresh browser consent flow.
 
 Google OAuth access/refresh tokens are stored with Windows user data protection.
 
@@ -62,6 +62,7 @@ The app writes invoice PDFs through a staging/verification/publish flow and does
 - Google Calendar is the operational lesson schedule, with two-way sync.
 - Google Calendar integration uses the official Google Calendar API client, external browser OAuth, and Windows-protected local token storage.
 - The Google OAuth app identity is publisher-owned and supplied from `Configuration\google-oauth-client.json`, not selected by each user in Settings.
+- The main window Open Calendar action opens Google Calendar in the browser with the configured Google account email as the account hint.
 - Runtime data is stored under `%APPDATA%\visualtech.dk\MySmallBusinessLedger`.
 - The WPF app now uses real SQLite/Core/Calendar-backed services; if Google Calendar is not configured, the dashboard reports that instead of showing sample lesson rows.
 - Company and Google Calendar account setup, connection, and authorization reset are available from `Application > Settings`.

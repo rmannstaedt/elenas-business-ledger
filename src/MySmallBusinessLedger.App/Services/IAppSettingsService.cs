@@ -10,7 +10,8 @@ public sealed record AppSettingsSnapshot(
     GoogleOAuthClientConfigurationStatus GoogleOAuthAppConfigurationStatus,
     string AppDataFolderPath = "",
     string DatabasePath = "",
-    string GoogleTokenFolderPath = "");
+    string GoogleTokenFolderPath = "",
+    bool HasGoogleAuthorizationTokens = false);
 
 public interface IAppSettingsService
 {

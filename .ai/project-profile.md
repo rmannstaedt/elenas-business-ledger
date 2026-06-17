@@ -32,7 +32,7 @@ Invoice PDFs: stored as files, not BLOBs
 Invoice PDF generation: QuestPDF
 Invoice PDF safety: write to staging, verify PDF bytes, publish without overwriting, then persist invoice metadata and request print
 Google Calendar account tokens: stored locally with Windows user data protection, never in SQLite or plaintext config
-Google Calendar selected calendar/account label: stored in SQLite app settings
+Google Calendar selected calendar/account label: stored in SQLite app settings; the main-window browser launcher uses the configured account email as a Google Calendar account hint
 Runtime app data folder: `%APPDATA%\visualtech.dk\MySmallBusinessLedger`
 Runtime SQLite database path: `%APPDATA%\visualtech.dk\MySmallBusinessLedger\ledger.db`
 Publisher Google OAuth Desktop client configuration: local/release file `src\MySmallBusinessLedger.App\Configuration\google-oauth-client.json`, copied to app output under `Configuration\google-oauth-client.json` when present; the real file is ignored by Git and the committed template is `src\MySmallBusinessLedger.App\Configuration\google-oauth-client.template.json`
@@ -55,7 +55,7 @@ WPF + MVVM
 No business logic in code-behind
 Danish user-facing invoice text
 My-facing UI must stay simple
-Company profile, invoice folder, Google Calendar ID/account label, Google sign-in app status, connect/reconnect controls, and read-only app data/database paths are configured or shown from `Application > Settings`
+Company profile, two-line address entry, invoice folder with typed or folder-picker selection, Google calendar/account label, Google sign-in app status, local Google authorization status, connect/reconnect controls, and read-only app data/database paths are configured or shown from `Application > Settings`; the Google calendar defaults to `primary`
 Desktop windows must remember size and position, including subwindows, and restore inside the current visible screen area
 
 ## Build and test commands

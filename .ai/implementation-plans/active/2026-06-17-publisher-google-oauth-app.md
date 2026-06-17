@@ -73,7 +73,7 @@ Use a visualtech.dk / publisher-owned Google Cloud OAuth Desktop client as the a
 - The app loads a publisher OAuth client configuration from the app installation/output, not from user-selected app data.
 - Settings no longer asks for a Google Calendar login setup file.
 - Settings clearly shows whether the installed app has Google sign-in configured.
-- Users configure only the Calendar ID and Google account email, then authorize their own Google account through the browser OAuth flow.
+- Users configure only the Google calendar and Google account email, then authorize their own Google account through the browser OAuth flow. The calendar defaults to `primary`.
 - A user can force reconnection by clearing the Windows-protected Google token store from Settings.
 - Missing publisher OAuth configuration fails closed with a clear Settings/dashboard message and does not pretend Calendar is available.
 - Immediate testing is possible by placing the visualtech.dk Desktop OAuth JSON into a known local file path before running the app.
@@ -386,7 +386,7 @@ Concrete steps:
 
 Behavior that must remain unchanged:
 
-- Missing Calendar ID/account still disables Calendar-backed dashboard/edit actions truthfully.
+- Missing Google account still disables Calendar-backed dashboard/edit actions truthfully; a blank calendar value normalizes to `primary`.
 - Missing OAuth configuration disables Calendar-backed actions truthfully.
 - The browser OAuth flow still uses the configured Google account email as `userId`.
 - Tokens remain in `%APPDATA%\visualtech.dk\MySmallBusinessLedger\GoogleTokens`.
@@ -727,7 +727,7 @@ Concrete steps:
 
 - [ ] Open `Application > Settings`.
 - [ ] Confirm Google sign-in app status is ready.
-- [ ] Enter Calendar ID and Google account email for the account/calendar being tested.
+- [ ] Confirm the Google calendar field is `primary`, or enter a separate calendar ID, and enter Google account email for the account/calendar being tested.
 - [ ] Click Connect Google Calendar or trigger dashboard refresh if Stage 4 keeps implicit authorization.
 - [ ] In the browser, sign in as the target user and grant Calendar access.
 - [ ] Confirm Settings/dashboard reports success or displays real Calendar-backed lesson data.
@@ -824,7 +824,7 @@ Prerequisites/setup:
 - OAuth Desktop client exists under the intended publisher project.
 - If the app is in Testing mode, the test Google account is listed as a test user.
 - Real OAuth JSON is available locally at `src\MySmallBusinessLedger.App\Configuration\google-oauth-client.json` or equivalent release-injected path chosen before implementation.
-- Safe Calendar ID and Google account email are known.
+- Safe Google account email is known; use the default `primary` calendar unless testing a separate calendar.
 
 Exact user actions or commands:
 
@@ -838,7 +838,7 @@ Exact user actions or commands:
 
 2. Open `Application > Settings`.
 3. Confirm Google sign-in app status is ready.
-4. Enter Calendar ID and Google account email.
+4. Leave Google calendar as `primary`, or enter a separate calendar ID, and enter Google account email.
 5. Save Settings.
 6. Click Connect/Reconnect Google Calendar if available, or refresh the dashboard.
 7. Complete browser consent with the intended Google account.
@@ -890,3 +890,16 @@ Cleanup/reset instructions:
   - Final verification: `dotnet build MySmallBusinessLedger.sln -nodeReuse:false` passed with 0 warnings and 0 errors; `dotnet test MySmallBusinessLedger.sln -nodeReuse:false` passed with 110/110 tests.
   - Deviations: Build output keeps the `Configuration\google-oauth-client.json` relative folder instead of copying the JSON to output root.
   - Risks/open questions: Stage 6 remains open and requires the real untracked publisher OAuth JSON plus manual browser consent with the intended Google account.
+- 2026-06-17:
+  - Stage: Settings usability follow-up
+  - Files changed: `README.md`, `.ai/project-profile.md`, `.ai/context/HANDOFF.md`, `.ai/implementation-plans/active/2026-06-17-publisher-google-oauth-app.md`, `src/MySmallBusinessLedger.App/ViewModels/SettingsViewModel.cs`, `src/MySmallBusinessLedger.App/Views/SettingsView.xaml`, `tests/MySmallBusinessLedger.Tests/App/ViewModels/SettingsViewModelTests.cs`.
+  - Summary: Defaulted the Google calendar field to `primary`, normalized blank calendar values back to `primary`, renamed the Settings label to `Google calendar`, and added tooltip/help text explaining how to find a separate calendar ID in Google Calendar.
+  - Tests/verification run: focused Settings ViewModel tests passed 11/11; `dotnet build MySmallBusinessLedger.sln -nodeReuse:false`; `dotnet test MySmallBusinessLedger.sln -nodeReuse:false`.
+  - Results: Full build passed with 0 warnings and 0 errors; full test suite passed with 113/113 tests.
+- 2026-06-17:
+  - Stage: Settings and browser-account follow-up
+  - Files changed: `README.md`, `.ai/project-profile.md`, `.ai/context/HANDOFF.md`, `.ai/implementation-plans/active/2026-06-17-publisher-google-oauth-app.md`, `src/MySmallBusinessLedger.App/App.xaml.cs`, `src/MySmallBusinessLedger.App/Services/CoreAppSettingsService.cs`, `src/MySmallBusinessLedger.App/Services/ExternalBrowserCalendarLauncher.cs`, `src/MySmallBusinessLedger.App/Services/IAppSettingsService.cs`, `src/MySmallBusinessLedger.App/ViewModels/SettingsViewModel.cs`, `src/MySmallBusinessLedger.App/Views/SettingsView.xaml`, `src/MySmallBusinessLedger.App/Views/SettingsView.xaml.cs`, `tests/MySmallBusinessLedger.Tests/App/Services/AppServiceTests.cs`, `tests/MySmallBusinessLedger.Tests/App/Services/ExternalBrowserCalendarLauncherTests.cs`, `tests/MySmallBusinessLedger.Tests/App/ViewModels/SettingsViewModelTests.cs`.
+  - Summary: Added a Browse picker for the invoice folder, split Settings company address into address plus a second unlabeled city/address line while preserving one stored address field, reported saved local Google authorization token state on Settings reload, and changed Open Calendar to use the configured Google account email as a browser `authuser` hint instead of hardcoded `/u/0/`.
+  - Tests/verification run: red/green Settings ViewModel, app settings service, and external calendar launcher tests; `dotnet build MySmallBusinessLedger.sln -nodeReuse:false`; `dotnet test MySmallBusinessLedger.sln -nodeReuse:false`.
+  - Results: Full build passed with 0 warnings and 0 errors; full test suite passed with 119/119 tests.
+  - Risks/open questions: The `authuser` browser hint depends on the account already being signed into the user's browser; if Google cannot match it, Google may still ask the user to sign in or choose an account.
