@@ -20,6 +20,7 @@
     flexibility: none / move or cancel by agreement
     number of students: 1 / 2
     effective date: <date/time>
+    payment terms: paid monthly in advance / paid per lesson
 
 ### Lesson
     date/time
@@ -69,13 +70,17 @@ The Lessons table is updated with student lessons when the invoice is printed.
 The Plan is an agreement between teacher and student and determines how many lessons there are per week and how much the student will pay for them. If the 'lessons per week' is 'by appointment', there is no fixed number.
 
 Plan catalog entries have a lifecycle:
-  * Draft: editable and deletable, but not assignable to students.
+  * Draft: editable and deletable, but not assignable to students. A Draft may be incomplete.
   * Active: immutable and assignable to students; the only editable field is `Retire on`, and the allowed catalog action is Retire.
   * Retired: immutable and not assignable to students; the only allowed catalog action is Reactivate.
+
+A Draft Plan starts with blank name, blank price, one lesson per week, 60 minute duration, one student, move/cancel flexibility, `Paid monthly in advance`, the first day of the current month as effective date, and no `Retire on` date. All fields except `Retire on` must be filled with valid values before the Draft can be published.
 
 Plans are managed independently from Students from the Plan menu. When an Active catalog Plan is assigned to a Student, the Plan fields are copied into that Student's plan period. After that assignment, catalog edits while Draft, publish/retire/reactivate actions, and future catalog cleanup must not mutate existing Student plan periods or issued invoices.
 
 An Active Plan's `Retire on` date is equivalent to choosing Retire on that date. When the application starts, due Active Plans are moved to Retired so they no longer appear for new student assignment. Existing Student plan periods keep their copied Plan data until the Student is explicitly moved to another Active Plan.
+
+When adding another Plan from Manage Plans, changed Draft fields are saved before the new Draft is created. If the selected Active Plan has an unsaved `Retire on` change, the user is asked whether to save or discard that change before adding the new Draft.
 
 Students may be moved to a different Active Plan by creating a new assigned student plan period.
 
@@ -215,7 +220,7 @@ Once an Invoice has been *successfully* saved, it can no longer be edited.
 
   * VAT exemptions for individual students are outside the current scope.
   * No VAT reporting.
-  * No payment due/terms.
+  * No automated payment reminders or due-date workflow.
   * No support for credit notes/correction invoices.
   * No integration with MobilePay/Bank for payment registration.
   * No tax reserve estimate.

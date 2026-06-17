@@ -11,20 +11,30 @@ namespace MySmallBusinessLedger.App.ViewModels;
 public sealed class PlanCatalogViewModel : ViewModelBase
 {
     private readonly IPlanCatalogService planCatalogService;
+    private readonly IPlanCatalogInteractionService interactionService;
     private PlanCatalogDisplayModel? selectedPlan;
     private string name = string.Empty;
-    private decimal priceWithoutVat;
+    private decimal? priceWithoutVat;
     private LessonsPerWeek lessonsPerWeek = LessonsPerWeek.One;
     private int durationMinutes = 60;
     private PlanFlexibility flexibility = PlanFlexibility.MoveOrCancelByAgreement;
     private int numberOfStudents = 1;
-    private DateTime effectiveDate = new DateOnly(2026, 1, 1).ToDateTime(TimeOnly.MinValue);
+    private DateTime effectiveDate = DefaultEffectiveDate();
+    private string paymentTerms = PlanPaymentTerms.PaidMonthlyInAdvance;
     private DateTime? retireOnDate;
     private string? errorMessage;
 
     public PlanCatalogViewModel(IPlanCatalogService planCatalogService)
+        : this(planCatalogService, new DiscardPlanCatalogInteractionService())
+    {
+    }
+
+    public PlanCatalogViewModel(
+        IPlanCatalogService planCatalogService,
+        IPlanCatalogInteractionService interactionService)
     {
         this.planCatalogService = planCatalogService;
+        this.interactionService = interactionService;
         PlansView = CollectionViewSource.GetDefaultView(Plans);
         PlansView.GroupDescriptions?.Add(new PropertyGroupDescription(nameof(PlanCatalogDisplayModel.StateText)));
 
@@ -54,6 +64,8 @@ public sealed class PlanCatalogViewModel : ViewModelBase
             new(PlanFlexibility.MoveOrCancelByAgreement, "Move or cancel by agreement")
         ];
 
+    public IReadOnlyList<string> PaymentTermOptions => PlanPaymentTerms.All;
+
     public PlanCatalogDisplayModel? SelectedPlan
     {
         get => selectedPlan;
@@ -68,7 +80,7 @@ public sealed class PlanCatalogViewModel : ViewModelBase
 
     public string Name { get => name; set => SetProperty(ref name, value); }
 
-    public decimal PriceWithoutVat { get => priceWithoutVat; set => SetProperty(ref priceWithoutVat, value); }
+    public decimal? PriceWithoutVat { get => priceWithoutVat; set => SetProperty(ref priceWithoutVat, value); }
 
     public LessonsPerWeek LessonsPerWeek { get => lessonsPerWeek; set => SetProperty(ref lessonsPerWeek, value); }
 
@@ -79,6 +91,8 @@ public sealed class PlanCatalogViewModel : ViewModelBase
     public int NumberOfStudents { get => numberOfStudents; set => SetProperty(ref numberOfStudents, value); }
 
     public DateTime EffectiveDate { get => effectiveDate; set => SetProperty(ref effectiveDate, value); }
+
+    public string PaymentTerms { get => paymentTerms; set => SetProperty(ref paymentTerms, value); }
 
     public DateTime? RetireOnDate { get => retireOnDate; set => SetProperty(ref retireOnDate, value); }
 
@@ -128,15 +142,21 @@ public sealed class PlanCatalogViewModel : ViewModelBase
 
     private async Task AddDraftPlanAsync()
     {
+        if (!await PrepareCurrentPlanForAddAsync())
+        {
+            return;
+        }
+
         var result = await planCatalogService.CreateDraftAsync(
             new PlanDraftInput(
-                "New plan",
-                400m,
+                string.Empty,
+                null,
                 LessonsPerWeek.One,
                 DurationMinutes: 60,
                 PlanFlexibility.MoveOrCancelByAgreement,
                 NumberOfStudents: 1,
-                new DateTimeOffset(EffectiveDate.Date, TimeSpan.Zero),
+                new DateTimeOffset(DefaultEffectiveDate(), TimeSpan.Zero),
+                PaymentTerms: PlanPaymentTerms.PaidMonthlyInAdvance,
                 RetireOn: null),
             CancellationToken.None);
         if (!result.Succeeded)
@@ -156,18 +176,29 @@ public sealed class PlanCatalogViewModel : ViewModelBase
             return;
         }
 
+        await SaveDraftPlanCoreAsync(SelectedPlan.Id);
+    }
+
+    private async Task<bool> SaveDraftPlanCoreAsync(int planId)
+    {
+        if (SelectedPlan is null)
+        {
+            return true;
+        }
+
         var result = await planCatalogService.UpdateDraftAsync(
-            SelectedPlan.Id,
+            planId,
             CreateDraftInput(),
             CancellationToken.None);
         if (!result.Succeeded)
         {
             SetError(result.Errors.FirstOrDefault()?.Message ?? "Plan could not be saved.");
-            return;
+            return false;
         }
 
         ErrorMessage = null;
         await ReloadAsync(result.Value!.Id);
+        return true;
     }
 
     private async Task DeleteDraftPlanAsync()
@@ -213,18 +244,29 @@ public sealed class PlanCatalogViewModel : ViewModelBase
             return;
         }
 
+        await SaveRetireOnCoreAsync(SelectedPlan.Id);
+    }
+
+    private async Task<bool> SaveRetireOnCoreAsync(int planId)
+    {
+        if (SelectedPlan is null)
+        {
+            return true;
+        }
+
         var result = await planCatalogService.UpdateRetireOnAsync(
-            SelectedPlan.Id,
+            planId,
             ToRetireOn(),
             CancellationToken.None);
         if (!result.Succeeded)
         {
             SetError(result.Errors.FirstOrDefault()?.Message ?? "Retire on could not be saved.");
-            return;
+            return false;
         }
 
         ErrorMessage = null;
         await ReloadAsync(result.Value!.Id);
+        return true;
     }
 
     private async Task RetirePlanAsync()
@@ -291,6 +333,7 @@ public sealed class PlanCatalogViewModel : ViewModelBase
             Flexibility = plan.Flexibility;
             NumberOfStudents = plan.NumberOfStudents;
             EffectiveDate = plan.EffectiveFrom.Date;
+            PaymentTerms = plan.PaymentTerms;
             RetireOnDate = plan.RetireOn?.Date;
         }
 
@@ -318,10 +361,51 @@ public sealed class PlanCatalogViewModel : ViewModelBase
             Flexibility,
             NumberOfStudents,
             new DateTimeOffset(EffectiveDate.Date, TimeSpan.Zero),
+            PaymentTerms,
             ToRetireOn());
 
     private DateTimeOffset? ToRetireOn() =>
         RetireOnDate is null ? null : new DateTimeOffset(RetireOnDate.Value.Date, TimeSpan.Zero);
+
+    private async Task<bool> PrepareCurrentPlanForAddAsync()
+    {
+        if (SelectedPlan is null)
+        {
+            return true;
+        }
+
+        if (SelectedPlan.State == PlanCatalogState.Draft && HasDraftChanges(SelectedPlan.Plan))
+        {
+            return await SaveDraftPlanCoreAsync(SelectedPlan.Id);
+        }
+
+        if (SelectedPlan.State == PlanCatalogState.Active && HasRetireOnChanged(SelectedPlan.Plan))
+        {
+            var choice = await interactionService.PromptAddPlanSaveChangesAsync(CancellationToken.None);
+            return choice switch
+            {
+                PlanCatalogAddPlanChoice.Save => await SaveRetireOnCoreAsync(SelectedPlan.Id),
+                PlanCatalogAddPlanChoice.Discard => true,
+                _ => false
+            };
+        }
+
+        return true;
+    }
+
+    private bool HasDraftChanges(PlanCatalogItem plan) =>
+        !string.Equals(Name, plan.Name, StringComparison.Ordinal) ||
+        PriceWithoutVat != plan.PriceWithoutVat ||
+        LessonsPerWeek != plan.LessonsPerWeek ||
+        DurationMinutes != plan.DurationMinutes ||
+        Flexibility != plan.Flexibility ||
+        NumberOfStudents != plan.NumberOfStudents ||
+        new DateTimeOffset(EffectiveDate.Date, TimeSpan.Zero) != plan.EffectiveFrom ||
+        !string.Equals(PaymentTerms, plan.PaymentTerms, StringComparison.Ordinal) ||
+        ToRetireOn() != plan.RetireOn;
+
+    private bool HasRetireOnChanged(PlanCatalogItem plan) =>
+        ToRetireOn() != plan.RetireOn;
 
     private void SetError(string message)
     {
@@ -336,4 +420,10 @@ public sealed class PlanCatalogViewModel : ViewModelBase
             PlanCatalogState.Retired => 2,
             _ => 3
         };
+
+    private static DateTime DefaultEffectiveDate()
+    {
+        var today = DateTime.Today;
+        return new DateTime(today.Year, today.Month, 1);
+    }
 }

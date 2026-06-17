@@ -41,7 +41,7 @@ public sealed class PlanCatalogEntity
 
     public string Name { get; set; } = string.Empty;
 
-    public decimal PriceWithoutVat { get; set; }
+    public string PriceWithoutVat { get; set; } = string.Empty;
 
     public LessonsPerWeek LessonsPerWeek { get; set; }
 
@@ -52,6 +52,8 @@ public sealed class PlanCatalogEntity
     public int NumberOfStudents { get; set; }
 
     public DateTimeOffset EffectiveFrom { get; set; }
+
+    public string PaymentTerms { get; set; } = string.Empty;
 
     public DateTimeOffset? RetireOn { get; set; }
 
@@ -104,6 +106,8 @@ public sealed class StudentPlanPeriodEntity
     public int NumberOfStudents { get; set; }
 
     public DateTimeOffset PlanEffectiveFrom { get; set; }
+
+    public string PaymentTerms { get; set; } = string.Empty;
 
     public DateOnly StartsOn { get; set; }
 

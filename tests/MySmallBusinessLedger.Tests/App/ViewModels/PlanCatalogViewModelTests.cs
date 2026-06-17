@@ -9,6 +9,7 @@ using WpfButton = System.Windows.Controls.Button;
 using WpfComboBox = System.Windows.Controls.ComboBox;
 using WpfDataGrid = System.Windows.Controls.DataGrid;
 using WpfGrid = System.Windows.Controls.Grid;
+using WpfTextBox = System.Windows.Controls.TextBox;
 
 namespace MySmallBusinessLedger.Tests.App.ViewModels;
 
@@ -72,7 +73,15 @@ public sealed class PlanCatalogViewModelTests
         Assert.True(viewModel.CanEditSelectedPlanFields);
         Assert.True(viewModel.CanEditSelectedPlanRetireOn);
         Assert.True(viewModel.CanDeleteSelectedPlan);
-        Assert.Equal("New plan", service.CreatedDraftInput?.Name);
+        Assert.Equal(string.Empty, service.CreatedDraftInput?.Name);
+        Assert.Null(service.CreatedDraftInput?.PriceWithoutVat);
+        Assert.Equal(LessonsPerWeek.One, service.CreatedDraftInput?.LessonsPerWeek);
+        Assert.Equal(60, service.CreatedDraftInput?.DurationMinutes);
+        Assert.Equal(1, service.CreatedDraftInput?.NumberOfStudents);
+        Assert.Equal(PlanFlexibility.MoveOrCancelByAgreement, service.CreatedDraftInput?.Flexibility);
+        Assert.Equal("Paid monthly in advance", service.CreatedDraftInput?.PaymentTerms);
+        Assert.Equal(new DateTimeOffset(new DateTime(DateTime.Today.Year, DateTime.Today.Month, 1), TimeSpan.Zero), service.CreatedDraftInput?.EffectiveFrom);
+        Assert.Null(service.CreatedDraftInput?.RetireOn);
     }
 
     [Fact]
@@ -84,6 +93,7 @@ public sealed class PlanCatalogViewModelTests
         await viewModel.LoadAsync();
         viewModel.Name = "Updated";
         viewModel.PriceWithoutVat = 500m;
+        viewModel.PaymentTerms = "Paid monthly in advance";
         viewModel.RetireOnDate = new DateTime(2026, 7, 1);
 
         await viewModel.SaveDraftPlanCommand.ExecuteAsync();
@@ -91,7 +101,64 @@ public sealed class PlanCatalogViewModelTests
         Assert.Equal(draft.Id, service.UpdatedPlanId);
         Assert.Equal("Updated", service.UpdatedDraftInput?.Name);
         Assert.Equal(500m, service.UpdatedDraftInput?.PriceWithoutVat);
+        Assert.Equal("Paid monthly in advance", service.UpdatedDraftInput?.PaymentTerms);
         Assert.Equal(new DateTimeOffset(2026, 7, 1, 0, 0, 0, TimeSpan.Zero), service.UpdatedDraftInput?.RetireOn);
+    }
+
+    [Fact]
+    public async Task AddDraftSavesChangedDraftBeforeCreatingNewDraft()
+    {
+        var service = new FakePlanCatalogService();
+        var draft = service.Seed(CreatePlan("Draft", PlanCatalogState.Draft));
+        var viewModel = new PlanCatalogViewModel(service, new FakePlanCatalogInteractionService());
+        await viewModel.LoadAsync();
+        viewModel.Name = "Saved before add";
+        viewModel.PaymentTerms = "Paid per lesson";
+
+        await viewModel.AddDraftPlanCommand.ExecuteAsync();
+
+        Assert.Equal(draft.Id, service.UpdatedPlanId);
+        Assert.Equal("Saved before add", service.UpdatedDraftInput?.Name);
+        Assert.Equal("Paid per lesson", service.UpdatedDraftInput?.PaymentTerms);
+        Assert.Equal(["UpdateDraft", "CreateDraft"], service.Calls);
+        Assert.Equal(string.Empty, viewModel.SelectedPlan?.Name);
+    }
+
+    [Fact]
+    public async Task AddDraftPromptsBeforeSavingChangedActivePlan()
+    {
+        var service = new FakePlanCatalogService();
+        var active = service.Seed(CreatePlan("Active", PlanCatalogState.Active));
+        var interactions = new FakePlanCatalogInteractionService { NextAddPlanChoice = PlanCatalogAddPlanChoice.Save };
+        var viewModel = new PlanCatalogViewModel(service, interactions);
+        await viewModel.LoadAsync();
+        viewModel.RetireOnDate = new DateTime(2026, 10, 1);
+
+        await viewModel.AddDraftPlanCommand.ExecuteAsync();
+
+        Assert.Equal(1, interactions.PromptAddPlanSaveChangesCount);
+        Assert.Equal(active.Id, service.UpdatedRetireOnPlanId);
+        Assert.Equal(new DateTimeOffset(2026, 10, 1, 0, 0, 0, TimeSpan.Zero), service.UpdatedRetireOn);
+        Assert.Equal(["UpdateRetireOn", "CreateDraft"], service.Calls);
+        Assert.Equal(string.Empty, viewModel.SelectedPlan?.Name);
+    }
+
+    [Fact]
+    public async Task AddDraftCanCancelWhenChangedActivePlanIsPrompted()
+    {
+        var service = new FakePlanCatalogService();
+        service.Seed(CreatePlan("Active", PlanCatalogState.Active));
+        var interactions = new FakePlanCatalogInteractionService { NextAddPlanChoice = PlanCatalogAddPlanChoice.Cancel };
+        var viewModel = new PlanCatalogViewModel(service, interactions);
+        await viewModel.LoadAsync();
+        viewModel.RetireOnDate = new DateTime(2026, 10, 1);
+
+        await viewModel.AddDraftPlanCommand.ExecuteAsync();
+
+        Assert.Equal(1, interactions.PromptAddPlanSaveChangesCount);
+        Assert.Null(service.CreatedDraftInput);
+        Assert.Null(service.UpdatedRetireOnPlanId);
+        Assert.Equal("Active", viewModel.SelectedPlan?.Name);
     }
 
     [Fact]
@@ -186,6 +253,25 @@ public sealed class PlanCatalogViewModelTests
             Assert.Equal("DisplayName", flexibilityComboBox.DisplayMemberPath);
             Assert.Equal("Value", flexibilityComboBox.SelectedValuePath);
 
+            var paymentTermsComboBox = Assert.Single(comboBoxes, comboBox =>
+                comboBox.GetBindingExpression(WpfComboBox.SelectedItemProperty)?.ParentBinding.Path.Path == nameof(PlanCatalogViewModel.PaymentTerms));
+            Assert.Empty(paymentTermsComboBox.DisplayMemberPath);
+
+            var textBoxes = FindChildren<WpfTextBox>(window);
+            var fieldOrder = textBoxes
+                .Select(textBox => textBox.GetBindingExpression(WpfTextBox.TextProperty)?.ParentBinding.Path.Path)
+                .Where(path => path is not null)
+                .Select(path => path!)
+                .ToArray();
+            Assert.Equal(
+                [
+                    nameof(PlanCatalogViewModel.Name),
+                    nameof(PlanCatalogViewModel.PriceWithoutVat),
+                    nameof(PlanCatalogViewModel.DurationMinutes),
+                    nameof(PlanCatalogViewModel.NumberOfStudents)
+                ],
+                fieldOrder);
+
             window.Close();
         });
     }
@@ -201,6 +287,9 @@ public sealed class PlanCatalogViewModelTests
         Assert.Equal(
             ["No flexibility", "Move or cancel by agreement"],
             viewModel.FlexibilityOptions.Select(option => option.DisplayName).ToArray());
+        Assert.Equal(
+            ["Paid monthly in advance", "Paid per lesson"],
+            viewModel.PaymentTermOptions);
     }
 
     private static PlanCatalogItem CreatePlan(string name, PlanCatalogState state) =>
@@ -213,6 +302,7 @@ public sealed class PlanCatalogViewModelTests
             PlanFlexibility.MoveOrCancelByAgreement,
             NumberOfStudents: 1,
             EffectiveFrom: new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
+            PaymentTerms: "Paid monthly in advance",
             RetireOn: null,
             state);
 
@@ -233,6 +323,8 @@ public sealed class PlanCatalogViewModelTests
 
         public DateTimeOffset? UpdatedRetireOn { get; private set; }
 
+        public List<string> Calls { get; } = [];
+
         public PlanCatalogItem Seed(PlanCatalogItem plan)
         {
             var saved = plan with { Id = nextId++ };
@@ -248,12 +340,17 @@ public sealed class PlanCatalogViewModelTests
 
         public Task<OperationResult<PlanCatalogItem>> CreateDraftAsync(PlanDraftInput input, CancellationToken cancellationToken)
         {
+            Calls.Add("CreateDraft");
             CreatedDraftInput = input;
-            return Task.FromResult(OperationResult<PlanCatalogItem>.Success(Seed(CreatePlan(input.Name, PlanCatalogState.Draft))));
+            return Task.FromResult(OperationResult<PlanCatalogItem>.Success(Seed(CreatePlan(input.Name, PlanCatalogState.Draft) with
+            {
+                PaymentTerms = input.PaymentTerms
+            })));
         }
 
         public Task<OperationResult<PlanCatalogItem>> UpdateDraftAsync(int planId, PlanDraftInput input, CancellationToken cancellationToken)
         {
+            Calls.Add("UpdateDraft");
             UpdatedPlanId = planId;
             UpdatedDraftInput = input;
             var index = plans.FindIndex(plan => plan.Id == planId);
@@ -266,6 +363,7 @@ public sealed class PlanCatalogViewModelTests
                 Flexibility = input.Flexibility,
                 NumberOfStudents = input.NumberOfStudents,
                 EffectiveFrom = input.EffectiveFrom,
+                PaymentTerms = input.PaymentTerms,
                 RetireOn = input.RetireOn
             };
             return Task.FromResult(OperationResult<PlanCatalogItem>.Success(plans[index]));
@@ -296,6 +394,7 @@ public sealed class PlanCatalogViewModelTests
             DateTimeOffset? retireOn,
             CancellationToken cancellationToken)
         {
+            Calls.Add("UpdateRetireOn");
             UpdatedRetireOnPlanId = planId;
             UpdatedRetireOn = retireOn;
             var index = plans.FindIndex(plan => plan.Id == planId);
@@ -313,6 +412,19 @@ public sealed class PlanCatalogViewModelTests
             var index = plans.FindIndex(plan => plan.Id == planId);
             plans[index] = plans[index] with { State = state };
             return Task.FromResult(OperationResult<PlanCatalogItem>.Success(plans[index]));
+        }
+    }
+
+    private sealed class FakePlanCatalogInteractionService : IPlanCatalogInteractionService
+    {
+        public PlanCatalogAddPlanChoice NextAddPlanChoice { get; init; } = PlanCatalogAddPlanChoice.Discard;
+
+        public int PromptAddPlanSaveChangesCount { get; private set; }
+
+        public Task<PlanCatalogAddPlanChoice> PromptAddPlanSaveChangesAsync(CancellationToken cancellationToken)
+        {
+            PromptAddPlanSaveChangesCount++;
+            return Task.FromResult(NextAddPlanChoice);
         }
     }
 

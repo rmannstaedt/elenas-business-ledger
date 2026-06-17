@@ -8,8 +8,8 @@ public partial class StudentEditorView : Window
 {
     public StudentEditorView(StudentEditorViewModel viewModel)
     {
-        InitializeComponent();
         DataContext = viewModel;
+        InitializeComponent();
         viewModel.CloseRequested += OnCloseRequested;
         WindowPlacementStore.Attach(this, nameof(StudentEditorView));
     }

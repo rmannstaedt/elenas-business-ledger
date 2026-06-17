@@ -12,7 +12,8 @@ public sealed record StudentPlanPeriodInput(
     int NumberOfStudents,
     DateTimeOffset PlanEffectiveFrom,
     DateOnly StartsOn,
-    DateOnly? EndsOn);
+    DateOnly? EndsOn,
+    string PaymentTerms = "");
 
 public sealed record StudentScheduleInput(DayOfWeek Weekday, TimeOnly StartsAt);
 

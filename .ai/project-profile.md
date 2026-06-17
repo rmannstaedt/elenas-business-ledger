@@ -28,8 +28,8 @@ tests/
 
 Database: SQLite
 Database access: EF Core SQLite
-Plan catalog: stored in SQLite with Draft, Active, and Retired lifecycle state; Draft plans are editable/deletable, Active plans are immutable/assignable except for Retire on scheduling and immediate retirement, and Retired plans are immutable/reactivatable but not assignable
-Student plan periods: stored as copied plan snapshots; catalog lifecycle changes must not rewrite existing student plan periods or issued invoice data
+Plan catalog: stored in SQLite with Draft, Active, and Retired lifecycle state; Draft plans are editable/deletable and may be incomplete, publishing requires all fields except Retire on, Active plans are immutable/assignable except for Retire on scheduling and immediate retirement, and Retired plans are immutable/reactivatable but not assignable
+Student plan periods: stored as copied plan snapshots including payment terms; catalog lifecycle changes must not rewrite existing student plan periods or issued invoice data
 Invoice PDFs: stored as files, not BLOBs
 Invoice PDF generation: QuestPDF
 Invoice PDF safety: write to staging, verify PDF bytes, publish without overwriting, then persist invoice metadata and request print
@@ -60,7 +60,7 @@ Danish user-facing invoice text
 My-facing UI must stay simple
 Company profile, two-line company address entry, invoice folder with typed or folder-picker selection, Google calendar/account label, Google sign-in app status, local Google authorization status, connect/reconnect controls, and read-only app data/database paths are configured or shown from `Application > Settings`; the Google calendar defaults to `primary`
 Student editor uses two stacked address fields and stores them as one multiline student address value.
-Plans are managed from `Plan > Manage Plans`; the student editor offers only Active catalog plans and copies the selected plan into the student's plan period. The Manage Plans window remembers its size/position and list column widths.
+Plans are managed from `Plan > Manage Plans`; new Draft plans start with blank name/price, default lesson/duration/student/flexibility values, payment terms selected from `Paid monthly in advance` or `Paid per lesson`, and an effective date set to the first day of the current month. `Add Plan` saves changed Draft data before creating the next Draft, and changed Active `Retire on` values are prompted before adding. The student editor offers only publish-complete Active catalog plans and copies the selected plan into the student's plan period. The Manage Plans window remembers its size/position and list column widths.
 Desktop windows must remember size and position, including subwindows, and restore inside the current visible screen area
 
 ## Build and test commands

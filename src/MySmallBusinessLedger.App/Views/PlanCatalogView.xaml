@@ -152,7 +152,7 @@
                              IsEnabled="{Binding CanEditSelectedPlanFields}"
                              Margin="0,3,0,8" />
                     <TextBlock Text="Price without VAT" />
-                    <TextBox Text="{Binding PriceWithoutVat, UpdateSourceTrigger=PropertyChanged}"
+                    <TextBox Text="{Binding PriceWithoutVat, UpdateSourceTrigger=PropertyChanged, TargetNullValue=''}"
                              IsEnabled="{Binding CanEditSelectedPlanFields}"
                              Margin="0,3,0,8" />
                     <TextBlock Text="Lessons per week" />
@@ -166,6 +166,10 @@
                     <TextBox Text="{Binding DurationMinutes, UpdateSourceTrigger=PropertyChanged}"
                              IsEnabled="{Binding CanEditSelectedPlanFields}"
                              Margin="0,3,0,8" />
+                    <TextBlock Text="Number of students" />
+                    <TextBox Text="{Binding NumberOfStudents, UpdateSourceTrigger=PropertyChanged}"
+                             IsEnabled="{Binding CanEditSelectedPlanFields}"
+                             Margin="0,3,0,8" />
                     <TextBlock Text="Flexibility" />
                     <ComboBox ItemsSource="{Binding FlexibilityOptions}"
                               DisplayMemberPath="DisplayName"
@@ -173,10 +177,11 @@
                               SelectedValue="{Binding Flexibility}"
                               IsEnabled="{Binding CanEditSelectedPlanFields}"
                               Margin="0,3,0,8" />
-                    <TextBlock Text="Number of students" />
-                    <TextBox Text="{Binding NumberOfStudents, UpdateSourceTrigger=PropertyChanged}"
-                             IsEnabled="{Binding CanEditSelectedPlanFields}"
-                             Margin="0,3,0,8" />
+                    <TextBlock Text="Payment terms" />
+                    <ComboBox ItemsSource="{Binding PaymentTermOptions}"
+                              SelectedItem="{Binding PaymentTerms}"
+                              IsEnabled="{Binding CanEditSelectedPlanFields}"
+                              Margin="0,3,0,8" />
                     <TextBlock Text="Effective date" />
                     <DatePicker SelectedDate="{Binding EffectiveDate, UpdateSourceTrigger=PropertyChanged}"
                                 IsEnabled="{Binding CanEditSelectedPlanFields}"

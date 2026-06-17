@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using System.Globalization;
 using MySmallBusinessLedger.Core.Common;
 using MySmallBusinessLedger.Core.Plans;
 using MySmallBusinessLedger.Core.Ports;
@@ -71,12 +72,13 @@ public sealed class SqlitePlanCatalogRepository : IPlanCatalogRepository
         }
 
         entity.Name = plan.Name;
-        entity.PriceWithoutVat = plan.PriceWithoutVat;
+        entity.PriceWithoutVat = FormatPrice(plan.PriceWithoutVat);
         entity.LessonsPerWeek = plan.LessonsPerWeek;
         entity.DurationMinutes = plan.DurationMinutes;
         entity.Flexibility = plan.Flexibility;
         entity.NumberOfStudents = plan.NumberOfStudents;
         entity.EffectiveFrom = plan.EffectiveFrom;
+        entity.PaymentTerms = plan.PaymentTerms;
         entity.RetireOn = plan.RetireOn;
         entity.State = plan.State;
 
@@ -113,12 +115,21 @@ public sealed class SqlitePlanCatalogRepository : IPlanCatalogRepository
         new(
             entity.Id,
             entity.Name,
-            entity.PriceWithoutVat,
+            ParsePrice(entity.PriceWithoutVat),
             entity.LessonsPerWeek,
             entity.DurationMinutes,
             entity.Flexibility,
             entity.NumberOfStudents,
             entity.EffectiveFrom,
+            entity.PaymentTerms,
             entity.RetireOn,
             entity.State);
+
+    private static string FormatPrice(decimal? price) =>
+        price is null ? string.Empty : price.Value.ToString(CultureInfo.InvariantCulture);
+
+    private static decimal? ParsePrice(string price) =>
+        string.IsNullOrWhiteSpace(price)
+            ? null
+            : decimal.Parse(price, CultureInfo.InvariantCulture);
 }

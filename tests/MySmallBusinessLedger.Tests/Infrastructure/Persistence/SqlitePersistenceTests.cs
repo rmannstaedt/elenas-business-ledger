@@ -88,12 +88,32 @@ public sealed class SqlitePersistenceTests
         Assert.Equal(
             [PlanCatalogState.Active, PlanCatalogState.Draft, PlanCatalogState.Retired],
             allPlans.Select(plan => plan.State).OrderBy(state => state.ToString(), StringComparer.Ordinal).ToArray());
+        Assert.Equal("Paid monthly in advance", allPlans.Single(plan => plan.Id == active.Id).PaymentTerms);
         Assert.Equal(new DateTimeOffset(2026, 8, 1, 0, 0, 0, TimeSpan.Zero), allPlans.Single(plan => plan.Id == retired.Id).RetireOn);
         var assignablePlan = Assert.Single(assignablePlans);
         Assert.Equal(active.Id, assignablePlan.Id);
         Assert.DoesNotContain(afterDraftDelete, plan => plan.Id == draft.Id);
         Assert.Contains(afterDraftDelete, plan => plan.Id == active.Id);
         Assert.Contains(afterDraftDelete, plan => plan.Id == retired.Id);
+    }
+
+    [Fact]
+    public async Task IncompleteDraftPlanCanBeSavedAndLoaded()
+    {
+        using var database = await TestDatabase.CreateAsync();
+        var repository = new SqlitePlanCatalogRepository(database.CreateContext);
+
+        var draft = (await repository.SaveAsync(CreatePlanCatalogItem("", PlanCatalogState.Draft) with
+        {
+            PriceWithoutVat = null
+        }, CancellationToken.None)).Value!;
+
+        var loaded = await repository.GetAsync(draft.Id, CancellationToken.None);
+
+        Assert.NotNull(loaded);
+        Assert.Equal(string.Empty, loaded.Name);
+        Assert.Null(loaded.PriceWithoutVat);
+        Assert.Equal(PlanCatalogState.Draft, loaded.State);
     }
 
     [Fact]
@@ -113,6 +133,7 @@ public sealed class SqlitePersistenceTests
         Assert.Equal("Standard", currentPlan.Name);
         Assert.Equal(400m, currentPlan.PriceWithoutVat);
         Assert.Equal(LessonsPerWeek.One, currentPlan.LessonsPerWeek);
+        Assert.Equal("Paid monthly in advance", currentPlan.PaymentTerms);
     }
 
     [Fact]
@@ -186,6 +207,7 @@ public sealed class SqlitePersistenceTests
 
         var plan = Assert.Single(plans);
         Assert.Equal(PlanCatalogState.Retired, plan.State);
+        Assert.Equal("Paid monthly in advance", plan.PaymentTerms);
         Assert.Null(plan.RetireOn);
     }
 
@@ -285,7 +307,8 @@ public sealed class SqlitePersistenceTests
                         durationMinutes: 30,
                         PlanFlexibility.MoveOrCancelByAgreement,
                         numberOfStudents: 1,
-                        effectiveFrom: new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero)),
+                        effectiveFrom: new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
+                        paymentTerms: "Paid monthly in advance"),
                     new DateOnly(2026, 1, 1),
                     new DateOnly(2026, 5, 31)),
                 new StudentPlanPeriod(
@@ -296,7 +319,8 @@ public sealed class SqlitePersistenceTests
                         durationMinutes: 60,
                         PlanFlexibility.MoveOrCancelByAgreement,
                         numberOfStudents: 1,
-                        effectiveFrom: new DateTimeOffset(2026, 6, 1, 0, 0, 0, TimeSpan.Zero)),
+                        effectiveFrom: new DateTimeOffset(2026, 6, 1, 0, 0, 0, TimeSpan.Zero),
+                        paymentTerms: "Paid monthly in advance"),
                     new DateOnly(2026, 6, 1),
                     EndsOn: null)
             ],
@@ -339,6 +363,7 @@ public sealed class SqlitePersistenceTests
             PlanFlexibility.MoveOrCancelByAgreement,
             NumberOfStudents: 1,
             EffectiveFrom: new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
+            PaymentTerms: "Paid monthly in advance",
             RetireOn: null,
             state);
 

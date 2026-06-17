@@ -41,7 +41,8 @@ public sealed class SaveStudentUseCase
                     planPeriod.DurationMinutes,
                     planPeriod.Flexibility,
                     planPeriod.NumberOfStudents,
-                    planPeriod.PlanEffectiveFrom),
+                    planPeriod.PlanEffectiveFrom,
+                    planPeriod.PaymentTerms.Trim()),
                 planPeriod.StartsOn,
                 planPeriod.EndsOn))
             .OrderBy(planPeriod => planPeriod.StartsOn)

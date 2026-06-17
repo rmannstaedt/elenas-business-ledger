@@ -28,6 +28,12 @@ public sealed class PublishPlanUseCase
                 new ValidationError("Plan.PublishRequiresDraft", "Only draft plans can be published."));
         }
 
+        var errors = PlanCatalogValidation.ValidatePublish(plan);
+        if (errors.Count > 0)
+        {
+            return OperationResult<PlanCatalogItem>.Failure(errors.ToArray());
+        }
+
         return await planCatalogRepository.SaveAsync(plan with { State = PlanCatalogState.Active }, cancellationToken);
     }
 }

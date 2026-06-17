@@ -32,8 +32,22 @@ public sealed class PlanCatalogUseCaseTests
         var result = await useCase.ExecuteAsync(CreateInput(name: "", priceWithoutVat: -1m), CancellationToken.None);
 
         Assert.False(result.Succeeded);
-        Assert.Contains(result.Errors, error => error.Code == "Plan.NameRequired");
+        Assert.Contains(result.Errors, error => error.Code == "Plan.PriceInvalid");
         Assert.Empty(repository.Plans);
+    }
+
+    [Fact]
+    public async Task CreateDraftPlanAllowsIncompleteMandatoryPublishFields()
+    {
+        var repository = new FakePlanCatalogRepository();
+        var useCase = new CreateDraftPlanUseCase(repository);
+
+        var result = await useCase.ExecuteAsync(CreateInput(name: "", priceWithoutVat: null), CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(PlanCatalogState.Draft, result.Value!.State);
+        Assert.Equal(string.Empty, result.Value.Name);
+        Assert.Null(result.Value.PriceWithoutVat);
     }
 
     [Fact]
@@ -52,6 +66,7 @@ public sealed class PlanCatalogUseCaseTests
         Assert.True(result.Succeeded);
         Assert.Equal("Premium", result.Value!.Name);
         Assert.Equal(500m, result.Value.PriceWithoutVat);
+        Assert.Equal("Paid monthly in advance", result.Value.PaymentTerms);
         Assert.Equal(retireOn, result.Value.RetireOn);
     }
 
@@ -105,6 +120,26 @@ public sealed class PlanCatalogUseCaseTests
         Assert.Equal(PlanCatalogState.Active, draftResult.Value!.State);
         Assert.True(draftResult.Value.IsImmutable);
         Assert.True(draftResult.Value.CanBeAssigned);
+    }
+
+    [Fact]
+    public async Task PublishPlanRejectsDraftMissingMandatoryFields()
+    {
+        var repository = new FakePlanCatalogRepository();
+        var draft = repository.Seed(CreatePlan("", PlanCatalogState.Draft) with
+        {
+            PriceWithoutVat = null,
+            PaymentTerms = ""
+        });
+        var useCase = new PublishPlanUseCase(repository);
+
+        var result = await useCase.ExecuteAsync(draft.Id, CancellationToken.None);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Errors, error => error.Code == "Plan.NameRequired");
+        Assert.Contains(result.Errors, error => error.Code == "Plan.PriceRequired");
+        Assert.Contains(result.Errors, error => error.Code == "Plan.PaymentTermsRequired");
+        Assert.Equal(PlanCatalogState.Draft, repository.Plans.Single(plan => plan.Id == draft.Id).State);
     }
 
     [Fact]
@@ -228,7 +263,7 @@ public sealed class PlanCatalogUseCaseTests
 
     private static PlanDraftInput CreateInput(
         string name = "Standard",
-        decimal priceWithoutVat = 400m,
+        decimal? priceWithoutVat = 400m,
         DateTimeOffset? retireOn = null) =>
         new(
             name,
@@ -238,6 +273,7 @@ public sealed class PlanCatalogUseCaseTests
             PlanFlexibility.MoveOrCancelByAgreement,
             NumberOfStudents: 1,
             new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
+            "Paid monthly in advance",
             retireOn);
 
     private static PlanCatalogItem CreatePlan(string name, PlanCatalogState state) =>
@@ -250,6 +286,7 @@ public sealed class PlanCatalogUseCaseTests
             PlanFlexibility.MoveOrCancelByAgreement,
             NumberOfStudents: 1,
             EffectiveFrom: new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
+            PaymentTerms: "Paid monthly in advance",
             RetireOn: null,
             state);
 

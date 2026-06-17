@@ -77,6 +77,7 @@ public sealed class SqliteStudentRepository : IStudentRepository
                 Flexibility = planPeriod.Plan.Flexibility,
                 NumberOfStudents = planPeriod.Plan.NumberOfStudents,
                 PlanEffectiveFrom = planPeriod.Plan.EffectiveFrom,
+                PaymentTerms = planPeriod.Plan.PaymentTerms,
                 StartsOn = planPeriod.StartsOn,
                 EndsOn = planPeriod.EndsOn
             });
@@ -117,7 +118,8 @@ public sealed class SqliteStudentRepository : IStudentRepository
                     plan.DurationMinutes,
                     plan.Flexibility,
                     plan.NumberOfStudents,
-                    plan.PlanEffectiveFrom),
+                    plan.PlanEffectiveFrom,
+                    plan.PaymentTerms),
                 plan.StartsOn,
                 plan.EndsOn))
             .ToArray();

@@ -56,7 +56,7 @@ Runtime data lives under `%APPDATA%\visualtech.dk\MySmallBusinessLedger`:
 The invoice folder is configured in Settings and may be outside the app data folder.
 The app writes invoice PDFs through a staging/verification/publish flow and does not silently overwrite an existing issued invoice PDF.
 
-Plans are managed from `Plan > Manage Plans`. New plans start as Draft, where they can be edited, deleted, or published. Published Active plans are immutable and can be assigned to students; their `Retire on` date can still be changed, and they can be retired immediately. Retired plans are immutable and hidden from student assignment until reactivated. Assigning a plan to a student copies the plan fields into the student's plan period, so later catalog lifecycle changes do not rewrite existing student or invoice data.
+Plans are managed from `Plan > Manage Plans`. New plans start as incomplete Drafts, where they can be edited, deleted, or published. Draft payment terms are selected from `Paid monthly in advance` or `Paid per lesson`, with `Paid monthly in advance` as the default. Publishing requires all plan fields except `Retire on`. Published Active plans are immutable and can be assigned to students; their `Retire on` date can still be changed, and they can be retired immediately. Retired plans are immutable and hidden from student assignment until reactivated. Assigning a plan to a student copies the plan fields, including payment terms, into the student's plan period, so later catalog lifecycle changes do not rewrite existing student or invoice data.
 
 ## Current key assumptions
 

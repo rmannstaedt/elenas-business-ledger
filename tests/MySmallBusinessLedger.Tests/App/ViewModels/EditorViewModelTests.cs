@@ -8,6 +8,7 @@ using MySmallBusinessLedger.Core.Students;
 using MySmallBusinessLedger.Core.UseCases.Lessons;
 using MySmallBusinessLedger.Core.UseCases.Students;
 using System.Windows;
+using WpfTextBlock = System.Windows.Controls.TextBlock;
 using WpfTextBox = System.Windows.Controls.TextBox;
 
 namespace MySmallBusinessLedger.Tests.App.ViewModels;
@@ -144,6 +145,7 @@ public sealed class EditorViewModelTests
         Assert.Equal(PlanFlexibility.None, savedPlan.Flexibility);
         Assert.Equal(2, savedPlan.NumberOfStudents);
         Assert.Equal(new DateTimeOffset(2026, 2, 1, 0, 0, 0, TimeSpan.Zero), savedPlan.PlanEffectiveFrom);
+        Assert.Equal("Paid monthly in advance", savedPlan.PaymentTerms);
     }
 
     [Fact]
@@ -160,6 +162,28 @@ public sealed class EditorViewModelTests
         var plan = Assert.Single(viewModel.AssignablePlans);
         Assert.Equal("Active", plan.Name);
         Assert.Equal("Active", viewModel.SelectedAssignablePlan?.Name);
+    }
+
+    [Fact]
+    public void StudentEditorHidesCurrentPlanDetailsWhenNoActivePlanIsSelected()
+    {
+        var viewModel = StudentEditorViewModel.CreateNew(new FakeStudentEditorService());
+
+        Assert.False(viewModel.HasSelectedPlan);
+
+        RunOnStaThread(() =>
+        {
+            var window = new StudentEditorView(viewModel);
+
+            var planNameLabel = Assert.Single(FindTextBlocks(window, "Plan name"));
+            Assert.Equal(Visibility.Collapsed, planNameLabel.Visibility);
+            var priceLabel = Assert.Single(FindTextBlocks(window, "Price without VAT"));
+            Assert.Equal(Visibility.Collapsed, priceLabel.Visibility);
+            var startsOnLabel = Assert.Single(FindTextBlocks(window, "Starts on"));
+            Assert.Equal(Visibility.Collapsed, startsOnLabel.Visibility);
+
+            window.Close();
+        });
     }
 
     [Fact]
@@ -204,7 +228,8 @@ public sealed class EditorViewModelTests
                     NumberOfStudents: 1,
                     PlanEffectiveFrom: new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
                     StartsOn: new DateOnly(2026, 1, 1),
-                    EndsOn: null)
+                    EndsOn: null,
+                    PaymentTerms: "Paid monthly in advance")
             ],
             []);
         var viewModel = StudentEditorViewModel.FromSnapshot(
@@ -218,6 +243,7 @@ public sealed class EditorViewModelTests
         var savedPlan = Assert.Single(service.LastRequest.PlanPeriods);
         Assert.Equal("Standard", savedPlan.PlanName);
         Assert.Equal(400m, savedPlan.PriceWithoutVat);
+        Assert.Equal("Paid monthly in advance", savedPlan.PaymentTerms);
         Assert.Equal("Standard", viewModel.SelectedAssignablePlan?.Name);
     }
 
@@ -302,6 +328,7 @@ public sealed class EditorViewModelTests
             Flexibility,
             NumberOfStudents,
             EffectiveFrom ?? new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
+            PaymentTerms: "Paid monthly in advance",
             RetireOn: null,
             state);
 
@@ -371,6 +398,25 @@ public sealed class EditorViewModelTests
             if (child is DependencyObject dependencyObject)
             {
                 matches.AddRange(FindTextBoxesBoundTo(dependencyObject, bindingPaths));
+            }
+        }
+
+        return matches;
+    }
+
+    private static IReadOnlyList<WpfTextBlock> FindTextBlocks(DependencyObject root, string text)
+    {
+        var matches = new List<WpfTextBlock>();
+        foreach (var child in LogicalTreeHelper.GetChildren(root))
+        {
+            if (child is WpfTextBlock textBlock && textBlock.Text == text)
+            {
+                matches.Add(textBlock);
+            }
+
+            if (child is DependencyObject dependencyObject)
+            {
+                matches.AddRange(FindTextBlocks(dependencyObject, text));
             }
         }
 

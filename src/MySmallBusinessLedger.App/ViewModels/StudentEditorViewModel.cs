@@ -27,6 +27,7 @@ public sealed class StudentEditorViewModel : ViewModelBase
     private PlanFlexibility planFlexibility = PlanFlexibility.MoveOrCancelByAgreement;
     private int planNumberOfStudents = 1;
     private DateTime planEffectiveDate = new DateOnly(2026, 1, 1).ToDateTime(TimeOnly.MinValue);
+    private string planPaymentTerms = string.Empty;
     private DateTime planStartsOnDate = new DateOnly(2026, 1, 1).ToDateTime(TimeOnly.MinValue);
     private DateTime? planEndsOnDate;
     private PlanCatalogItem? selectedAssignablePlan;
@@ -88,6 +89,7 @@ public sealed class StudentEditorViewModel : ViewModelBase
             viewModel.PlanFlexibility = currentPlan.Flexibility;
             viewModel.PlanNumberOfStudents = currentPlan.NumberOfStudents;
             viewModel.PlanEffectiveDate = currentPlan.PlanEffectiveFrom.Date;
+            viewModel.PlanPaymentTerms = currentPlan.PaymentTerms;
             viewModel.PlanStartsOnDate = currentPlan.StartsOn.ToDateTime(TimeOnly.MinValue);
             viewModel.PlanEndsOnDate = currentPlan.EndsOn?.ToDateTime(TimeOnly.MinValue);
             viewModel.SetSelectedAssignablePlan(
@@ -267,6 +269,12 @@ public sealed class StudentEditorViewModel : ViewModelBase
         set => SetProperty(ref planEffectiveDate, value);
     }
 
+    public string PlanPaymentTerms
+    {
+        get => planPaymentTerms;
+        set => SetProperty(ref planPaymentTerms, value);
+    }
+
     public DateTime PlanStartsOnDate
     {
         get => planStartsOnDate;
@@ -288,6 +296,8 @@ public sealed class StudentEditorViewModel : ViewModelBase
     public bool HasAssignablePlans => AssignablePlans.Count > 0;
 
     public bool HasNoAssignablePlans => !HasAssignablePlans;
+
+    public bool HasSelectedPlan => SelectedAssignablePlan is not null;
 
     public string? ErrorMessage
     {
@@ -392,7 +402,8 @@ public sealed class StudentEditorViewModel : ViewModelBase
                     PlanNumberOfStudents,
                     new DateTimeOffset(PlanEffectiveDate.Date, TimeSpan.Zero),
                     DateOnly.FromDateTime(PlanStartsOnDate),
-                    PlanEndsOnDate is null ? null : DateOnly.FromDateTime(PlanEndsOnDate.Value))
+                    PlanEndsOnDate is null ? null : DateOnly.FromDateTime(PlanEndsOnDate.Value),
+                    PlanPaymentTerms)
             ],
             schedule);
     }
@@ -443,6 +454,8 @@ public sealed class StudentEditorViewModel : ViewModelBase
             return;
         }
 
+        OnPropertyChanged(nameof(HasSelectedPlan));
+
         if (applyPlan && plan is not null)
         {
             ApplyCatalogPlan(plan);
@@ -452,12 +465,13 @@ public sealed class StudentEditorViewModel : ViewModelBase
     private void ApplyCatalogPlan(PlanCatalogItem plan)
     {
         PlanName = plan.Name;
-        PlanPriceWithoutVat = plan.PriceWithoutVat;
+        PlanPriceWithoutVat = plan.PriceWithoutVat ?? 0m;
         LessonsPerWeek = plan.LessonsPerWeek;
         PlanDurationMinutes = plan.DurationMinutes;
         PlanFlexibility = plan.Flexibility;
         PlanNumberOfStudents = plan.NumberOfStudents;
         PlanEffectiveDate = plan.EffectiveFrom.Date;
+        PlanPaymentTerms = plan.PaymentTerms;
     }
 
     private static (string Line1, string Line2) SplitAddress(string address)

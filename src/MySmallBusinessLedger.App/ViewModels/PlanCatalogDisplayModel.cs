@@ -25,7 +25,7 @@ public sealed class PlanCatalogDisplayModel
         _ => "Unknown"
     };
 
-    public string PriceWithoutVatText => Plan.PriceWithoutVat.ToString("0.##");
+    public string PriceWithoutVatText => Plan.PriceWithoutVat?.ToString("0.##") ?? string.Empty;
 
     public string DurationMinutesText => Plan.DurationMinutes.ToString();
 

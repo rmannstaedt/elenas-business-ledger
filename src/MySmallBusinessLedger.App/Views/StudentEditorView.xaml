@@ -9,6 +9,16 @@
         WindowStartupLocation="CenterOwner">
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+        <Style x:Key="CurrentPlanDetailTextStyle"
+               TargetType="TextBlock">
+            <Setter Property="Visibility"
+                    Value="{Binding HasSelectedPlan, Converter={StaticResource BooleanToVisibilityConverter}}" />
+        </Style>
+        <Style x:Key="CurrentPlanDetailDatePickerStyle"
+               TargetType="DatePicker">
+            <Setter Property="Visibility"
+                    Value="{Binding HasSelectedPlan, Converter={StaticResource BooleanToVisibilityConverter}}" />
+        </Style>
     </Window.Resources>
 
     <DockPanel Margin="16">
@@ -97,34 +107,57 @@
                                Margin="0,0,0,8"
                                Visibility="{Binding HasNoAssignablePlans, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
-                    <TextBlock Text="Plan name" />
+                    <TextBlock Text="Plan name"
+                               Style="{StaticResource CurrentPlanDetailTextStyle}" />
                     <TextBlock Text="{Binding PlanName}"
                                Margin="0,3,0,8"
-                               FontWeight="SemiBold" />
-                    <TextBlock Text="Price without VAT" />
+                               FontWeight="SemiBold"
+                               Style="{StaticResource CurrentPlanDetailTextStyle}" />
+                    <TextBlock Text="Price without VAT"
+                               Style="{StaticResource CurrentPlanDetailTextStyle}" />
                     <TextBlock Text="{Binding PlanPriceWithoutVatText}"
-                               Margin="0,3,0,8" />
-                    <TextBlock Text="Lessons per week" />
+                               Margin="0,3,0,8"
+                               Style="{StaticResource CurrentPlanDetailTextStyle}" />
+                    <TextBlock Text="Lessons per week"
+                               Style="{StaticResource CurrentPlanDetailTextStyle}" />
                     <TextBlock Text="{Binding LessonsPerWeekText}"
-                               Margin="0,3,0,8" />
-                    <TextBlock Text="Duration minutes" />
+                               Margin="0,3,0,8"
+                               Style="{StaticResource CurrentPlanDetailTextStyle}" />
+                    <TextBlock Text="Duration minutes"
+                               Style="{StaticResource CurrentPlanDetailTextStyle}" />
                     <TextBlock Text="{Binding PlanDurationMinutesText}"
-                               Margin="0,3,0,8" />
-                    <TextBlock Text="Flexibility" />
+                               Margin="0,3,0,8"
+                               Style="{StaticResource CurrentPlanDetailTextStyle}" />
+                    <TextBlock Text="Flexibility"
+                               Style="{StaticResource CurrentPlanDetailTextStyle}" />
                     <TextBlock Text="{Binding PlanFlexibilityText}"
-                               Margin="0,3,0,8" />
-                    <TextBlock Text="Number of students" />
+                               Margin="0,3,0,8"
+                               Style="{StaticResource CurrentPlanDetailTextStyle}" />
+                    <TextBlock Text="Number of students"
+                               Style="{StaticResource CurrentPlanDetailTextStyle}" />
                     <TextBlock Text="{Binding PlanNumberOfStudentsText}"
-                               Margin="0,3,0,8" />
-                    <TextBlock Text="Effective date" />
+                               Margin="0,3,0,8"
+                               Style="{StaticResource CurrentPlanDetailTextStyle}" />
+                    <TextBlock Text="Effective date"
+                               Style="{StaticResource CurrentPlanDetailTextStyle}" />
                     <TextBlock Text="{Binding PlanEffectiveDate, StringFormat={}{0:dd-MM-yyyy}}"
-                               Margin="0,3,0,8" />
-                    <TextBlock Text="Starts on" />
+                               Margin="0,3,0,8"
+                               Style="{StaticResource CurrentPlanDetailTextStyle}" />
+                    <TextBlock Text="Payment terms"
+                               Style="{StaticResource CurrentPlanDetailTextStyle}" />
+                    <TextBlock Text="{Binding PlanPaymentTerms}"
+                               Margin="0,3,0,8"
+                               Style="{StaticResource CurrentPlanDetailTextStyle}" />
+                    <TextBlock Text="Starts on"
+                               Style="{StaticResource CurrentPlanDetailTextStyle}" />
                     <DatePicker SelectedDate="{Binding PlanStartsOnDate, UpdateSourceTrigger=PropertyChanged}"
-                                Margin="0,3,0,8" />
-                    <TextBlock Text="Ends on" />
+                                Margin="0,3,0,8"
+                                Style="{StaticResource CurrentPlanDetailDatePickerStyle}" />
+                    <TextBlock Text="Ends on"
+                               Style="{StaticResource CurrentPlanDetailTextStyle}" />
                     <DatePicker SelectedDate="{Binding PlanEndsOnDate, UpdateSourceTrigger=PropertyChanged}"
-                                Margin="0,3,0,12" />
+                                Margin="0,3,0,12"
+                                Style="{StaticResource CurrentPlanDetailDatePickerStyle}" />
 
                     <TextBlock Text="Schedule"
                                FontSize="18"

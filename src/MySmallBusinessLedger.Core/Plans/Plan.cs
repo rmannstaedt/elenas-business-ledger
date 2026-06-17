@@ -9,7 +9,8 @@ public sealed class Plan
         int durationMinutes,
         PlanFlexibility flexibility,
         int numberOfStudents,
-        DateTimeOffset effectiveFrom)
+        DateTimeOffset effectiveFrom,
+        string paymentTerms = "")
     {
         Name = name;
         PriceWithoutVat = priceWithoutVat;
@@ -18,6 +19,7 @@ public sealed class Plan
         Flexibility = flexibility;
         NumberOfStudents = numberOfStudents;
         EffectiveFrom = effectiveFrom;
+        PaymentTerms = paymentTerms;
     }
 
     public string Name { get; }
@@ -33,4 +35,6 @@ public sealed class Plan
     public int NumberOfStudents { get; }
 
     public DateTimeOffset EffectiveFrom { get; }
+
+    public string PaymentTerms { get; }
 }

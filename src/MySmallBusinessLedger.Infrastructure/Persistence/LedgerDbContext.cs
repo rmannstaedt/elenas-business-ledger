@@ -50,6 +50,8 @@ public sealed class LedgerDbContext : DbContext
         {
             entity.HasKey(plan => plan.Id);
             entity.Property(plan => plan.Name).HasMaxLength(200).IsRequired();
+            entity.Property(plan => plan.PriceWithoutVat).HasMaxLength(50).IsRequired();
+            entity.Property(plan => plan.PaymentTerms).HasMaxLength(500).IsRequired();
             entity.Property(plan => plan.LessonsPerWeek).HasConversion<string>().HasMaxLength(50).IsRequired();
             entity.Property(plan => plan.Flexibility).HasConversion<string>().HasMaxLength(100).IsRequired();
             entity.Property(plan => plan.State).HasConversion<string>().HasMaxLength(50).IsRequired();
@@ -80,6 +82,7 @@ public sealed class LedgerDbContext : DbContext
         {
             entity.HasKey(plan => plan.Id);
             entity.Property(plan => plan.PlanName).HasMaxLength(200).IsRequired();
+            entity.Property(plan => plan.PaymentTerms).HasMaxLength(500).IsRequired();
             entity.Property(plan => plan.LessonsPerWeek).HasConversion<string>().HasMaxLength(50).IsRequired();
             entity.Property(plan => plan.Flexibility).HasConversion<string>().HasMaxLength(100).IsRequired();
         });
