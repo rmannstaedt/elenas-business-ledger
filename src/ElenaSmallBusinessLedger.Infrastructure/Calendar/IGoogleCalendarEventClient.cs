@@ -1,6 +1,6 @@
-using ElenaSmallBusinessLedger.Core.Lessons;
+using MySmallBusinessLedger.Core.Lessons;
 
-namespace ElenaSmallBusinessLedger.Infrastructure.Calendar;
+namespace MySmallBusinessLedger.Infrastructure.Calendar;
 
 public interface IGoogleCalendarEventClient
 {

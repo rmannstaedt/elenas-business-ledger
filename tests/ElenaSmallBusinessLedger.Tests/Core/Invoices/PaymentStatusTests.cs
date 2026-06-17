@@ -1,6 +1,6 @@
-using ElenaSmallBusinessLedger.Core.Invoices;
+using MySmallBusinessLedger.Core.Invoices;
 
-namespace ElenaSmallBusinessLedger.Tests.Core.Invoices;
+namespace MySmallBusinessLedger.Tests.Core.Invoices;
 
 public sealed class PaymentStatusTests
 {

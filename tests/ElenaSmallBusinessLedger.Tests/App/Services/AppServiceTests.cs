@@ -1,14 +1,14 @@
-using ElenaSmallBusinessLedger.App.Services;
-using ElenaSmallBusinessLedger.Core.Calendar;
-using ElenaSmallBusinessLedger.Core.Common;
-using ElenaSmallBusinessLedger.Core.Invoices;
-using ElenaSmallBusinessLedger.Core.Lessons;
-using ElenaSmallBusinessLedger.Core.Ports;
-using ElenaSmallBusinessLedger.Core.Time;
-using ElenaSmallBusinessLedger.Core.UseCases.Lessons;
-using ElenaSmallBusinessLedger.Core.UseCases.Startup;
+using MySmallBusinessLedger.App.Services;
+using MySmallBusinessLedger.Core.Calendar;
+using MySmallBusinessLedger.Core.Common;
+using MySmallBusinessLedger.Core.Invoices;
+using MySmallBusinessLedger.Core.Lessons;
+using MySmallBusinessLedger.Core.Ports;
+using MySmallBusinessLedger.Core.Time;
+using MySmallBusinessLedger.Core.UseCases.Lessons;
+using MySmallBusinessLedger.Core.UseCases.Startup;
 
-namespace ElenaSmallBusinessLedger.Tests.App.Services;
+namespace MySmallBusinessLedger.Tests.App.Services;
 
 public sealed class AppServiceTests
 {

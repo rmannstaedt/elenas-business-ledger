@@ -1,4 +1,4 @@
-namespace ElenaSmallBusinessLedger.Core.Time;
+namespace MySmallBusinessLedger.Core.Time;
 
 public interface IClock
 {

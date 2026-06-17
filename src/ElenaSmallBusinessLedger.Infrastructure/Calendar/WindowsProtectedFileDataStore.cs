@@ -4,12 +4,12 @@ using System.Text;
 using System.Text.Json;
 using Google.Apis.Util.Store;
 
-namespace ElenaSmallBusinessLedger.Infrastructure.Calendar;
+namespace MySmallBusinessLedger.Infrastructure.Calendar;
 
 [SupportedOSPlatform("windows")]
 public sealed class WindowsProtectedFileDataStore : IDataStore
 {
-    private static readonly byte[] Entropy = Encoding.UTF8.GetBytes("ElenaSmallBusinessLedger.GoogleCalendarOAuth");
+    private static readonly byte[] Entropy = Encoding.UTF8.GetBytes("MySmallBusinessLedger.GoogleCalendarOAuth");
     private readonly string directoryPath;
 
     public WindowsProtectedFileDataStore(string directoryPath)

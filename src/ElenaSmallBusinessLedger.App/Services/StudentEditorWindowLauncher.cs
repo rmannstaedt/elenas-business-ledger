@@ -1,8 +1,8 @@
 using System.Windows;
-using ElenaSmallBusinessLedger.App.ViewModels;
-using ElenaSmallBusinessLedger.App.Views;
+using MySmallBusinessLedger.App.ViewModels;
+using MySmallBusinessLedger.App.Views;
 
-namespace ElenaSmallBusinessLedger.App.Services;
+namespace MySmallBusinessLedger.App.Services;
 
 public sealed class StudentEditorWindowLauncher : IStudentEditorLauncher
 {

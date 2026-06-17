@@ -1,4 +1,4 @@
-namespace ElenaSmallBusinessLedger.Core;
+namespace MySmallBusinessLedger.Core;
 
 public sealed class AssemblyMarker
 {

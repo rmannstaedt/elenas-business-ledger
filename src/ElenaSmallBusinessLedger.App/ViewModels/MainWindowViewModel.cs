@@ -1,13 +1,13 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
-using ElenaSmallBusinessLedger.App.Commands;
-using ElenaSmallBusinessLedger.App.Services;
-using ElenaSmallBusinessLedger.Core.Invoices;
-using ElenaSmallBusinessLedger.Core.Lessons;
-using ElenaSmallBusinessLedger.Core.UseCases.Lessons;
-using ElenaSmallBusinessLedger.Core.UseCases.Startup;
+using MySmallBusinessLedger.App.Commands;
+using MySmallBusinessLedger.App.Services;
+using MySmallBusinessLedger.Core.Invoices;
+using MySmallBusinessLedger.Core.Lessons;
+using MySmallBusinessLedger.Core.UseCases.Lessons;
+using MySmallBusinessLedger.Core.UseCases.Startup;
 
-namespace ElenaSmallBusinessLedger.App.ViewModels;
+namespace MySmallBusinessLedger.App.ViewModels;
 
 public sealed class MainWindowViewModel : ViewModelBase
 {

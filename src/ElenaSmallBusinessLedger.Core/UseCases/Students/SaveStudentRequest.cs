@@ -1,7 +1,7 @@
-using ElenaSmallBusinessLedger.Core.Plans;
-using ElenaSmallBusinessLedger.Core.Students;
+using MySmallBusinessLedger.Core.Plans;
+using MySmallBusinessLedger.Core.Students;
 
-namespace ElenaSmallBusinessLedger.Core.UseCases.Students;
+namespace MySmallBusinessLedger.Core.UseCases.Students;
 
 public sealed record StudentPlanPeriodInput(
     string PlanName,

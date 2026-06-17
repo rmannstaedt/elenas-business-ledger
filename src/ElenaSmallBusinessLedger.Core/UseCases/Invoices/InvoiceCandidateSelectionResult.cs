@@ -1,4 +1,4 @@
-namespace ElenaSmallBusinessLedger.Core.UseCases.Invoices;
+namespace MySmallBusinessLedger.Core.UseCases.Invoices;
 
 public sealed record InvoiceCandidateSelectionResult(
     IReadOnlyList<string> CandidateStudentShortNames,

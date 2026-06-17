@@ -1,6 +1,6 @@
 using System.IO;
 
-namespace ElenaSmallBusinessLedger.App.Services;
+namespace MySmallBusinessLedger.App.Services;
 
 public sealed record AppPaths(
     string AppDataFolderPath,
@@ -8,7 +8,7 @@ public sealed record AppPaths(
     string GoogleClientSecretsPath,
     string GoogleTokenFolderPath)
 {
-    private const string ApplicationFolderName = "ElenaSmallBusinessLedger";
+    private const string ApplicationFolderName = "MySmallBusinessLedger";
     private const string DatabaseFileName = "ledger.db";
     private const string GoogleClientSecretsFileName = "google-client-secrets.json";
     private const string GoogleTokenFolderName = "GoogleTokens";

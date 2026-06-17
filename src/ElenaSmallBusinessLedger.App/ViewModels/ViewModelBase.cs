@@ -1,7 +1,7 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 
-namespace ElenaSmallBusinessLedger.App.ViewModels;
+namespace MySmallBusinessLedger.App.ViewModels;
 
 public abstract class ViewModelBase : INotifyPropertyChanged
 {

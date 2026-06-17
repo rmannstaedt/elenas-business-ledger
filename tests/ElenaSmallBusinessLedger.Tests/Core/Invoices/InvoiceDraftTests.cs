@@ -1,7 +1,7 @@
-using ElenaSmallBusinessLedger.Core.Invoices;
-using ElenaSmallBusinessLedger.Core.Money;
+using MySmallBusinessLedger.Core.Invoices;
+using MySmallBusinessLedger.Core.Money;
 
-namespace ElenaSmallBusinessLedger.Tests.Core.Invoices;
+namespace MySmallBusinessLedger.Tests.Core.Invoices;
 
 public sealed class InvoiceDraftTests
 {

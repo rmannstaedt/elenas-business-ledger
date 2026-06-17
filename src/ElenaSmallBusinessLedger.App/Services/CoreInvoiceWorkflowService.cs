@@ -1,10 +1,10 @@
-using ElenaSmallBusinessLedger.Core.Common;
-using ElenaSmallBusinessLedger.Core.Invoices;
-using ElenaSmallBusinessLedger.Core.Ports;
-using ElenaSmallBusinessLedger.Core.UseCases.Invoices;
-using ElenaSmallBusinessLedger.Infrastructure.Invoices.Pdf;
+using MySmallBusinessLedger.Core.Common;
+using MySmallBusinessLedger.Core.Invoices;
+using MySmallBusinessLedger.Core.Ports;
+using MySmallBusinessLedger.Core.UseCases.Invoices;
+using MySmallBusinessLedger.Infrastructure.Invoices.Pdf;
 
-namespace ElenaSmallBusinessLedger.App.Services;
+namespace MySmallBusinessLedger.App.Services;
 
 public sealed class CoreInvoiceWorkflowService : IInvoiceWorkflowService
 {

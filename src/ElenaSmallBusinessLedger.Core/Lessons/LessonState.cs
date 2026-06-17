@@ -1,4 +1,4 @@
-namespace ElenaSmallBusinessLedger.Core.Lessons;
+namespace MySmallBusinessLedger.Core.Lessons;
 
 public enum LessonState
 {

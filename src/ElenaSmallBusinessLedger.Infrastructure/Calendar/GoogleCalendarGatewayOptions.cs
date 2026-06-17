@@ -1,4 +1,4 @@
-namespace ElenaSmallBusinessLedger.Infrastructure.Calendar;
+namespace MySmallBusinessLedger.Infrastructure.Calendar;
 
 public sealed record GoogleCalendarGatewayOptions(
     string CalendarId,

@@ -1,7 +1,7 @@
-using ElenaSmallBusinessLedger.Core.Common;
-using ElenaSmallBusinessLedger.Core.Ports;
+using MySmallBusinessLedger.Core.Common;
+using MySmallBusinessLedger.Core.Ports;
 
-namespace ElenaSmallBusinessLedger.Infrastructure.Invoices.Printing;
+namespace MySmallBusinessLedger.Infrastructure.Invoices.Printing;
 
 public sealed class SavedPdfPrinter : IInvoicePrinter
 {

@@ -1,6 +1,6 @@
-using ElenaSmallBusinessLedger.Core.Plans;
+using MySmallBusinessLedger.Core.Plans;
 
-namespace ElenaSmallBusinessLedger.Tests.Core.Plans;
+namespace MySmallBusinessLedger.Tests.Core.Plans;
 
 public sealed class StudentPlanPeriodTests
 {

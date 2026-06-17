@@ -1,10 +1,10 @@
-using ElenaSmallBusinessLedger.Core.Common;
-using ElenaSmallBusinessLedger.Core.Lessons;
-using ElenaSmallBusinessLedger.Core.UseCases.Lessons;
-using ElenaSmallBusinessLedger.Infrastructure.Calendar;
+using MySmallBusinessLedger.Core.Common;
+using MySmallBusinessLedger.Core.Lessons;
+using MySmallBusinessLedger.Core.UseCases.Lessons;
+using MySmallBusinessLedger.Infrastructure.Calendar;
 using Google.Apis.Util.Store;
 
-namespace ElenaSmallBusinessLedger.Tests.Infrastructure.Calendar;
+namespace MySmallBusinessLedger.Tests.Infrastructure.Calendar;
 
 public sealed class GoogleCalendarGatewayTests
 {

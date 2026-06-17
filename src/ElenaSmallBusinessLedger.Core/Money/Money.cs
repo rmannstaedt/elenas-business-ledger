@@ -1,4 +1,4 @@
-namespace ElenaSmallBusinessLedger.Core.Money;
+namespace MySmallBusinessLedger.Core.Money;
 
 public readonly record struct Money(decimal Amount, string Currency)
 {

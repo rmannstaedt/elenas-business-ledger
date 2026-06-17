@@ -1,6 +1,6 @@
-using ElenaSmallBusinessLedger.Core.Common;
+using MySmallBusinessLedger.Core.Common;
 
-namespace ElenaSmallBusinessLedger.Core.Students;
+namespace MySmallBusinessLedger.Core.Students;
 
 public sealed record Student(
     string ShortName,

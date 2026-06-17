@@ -1,6 +1,6 @@
-using ElenaSmallBusinessLedger.Core.Lessons;
+using MySmallBusinessLedger.Core.Lessons;
 
-namespace ElenaSmallBusinessLedger.Core.Calendar;
+namespace MySmallBusinessLedger.Core.Calendar;
 
 public sealed record CalendarLesson(
     string Id,

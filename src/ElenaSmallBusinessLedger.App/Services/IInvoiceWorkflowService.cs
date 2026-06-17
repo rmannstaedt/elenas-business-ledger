@@ -1,8 +1,8 @@
-using ElenaSmallBusinessLedger.Core.Common;
-using ElenaSmallBusinessLedger.Core.Invoices;
-using ElenaSmallBusinessLedger.Core.UseCases.Invoices;
+using MySmallBusinessLedger.Core.Common;
+using MySmallBusinessLedger.Core.Invoices;
+using MySmallBusinessLedger.Core.UseCases.Invoices;
 
-namespace ElenaSmallBusinessLedger.App.Services;
+namespace MySmallBusinessLedger.App.Services;
 
 public interface IInvoiceWorkflowService
 {

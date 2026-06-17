@@ -1,6 +1,6 @@
-using ElenaSmallBusinessLedger.Core.Time;
+using MySmallBusinessLedger.Core.Time;
 
-namespace ElenaSmallBusinessLedger.App.Services;
+namespace MySmallBusinessLedger.App.Services;
 
 public sealed class SystemUiClock : IUiClock, IClock
 {

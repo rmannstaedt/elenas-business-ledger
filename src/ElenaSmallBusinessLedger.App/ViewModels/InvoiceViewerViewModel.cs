@@ -1,9 +1,9 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
-using ElenaSmallBusinessLedger.Core.Invoices;
-using ElenaSmallBusinessLedger.Core.Money;
+using MySmallBusinessLedger.Core.Invoices;
+using MySmallBusinessLedger.Core.Money;
 
-namespace ElenaSmallBusinessLedger.App.ViewModels;
+namespace MySmallBusinessLedger.App.ViewModels;
 
 public sealed class InvoiceViewerViewModel
 {

@@ -1,9 +1,9 @@
-using ElenaSmallBusinessLedger.Core.Invoices;
-using ElenaSmallBusinessLedger.Core.Money;
-using ElenaSmallBusinessLedger.Infrastructure.Invoices.Pdf;
-using ElenaSmallBusinessLedger.Infrastructure.Invoices.Printing;
+using MySmallBusinessLedger.Core.Invoices;
+using MySmallBusinessLedger.Core.Money;
+using MySmallBusinessLedger.Infrastructure.Invoices.Pdf;
+using MySmallBusinessLedger.Infrastructure.Invoices.Printing;
 
-namespace ElenaSmallBusinessLedger.Tests.Infrastructure.Invoices;
+namespace MySmallBusinessLedger.Tests.Infrastructure.Invoices;
 
 public sealed class InvoiceInfrastructureTests
 {

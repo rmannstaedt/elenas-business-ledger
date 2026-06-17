@@ -1,13 +1,13 @@
-using ElenaSmallBusinessLedger.App.Services;
-using ElenaSmallBusinessLedger.App.ViewModels;
-using ElenaSmallBusinessLedger.Core.Calendar;
-using ElenaSmallBusinessLedger.Core.Common;
-using ElenaSmallBusinessLedger.Core.Plans;
-using ElenaSmallBusinessLedger.Core.Students;
-using ElenaSmallBusinessLedger.Core.UseCases.Lessons;
-using ElenaSmallBusinessLedger.Core.UseCases.Students;
+using MySmallBusinessLedger.App.Services;
+using MySmallBusinessLedger.App.ViewModels;
+using MySmallBusinessLedger.Core.Calendar;
+using MySmallBusinessLedger.Core.Common;
+using MySmallBusinessLedger.Core.Plans;
+using MySmallBusinessLedger.Core.Students;
+using MySmallBusinessLedger.Core.UseCases.Lessons;
+using MySmallBusinessLedger.Core.UseCases.Students;
 
-namespace ElenaSmallBusinessLedger.Tests.App.ViewModels;
+namespace MySmallBusinessLedger.Tests.App.ViewModels;
 
 public sealed class EditorViewModelTests
 {

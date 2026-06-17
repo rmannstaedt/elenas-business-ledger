@@ -1,12 +1,12 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
-using ElenaSmallBusinessLedger.App.Commands;
-using ElenaSmallBusinessLedger.App.Services;
-using ElenaSmallBusinessLedger.Core.Invoices;
-using ElenaSmallBusinessLedger.Core.Money;
-using ElenaSmallBusinessLedger.Core.UseCases.Invoices;
+using MySmallBusinessLedger.App.Commands;
+using MySmallBusinessLedger.App.Services;
+using MySmallBusinessLedger.Core.Invoices;
+using MySmallBusinessLedger.Core.Money;
+using MySmallBusinessLedger.Core.UseCases.Invoices;
 
-namespace ElenaSmallBusinessLedger.App.ViewModels;
+namespace MySmallBusinessLedger.App.ViewModels;
 
 public sealed class InvoicePreviewViewModel : ViewModelBase
 {

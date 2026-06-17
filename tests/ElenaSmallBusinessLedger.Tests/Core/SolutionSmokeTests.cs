@@ -1,7 +1,7 @@
-using CoreAssemblyMarker = ElenaSmallBusinessLedger.Core.AssemblyMarker;
-using InfrastructureAssemblyMarker = ElenaSmallBusinessLedger.Infrastructure.AssemblyMarker;
+using CoreAssemblyMarker = MySmallBusinessLedger.Core.AssemblyMarker;
+using InfrastructureAssemblyMarker = MySmallBusinessLedger.Infrastructure.AssemblyMarker;
 
-namespace ElenaSmallBusinessLedger.Tests.Core;
+namespace MySmallBusinessLedger.Tests.Core;
 
 public sealed class SolutionSmokeTests
 {

@@ -1,8 +1,8 @@
-using ElenaSmallBusinessLedger.Core.Common;
-using ElenaSmallBusinessLedger.Core.Company;
-using ElenaSmallBusinessLedger.Infrastructure.Persistence;
+using MySmallBusinessLedger.Core.Common;
+using MySmallBusinessLedger.Core.Company;
+using MySmallBusinessLedger.Infrastructure.Persistence;
 
-namespace ElenaSmallBusinessLedger.App.Services;
+namespace MySmallBusinessLedger.App.Services;
 
 public sealed record AppSettingsSnapshot(
     CompanyProfile? CompanyProfile,

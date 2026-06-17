@@ -1,4 +1,4 @@
-namespace ElenaSmallBusinessLedger.Infrastructure.Invoices.Printing;
+namespace MySmallBusinessLedger.Infrastructure.Invoices.Printing;
 
 public interface IPrintProcessLauncher
 {

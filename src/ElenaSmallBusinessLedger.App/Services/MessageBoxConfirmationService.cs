@@ -1,7 +1,7 @@
 using System.Windows;
-using ElenaSmallBusinessLedger.App.ViewModels;
+using MySmallBusinessLedger.App.ViewModels;
 
-namespace ElenaSmallBusinessLedger.App.Services;
+namespace MySmallBusinessLedger.App.Services;
 
 public sealed class MessageBoxConfirmationService : IConfirmationService
 {

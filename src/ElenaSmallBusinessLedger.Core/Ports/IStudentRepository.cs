@@ -1,6 +1,6 @@
-using ElenaSmallBusinessLedger.Core.Common;
+using MySmallBusinessLedger.Core.Common;
 
-namespace ElenaSmallBusinessLedger.Core.Ports;
+namespace MySmallBusinessLedger.Core.Ports;
 
 public interface IStudentRepository
 {

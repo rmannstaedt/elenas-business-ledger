@@ -1,6 +1,6 @@
-# Elena VAT & Piano Tutor Accounting Application
+# My Small Business Ledger
 
-This repository contains a small local-first application for independent piano teachers.
+This repository contains a small local-first ledger application for independent piano teachers.
 
 Primary goal:
 

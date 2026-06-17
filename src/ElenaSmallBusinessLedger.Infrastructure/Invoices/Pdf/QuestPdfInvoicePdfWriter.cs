@@ -1,13 +1,13 @@
 using System.Globalization;
-using ElenaSmallBusinessLedger.Core.Common;
-using ElenaSmallBusinessLedger.Core.Invoices;
-using ElenaSmallBusinessLedger.Core.Money;
-using ElenaSmallBusinessLedger.Core.Ports;
+using MySmallBusinessLedger.Core.Common;
+using MySmallBusinessLedger.Core.Invoices;
+using MySmallBusinessLedger.Core.Money;
+using MySmallBusinessLedger.Core.Ports;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
 
-namespace ElenaSmallBusinessLedger.Infrastructure.Invoices.Pdf;
+namespace MySmallBusinessLedger.Infrastructure.Invoices.Pdf;
 
 public sealed class QuestPdfInvoicePdfWriter : IInvoicePdfWriter
 {

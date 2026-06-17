@@ -1,9 +1,9 @@
-using ElenaSmallBusinessLedger.Core.Company;
-using ElenaSmallBusinessLedger.Core.Invoices;
-using ElenaSmallBusinessLedger.Core.Plans;
-using ElenaSmallBusinessLedger.Core.Students;
+using MySmallBusinessLedger.Core.Company;
+using MySmallBusinessLedger.Core.Invoices;
+using MySmallBusinessLedger.Core.Plans;
+using MySmallBusinessLedger.Core.Students;
 
-namespace ElenaSmallBusinessLedger.Infrastructure.Persistence;
+namespace MySmallBusinessLedger.Infrastructure.Persistence;
 
 public sealed class CompanyProfileEntity
 {

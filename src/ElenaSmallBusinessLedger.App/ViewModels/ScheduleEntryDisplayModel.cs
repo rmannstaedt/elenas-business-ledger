@@ -1,4 +1,4 @@
-namespace ElenaSmallBusinessLedger.App.ViewModels;
+namespace MySmallBusinessLedger.App.ViewModels;
 
 public sealed class ScheduleEntryDisplayModel
 {

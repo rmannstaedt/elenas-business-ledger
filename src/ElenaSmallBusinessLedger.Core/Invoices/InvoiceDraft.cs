@@ -1,9 +1,9 @@
 using System.Collections.ObjectModel;
-using ElenaSmallBusinessLedger.Core.Common;
-using ElenaSmallBusinessLedger.Core.Company;
-using MoneyAmount = ElenaSmallBusinessLedger.Core.Money.Money;
+using MySmallBusinessLedger.Core.Common;
+using MySmallBusinessLedger.Core.Company;
+using MoneyAmount = MySmallBusinessLedger.Core.Money.Money;
 
-namespace ElenaSmallBusinessLedger.Core.Invoices;
+namespace MySmallBusinessLedger.Core.Invoices;
 
 public sealed class InvoiceDraft
 {

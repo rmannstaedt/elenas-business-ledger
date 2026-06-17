@@ -1,9 +1,9 @@
 using System.Windows;
-using ElenaSmallBusinessLedger.App.Services;
-using ElenaSmallBusinessLedger.App.ViewModels;
+using MySmallBusinessLedger.App.Services;
+using MySmallBusinessLedger.App.ViewModels;
 using Microsoft.Win32;
 
-namespace ElenaSmallBusinessLedger.App.Views;
+namespace MySmallBusinessLedger.App.Views;
 
 public partial class SettingsView : Window
 {

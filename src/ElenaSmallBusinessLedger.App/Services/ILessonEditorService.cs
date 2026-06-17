@@ -1,8 +1,8 @@
-using ElenaSmallBusinessLedger.Core.Calendar;
-using ElenaSmallBusinessLedger.Core.Common;
-using ElenaSmallBusinessLedger.Core.UseCases.Lessons;
+using MySmallBusinessLedger.Core.Calendar;
+using MySmallBusinessLedger.Core.Common;
+using MySmallBusinessLedger.Core.UseCases.Lessons;
 
-namespace ElenaSmallBusinessLedger.App.Services;
+namespace MySmallBusinessLedger.App.Services;
 
 public interface ILessonEditorService
 {

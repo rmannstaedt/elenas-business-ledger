@@ -1,8 +1,8 @@
-using ElenaSmallBusinessLedger.Core.Company;
-using ElenaSmallBusinessLedger.Core.Invoices;
-using ElenaSmallBusinessLedger.Core.Money;
+using MySmallBusinessLedger.Core.Company;
+using MySmallBusinessLedger.Core.Invoices;
+using MySmallBusinessLedger.Core.Money;
 
-namespace ElenaSmallBusinessLedger.Tests.Core.Invoices;
+namespace MySmallBusinessLedger.Tests.Core.Invoices;
 
 public sealed class InvoiceCalculationTests
 {

@@ -2,7 +2,7 @@
 
 ## Project identity
 
-Working name: Elena's Small Business Ledger
+Working name: My Small Business Ledger
 
 Internal namespace/project prefix:
 ElenaSmallBusinessLedger

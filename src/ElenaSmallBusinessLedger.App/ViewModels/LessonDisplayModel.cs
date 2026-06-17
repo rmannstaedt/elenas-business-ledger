@@ -1,10 +1,10 @@
 using System.Globalization;
-using ElenaSmallBusinessLedger.Core.Invoices;
-using ElenaSmallBusinessLedger.Core.Calendar;
-using ElenaSmallBusinessLedger.Core.Lessons;
-using ElenaSmallBusinessLedger.Core.UseCases.Startup;
+using MySmallBusinessLedger.Core.Invoices;
+using MySmallBusinessLedger.Core.Calendar;
+using MySmallBusinessLedger.Core.Lessons;
+using MySmallBusinessLedger.Core.UseCases.Startup;
 
-namespace ElenaSmallBusinessLedger.App.ViewModels;
+namespace MySmallBusinessLedger.App.ViewModels;
 
 public sealed class LessonDisplayModel : ViewModelBase
 {

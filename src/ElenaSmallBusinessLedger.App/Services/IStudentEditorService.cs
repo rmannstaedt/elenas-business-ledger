@@ -1,8 +1,8 @@
-using ElenaSmallBusinessLedger.Core.Common;
-using ElenaSmallBusinessLedger.Core.Students;
-using ElenaSmallBusinessLedger.Core.UseCases.Students;
+using MySmallBusinessLedger.Core.Common;
+using MySmallBusinessLedger.Core.Students;
+using MySmallBusinessLedger.Core.UseCases.Students;
 
-namespace ElenaSmallBusinessLedger.App.Services;
+namespace MySmallBusinessLedger.App.Services;
 
 public sealed record StudentEditorSnapshot(
     string ShortName,

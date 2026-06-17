@@ -1,4 +1,4 @@
-namespace ElenaSmallBusinessLedger.Infrastructure;
+namespace MySmallBusinessLedger.Infrastructure;
 
 public sealed class AssemblyMarker
 {

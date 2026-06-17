@@ -1,4 +1,4 @@
-namespace ElenaSmallBusinessLedger.App.ViewModels;
+namespace MySmallBusinessLedger.App.ViewModels;
 
 public sealed record WeekdayOption(string Label, DayOfWeek? Weekday)
 {

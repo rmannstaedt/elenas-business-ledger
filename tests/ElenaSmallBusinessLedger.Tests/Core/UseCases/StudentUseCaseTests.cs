@@ -1,10 +1,10 @@
-using ElenaSmallBusinessLedger.Core.Common;
-using ElenaSmallBusinessLedger.Core.Plans;
-using ElenaSmallBusinessLedger.Core.Ports;
-using ElenaSmallBusinessLedger.Core.Students;
-using ElenaSmallBusinessLedger.Core.UseCases.Students;
+using MySmallBusinessLedger.Core.Common;
+using MySmallBusinessLedger.Core.Plans;
+using MySmallBusinessLedger.Core.Ports;
+using MySmallBusinessLedger.Core.Students;
+using MySmallBusinessLedger.Core.UseCases.Students;
 
-namespace ElenaSmallBusinessLedger.Tests.Core.UseCases;
+namespace MySmallBusinessLedger.Tests.Core.UseCases;
 
 public sealed class StudentUseCaseTests
 {

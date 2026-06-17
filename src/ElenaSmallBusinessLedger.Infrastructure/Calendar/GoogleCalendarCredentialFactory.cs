@@ -3,7 +3,7 @@ using Google.Apis.Calendar.v3;
 using Google.Apis.Services;
 using Google.Apis.Util.Store;
 
-namespace ElenaSmallBusinessLedger.Infrastructure.Calendar;
+namespace MySmallBusinessLedger.Infrastructure.Calendar;
 
 public sealed class GoogleCalendarCredentialFactory
 {

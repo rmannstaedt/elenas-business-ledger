@@ -1,6 +1,6 @@
 using System.Diagnostics;
 
-namespace ElenaSmallBusinessLedger.Infrastructure.Invoices.Printing;
+namespace MySmallBusinessLedger.Infrastructure.Invoices.Printing;
 
 public sealed class ShellPrintProcessLauncher : IPrintProcessLauncher
 {

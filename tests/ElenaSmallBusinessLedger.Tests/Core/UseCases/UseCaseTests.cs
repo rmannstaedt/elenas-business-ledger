@@ -1,18 +1,18 @@
-using ElenaSmallBusinessLedger.Core.Calendar;
-using ElenaSmallBusinessLedger.Core.Common;
-using ElenaSmallBusinessLedger.Core.Company;
-using ElenaSmallBusinessLedger.Core.Invoices;
-using ElenaSmallBusinessLedger.Core.Lessons;
-using ElenaSmallBusinessLedger.Core.Money;
-using ElenaSmallBusinessLedger.Core.Plans;
-using ElenaSmallBusinessLedger.Core.Ports;
-using ElenaSmallBusinessLedger.Core.Students;
-using ElenaSmallBusinessLedger.Core.Time;
-using ElenaSmallBusinessLedger.Core.UseCases.Invoices;
-using ElenaSmallBusinessLedger.Core.UseCases.Lessons;
-using ElenaSmallBusinessLedger.Core.UseCases.Startup;
+using MySmallBusinessLedger.Core.Calendar;
+using MySmallBusinessLedger.Core.Common;
+using MySmallBusinessLedger.Core.Company;
+using MySmallBusinessLedger.Core.Invoices;
+using MySmallBusinessLedger.Core.Lessons;
+using MySmallBusinessLedger.Core.Money;
+using MySmallBusinessLedger.Core.Plans;
+using MySmallBusinessLedger.Core.Ports;
+using MySmallBusinessLedger.Core.Students;
+using MySmallBusinessLedger.Core.Time;
+using MySmallBusinessLedger.Core.UseCases.Invoices;
+using MySmallBusinessLedger.Core.UseCases.Lessons;
+using MySmallBusinessLedger.Core.UseCases.Startup;
 
-namespace ElenaSmallBusinessLedger.Tests.Core.UseCases;
+namespace MySmallBusinessLedger.Tests.Core.UseCases;
 
 public sealed class UseCaseTests
 {

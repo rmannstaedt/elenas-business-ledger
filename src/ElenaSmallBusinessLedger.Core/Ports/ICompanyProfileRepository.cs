@@ -1,6 +1,6 @@
-using ElenaSmallBusinessLedger.Core.Company;
+using MySmallBusinessLedger.Core.Company;
 
-namespace ElenaSmallBusinessLedger.Core.Ports;
+namespace MySmallBusinessLedger.Core.Ports;
 
 public interface ICompanyProfileRepository
 {

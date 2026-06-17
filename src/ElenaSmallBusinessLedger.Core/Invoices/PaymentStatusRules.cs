@@ -1,6 +1,6 @@
-using ElenaSmallBusinessLedger.Core.Common;
+using MySmallBusinessLedger.Core.Common;
 
-namespace ElenaSmallBusinessLedger.Core.Invoices;
+namespace MySmallBusinessLedger.Core.Invoices;
 
 public static class PaymentStatusRules
 {

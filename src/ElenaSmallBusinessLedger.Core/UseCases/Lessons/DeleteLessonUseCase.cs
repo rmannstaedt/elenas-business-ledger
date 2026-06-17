@@ -1,8 +1,8 @@
-using ElenaSmallBusinessLedger.Core.Calendar;
-using ElenaSmallBusinessLedger.Core.Common;
-using ElenaSmallBusinessLedger.Core.Ports;
+using MySmallBusinessLedger.Core.Calendar;
+using MySmallBusinessLedger.Core.Common;
+using MySmallBusinessLedger.Core.Ports;
 
-namespace ElenaSmallBusinessLedger.Core.UseCases.Lessons;
+namespace MySmallBusinessLedger.Core.UseCases.Lessons;
 
 public sealed class DeleteLessonUseCase
 {

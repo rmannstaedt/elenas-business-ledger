@@ -1,10 +1,10 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using ElenaSmallBusinessLedger.App.Services;
-using ElenaSmallBusinessLedger.App.ViewModels;
+using MySmallBusinessLedger.App.Services;
+using MySmallBusinessLedger.App.ViewModels;
 
-namespace ElenaSmallBusinessLedger.App;
+namespace MySmallBusinessLedger.App;
 
 public partial class MainWindow : Window
 {

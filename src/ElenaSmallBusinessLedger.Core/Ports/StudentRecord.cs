@@ -1,7 +1,7 @@
-using ElenaSmallBusinessLedger.Core.Plans;
-using ElenaSmallBusinessLedger.Core.Students;
+using MySmallBusinessLedger.Core.Plans;
+using MySmallBusinessLedger.Core.Students;
 
-namespace ElenaSmallBusinessLedger.Core.Ports;
+namespace MySmallBusinessLedger.Core.Ports;
 
 public sealed record StudentRecord(
     Student Student,

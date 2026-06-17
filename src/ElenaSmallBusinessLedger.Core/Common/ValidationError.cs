@@ -1,3 +1,3 @@
-namespace ElenaSmallBusinessLedger.Core.Common;
+namespace MySmallBusinessLedger.Core.Common;
 
 public sealed record ValidationError(string Code, string Message);

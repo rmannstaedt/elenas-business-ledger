@@ -1,12 +1,12 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
-using ElenaSmallBusinessLedger.Core.Common;
-using ElenaSmallBusinessLedger.Core.Invoices;
-using ElenaSmallBusinessLedger.Core.Ports;
-using MoneyAmount = ElenaSmallBusinessLedger.Core.Money.Money;
+using MySmallBusinessLedger.Core.Common;
+using MySmallBusinessLedger.Core.Invoices;
+using MySmallBusinessLedger.Core.Ports;
+using MoneyAmount = MySmallBusinessLedger.Core.Money.Money;
 using Microsoft.EntityFrameworkCore;
 
-namespace ElenaSmallBusinessLedger.Infrastructure.Persistence;
+namespace MySmallBusinessLedger.Infrastructure.Persistence;
 
 public sealed class SqliteInvoiceRepository : IInvoiceRepository
 {

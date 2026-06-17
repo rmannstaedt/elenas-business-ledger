@@ -1,8 +1,8 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
-    <ProjectReference Include="..\ElenaSmallBusinessLedger.Core\ElenaSmallBusinessLedger.Core.csproj" />
-    <ProjectReference Include="..\ElenaSmallBusinessLedger.Infrastructure\ElenaSmallBusinessLedger.Infrastructure.csproj" />
+    <ProjectReference Include="..\MySmallBusinessLedger.Core\MySmallBusinessLedger.Core.csproj" />
+    <ProjectReference Include="..\MySmallBusinessLedger.Infrastructure\MySmallBusinessLedger.Infrastructure.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

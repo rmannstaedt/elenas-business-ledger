@@ -1,4 +1,4 @@
-namespace ElenaSmallBusinessLedger.Core.Company;
+namespace MySmallBusinessLedger.Core.Company;
 
 public enum VatStatus
 {

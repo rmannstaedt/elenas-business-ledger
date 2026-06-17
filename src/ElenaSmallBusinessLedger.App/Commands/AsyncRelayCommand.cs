@@ -1,6 +1,6 @@
 using System.Windows.Input;
 
-namespace ElenaSmallBusinessLedger.App.Commands;
+namespace MySmallBusinessLedger.App.Commands;
 
 public sealed class AsyncRelayCommand : ICommand
 {

@@ -1,11 +1,11 @@
-using ElenaSmallBusinessLedger.Core.Common;
-using ElenaSmallBusinessLedger.Core.Calendar;
-using ElenaSmallBusinessLedger.Core.Invoices;
-using ElenaSmallBusinessLedger.Core.Lessons;
-using ElenaSmallBusinessLedger.Core.Ports;
-using ElenaSmallBusinessLedger.Core.Time;
+using MySmallBusinessLedger.Core.Common;
+using MySmallBusinessLedger.Core.Calendar;
+using MySmallBusinessLedger.Core.Invoices;
+using MySmallBusinessLedger.Core.Lessons;
+using MySmallBusinessLedger.Core.Ports;
+using MySmallBusinessLedger.Core.Time;
 
-namespace ElenaSmallBusinessLedger.Core.UseCases.Startup;
+namespace MySmallBusinessLedger.Core.UseCases.Startup;
 
 public sealed class StartupDashboardQuery
 {

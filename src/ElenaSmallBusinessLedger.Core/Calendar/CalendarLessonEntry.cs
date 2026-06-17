@@ -1,6 +1,6 @@
-using ElenaSmallBusinessLedger.Core.Lessons;
+using MySmallBusinessLedger.Core.Lessons;
 
-namespace ElenaSmallBusinessLedger.Core.Calendar;
+namespace MySmallBusinessLedger.Core.Calendar;
 
 public sealed record CalendarLessonEntry(string StudentShortName, DateTimeOffset StartsAt, LessonState State = LessonState.Planned)
 {

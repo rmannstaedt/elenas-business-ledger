@@ -1,5 +1,5 @@
-using MoneyAmount = ElenaSmallBusinessLedger.Core.Money.Money;
+using MoneyAmount = MySmallBusinessLedger.Core.Money.Money;
 
-namespace ElenaSmallBusinessLedger.Core.Invoices;
+namespace MySmallBusinessLedger.Core.Invoices;
 
 public sealed record PriceAdjustment(MoneyAmount Amount, string Reason);

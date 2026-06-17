@@ -1,8 +1,8 @@
 using System.Collections.ObjectModel;
-using ElenaSmallBusinessLedger.App.Commands;
-using ElenaSmallBusinessLedger.App.Services;
+using MySmallBusinessLedger.App.Commands;
+using MySmallBusinessLedger.App.Services;
 
-namespace ElenaSmallBusinessLedger.App.ViewModels;
+namespace MySmallBusinessLedger.App.ViewModels;
 
 public sealed class InvoiceCandidateDialogViewModel : ViewModelBase
 {

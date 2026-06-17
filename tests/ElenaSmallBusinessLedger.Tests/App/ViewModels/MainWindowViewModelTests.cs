@@ -1,12 +1,12 @@
-using ElenaSmallBusinessLedger.App.Services;
-using ElenaSmallBusinessLedger.App.ViewModels;
-using ElenaSmallBusinessLedger.Core.Common;
-using ElenaSmallBusinessLedger.Core.Invoices;
-using ElenaSmallBusinessLedger.Core.Lessons;
-using ElenaSmallBusinessLedger.Core.UseCases.Startup;
-using AppMainWindow = ElenaSmallBusinessLedger.App.MainWindow;
+using MySmallBusinessLedger.App.Services;
+using MySmallBusinessLedger.App.ViewModels;
+using MySmallBusinessLedger.Core.Common;
+using MySmallBusinessLedger.Core.Invoices;
+using MySmallBusinessLedger.Core.Lessons;
+using MySmallBusinessLedger.Core.UseCases.Startup;
+using AppMainWindow = MySmallBusinessLedger.App.MainWindow;
 
-namespace ElenaSmallBusinessLedger.Tests.App.ViewModels;
+namespace MySmallBusinessLedger.Tests.App.ViewModels;
 
 public sealed class MainWindowViewModelTests
 {
@@ -18,7 +18,7 @@ public sealed class MainWindowViewModelTests
             var viewModel = CreateViewModel();
             var window = new AppMainWindow(viewModel);
 
-            Assert.Equal("Elena's Small Business Ledger", window.Title);
+            Assert.Equal("My Small Business Ledger", window.Title);
             Assert.Same(viewModel, window.DataContext);
             Assert.NotNull(window.Content);
 
@@ -586,35 +586,35 @@ public sealed class MainWindowViewModelTests
 
         public bool DeleteWasCalled { get; private set; }
 
-        public ElenaSmallBusinessLedger.Core.UseCases.Lessons.LessonAddRequest? LastAddRequest { get; private set; }
+        public MySmallBusinessLedger.Core.UseCases.Lessons.LessonAddRequest? LastAddRequest { get; private set; }
 
-        public Task<OperationResult<IReadOnlyList<ElenaSmallBusinessLedger.Core.Calendar.CalendarLesson>>> AddAsync(
-            ElenaSmallBusinessLedger.Core.UseCases.Lessons.LessonAddRequest request,
+        public Task<OperationResult<IReadOnlyList<MySmallBusinessLedger.Core.Calendar.CalendarLesson>>> AddAsync(
+            MySmallBusinessLedger.Core.UseCases.Lessons.LessonAddRequest request,
             DateOnly refreshMonth,
             CancellationToken cancellationToken)
         {
             AddWasCalled = true;
             LastAddRequest = request;
-            return Task.FromResult(OperationResult<IReadOnlyList<ElenaSmallBusinessLedger.Core.Calendar.CalendarLesson>>.Success(
-                [new ElenaSmallBusinessLedger.Core.Calendar.CalendarLesson("new-lesson", request.StudentShortName, request.StartsAt)]));
+            return Task.FromResult(OperationResult<IReadOnlyList<MySmallBusinessLedger.Core.Calendar.CalendarLesson>>.Success(
+                [new MySmallBusinessLedger.Core.Calendar.CalendarLesson("new-lesson", request.StudentShortName, request.StartsAt)]));
         }
 
-        public Task<OperationResult<IReadOnlyList<ElenaSmallBusinessLedger.Core.Calendar.CalendarLesson>>> EditAsync(
-            ElenaSmallBusinessLedger.Core.UseCases.Lessons.LessonEditRequest request,
+        public Task<OperationResult<IReadOnlyList<MySmallBusinessLedger.Core.Calendar.CalendarLesson>>> EditAsync(
+            MySmallBusinessLedger.Core.UseCases.Lessons.LessonEditRequest request,
             DateOnly refreshMonth,
             CancellationToken cancellationToken)
         {
             EditWasCalled = true;
-            return Task.FromResult(OperationResult<IReadOnlyList<ElenaSmallBusinessLedger.Core.Calendar.CalendarLesson>>.Success([]));
+            return Task.FromResult(OperationResult<IReadOnlyList<MySmallBusinessLedger.Core.Calendar.CalendarLesson>>.Success([]));
         }
 
-        public Task<OperationResult<IReadOnlyList<ElenaSmallBusinessLedger.Core.Calendar.CalendarLesson>>> DeleteAsync(
+        public Task<OperationResult<IReadOnlyList<MySmallBusinessLedger.Core.Calendar.CalendarLesson>>> DeleteAsync(
             string lessonId,
             DateOnly refreshMonth,
             CancellationToken cancellationToken)
         {
             DeleteWasCalled = true;
-            return Task.FromResult(OperationResult<IReadOnlyList<ElenaSmallBusinessLedger.Core.Calendar.CalendarLesson>>.Success([]));
+            return Task.FromResult(OperationResult<IReadOnlyList<MySmallBusinessLedger.Core.Calendar.CalendarLesson>>.Success([]));
         }
     }
 

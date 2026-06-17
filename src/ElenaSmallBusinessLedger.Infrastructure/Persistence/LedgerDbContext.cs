@@ -1,6 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 
-namespace ElenaSmallBusinessLedger.Infrastructure.Persistence;
+namespace MySmallBusinessLedger.Infrastructure.Persistence;
 
 public sealed class LedgerDbContext : DbContext
 {

@@ -2,14 +2,14 @@ using System.IO;
 using System.Text.Json;
 using System.Windows;
 
-namespace ElenaSmallBusinessLedger.App.Services;
+namespace MySmallBusinessLedger.App.Services;
 
 public static class WindowPlacementStore
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
     private static readonly string StorePath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "ElenaSmallBusinessLedger",
+        "MySmallBusinessLedger",
         "window-placement.json");
 
     public static void Attach(Window window, string key)

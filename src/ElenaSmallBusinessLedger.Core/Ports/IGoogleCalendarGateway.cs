@@ -1,9 +1,9 @@
-using ElenaSmallBusinessLedger.Core.Calendar;
-using ElenaSmallBusinessLedger.Core.Common;
-using ElenaSmallBusinessLedger.Core.Lessons;
-using ElenaSmallBusinessLedger.Core.UseCases.Lessons;
+using MySmallBusinessLedger.Core.Calendar;
+using MySmallBusinessLedger.Core.Common;
+using MySmallBusinessLedger.Core.Lessons;
+using MySmallBusinessLedger.Core.UseCases.Lessons;
 
-namespace ElenaSmallBusinessLedger.Core.Ports;
+namespace MySmallBusinessLedger.Core.Ports;
 
 public interface IGoogleCalendarGateway
 {

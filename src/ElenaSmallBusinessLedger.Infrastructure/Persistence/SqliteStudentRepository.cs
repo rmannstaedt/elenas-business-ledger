@@ -1,10 +1,10 @@
-using ElenaSmallBusinessLedger.Core.Plans;
-using ElenaSmallBusinessLedger.Core.Ports;
-using ElenaSmallBusinessLedger.Core.Students;
-using ElenaSmallBusinessLedger.Core.Common;
+using MySmallBusinessLedger.Core.Plans;
+using MySmallBusinessLedger.Core.Ports;
+using MySmallBusinessLedger.Core.Students;
+using MySmallBusinessLedger.Core.Common;
 using Microsoft.EntityFrameworkCore;
 
-namespace ElenaSmallBusinessLedger.Infrastructure.Persistence;
+namespace MySmallBusinessLedger.Infrastructure.Persistence;
 
 public sealed class SqliteStudentRepository : IStudentRepository
 {

@@ -1,8 +1,8 @@
-using ElenaSmallBusinessLedger.Core.Company;
-using ElenaSmallBusinessLedger.Core.Ports;
+using MySmallBusinessLedger.Core.Company;
+using MySmallBusinessLedger.Core.Ports;
 using Microsoft.EntityFrameworkCore;
 
-namespace ElenaSmallBusinessLedger.Infrastructure.Persistence;
+namespace MySmallBusinessLedger.Infrastructure.Persistence;
 
 public sealed class SqliteCompanyProfileRepository : ICompanyProfileRepository
 {

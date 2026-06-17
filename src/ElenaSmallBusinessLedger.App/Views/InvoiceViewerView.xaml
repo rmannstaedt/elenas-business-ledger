@@ -1,4 +1,4 @@
-<Window x:Class="ElenaSmallBusinessLedger.App.Views.InvoiceViewerView"
+<Window x:Class="MySmallBusinessLedger.App.Views.InvoiceViewerView"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Invoice"

@@ -1,11 +1,11 @@
-using ElenaSmallBusinessLedger.App.Services;
-using ElenaSmallBusinessLedger.App.ViewModels;
-using ElenaSmallBusinessLedger.App.Views;
-using ElenaSmallBusinessLedger.Core.Common;
-using ElenaSmallBusinessLedger.Core.Company;
-using ElenaSmallBusinessLedger.Infrastructure.Persistence;
+using MySmallBusinessLedger.App.Services;
+using MySmallBusinessLedger.App.ViewModels;
+using MySmallBusinessLedger.App.Views;
+using MySmallBusinessLedger.Core.Common;
+using MySmallBusinessLedger.Core.Company;
+using MySmallBusinessLedger.Infrastructure.Persistence;
 
-namespace ElenaSmallBusinessLedger.Tests.App.ViewModels;
+namespace MySmallBusinessLedger.Tests.App.ViewModels;
 
 public sealed class SettingsViewModelTests
 {
@@ -42,8 +42,8 @@ public sealed class SettingsViewModelTests
                 @"C:\Invoices"),
                 new CalendarSettings("primary", "studio@example.test"),
                 HasGoogleClientSecrets: true,
-                AppDataFolderPath: @"C:\Users\ExampleUser\AppData\Local\ElenaSmallBusinessLedger",
-                DatabasePath: @"C:\Users\ExampleUser\AppData\Local\ElenaSmallBusinessLedger\ledger.db")
+                AppDataFolderPath: @"C:\Users\ExampleUser\AppData\Local\MySmallBusinessLedger",
+                DatabasePath: @"C:\Users\ExampleUser\AppData\Local\MySmallBusinessLedger\ledger.db")
         };
         var viewModel = new SettingsViewModel(service);
 
@@ -54,8 +54,8 @@ public sealed class SettingsViewModelTests
         Assert.True(viewModel.IsVatRegistered);
         Assert.True(viewModel.HasGoogleClientSecrets);
         Assert.Equal("Google login setup file saved: Yes", viewModel.GoogleLoginSetupFileStatusText);
-        Assert.Equal(@"C:\Users\ExampleUser\AppData\Local\ElenaSmallBusinessLedger", viewModel.AppDataFolderPath);
-        Assert.Equal(@"C:\Users\ExampleUser\AppData\Local\ElenaSmallBusinessLedger\ledger.db", viewModel.DatabasePath);
+        Assert.Equal(@"C:\Users\ExampleUser\AppData\Local\MySmallBusinessLedger", viewModel.AppDataFolderPath);
+        Assert.Equal(@"C:\Users\ExampleUser\AppData\Local\MySmallBusinessLedger\ledger.db", viewModel.DatabasePath);
     }
 
     [Fact]

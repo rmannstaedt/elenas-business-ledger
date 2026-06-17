@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0-windows</TargetFramework>
@@ -21,9 +21,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\ElenaSmallBusinessLedger.Core\ElenaSmallBusinessLedger.Core.csproj" />
-    <ProjectReference Include="..\..\src\ElenaSmallBusinessLedger.App\ElenaSmallBusinessLedger.App.csproj" />
-    <ProjectReference Include="..\..\src\ElenaSmallBusinessLedger.Infrastructure\ElenaSmallBusinessLedger.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\MySmallBusinessLedger.Core\MySmallBusinessLedger.Core.csproj" />
+    <ProjectReference Include="..\..\src\MySmallBusinessLedger.App\MySmallBusinessLedger.App.csproj" />
+    <ProjectReference Include="..\..\src\MySmallBusinessLedger.Infrastructure\MySmallBusinessLedger.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

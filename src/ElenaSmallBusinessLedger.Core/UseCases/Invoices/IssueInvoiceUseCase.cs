@@ -1,8 +1,8 @@
-using ElenaSmallBusinessLedger.Core.Common;
-using ElenaSmallBusinessLedger.Core.Invoices;
-using ElenaSmallBusinessLedger.Core.Ports;
+using MySmallBusinessLedger.Core.Common;
+using MySmallBusinessLedger.Core.Invoices;
+using MySmallBusinessLedger.Core.Ports;
 
-namespace ElenaSmallBusinessLedger.Core.UseCases.Invoices;
+namespace MySmallBusinessLedger.Core.UseCases.Invoices;
 
 public sealed class IssueInvoiceUseCase
 {

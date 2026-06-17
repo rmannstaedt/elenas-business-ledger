@@ -1,10 +1,10 @@
-using ElenaSmallBusinessLedger.Core.Common;
-using ElenaSmallBusinessLedger.Core.Invoices;
-using ElenaSmallBusinessLedger.Core.Plans;
-using ElenaSmallBusinessLedger.Core.Ports;
-using MoneyAmount = ElenaSmallBusinessLedger.Core.Money.Money;
+using MySmallBusinessLedger.Core.Common;
+using MySmallBusinessLedger.Core.Invoices;
+using MySmallBusinessLedger.Core.Plans;
+using MySmallBusinessLedger.Core.Ports;
+using MoneyAmount = MySmallBusinessLedger.Core.Money.Money;
 
-namespace ElenaSmallBusinessLedger.Core.UseCases.Invoices;
+namespace MySmallBusinessLedger.Core.UseCases.Invoices;
 
 public sealed class InvoicePreviewUseCase
 {

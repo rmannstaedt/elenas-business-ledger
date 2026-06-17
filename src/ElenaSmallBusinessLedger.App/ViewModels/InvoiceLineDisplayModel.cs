@@ -1,7 +1,7 @@
 using System.Globalization;
-using ElenaSmallBusinessLedger.Core.Invoices;
+using MySmallBusinessLedger.Core.Invoices;
 
-namespace ElenaSmallBusinessLedger.App.ViewModels;
+namespace MySmallBusinessLedger.App.ViewModels;
 
 public sealed class InvoiceLineDisplayModel : ViewModelBase
 {

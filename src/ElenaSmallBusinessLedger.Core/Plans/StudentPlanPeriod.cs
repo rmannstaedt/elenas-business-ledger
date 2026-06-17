@@ -1,4 +1,4 @@
-namespace ElenaSmallBusinessLedger.Core.Plans;
+namespace MySmallBusinessLedger.Core.Plans;
 
 public sealed record StudentPlanPeriod(Plan Plan, DateOnly StartsOn, DateOnly? EndsOn)
 {

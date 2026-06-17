@@ -1,6 +1,6 @@
-using ElenaSmallBusinessLedger.Core.Invoices;
+using MySmallBusinessLedger.Core.Invoices;
 
-namespace ElenaSmallBusinessLedger.Core.UseCases.Startup;
+namespace MySmallBusinessLedger.Core.UseCases.Startup;
 
 public sealed record StartupDashboardResult(
     string? CurrentStudentShortName,

@@ -1,9 +1,9 @@
 using System.Text;
-using ElenaSmallBusinessLedger.Core.Common;
-using ElenaSmallBusinessLedger.Core.Invoices;
-using ElenaSmallBusinessLedger.Core.Ports;
+using MySmallBusinessLedger.Core.Common;
+using MySmallBusinessLedger.Core.Invoices;
+using MySmallBusinessLedger.Core.Ports;
 
-namespace ElenaSmallBusinessLedger.Infrastructure.Invoices.Pdf;
+namespace MySmallBusinessLedger.Infrastructure.Invoices.Pdf;
 
 public sealed class LocalInvoiceFileStore : IInvoiceFileStore
 {

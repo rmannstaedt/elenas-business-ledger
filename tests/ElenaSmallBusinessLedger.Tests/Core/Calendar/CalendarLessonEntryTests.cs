@@ -1,7 +1,7 @@
-using ElenaSmallBusinessLedger.Core.Calendar;
-using ElenaSmallBusinessLedger.Core.Lessons;
+using MySmallBusinessLedger.Core.Calendar;
+using MySmallBusinessLedger.Core.Lessons;
 
-namespace ElenaSmallBusinessLedger.Tests.Core.Calendar;
+namespace MySmallBusinessLedger.Tests.Core.Calendar;
 
 public sealed class CalendarLessonEntryTests
 {

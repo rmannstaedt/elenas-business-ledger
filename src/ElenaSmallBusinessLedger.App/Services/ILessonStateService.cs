@@ -1,7 +1,7 @@
-using ElenaSmallBusinessLedger.Core.Common;
-using ElenaSmallBusinessLedger.Core.Lessons;
+using MySmallBusinessLedger.Core.Common;
+using MySmallBusinessLedger.Core.Lessons;
 
-namespace ElenaSmallBusinessLedger.App.Services;
+namespace MySmallBusinessLedger.App.Services;
 
 public interface ILessonStateService
 {

@@ -1,9 +1,9 @@
-using ElenaSmallBusinessLedger.Core.Calendar;
-using ElenaSmallBusinessLedger.Core.Lessons;
+using MySmallBusinessLedger.Core.Calendar;
+using MySmallBusinessLedger.Core.Lessons;
 using Google.Apis.Calendar.v3;
 using Google.Apis.Calendar.v3.Data;
 
-namespace ElenaSmallBusinessLedger.Infrastructure.Calendar;
+namespace MySmallBusinessLedger.Infrastructure.Calendar;
 
 public sealed class GoogleCalendarServiceEventClient : IGoogleCalendarEventClient
 {

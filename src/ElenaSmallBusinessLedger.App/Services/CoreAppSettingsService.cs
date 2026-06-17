@@ -1,10 +1,10 @@
 using System.IO;
-using ElenaSmallBusinessLedger.Core.Common;
-using ElenaSmallBusinessLedger.Core.Company;
-using ElenaSmallBusinessLedger.Core.Ports;
-using ElenaSmallBusinessLedger.Infrastructure.Persistence;
+using MySmallBusinessLedger.Core.Common;
+using MySmallBusinessLedger.Core.Company;
+using MySmallBusinessLedger.Core.Ports;
+using MySmallBusinessLedger.Infrastructure.Persistence;
 
-namespace ElenaSmallBusinessLedger.App.Services;
+namespace MySmallBusinessLedger.App.Services;
 
 public sealed class CoreAppSettingsService : IAppSettingsService
 {

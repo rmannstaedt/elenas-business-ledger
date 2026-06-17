@@ -1,4 +1,4 @@
-namespace ElenaSmallBusinessLedger.Core.Invoices;
+namespace MySmallBusinessLedger.Core.Invoices;
 
 public enum PaymentStatus
 {

@@ -1,7 +1,7 @@
-using ElenaSmallBusinessLedger.Core.Common;
-using ElenaSmallBusinessLedger.Core.Invoices;
+using MySmallBusinessLedger.Core.Common;
+using MySmallBusinessLedger.Core.Invoices;
 
-namespace ElenaSmallBusinessLedger.Core.UseCases.Invoices;
+namespace MySmallBusinessLedger.Core.UseCases.Invoices;
 
 public sealed record IssueInvoiceResult(
     IssuedInvoice Invoice,

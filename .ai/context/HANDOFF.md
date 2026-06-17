@@ -6,6 +6,7 @@ Date: 2026-06-16
 
 - Active implementation plan: `.ai/implementation-plans/active/2026-06-16-v1-invoice-printer.md`.
 - The app is now a real WPF/Core/Infrastructure local-first pilot build, not sample-backed.
+- User-facing product name is `My Small Business Ledger`; internal namespace/project/app-data prefix remains `ElenaSmallBusinessLedger` during the pilot to avoid disrupting existing data and setup paths.
 - Runtime composition uses SQLite under `%LOCALAPPDATA%\ElenaSmallBusinessLedger`, Google Calendar through the official API client, QuestPDF invoice generation, staged PDF storage, invoice metadata persistence, and OS print request after PDF save.
 - `Application > Settings` configures company profile, invoice folder, Google Calendar ID/account label, and Google Calendar login setup file; it also shows read-only app data/database paths.
 - Completed/Planned lesson state is manual. Google Calendar keeps the first-line `$` student marker and uses a later `Status: Completed` summary line for completed lessons.

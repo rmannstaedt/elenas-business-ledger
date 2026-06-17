@@ -1,12 +1,12 @@
-using ElenaSmallBusinessLedger.App.Services;
-using ElenaSmallBusinessLedger.App.ViewModels;
-using ElenaSmallBusinessLedger.Core.Company;
-using ElenaSmallBusinessLedger.Core.Common;
-using ElenaSmallBusinessLedger.Core.Invoices;
-using ElenaSmallBusinessLedger.Core.Money;
-using ElenaSmallBusinessLedger.Core.UseCases.Invoices;
+using MySmallBusinessLedger.App.Services;
+using MySmallBusinessLedger.App.ViewModels;
+using MySmallBusinessLedger.Core.Company;
+using MySmallBusinessLedger.Core.Common;
+using MySmallBusinessLedger.Core.Invoices;
+using MySmallBusinessLedger.Core.Money;
+using MySmallBusinessLedger.Core.UseCases.Invoices;
 
-namespace ElenaSmallBusinessLedger.Tests.App.ViewModels;
+namespace MySmallBusinessLedger.Tests.App.ViewModels;
 
 public sealed class InvoiceViewModelTests
 {

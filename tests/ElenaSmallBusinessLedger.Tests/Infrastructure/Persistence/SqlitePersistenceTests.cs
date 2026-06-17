@@ -1,13 +1,13 @@
-using ElenaSmallBusinessLedger.Core.Company;
-using ElenaSmallBusinessLedger.Core.Invoices;
-using ElenaSmallBusinessLedger.Core.Money;
-using ElenaSmallBusinessLedger.Core.Plans;
-using ElenaSmallBusinessLedger.Core.Ports;
-using ElenaSmallBusinessLedger.Core.Students;
-using ElenaSmallBusinessLedger.Infrastructure.Persistence;
+using MySmallBusinessLedger.Core.Company;
+using MySmallBusinessLedger.Core.Invoices;
+using MySmallBusinessLedger.Core.Money;
+using MySmallBusinessLedger.Core.Plans;
+using MySmallBusinessLedger.Core.Ports;
+using MySmallBusinessLedger.Core.Students;
+using MySmallBusinessLedger.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
-namespace ElenaSmallBusinessLedger.Tests.Infrastructure.Persistence;
+namespace MySmallBusinessLedger.Tests.Infrastructure.Persistence;
 
 public sealed class SqlitePersistenceTests
 {

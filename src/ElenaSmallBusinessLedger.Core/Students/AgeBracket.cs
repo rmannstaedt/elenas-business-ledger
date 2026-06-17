@@ -1,4 +1,4 @@
-namespace ElenaSmallBusinessLedger.Core.Students;
+namespace MySmallBusinessLedger.Core.Students;
 
 public enum AgeBracket
 {

@@ -1,12 +1,12 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
-using ElenaSmallBusinessLedger.App.Commands;
-using ElenaSmallBusinessLedger.App.Services;
-using ElenaSmallBusinessLedger.Core.Plans;
-using ElenaSmallBusinessLedger.Core.Students;
-using ElenaSmallBusinessLedger.Core.UseCases.Students;
+using MySmallBusinessLedger.App.Commands;
+using MySmallBusinessLedger.App.Services;
+using MySmallBusinessLedger.Core.Plans;
+using MySmallBusinessLedger.Core.Students;
+using MySmallBusinessLedger.Core.UseCases.Students;
 
-namespace ElenaSmallBusinessLedger.App.ViewModels;
+namespace MySmallBusinessLedger.App.ViewModels;
 
 public sealed class StudentEditorViewModel : ViewModelBase
 {

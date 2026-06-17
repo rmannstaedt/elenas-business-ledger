@@ -1,4 +1,4 @@
-namespace ElenaSmallBusinessLedger.Core.Common;
+namespace MySmallBusinessLedger.Core.Common;
 
 public sealed class ValidationResult<T>
 {

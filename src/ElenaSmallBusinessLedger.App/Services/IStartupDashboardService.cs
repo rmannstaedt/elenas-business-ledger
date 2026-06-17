@@ -1,7 +1,7 @@
-using ElenaSmallBusinessLedger.Core.Common;
-using ElenaSmallBusinessLedger.Core.UseCases.Startup;
+using MySmallBusinessLedger.Core.Common;
+using MySmallBusinessLedger.Core.UseCases.Startup;
 
-namespace ElenaSmallBusinessLedger.App.Services;
+namespace MySmallBusinessLedger.App.Services;
 
 public interface IStartupDashboardService
 {

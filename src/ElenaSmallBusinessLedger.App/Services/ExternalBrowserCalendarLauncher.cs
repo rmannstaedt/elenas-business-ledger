@@ -1,6 +1,6 @@
 using System.Diagnostics;
 
-namespace ElenaSmallBusinessLedger.App.Services;
+namespace MySmallBusinessLedger.App.Services;
 
 public sealed class ExternalBrowserCalendarLauncher : ICalendarLauncher
 {

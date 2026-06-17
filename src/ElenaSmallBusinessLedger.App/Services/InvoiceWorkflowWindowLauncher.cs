@@ -1,9 +1,9 @@
 using System.Windows;
-using ElenaSmallBusinessLedger.App.ViewModels;
-using ElenaSmallBusinessLedger.App.Views;
-using ElenaSmallBusinessLedger.Core.Invoices;
+using MySmallBusinessLedger.App.ViewModels;
+using MySmallBusinessLedger.App.Views;
+using MySmallBusinessLedger.Core.Invoices;
 
-namespace ElenaSmallBusinessLedger.App.Services;
+namespace MySmallBusinessLedger.App.Services;
 
 public sealed class InvoiceWorkflowWindowLauncher : IInvoiceWorkflowLauncher
 {

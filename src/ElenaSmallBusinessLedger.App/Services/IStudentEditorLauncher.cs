@@ -1,4 +1,4 @@
-namespace ElenaSmallBusinessLedger.App.Services;
+namespace MySmallBusinessLedger.App.Services;
 
 public interface IStudentEditorLauncher
 {

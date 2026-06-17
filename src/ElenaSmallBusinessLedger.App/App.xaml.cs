@@ -1,19 +1,19 @@
 using System.IO;
 using System.Windows;
-using ElenaSmallBusinessLedger.App.Services;
-using ElenaSmallBusinessLedger.App.ViewModels;
-using ElenaSmallBusinessLedger.Core.UseCases.Invoices;
-using ElenaSmallBusinessLedger.Core.UseCases.Lessons;
-using ElenaSmallBusinessLedger.Core.UseCases.Startup;
-using ElenaSmallBusinessLedger.Infrastructure.Calendar;
-using ElenaSmallBusinessLedger.Infrastructure.Invoices.Pdf;
-using ElenaSmallBusinessLedger.Infrastructure.Invoices.Printing;
-using ElenaSmallBusinessLedger.Infrastructure.Persistence;
+using MySmallBusinessLedger.App.Services;
+using MySmallBusinessLedger.App.ViewModels;
+using MySmallBusinessLedger.Core.UseCases.Invoices;
+using MySmallBusinessLedger.Core.UseCases.Lessons;
+using MySmallBusinessLedger.Core.UseCases.Startup;
+using MySmallBusinessLedger.Infrastructure.Calendar;
+using MySmallBusinessLedger.Infrastructure.Invoices.Pdf;
+using MySmallBusinessLedger.Infrastructure.Invoices.Printing;
+using MySmallBusinessLedger.Infrastructure.Persistence;
 using Google.Apis.Auth.OAuth2;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
-namespace ElenaSmallBusinessLedger.App;
+namespace MySmallBusinessLedger.App;
 
 public partial class App : Application
 {
@@ -114,7 +114,7 @@ public partial class App : Application
         var credentialFactory = new GoogleCalendarCredentialFactory(
             clientSecrets,
             tokenStore,
-            "Elena's Small Business Ledger");
+            "My Small Business Ledger");
         var calendarService = await credentialFactory.CreateCalendarServiceAsync(settings.GoogleAccountEmail, cancellationToken);
 
         return new ConfiguredGoogleCalendarClient(

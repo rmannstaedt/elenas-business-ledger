@@ -1,9 +1,9 @@
-using ElenaSmallBusinessLedger.App.Commands;
-using ElenaSmallBusinessLedger.App.Services;
-using ElenaSmallBusinessLedger.Core.Company;
-using ElenaSmallBusinessLedger.Infrastructure.Persistence;
+using MySmallBusinessLedger.App.Commands;
+using MySmallBusinessLedger.App.Services;
+using MySmallBusinessLedger.Core.Company;
+using MySmallBusinessLedger.Infrastructure.Persistence;
 
-namespace ElenaSmallBusinessLedger.App.ViewModels;
+namespace MySmallBusinessLedger.App.ViewModels;
 
 public sealed class SettingsViewModel : ViewModelBase
 {
