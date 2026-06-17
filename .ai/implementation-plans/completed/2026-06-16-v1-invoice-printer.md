@@ -8,7 +8,7 @@
 
 **Tech Stack:** .NET 10, WPF/MVVM, xUnit, SQLite, Google Calendar API, QuestPDF or an approved PDF alternative.
 
-Status: Active
+Status: Completed
 Created: 2026-06-16
 Last updated: 2026-06-16
 Owner/context: Ruben and Codex; stages 1-9 are implemented/refined, and the WPF startup path now uses real Core/SQLite/Calendar-backed services instead of sample dashboard/editor services. Stage 10 remains next for the invoice printer/viewer flow.
