@@ -41,7 +41,7 @@ public sealed class SettingsViewModelTests
                 VatStatus.Registered,
                 @"C:\Invoices"),
                 new CalendarSettings("primary", "studio@example.test"),
-                HasGoogleClientSecrets: true,
+                GoogleOAuthAppConfigurationStatus: GoogleOAuthClientConfigurationStatus.Ready,
                 AppDataFolderPath: @"C:\Users\ExampleUser\AppData\Roaming\visualtech.dk\MySmallBusinessLedger",
                 DatabasePath: @"C:\Users\ExampleUser\AppData\Roaming\visualtech.dk\MySmallBusinessLedger\ledger.db")
         };
@@ -52,8 +52,8 @@ public sealed class SettingsViewModelTests
         Assert.Equal("Maple Key Studio", viewModel.CompanyName);
         Assert.Equal("primary", viewModel.CalendarId);
         Assert.True(viewModel.IsVatRegistered);
-        Assert.True(viewModel.HasGoogleClientSecrets);
-        Assert.Equal("Google login setup file saved: Yes", viewModel.GoogleLoginSetupFileStatusText);
+        Assert.True(viewModel.HasGoogleOAuthAppConfiguration);
+        Assert.Equal("Google sign-in app: Ready", viewModel.GoogleOAuthAppStatusText);
         Assert.Equal(@"C:\Users\ExampleUser\AppData\Roaming\visualtech.dk\MySmallBusinessLedger", viewModel.AppDataFolderPath);
         Assert.Equal(@"C:\Users\ExampleUser\AppData\Roaming\visualtech.dk\MySmallBusinessLedger\ledger.db", viewModel.DatabasePath);
     }
@@ -86,6 +86,76 @@ public sealed class SettingsViewModelTests
     }
 
     [Fact]
+    public async Task SaveDoesNotPassGoogleOAuthJsonPath()
+    {
+        var service = new FakeAppSettingsService();
+        var viewModel = new SettingsViewModel(service)
+        {
+            CompanyName = "Maple Key Studio",
+            CompanyAddress = "Musikvej 1",
+            CompanyPhone = "12345678",
+            CompanyEmail = "elena@example.test",
+            InvoiceFolderPath = @"C:\Invoices",
+            CalendarId = "primary",
+            GoogleAccountEmail = "studio@example.test"
+        };
+
+        await viewModel.SaveCommand.ExecuteAsync();
+
+        Assert.NotNull(service.SavedProfile);
+        Assert.Equal(new CalendarSettings("primary", "studio@example.test"), service.SavedCalendarSettings);
+    }
+
+    [Fact]
+    public async Task ConnectGoogleCalendarReportsMissingCalendarSettings()
+    {
+        var service = new FakeAppSettingsService();
+        var viewModel = new SettingsViewModel(service)
+        {
+            CalendarId = "",
+            GoogleAccountEmail = ""
+        };
+
+        await viewModel.ConnectGoogleCalendarCommand.ExecuteAsync();
+
+        Assert.False(service.ConnectGoogleCalendarWasCalled);
+        Assert.Contains("Calendar ID", viewModel.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task ForgetGoogleAuthorizationClearsTokenStoreAndReportsNextAuthorization()
+    {
+        var service = new FakeAppSettingsService();
+        var viewModel = new SettingsViewModel(service);
+
+        await viewModel.ForgetGoogleAuthorizationCommand.ExecuteAsync();
+
+        Assert.True(service.ForgetGoogleAuthorizationWasCalled);
+        Assert.Equal(
+            "Google authorization cleared. The next connection will ask you to sign in.",
+            viewModel.GoogleAuthorizationStatusText);
+        Assert.False(viewModel.HasError);
+    }
+
+    [Fact]
+    public async Task ConnectGoogleCalendarReportsSuccessfulAuthorization()
+    {
+        var service = new FakeAppSettingsService();
+        var viewModel = new SettingsViewModel(service)
+        {
+            CalendarId = "primary",
+            GoogleAccountEmail = "studio@example.test"
+        };
+
+        await viewModel.ConnectGoogleCalendarCommand.ExecuteAsync();
+
+        Assert.True(service.ConnectGoogleCalendarWasCalled);
+        Assert.Equal(new CalendarSettings("primary", "studio@example.test"), service.ConnectedCalendarSettings);
+        Assert.Equal("Google Calendar connection succeeded. Save settings to use this calendar.", viewModel.GoogleAuthorizationStatusText);
+        Assert.False(viewModel.HasError);
+    }
+
+    [Fact]
     public async Task SaveRequiresCompanyNameAndInvoiceFolder()
     {
         var service = new FakeAppSettingsService();
@@ -103,11 +173,17 @@ public sealed class SettingsViewModelTests
 
     private sealed class FakeAppSettingsService : IAppSettingsService
     {
-        public AppSettingsSnapshot Snapshot { get; init; } = new(null, null, HasGoogleClientSecrets: false);
+        public AppSettingsSnapshot Snapshot { get; init; } = new(null, null, GoogleOAuthClientConfigurationStatus.Missing);
 
         public CompanyProfile? SavedProfile { get; private set; }
 
         public CalendarSettings? SavedCalendarSettings { get; private set; }
+
+        public CalendarSettings? ConnectedCalendarSettings { get; private set; }
+
+        public bool ConnectGoogleCalendarWasCalled { get; private set; }
+
+        public bool ForgetGoogleAuthorizationWasCalled { get; private set; }
 
         public Task<AppSettingsSnapshot> LoadAsync(CancellationToken cancellationToken) =>
             Task.FromResult(Snapshot);
@@ -115,13 +191,27 @@ public sealed class SettingsViewModelTests
         public Task<OperationResult<AppSettingsSnapshot>> SaveAsync(
             CompanyProfile companyProfile,
             CalendarSettings calendarSettings,
-            string? googleClientSecretsSourcePath,
             CancellationToken cancellationToken)
         {
             SavedProfile = companyProfile;
             SavedCalendarSettings = calendarSettings;
             return Task.FromResult(OperationResult<AppSettingsSnapshot>.Success(
-                new AppSettingsSnapshot(companyProfile, calendarSettings, HasGoogleClientSecrets: true)));
+                new AppSettingsSnapshot(companyProfile, calendarSettings, GoogleOAuthClientConfigurationStatus.Ready)));
+        }
+
+        public Task<OperationResult<bool>> ConnectGoogleCalendarAsync(
+            CalendarSettings calendarSettings,
+            CancellationToken cancellationToken)
+        {
+            ConnectGoogleCalendarWasCalled = true;
+            ConnectedCalendarSettings = calendarSettings;
+            return Task.FromResult(OperationResult<bool>.Success(true));
+        }
+
+        public Task<OperationResult<bool>> ForgetGoogleAuthorizationAsync(CancellationToken cancellationToken)
+        {
+            ForgetGoogleAuthorizationWasCalled = true;
+            return Task.FromResult(OperationResult<bool>.Success(true));
         }
     }
 

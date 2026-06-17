@@ -5,6 +5,13 @@
     <ProjectReference Include="..\MySmallBusinessLedger.Infrastructure\MySmallBusinessLedger.Infrastructure.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Include="Configuration\google-oauth-client.json"
+          CopyToOutputDirectory="PreserveNewest"
+          Condition="Exists('Configuration\google-oauth-client.json')" />
+    <None Include="Configuration\google-oauth-client.template.json" />
+  </ItemGroup>
+
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>

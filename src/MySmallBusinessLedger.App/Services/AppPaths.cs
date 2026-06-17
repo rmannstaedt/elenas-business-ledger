@@ -5,14 +5,12 @@ namespace MySmallBusinessLedger.App.Services;
 public sealed record AppPaths(
     string AppDataFolderPath,
     string DatabasePath,
-    string GoogleClientSecretsPath,
     string GoogleTokenFolderPath,
     string WindowPlacementPath)
 {
     private const string CompanyFolderName = "visualtech.dk";
     private const string ApplicationFolderName = "MySmallBusinessLedger";
     private const string DatabaseFileName = "ledger.db";
-    private const string GoogleClientSecretsFileName = "google-client-secrets.json";
     private const string GoogleTokenFolderName = "GoogleTokens";
     private const string WindowPlacementFileName = "window-placement.json";
 
@@ -29,7 +27,6 @@ public sealed record AppPaths(
         new(
             appDataFolderPath,
             Path.Combine(appDataFolderPath, DatabaseFileName),
-            Path.Combine(appDataFolderPath, GoogleClientSecretsFileName),
             Path.Combine(appDataFolderPath, GoogleTokenFolderName),
             Path.Combine(appDataFolderPath, WindowPlacementFileName));
 }

@@ -18,8 +18,8 @@ public sealed class SettingsViewModel : ViewModelBase
     private string invoiceFolderPath = string.Empty;
     private string calendarId = string.Empty;
     private string googleAccountEmail = string.Empty;
-    private string googleClientSecretsSourcePath = string.Empty;
-    private bool hasGoogleClientSecrets;
+    private GoogleOAuthClientConfigurationStatus googleOAuthAppConfigurationStatus = GoogleOAuthClientConfigurationStatus.Missing;
+    private string googleAuthorizationStatusText = "Google authorization: Not checked";
     private string appDataFolderPath = string.Empty;
     private string databasePath = string.Empty;
     private string? errorMessage;
@@ -28,6 +28,8 @@ public sealed class SettingsViewModel : ViewModelBase
     {
         this.settingsService = settingsService;
         SaveCommand = new AsyncRelayCommand(SaveAsync);
+        ConnectGoogleCalendarCommand = new AsyncRelayCommand(ConnectGoogleCalendarAsync);
+        ForgetGoogleAuthorizationCommand = new AsyncRelayCommand(ForgetGoogleAuthorizationAsync);
     }
 
     public string CompanyName { get => companyName; set => SetProperty(ref companyName, value); }
@@ -50,26 +52,21 @@ public sealed class SettingsViewModel : ViewModelBase
 
     public string GoogleAccountEmail { get => googleAccountEmail; set => SetProperty(ref googleAccountEmail, value); }
 
-    public string GoogleClientSecretsSourcePath
-    {
-        get => googleClientSecretsSourcePath;
-        set => SetProperty(ref googleClientSecretsSourcePath, value);
-    }
+    public bool HasGoogleOAuthAppConfiguration => googleOAuthAppConfigurationStatus == GoogleOAuthClientConfigurationStatus.Ready;
 
-    public bool HasGoogleClientSecrets
-    {
-        get => hasGoogleClientSecrets;
-        private set
+    public string GoogleOAuthAppStatusText =>
+        googleOAuthAppConfigurationStatus switch
         {
-            if (SetProperty(ref hasGoogleClientSecrets, value))
-            {
-                OnPropertyChanged(nameof(GoogleLoginSetupFileStatusText));
-            }
-        }
-    }
+            GoogleOAuthClientConfigurationStatus.Ready => "Google sign-in app: Ready",
+            GoogleOAuthClientConfigurationStatus.Invalid => "Google sign-in app: Invalid",
+            _ => "Google sign-in app: Missing"
+        };
 
-    public string GoogleLoginSetupFileStatusText =>
-        HasGoogleClientSecrets ? "Google login setup file saved: Yes" : "Google login setup file saved: No";
+    public string GoogleAuthorizationStatusText
+    {
+        get => googleAuthorizationStatusText;
+        private set => SetProperty(ref googleAuthorizationStatusText, value);
+    }
 
     public string AppDataFolderPath
     {
@@ -101,6 +98,10 @@ public sealed class SettingsViewModel : ViewModelBase
 
     public AsyncRelayCommand SaveCommand { get; }
 
+    public AsyncRelayCommand ConnectGoogleCalendarCommand { get; }
+
+    public AsyncRelayCommand ForgetGoogleAuthorizationCommand { get; }
+
     public event EventHandler<bool?>? CloseRequested;
 
     public async Task LoadAsync()
@@ -124,7 +125,7 @@ public sealed class SettingsViewModel : ViewModelBase
             GoogleAccountEmail = calendar.GoogleAccountEmail;
         }
 
-        HasGoogleClientSecrets = snapshot.HasGoogleClientSecrets;
+        SetGoogleOAuthAppConfigurationStatus(snapshot.GoogleOAuthAppConfigurationStatus);
         AppDataFolderPath = snapshot.AppDataFolderPath;
         DatabasePath = snapshot.DatabasePath;
     }
@@ -150,7 +151,6 @@ public sealed class SettingsViewModel : ViewModelBase
         var result = await settingsService.SaveAsync(
             profile,
             calendarSettings,
-            string.IsNullOrWhiteSpace(GoogleClientSecretsSourcePath) ? null : GoogleClientSecretsSourcePath,
             CancellationToken.None);
         if (!result.Succeeded)
         {
@@ -158,10 +158,52 @@ public sealed class SettingsViewModel : ViewModelBase
             return;
         }
 
-        HasGoogleClientSecrets = result.Value!.HasGoogleClientSecrets;
+        SetGoogleOAuthAppConfigurationStatus(result.Value!.GoogleOAuthAppConfigurationStatus);
         WasSaved = true;
         ErrorMessage = null;
         CloseRequested?.Invoke(this, true);
+    }
+
+    private async Task ConnectGoogleCalendarAsync()
+    {
+        if (string.IsNullOrWhiteSpace(CalendarId))
+        {
+            ErrorMessage = "Calendar ID is required before connecting Google Calendar.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(GoogleAccountEmail))
+        {
+            ErrorMessage = "Google account email is required before connecting Google Calendar.";
+            return;
+        }
+
+        var result = await settingsService.ConnectGoogleCalendarAsync(
+            new CalendarSettings(CalendarId.Trim(), GoogleAccountEmail.Trim()),
+            CancellationToken.None);
+        if (!result.Succeeded)
+        {
+            ErrorMessage = result.Errors.FirstOrDefault()?.Message ?? "Google Calendar connection failed.";
+            GoogleAuthorizationStatusText = ErrorMessage;
+            return;
+        }
+
+        ErrorMessage = null;
+        GoogleAuthorizationStatusText = "Google Calendar connection succeeded. Save settings to use this calendar.";
+    }
+
+    private async Task ForgetGoogleAuthorizationAsync()
+    {
+        var result = await settingsService.ForgetGoogleAuthorizationAsync(CancellationToken.None);
+        if (!result.Succeeded)
+        {
+            ErrorMessage = result.Errors.FirstOrDefault()?.Message ?? "Google authorization could not be cleared.";
+            GoogleAuthorizationStatusText = ErrorMessage;
+            return;
+        }
+
+        ErrorMessage = null;
+        GoogleAuthorizationStatusText = "Google authorization cleared. The next connection will ask you to sign in.";
     }
 
     private bool Validate()
@@ -186,5 +228,13 @@ public sealed class SettingsViewModel : ViewModelBase
 
         ErrorMessage = null;
         return true;
+    }
+
+    private void SetGoogleOAuthAppConfigurationStatus(GoogleOAuthClientConfigurationStatus status)
+    {
+        if (SetProperty(ref googleOAuthAppConfigurationStatus, status, nameof(HasGoogleOAuthAppConfiguration)))
+        {
+            OnPropertyChanged(nameof(GoogleOAuthAppStatusText));
+        }
     }
 }

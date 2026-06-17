@@ -88,22 +88,24 @@
                     <TextBlock Text="Google account email" />
                     <TextBox Text="{Binding GoogleAccountEmail, UpdateSourceTrigger=PropertyChanged}"
                              Margin="0,3,0,8" />
-                    <TextBlock Text="Google Calendar login setup file" />
-                    <Grid Margin="0,3,0,8">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="8" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBox Text="{Binding GoogleClientSecretsSourcePath, UpdateSourceTrigger=PropertyChanged}" />
-                        <Button Grid.Column="2"
-                                Content="Browse"
-                                Click="OnBrowseGoogleClientSecrets"
-                                MinWidth="76"
-                                Height="26" />
-                    </Grid>
-                    <TextBlock Text="{Binding GoogleLoginSetupFileStatusText}"
+                    <TextBlock Text="{Binding GoogleOAuthAppStatusText}"
                                Foreground="#5B6472"
+                               Margin="0,0,0,8" />
+                    <StackPanel Orientation="Horizontal"
+                                Margin="0,0,0,8">
+                        <Button Content="Connect Google Calendar"
+                                Command="{Binding ConnectGoogleCalendarCommand}"
+                                MinWidth="150"
+                                Height="28"
+                                Margin="0,0,8,0" />
+                        <Button Content="Forget Google sign-in"
+                                Command="{Binding ForgetGoogleAuthorizationCommand}"
+                                MinWidth="142"
+                                Height="28" />
+                    </StackPanel>
+                    <TextBlock Text="{Binding GoogleAuthorizationStatusText}"
+                               Foreground="#5B6472"
+                               TextWrapping="Wrap"
                                Margin="0,0,0,18" />
                     <TextBlock Text="Application data"
                                FontSize="18"

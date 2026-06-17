@@ -16,7 +16,6 @@ public sealed class AppPathsTests
 
         Assert.Equal(expectedRoot, paths.AppDataFolderPath);
         Assert.Equal(Path.Combine(expectedRoot, "ledger.db"), paths.DatabasePath);
-        Assert.Equal(Path.Combine(expectedRoot, "google-client-secrets.json"), paths.GoogleClientSecretsPath);
         Assert.Equal(Path.Combine(expectedRoot, "GoogleTokens"), paths.GoogleTokenFolderPath);
         Assert.Equal(Path.Combine(expectedRoot, "window-placement.json"), paths.WindowPlacementPath);
     }

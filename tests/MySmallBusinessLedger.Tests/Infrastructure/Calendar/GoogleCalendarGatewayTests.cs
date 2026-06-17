@@ -201,6 +201,36 @@ public sealed class GoogleCalendarGatewayTests
         }
     }
 
+    [Fact]
+    public async Task WindowsProtectedFileDataStoreClearDeletesOnlyFilesInsideTokenFolder()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var root = Path.Combine(Path.GetTempPath(), "ElenaLedgerTokenTests", Guid.NewGuid().ToString("N"));
+        var tokenDirectory = Path.Combine(root, "GoogleTokens");
+        Directory.CreateDirectory(tokenDirectory);
+        var outsideFile = Path.Combine(root, "ledger.db");
+        File.WriteAllText(outsideFile, "keep");
+
+        try
+        {
+            IDataStore store = new WindowsProtectedFileDataStore(tokenDirectory);
+            await store.StoreAsync("google-token", new StoredToken("visible-secret-token"));
+
+            await store.ClearAsync();
+
+            Assert.Empty(Directory.GetFiles(tokenDirectory));
+            Assert.True(File.Exists(outsideFile));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
     private static GoogleCalendarGatewayOptions CreateOptions(TimeSpan? defaultLessonDuration = null) =>
         new(
             CalendarId: "primary",

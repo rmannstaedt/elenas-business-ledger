@@ -40,17 +40,16 @@ dotnet run --project src\MySmallBusinessLedger.App\MySmallBusinessLedger.App.csp
 On first setup, open `Application > Settings` and configure:
 
 - company name, address, VAT status, and invoice folder;
-- Google Calendar ID and account label/email;
-- Google Calendar login setup file, which is the Google-downloaded OAuth JSON file.
+- Google Calendar ID and account label/email.
 
-The app copies the selected Google Calendar login setup file to `%APPDATA%\visualtech.dk\MySmallBusinessLedger\google-client-secrets.json`.
-Google OAuth access/refresh tokens are stored separately with Windows user data protection.
+The app uses the publisher Google sign-in configuration bundled with the application. For local development, put the real Desktop OAuth JSON at `src\MySmallBusinessLedger.App\Configuration\google-oauth-client.json`; the file is intentionally ignored by Git and copied to the app output when present. Use `Application > Settings > Connect Google Calendar` to authorize the configured Google account in the browser. Use `Forget Google sign-in` to clear local authorization and force a fresh browser consent flow.
+
+Google OAuth access/refresh tokens are stored with Windows user data protection.
 
 Runtime data lives under `%APPDATA%\visualtech.dk\MySmallBusinessLedger`:
 
 - `ledger.db` - local SQLite database;
-- `google-client-secrets.json` - copied Google Calendar login setup file;
-- `GoogleTokens\` - Windows-protected Google OAuth token store.
+- `GoogleTokens\` - Windows-protected Google OAuth token store;
 - `window-placement.json` - remembered window sizes and positions.
 
 The invoice folder is configured in Settings and may be outside the app data folder.
@@ -62,9 +61,10 @@ The app writes invoice PDFs through a staging/verification/publish flow and does
 - Lønsumsafgift is out of scope for version 1.0.
 - Google Calendar is the operational lesson schedule, with two-way sync.
 - Google Calendar integration uses the official Google Calendar API client, external browser OAuth, and Windows-protected local token storage.
+- The Google OAuth app identity is publisher-owned and supplied from `Configuration\google-oauth-client.json`, not selected by each user in Settings.
 - Runtime data is stored under `%APPDATA%\visualtech.dk\MySmallBusinessLedger`.
 - The WPF app now uses real SQLite/Core/Calendar-backed services; if Google Calendar is not configured, the dashboard reports that instead of showing sample lesson rows.
-- Company and Google Calendar setup is available from `Application > Settings`.
+- Company and Google Calendar account setup, connection, and authorization reset are available from `Application > Settings`.
 - The app stores issued invoice PDFs in a configurable invoices folder.
 - Invoice PDFs are generated with QuestPDF, staged and verified before final storage, and never silently overwritten.
 - The initial UI recommendation is WPF + .NET 10.

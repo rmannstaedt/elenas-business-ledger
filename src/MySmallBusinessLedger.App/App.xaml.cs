@@ -9,7 +9,6 @@ using MySmallBusinessLedger.Infrastructure.Calendar;
 using MySmallBusinessLedger.Infrastructure.Invoices.Pdf;
 using MySmallBusinessLedger.Infrastructure.Invoices.Printing;
 using MySmallBusinessLedger.Infrastructure.Persistence;
-using Google.Apis.Auth.OAuth2;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
@@ -44,8 +43,16 @@ public partial class App : Application
         var invoiceRepository = new SqliteInvoiceRepository(CreateContext);
         var companyProfileRepository = new SqliteCompanyProfileRepository(CreateContext);
         var calendarSettingsRepository = new SqliteCalendarSettingsRepository(CreateContext);
+        var googleOAuthClientConfigurationProvider = new GoogleOAuthClientConfigurationProvider(
+            GoogleOAuthClientConfigurationProvider.CreateDefaultConfigurationPath());
+        var googleCalendarClientFactory = new GoogleCalendarClientFactory(
+            calendarSettingsRepository.GetAsync,
+            googleOAuthClientConfigurationProvider,
+            appPaths.GoogleTokenFolderPath,
+            "My Small Business Ledger",
+            TimeZoneInfo.Local.Id);
         var calendarGateway = new ConfiguredGoogleCalendarGateway(
-            cancellationToken => LoadConfiguredCalendarClientAsync(appPaths, calendarSettingsRepository, cancellationToken),
+            googleCalendarClientFactory.CreateAsync,
             TimeZoneInfo.Local,
             DefaultLessonDuration);
         var systemClock = new SystemUiClock();
@@ -66,7 +73,9 @@ public partial class App : Application
         var settingsService = new CoreAppSettingsService(
             companyProfileRepository,
             calendarSettingsRepository,
-            appPaths);
+            appPaths,
+            googleOAuthClientConfigurationProvider,
+            googleCalendarClientFactory);
 
         var viewModel = new MainWindowViewModel(
             new CoreStartupDashboardService(new StartupDashboardQuery(
@@ -88,37 +97,5 @@ public partial class App : Application
         var window = new MainWindow(viewModel);
         MainWindow = window;
         window.Show();
-    }
-
-    private static async Task<ConfiguredGoogleCalendarClient?> LoadConfiguredCalendarClientAsync(
-        AppPaths appPaths,
-        SqliteCalendarSettingsRepository calendarSettingsRepository,
-        CancellationToken cancellationToken)
-    {
-        var settings = await calendarSettingsRepository.GetAsync(cancellationToken);
-        if (settings is null ||
-            string.IsNullOrWhiteSpace(settings.SelectedCalendarId) ||
-            string.IsNullOrWhiteSpace(settings.GoogleAccountEmail))
-        {
-            return null;
-        }
-
-        if (!File.Exists(appPaths.GoogleClientSecretsPath))
-        {
-            return null;
-        }
-
-        await using var secretsStream = File.OpenRead(appPaths.GoogleClientSecretsPath);
-        var clientSecrets = GoogleClientSecrets.FromStream(secretsStream).Secrets;
-        var tokenStore = new WindowsProtectedFileDataStore(appPaths.GoogleTokenFolderPath);
-        var credentialFactory = new GoogleCalendarCredentialFactory(
-            clientSecrets,
-            tokenStore,
-            "My Small Business Ledger");
-        var calendarService = await credentialFactory.CreateCalendarServiceAsync(settings.GoogleAccountEmail, cancellationToken);
-
-        return new ConfiguredGoogleCalendarClient(
-            settings.SelectedCalendarId,
-            new GoogleCalendarServiceEventClient(calendarService, TimeZoneInfo.Local.Id));
     }
 }

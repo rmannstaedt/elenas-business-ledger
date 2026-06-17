@@ -7,10 +7,9 @@ namespace MySmallBusinessLedger.App.Services;
 public sealed record AppSettingsSnapshot(
     CompanyProfile? CompanyProfile,
     CalendarSettings? CalendarSettings,
-    bool HasGoogleClientSecrets,
+    GoogleOAuthClientConfigurationStatus GoogleOAuthAppConfigurationStatus,
     string AppDataFolderPath = "",
     string DatabasePath = "",
-    string GoogleClientSecretsPath = "",
     string GoogleTokenFolderPath = "");
 
 public interface IAppSettingsService
@@ -20,6 +19,11 @@ public interface IAppSettingsService
     Task<OperationResult<AppSettingsSnapshot>> SaveAsync(
         CompanyProfile companyProfile,
         CalendarSettings calendarSettings,
-        string? googleClientSecretsSourcePath,
         CancellationToken cancellationToken);
+
+    Task<OperationResult<bool>> ConnectGoogleCalendarAsync(
+        CalendarSettings calendarSettings,
+        CancellationToken cancellationToken);
+
+    Task<OperationResult<bool>> ForgetGoogleAuthorizationAsync(CancellationToken cancellationToken);
 }
