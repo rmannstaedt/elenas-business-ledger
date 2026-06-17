@@ -1,19 +1,19 @@
-﻿
+
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{827E0CD3-B72D-47B6-A68D-7590B98EB39B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ElenaSmallBusinessLedger.App", "src\ElenaSmallBusinessLedger.App\ElenaSmallBusinessLedger.App.csproj", "{B879FCF2-CBD2-4CB0-8250-C78309F5DEEF}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MySmallBusinessLedger.App", "src\MySmallBusinessLedger.App\MySmallBusinessLedger.App.csproj", "{B879FCF2-CBD2-4CB0-8250-C78309F5DEEF}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ElenaSmallBusinessLedger.Core", "src\ElenaSmallBusinessLedger.Core\ElenaSmallBusinessLedger.Core.csproj", "{7625F019-3B15-4A09-AF1B-24D553924F4C}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MySmallBusinessLedger.Core", "src\MySmallBusinessLedger.Core\MySmallBusinessLedger.Core.csproj", "{7625F019-3B15-4A09-AF1B-24D553924F4C}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ElenaSmallBusinessLedger.Infrastructure", "src\ElenaSmallBusinessLedger.Infrastructure\ElenaSmallBusinessLedger.Infrastructure.csproj", "{ACDCDF22-D5D4-4B58-8477-D67500510733}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MySmallBusinessLedger.Infrastructure", "src\MySmallBusinessLedger.Infrastructure\MySmallBusinessLedger.Infrastructure.csproj", "{ACDCDF22-D5D4-4B58-8477-D67500510733}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{0AB3BF05-4346-4AA6-1389-037BE0695223}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ElenaSmallBusinessLedger.Tests", "tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj", "{3AE71461-ED04-4B23-9A81-F7B4765FBCE6}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MySmallBusinessLedger.Tests", "tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj", "{3AE71461-ED04-4B23-9A81-F7B4765FBCE6}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
