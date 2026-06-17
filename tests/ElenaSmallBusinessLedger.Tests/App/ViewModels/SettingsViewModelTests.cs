@@ -1,5 +1,6 @@
 using ElenaSmallBusinessLedger.App.Services;
 using ElenaSmallBusinessLedger.App.ViewModels;
+using ElenaSmallBusinessLedger.App.Views;
 using ElenaSmallBusinessLedger.Core.Common;
 using ElenaSmallBusinessLedger.Core.Company;
 using ElenaSmallBusinessLedger.Infrastructure.Persistence;
@@ -8,6 +9,22 @@ namespace ElenaSmallBusinessLedger.Tests.App.ViewModels;
 
 public sealed class SettingsViewModelTests
 {
+    [Fact]
+    public void SettingsViewInitializesWithReadOnlyPathBindings()
+    {
+        RunOnStaThread(() =>
+        {
+            var viewModel = new SettingsViewModel(new FakeAppSettingsService());
+            var window = new SettingsView(viewModel);
+
+            Assert.Equal("Application Settings", window.Title);
+            Assert.Same(viewModel, window.DataContext);
+            Assert.NotNull(window.Content);
+
+            window.Close();
+        });
+    }
+
     [Fact]
     public async Task LoadsExistingSettings()
     {
@@ -105,6 +122,30 @@ public sealed class SettingsViewModelTests
             SavedCalendarSettings = calendarSettings;
             return Task.FromResult(OperationResult<AppSettingsSnapshot>.Success(
                 new AppSettingsSnapshot(companyProfile, calendarSettings, HasGoogleClientSecrets: true)));
+        }
+    }
+
+    private static void RunOnStaThread(Action action)
+    {
+        Exception? exception = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                action();
+            }
+            catch (Exception ex)
+            {
+                exception = ex;
+            }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+
+        if (exception is not null)
+        {
+            throw exception;
         }
     }
 }

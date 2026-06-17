@@ -110,11 +110,11 @@
                                FontWeight="SemiBold"
                                Margin="0,8,0,10" />
                     <TextBlock Text="Database location" />
-                    <TextBox Text="{Binding DatabasePath}"
+                    <TextBox Text="{Binding DatabasePath, Mode=OneWay}"
                              IsReadOnly="True"
                              Margin="0,3,0,8" />
                     <TextBlock Text="App data folder" />
-                    <TextBox Text="{Binding AppDataFolderPath}"
+                    <TextBox Text="{Binding AppDataFolderPath, Mode=OneWay}"
                              IsReadOnly="True"
                              Margin="0,3,0,8" />
                 </StackPanel>
