@@ -5,7 +5,7 @@
 Working name: My Small Business Ledger
 
 Internal namespace/project prefix:
-ElenaSmallBusinessLedger
+MySmallBusinessLedger
 
 ## Target framework and platform
 
@@ -17,12 +17,12 @@ Architecture: local-first desktop app
 ## Solution shape
 
 src/
-  ElenaSmallBusinessLedger.App
-  ElenaSmallBusinessLedger.Core
-  ElenaSmallBusinessLedger.Infrastructure
+  MySmallBusinessLedger.App
+  MySmallBusinessLedger.Core
+  MySmallBusinessLedger.Infrastructure
 
 tests/
-  ElenaSmallBusinessLedger.Tests
+  MySmallBusinessLedger.Tests
 
 ## Persistence and storage
 
@@ -33,10 +33,10 @@ Invoice PDF generation: QuestPDF
 Invoice PDF safety: write to staging, verify PDF bytes, publish without overwriting, then persist invoice metadata and request print
 Google Calendar account tokens: stored locally with Windows user data protection, never in SQLite or plaintext config
 Google Calendar selected calendar/account label: stored in SQLite app settings
-Runtime app data folder: `%LOCALAPPDATA%\ElenaSmallBusinessLedger`
-Runtime SQLite database path: `%LOCALAPPDATA%\ElenaSmallBusinessLedger\ledger.db`
-Google Calendar login setup file path: `%LOCALAPPDATA%\ElenaSmallBusinessLedger\google-client-secrets.json`
-Google OAuth protected token folder: `%LOCALAPPDATA%\ElenaSmallBusinessLedger\GoogleTokens`
+Runtime app data folder: `%LOCALAPPDATA%\visualtech.dk\MySmallBusinessLedger`
+Runtime SQLite database path: `%LOCALAPPDATA%\visualtech.dk\MySmallBusinessLedger\ledger.db`
+Google Calendar login setup file path: `%LOCALAPPDATA%\visualtech.dk\MySmallBusinessLedger\google-client-secrets.json`
+Google OAuth protected token folder: `%LOCALAPPDATA%\visualtech.dk\MySmallBusinessLedger\GoogleTokens`
 Backup: no automated backup in version 1.0; keep persistence design compatible with later manual backup/export
 
 ## External integrations
@@ -52,15 +52,15 @@ PDF generation: QuestPDF Community license accepted for v1
 WPF + MVVM
 No business logic in code-behind
 Danish user-facing invoice text
-Elena-facing UI must stay simple
+My-facing UI must stay simple
 Company profile, invoice folder, Google Calendar ID/account label, Google Calendar login setup file, and read-only app data/database paths are configured or shown from `Application > Settings`
 Desktop windows must remember size and position, including subwindows, and restore inside the current visible screen area
 
 ## Build and test commands
 
 ```powershell
-dotnet build ElenaSmallBusinessLedger.sln -nodeReuse:false
-dotnet test ElenaSmallBusinessLedger.sln -nodeReuse:false
+dotnet build MySmallBusinessLedger.sln -nodeReuse:false
+dotnet test MySmallBusinessLedger.sln -nodeReuse:false
 ```
 
 ## Test policy

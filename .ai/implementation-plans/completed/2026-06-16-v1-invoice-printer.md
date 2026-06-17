@@ -72,12 +72,12 @@ Create a focused v1 application that supports Elena's real workflow:
 
   ```text
   src/
-    ElenaSmallBusinessLedger.App
-    ElenaSmallBusinessLedger.Core
-    ElenaSmallBusinessLedger.Infrastructure
+    MySmallBusinessLedger.App
+    MySmallBusinessLedger.Core
+    MySmallBusinessLedger.Infrastructure
 
   tests/
-    ElenaSmallBusinessLedger.Tests
+    MySmallBusinessLedger.Tests
   ```
 
 - The app is a single-user Windows desktop app.
@@ -139,24 +139,24 @@ The following must remain unchanged unless this plan explicitly says otherwise:
 Expected files and directories:
 
 - Modify: `.ai/project-profile.md`
-- Create: `ElenaSmallBusinessLedger.sln`
-- Create: `src/ElenaSmallBusinessLedger.App/ElenaSmallBusinessLedger.App.csproj`
-- Create: `src/ElenaSmallBusinessLedger.Core/ElenaSmallBusinessLedger.Core.csproj`
-- Create: `src/ElenaSmallBusinessLedger.Infrastructure/ElenaSmallBusinessLedger.Infrastructure.csproj`
-- Create: `tests/ElenaSmallBusinessLedger.Tests/ElenaSmallBusinessLedger.Tests.csproj`
-- Create Core model/use-case files under `src/ElenaSmallBusinessLedger.Core/`
-- Create WPF views/ViewModels under `src/ElenaSmallBusinessLedger.App/`
-- Create SQLite, Calendar, PDF, printing, and file-storage implementations under `src/ElenaSmallBusinessLedger.Infrastructure/`
-- Create tests under `tests/ElenaSmallBusinessLedger.Tests/`
+- Create: `MySmallBusinessLedger.sln`
+- Create: `src/MySmallBusinessLedger.App/MySmallBusinessLedger.App.csproj`
+- Create: `src/MySmallBusinessLedger.Core/MySmallBusinessLedger.Core.csproj`
+- Create: `src/MySmallBusinessLedger.Infrastructure/MySmallBusinessLedger.Infrastructure.csproj`
+- Create: `tests/MySmallBusinessLedger.Tests/MySmallBusinessLedger.Tests.csproj`
+- Create Core model/use-case files under `src/MySmallBusinessLedger.Core/`
+- Create WPF views/ViewModels under `src/MySmallBusinessLedger.App/`
+- Create SQLite, Calendar, PDF, printing, and file-storage implementations under `src/MySmallBusinessLedger.Infrastructure/`
+- Create tests under `tests/MySmallBusinessLedger.Tests/`
 - Update: `README.md` with final build/test/run commands after commands are verified.
 - Update: `.ai/context/HANDOFF.md` or create it if project handoff context is needed after implementation.
 
 Likely commands after scaffolding:
 
 ```powershell
-dotnet build ElenaSmallBusinessLedger.sln -nodeReuse:false
-dotnet test ElenaSmallBusinessLedger.sln -nodeReuse:false
-dotnet format ElenaSmallBusinessLedger.sln --verify-no-changes
+dotnet build MySmallBusinessLedger.sln -nodeReuse:false
+dotnet test MySmallBusinessLedger.sln -nodeReuse:false
+dotnet format MySmallBusinessLedger.sln --verify-no-changes
 ```
 
 ## Risks And Mitigations
@@ -285,11 +285,11 @@ Create a buildable, testable .NET 10 solution with the simplified project struct
 
 Affected files/classes/schemas/commands/UI surfaces:
 
-- `ElenaSmallBusinessLedger.sln`
-- `src/ElenaSmallBusinessLedger.App/`
-- `src/ElenaSmallBusinessLedger.Core/`
-- `src/ElenaSmallBusinessLedger.Infrastructure/`
-- `tests/ElenaSmallBusinessLedger.Tests/`
+- `MySmallBusinessLedger.sln`
+- `src/MySmallBusinessLedger.App/`
+- `src/MySmallBusinessLedger.Core/`
+- `src/MySmallBusinessLedger.Infrastructure/`
+- `tests/MySmallBusinessLedger.Tests/`
 - `.editorconfig`
 - optional `global.json` if the installed .NET 10 SDK version should be pinned
 
@@ -304,40 +304,40 @@ Concrete steps:
 - [x] Create the solution:
 
   ```powershell
-  dotnet new sln -n ElenaSmallBusinessLedger
+  dotnet new sln -n MySmallBusinessLedger
   ```
 
 - [x] Create projects:
 
   ```powershell
-  dotnet new wpf -n ElenaSmallBusinessLedger.App -o src\ElenaSmallBusinessLedger.App -f net10.0-windows
-  dotnet new classlib -n ElenaSmallBusinessLedger.Core -o src\ElenaSmallBusinessLedger.Core -f net10.0
-  dotnet new classlib -n ElenaSmallBusinessLedger.Infrastructure -o src\ElenaSmallBusinessLedger.Infrastructure -f net10.0
-  dotnet new xunit -n ElenaSmallBusinessLedger.Tests -o tests\ElenaSmallBusinessLedger.Tests -f net10.0
+  dotnet new wpf -n MySmallBusinessLedger.App -o src\MySmallBusinessLedger.App -f net10.0-windows
+  dotnet new classlib -n MySmallBusinessLedger.Core -o src\MySmallBusinessLedger.Core -f net10.0
+  dotnet new classlib -n MySmallBusinessLedger.Infrastructure -o src\MySmallBusinessLedger.Infrastructure -f net10.0
+  dotnet new xunit -n MySmallBusinessLedger.Tests -o tests\MySmallBusinessLedger.Tests -f net10.0
   ```
 
 - [x] Add projects to solution:
 
   ```powershell
-  dotnet sln ElenaSmallBusinessLedger.sln add src\ElenaSmallBusinessLedger.App\ElenaSmallBusinessLedger.App.csproj
-  dotnet sln ElenaSmallBusinessLedger.sln add src\ElenaSmallBusinessLedger.Core\ElenaSmallBusinessLedger.Core.csproj
-  dotnet sln ElenaSmallBusinessLedger.sln add src\ElenaSmallBusinessLedger.Infrastructure\ElenaSmallBusinessLedger.Infrastructure.csproj
-  dotnet sln ElenaSmallBusinessLedger.sln add tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj
+  dotnet sln MySmallBusinessLedger.sln add src\MySmallBusinessLedger.App\MySmallBusinessLedger.App.csproj
+  dotnet sln MySmallBusinessLedger.sln add src\MySmallBusinessLedger.Core\MySmallBusinessLedger.Core.csproj
+  dotnet sln MySmallBusinessLedger.sln add src\MySmallBusinessLedger.Infrastructure\MySmallBusinessLedger.Infrastructure.csproj
+  dotnet sln MySmallBusinessLedger.sln add tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj
   ```
 
 - [x] Add references:
 
   ```powershell
-  dotnet add src\ElenaSmallBusinessLedger.App\ElenaSmallBusinessLedger.App.csproj reference src\ElenaSmallBusinessLedger.Core\ElenaSmallBusinessLedger.Core.csproj
-  dotnet add src\ElenaSmallBusinessLedger.App\ElenaSmallBusinessLedger.App.csproj reference src\ElenaSmallBusinessLedger.Infrastructure\ElenaSmallBusinessLedger.Infrastructure.csproj
-  dotnet add src\ElenaSmallBusinessLedger.Infrastructure\ElenaSmallBusinessLedger.Infrastructure.csproj reference src\ElenaSmallBusinessLedger.Core\ElenaSmallBusinessLedger.Core.csproj
-  dotnet add tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj reference src\ElenaSmallBusinessLedger.Core\ElenaSmallBusinessLedger.Core.csproj
-  dotnet add tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj reference src\ElenaSmallBusinessLedger.Infrastructure\ElenaSmallBusinessLedger.Infrastructure.csproj
+  dotnet add src\MySmallBusinessLedger.App\MySmallBusinessLedger.App.csproj reference src\MySmallBusinessLedger.Core\MySmallBusinessLedger.Core.csproj
+  dotnet add src\MySmallBusinessLedger.App\MySmallBusinessLedger.App.csproj reference src\MySmallBusinessLedger.Infrastructure\MySmallBusinessLedger.Infrastructure.csproj
+  dotnet add src\MySmallBusinessLedger.Infrastructure\MySmallBusinessLedger.Infrastructure.csproj reference src\MySmallBusinessLedger.Core\MySmallBusinessLedger.Core.csproj
+  dotnet add tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj reference src\MySmallBusinessLedger.Core\MySmallBusinessLedger.Core.csproj
+  dotnet add tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj reference src\MySmallBusinessLedger.Infrastructure\MySmallBusinessLedger.Infrastructure.csproj
   ```
 
 - [x] Add `.editorconfig` based on `.ai/templates/editorconfig.recommended`.
 - [x] Enable nullable and implicit usings in all project files.
-- [x] Add a simple smoke test in `tests/ElenaSmallBusinessLedger.Tests/Core/SolutionSmokeTests.cs` asserting a Core type can be referenced.
+- [x] Add a simple smoke test in `tests/MySmallBusinessLedger.Tests/Core/SolutionSmokeTests.cs` asserting a Core type can be referenced.
 - [x] Build and test the empty solution.
 
 Behavior that must remain unchanged:
@@ -351,8 +351,8 @@ Tests to add/update:
 Verification commands/manual checks:
 
 ```powershell
-dotnet build ElenaSmallBusinessLedger.sln -nodeReuse:false
-dotnet test ElenaSmallBusinessLedger.sln -nodeReuse:false
+dotnet build MySmallBusinessLedger.sln -nodeReuse:false
+dotnet test MySmallBusinessLedger.sln -nodeReuse:false
 ```
 
 Risks:
@@ -388,20 +388,20 @@ Implement the v1 business model and deterministic rules without WPF, SQLite, Goo
 
 Affected files/classes/schemas/commands/UI surfaces:
 
-- `src/ElenaSmallBusinessLedger.Core/Students/Student.cs`
-- `src/ElenaSmallBusinessLedger.Core/Plans/Plan.cs`
-- `src/ElenaSmallBusinessLedger.Core/Plans/StudentPlanPeriod.cs`
-- `src/ElenaSmallBusinessLedger.Core/Lessons/Lesson.cs`
-- `src/ElenaSmallBusinessLedger.Core/Company/CompanyProfile.cs`
-- `src/ElenaSmallBusinessLedger.Core/Invoices/Invoice.cs`
-- `src/ElenaSmallBusinessLedger.Core/Invoices/InvoiceLine.cs`
-- `src/ElenaSmallBusinessLedger.Core/Invoices/InvoiceDraft.cs`
-- `src/ElenaSmallBusinessLedger.Core/Invoices/InvoiceNumber.cs`
-- `src/ElenaSmallBusinessLedger.Core/Invoices/PaymentStatus.cs`
-- `src/ElenaSmallBusinessLedger.Core/Money/Money.cs`
-- `src/ElenaSmallBusinessLedger.Core/Calendar/CalendarLessonEntry.cs`
-- `src/ElenaSmallBusinessLedger.Core/Time/IClock.cs`
-- matching tests under `tests/ElenaSmallBusinessLedger.Tests/Core/`
+- `src/MySmallBusinessLedger.Core/Students/Student.cs`
+- `src/MySmallBusinessLedger.Core/Plans/Plan.cs`
+- `src/MySmallBusinessLedger.Core/Plans/StudentPlanPeriod.cs`
+- `src/MySmallBusinessLedger.Core/Lessons/Lesson.cs`
+- `src/MySmallBusinessLedger.Core/Company/CompanyProfile.cs`
+- `src/MySmallBusinessLedger.Core/Invoices/Invoice.cs`
+- `src/MySmallBusinessLedger.Core/Invoices/InvoiceLine.cs`
+- `src/MySmallBusinessLedger.Core/Invoices/InvoiceDraft.cs`
+- `src/MySmallBusinessLedger.Core/Invoices/InvoiceNumber.cs`
+- `src/MySmallBusinessLedger.Core/Invoices/PaymentStatus.cs`
+- `src/MySmallBusinessLedger.Core/Money/Money.cs`
+- `src/MySmallBusinessLedger.Core/Calendar/CalendarLessonEntry.cs`
+- `src/MySmallBusinessLedger.Core/Time/IClock.cs`
+- matching tests under `tests/MySmallBusinessLedger.Tests/Core/`
 
 Concrete steps:
 
@@ -438,8 +438,8 @@ Tests to add/update:
 Verification commands/manual checks:
 
 ```powershell
-dotnet test tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~Core" -nodeReuse:false
-dotnet build ElenaSmallBusinessLedger.sln -nodeReuse:false
+dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~Core" -nodeReuse:false
+dotnet build MySmallBusinessLedger.sln -nodeReuse:false
 ```
 
 Risks:
@@ -475,17 +475,17 @@ Define application workflows in Core while keeping technical details behind inte
 
 Affected files/classes/schemas/commands/UI surfaces:
 
-- `src/ElenaSmallBusinessLedger.Core/UseCases/Students/`
-- `src/ElenaSmallBusinessLedger.Core/UseCases/Lessons/`
-- `src/ElenaSmallBusinessLedger.Core/UseCases/Invoices/`
-- `src/ElenaSmallBusinessLedger.Core/Ports/IStudentRepository.cs`
-- `src/ElenaSmallBusinessLedger.Core/Ports/ICompanyProfileRepository.cs`
-- `src/ElenaSmallBusinessLedger.Core/Ports/IInvoiceRepository.cs`
-- `src/ElenaSmallBusinessLedger.Core/Ports/IGoogleCalendarGateway.cs`
-- `src/ElenaSmallBusinessLedger.Core/Ports/IInvoicePdfWriter.cs`
-- `src/ElenaSmallBusinessLedger.Core/Ports/IInvoicePrinter.cs`
-- `src/ElenaSmallBusinessLedger.Core/Ports/IInvoiceFileStore.cs`
-- matching tests under `tests/ElenaSmallBusinessLedger.Tests/Core/UseCases/`
+- `src/MySmallBusinessLedger.Core/UseCases/Students/`
+- `src/MySmallBusinessLedger.Core/UseCases/Lessons/`
+- `src/MySmallBusinessLedger.Core/UseCases/Invoices/`
+- `src/MySmallBusinessLedger.Core/Ports/IStudentRepository.cs`
+- `src/MySmallBusinessLedger.Core/Ports/ICompanyProfileRepository.cs`
+- `src/MySmallBusinessLedger.Core/Ports/IInvoiceRepository.cs`
+- `src/MySmallBusinessLedger.Core/Ports/IGoogleCalendarGateway.cs`
+- `src/MySmallBusinessLedger.Core/Ports/IInvoicePdfWriter.cs`
+- `src/MySmallBusinessLedger.Core/Ports/IInvoicePrinter.cs`
+- `src/MySmallBusinessLedger.Core/Ports/IInvoiceFileStore.cs`
+- matching tests under `tests/MySmallBusinessLedger.Tests/Core/UseCases/`
 
 Concrete steps:
 
@@ -515,8 +515,8 @@ Tests to add/update:
 Verification commands/manual checks:
 
 ```powershell
-dotnet test tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~UseCases" -nodeReuse:false
-dotnet build ElenaSmallBusinessLedger.sln -nodeReuse:false
+dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~UseCases" -nodeReuse:false
+dotnet build MySmallBusinessLedger.sln -nodeReuse:false
 ```
 
 Risks:
@@ -552,14 +552,14 @@ Persist company settings, students, plans, issued invoices, invoice lesson histo
 
 Affected files/classes/schemas/commands/UI surfaces:
 
-- `src/ElenaSmallBusinessLedger.Infrastructure/Persistence/`
-- `tests/ElenaSmallBusinessLedger.Tests/Infrastructure/Persistence/`
+- `src/MySmallBusinessLedger.Infrastructure/Persistence/`
+- `tests/MySmallBusinessLedger.Tests/Infrastructure/Persistence/`
 - package references selected by the SQLite decision
 
 Concrete steps:
 
 - [x] Apply the SQLite access decision from Open Questions.
-- [x] Add approved SQLite packages to `ElenaSmallBusinessLedger.Infrastructure`.
+- [x] Add approved SQLite packages to `MySmallBusinessLedger.Infrastructure`.
 - [x] Create persistence models/schema for company profile, students, plan periods, issued invoices, invoice lines, and payment status.
 - [x] Implement repository interfaces from Core.
 - [x] Add deterministic test database setup using a per-test temporary directory.
@@ -580,8 +580,8 @@ Tests to add/update:
 Verification commands/manual checks:
 
 ```powershell
-dotnet test tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~Persistence" -nodeReuse:false
-dotnet build ElenaSmallBusinessLedger.sln -nodeReuse:false
+dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~Persistence" -nodeReuse:false
+dotnet build MySmallBusinessLedger.sln -nodeReuse:false
 ```
 
 Risks:
@@ -617,8 +617,8 @@ Read and edit relevant Google Calendar entries using the strict first-line marke
 
 Affected files/classes/schemas/commands/UI surfaces:
 
-- `src/ElenaSmallBusinessLedger.Infrastructure/Calendar/`
-- `tests/ElenaSmallBusinessLedger.Tests/Infrastructure/Calendar/`
+- `src/MySmallBusinessLedger.Infrastructure/Calendar/`
+- `tests/MySmallBusinessLedger.Tests/Infrastructure/Calendar/`
 - WPF settings fields later for selected Google account/calendar
 
 Concrete steps:
@@ -648,8 +648,8 @@ Tests to add/update:
 Verification commands/manual checks:
 
 ```powershell
-dotnet test tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~Calendar" -nodeReuse:false
-dotnet build ElenaSmallBusinessLedger.sln -nodeReuse:false
+dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~Calendar" -nodeReuse:false
+dotnet build MySmallBusinessLedger.sln -nodeReuse:false
 ```
 
 Risks:
@@ -685,9 +685,9 @@ Generate Danish invoice PDFs, save them safely, and print only after a successfu
 
 Affected files/classes/schemas/commands/UI surfaces:
 
-- `src/ElenaSmallBusinessLedger.Infrastructure/Invoices/Pdf/`
-- `src/ElenaSmallBusinessLedger.Infrastructure/Invoices/Printing/`
-- `tests/ElenaSmallBusinessLedger.Tests/Infrastructure/Invoices/`
+- `src/MySmallBusinessLedger.Infrastructure/Invoices/Pdf/`
+- `src/MySmallBusinessLedger.Infrastructure/Invoices/Printing/`
+- `tests/MySmallBusinessLedger.Tests/Infrastructure/Invoices/`
 - configured invoice folder setting
 
 Concrete steps:
@@ -718,8 +718,8 @@ Tests to add/update:
 Verification commands/manual checks:
 
 ```powershell
-dotnet test tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~Invoice" -nodeReuse:false
-dotnet build ElenaSmallBusinessLedger.sln -nodeReuse:false
+dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~Invoice" -nodeReuse:false
+dotnet build MySmallBusinessLedger.sln -nodeReuse:false
 ```
 
 Manual check:
@@ -760,12 +760,12 @@ Create the main WPF window around Elena's everyday workflow.
 
 Affected files/classes/schemas/commands/UI surfaces:
 
-- `src/ElenaSmallBusinessLedger.App/App.xaml`
-- `src/ElenaSmallBusinessLedger.App/MainWindow.xaml`
-- `src/ElenaSmallBusinessLedger.App/ViewModels/MainWindowViewModel.cs`
-- `src/ElenaSmallBusinessLedger.App/ViewModels/StartupDashboardViewModel.cs`
-- `src/ElenaSmallBusinessLedger.App/Views/`
-- `tests/ElenaSmallBusinessLedger.Tests/App/ViewModels/`
+- `src/MySmallBusinessLedger.App/App.xaml`
+- `src/MySmallBusinessLedger.App/MainWindow.xaml`
+- `src/MySmallBusinessLedger.App/ViewModels/MainWindowViewModel.cs`
+- `src/MySmallBusinessLedger.App/ViewModels/StartupDashboardViewModel.cs`
+- `src/MySmallBusinessLedger.App/Views/`
+- `tests/MySmallBusinessLedger.Tests/App/ViewModels/`
 
 Concrete steps:
 
@@ -796,8 +796,8 @@ Tests to add/update:
 Verification commands/manual checks:
 
 ```powershell
-dotnet test tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~ViewModels" -nodeReuse:false
-dotnet build ElenaSmallBusinessLedger.sln -nodeReuse:false
+dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~ViewModels" -nodeReuse:false
+dotnet build MySmallBusinessLedger.sln -nodeReuse:false
 ```
 
 Manual check:
@@ -838,10 +838,10 @@ Allow Ruben/Elena to maintain students, plan history, schedule, and uninvoiced G
 
 Affected files/classes/schemas/commands/UI surfaces:
 
-- `src/ElenaSmallBusinessLedger.App/Views/StudentEditorView.xaml`
-- `src/ElenaSmallBusinessLedger.App/ViewModels/StudentEditorViewModel.cs`
-- `src/ElenaSmallBusinessLedger.App/Views/LessonEditorView.xaml`
-- `src/ElenaSmallBusinessLedger.App/ViewModels/LessonEditorViewModel.cs`
+- `src/MySmallBusinessLedger.App/Views/StudentEditorView.xaml`
+- `src/MySmallBusinessLedger.App/ViewModels/StudentEditorViewModel.cs`
+- `src/MySmallBusinessLedger.App/Views/LessonEditorView.xaml`
+- `src/MySmallBusinessLedger.App/ViewModels/LessonEditorViewModel.cs`
 - matching ViewModel tests
 
 Concrete steps:
@@ -876,8 +876,8 @@ Tests to add/update:
 Verification commands/manual checks:
 
 ```powershell
-dotnet test tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj -nodeReuse:false
-dotnet build ElenaSmallBusinessLedger.sln -nodeReuse:false
+dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj -nodeReuse:false
+dotnet build MySmallBusinessLedger.sln -nodeReuse:false
 ```
 
 Manual check:
@@ -917,12 +917,12 @@ Let the user choose a student, preview an invoice, edit lessons/adjustment, save
 
 Affected files/classes/schemas/commands/UI surfaces:
 
-- `src/ElenaSmallBusinessLedger.App/Views/InvoiceCandidateDialog.xaml`
-- `src/ElenaSmallBusinessLedger.App/ViewModels/InvoiceCandidateDialogViewModel.cs`
-- `src/ElenaSmallBusinessLedger.App/Views/InvoicePreviewView.xaml`
-- `src/ElenaSmallBusinessLedger.App/ViewModels/InvoicePreviewViewModel.cs`
-- `src/ElenaSmallBusinessLedger.App/Views/InvoiceViewerView.xaml`
-- `src/ElenaSmallBusinessLedger.App/ViewModels/InvoiceViewerViewModel.cs`
+- `src/MySmallBusinessLedger.App/Views/InvoiceCandidateDialog.xaml`
+- `src/MySmallBusinessLedger.App/ViewModels/InvoiceCandidateDialogViewModel.cs`
+- `src/MySmallBusinessLedger.App/Views/InvoicePreviewView.xaml`
+- `src/MySmallBusinessLedger.App/ViewModels/InvoicePreviewViewModel.cs`
+- `src/MySmallBusinessLedger.App/Views/InvoiceViewerView.xaml`
+- `src/MySmallBusinessLedger.App/ViewModels/InvoiceViewerViewModel.cs`
 - Core invoice issue use case
 - Infrastructure PDF/persistence/printer adapters
 - matching tests
@@ -959,8 +959,8 @@ Tests to add/update:
 Verification commands/manual checks:
 
 ```powershell
-dotnet test tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj -nodeReuse:false
-dotnet build ElenaSmallBusinessLedger.sln -nodeReuse:false
+dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj -nodeReuse:false
+dotnet build MySmallBusinessLedger.sln -nodeReuse:false
 ```
 
 Manual check:
@@ -1034,9 +1034,9 @@ Tests to add/update:
 Verification commands/manual checks:
 
 ```powershell
-dotnet build ElenaSmallBusinessLedger.sln -nodeReuse:false
-dotnet test ElenaSmallBusinessLedger.sln -nodeReuse:false
-dotnet format ElenaSmallBusinessLedger.sln --verify-no-changes
+dotnet build MySmallBusinessLedger.sln -nodeReuse:false
+dotnet test MySmallBusinessLedger.sln -nodeReuse:false
+dotnet format MySmallBusinessLedger.sln --verify-no-changes
 ```
 
 Manual check:
@@ -1072,19 +1072,19 @@ Use the narrowest useful command during each stage and full verification at the 
 Build:
 
 ```powershell
-dotnet build ElenaSmallBusinessLedger.sln -nodeReuse:false
+dotnet build MySmallBusinessLedger.sln -nodeReuse:false
 ```
 
 Tests:
 
 ```powershell
-dotnet test ElenaSmallBusinessLedger.sln -nodeReuse:false
+dotnet test MySmallBusinessLedger.sln -nodeReuse:false
 ```
 
 Formatting:
 
 ```powershell
-dotnet format ElenaSmallBusinessLedger.sln --verify-no-changes
+dotnet format MySmallBusinessLedger.sln --verify-no-changes
 ```
 
 Manual verification:
@@ -1178,9 +1178,9 @@ Cleanup/reset instructions:
 
 - 2026-06-16:
   - Stage: Stage 11 - Hardening, Packaging Readiness, And Documentation Refresh
-  - Files changed: `README.md`, `.ai/project-profile.md`, `.ai/context/HANDOFF.md`, `.ai/implementation-plans/active/2026-06-16-v1-invoice-printer.md`, `src/ElenaSmallBusinessLedger.Core/Invoices/InvoiceDraft.cs`, `src/ElenaSmallBusinessLedger.Core/Ports/ICompanyProfileRepository.cs`, `src/ElenaSmallBusinessLedger.Infrastructure/Persistence/SqliteCompanyProfileRepository.cs`, `src/ElenaSmallBusinessLedger.App/App.xaml.cs`, `src/ElenaSmallBusinessLedger.App/MainWindow.xaml`, `src/ElenaSmallBusinessLedger.App/Services/IAppSettingsService.cs`, `src/ElenaSmallBusinessLedger.App/Services/CoreAppSettingsService.cs`, `src/ElenaSmallBusinessLedger.App/Services/ISettingsLauncher.cs`, `src/ElenaSmallBusinessLedger.App/Services/SettingsWindowLauncher.cs`, `src/ElenaSmallBusinessLedger.App/ViewModels/SettingsViewModel.cs`, `src/ElenaSmallBusinessLedger.App/ViewModels/InvoiceLineDisplayModel.cs`, `src/ElenaSmallBusinessLedger.App/ViewModels/InvoicePreviewViewModel.cs`, `src/ElenaSmallBusinessLedger.App/Views/SettingsView.*`, `tests/ElenaSmallBusinessLedger.Tests/App/ViewModels/SettingsViewModelTests.cs`, `tests/ElenaSmallBusinessLedger.Tests/App/ViewModels/MainWindowViewModelTests.cs`, `tests/ElenaSmallBusinessLedger.Tests/App/ViewModels/InvoiceViewModelTests.cs`, and `tests/ElenaSmallBusinessLedger.Tests/Core/Invoices/InvoiceDraftTests.cs`.
+  - Files changed: `README.md`, `.ai/project-profile.md`, `.ai/context/HANDOFF.md`, `.ai/implementation-plans/active/2026-06-16-v1-invoice-printer.md`, `src/MySmallBusinessLedger.Core/Invoices/InvoiceDraft.cs`, `src/MySmallBusinessLedger.Core/Ports/ICompanyProfileRepository.cs`, `src/MySmallBusinessLedger.Infrastructure/Persistence/SqliteCompanyProfileRepository.cs`, `src/MySmallBusinessLedger.App/App.xaml.cs`, `src/MySmallBusinessLedger.App/MainWindow.xaml`, `src/MySmallBusinessLedger.App/Services/IAppSettingsService.cs`, `src/MySmallBusinessLedger.App/Services/CoreAppSettingsService.cs`, `src/MySmallBusinessLedger.App/Services/ISettingsLauncher.cs`, `src/MySmallBusinessLedger.App/Services/SettingsWindowLauncher.cs`, `src/MySmallBusinessLedger.App/ViewModels/SettingsViewModel.cs`, `src/MySmallBusinessLedger.App/ViewModels/InvoiceLineDisplayModel.cs`, `src/MySmallBusinessLedger.App/ViewModels/InvoicePreviewViewModel.cs`, `src/MySmallBusinessLedger.App/Views/SettingsView.*`, `tests/MySmallBusinessLedger.Tests/App/ViewModels/SettingsViewModelTests.cs`, `tests/MySmallBusinessLedger.Tests/App/ViewModels/MainWindowViewModelTests.cs`, `tests/MySmallBusinessLedger.Tests/App/ViewModels/InvoiceViewModelTests.cs`, and `tests/MySmallBusinessLedger.Tests/Core/Invoices/InvoiceDraftTests.cs`.
   - Summary: Added the minimal pilot setup surface under `Application > Settings` for company profile, invoice folder, Google Calendar ID/account label, and Google client secrets import. Hardened invoice draft creation so empty invoices are rejected in Core, made missing company profile errors user-readable, and refreshed invoice preview totals when included lines or price adjustments change. Updated README, project profile, and handoff with runtime paths, setup steps, and pilot-test notes.
-  - Tests/verification run: Focused settings/main-window tests during implementation; focused invoice regression tests; `dotnet build ElenaSmallBusinessLedger.sln -nodeReuse:false`; `dotnet test ElenaSmallBusinessLedger.sln -nodeReuse:false`; `dotnet format ElenaSmallBusinessLedger.sln --verify-no-changes --no-restore`.
+  - Tests/verification run: Focused settings/main-window tests during implementation; focused invoice regression tests; `dotnet build MySmallBusinessLedger.sln -nodeReuse:false`; `dotnet test MySmallBusinessLedger.sln -nodeReuse:false`; `dotnet format MySmallBusinessLedger.sln --verify-no-changes --no-restore`.
   - Results: Full build passed with 0 warnings and 0 errors. Full test suite passed: 96 passed, 0 failed. Formatter verification did not pass because it reports broad existing line-ending/whitespace differences across the repository, including files outside this final change; no sweeping format rewrite was performed.
   - Dependencies added: None.
   - Review notes: Dependency/license review found only the already accepted/expected production dependencies: Google Calendar API client, EF Core SQLite, QuestPDF, and Windows ProtectedData. Secrets review confirmed OAuth tokens remain in Windows-protected storage and are not stored in SQLite; the selected Google client secrets JSON is copied to the documented app-data path. Focused Core/Infrastructure review found and fixed empty-invoice acceptance and missing-company-profile messaging. Focused UI review found and fixed stale invoice-preview totals after include/exclude or adjustment edits.
@@ -1189,9 +1189,9 @@ Cleanup/reset instructions:
 
 - 2026-06-16:
   - Stage: Stage 10 - Implement Write Invoice Flow And Invoice Viewer
-  - Files changed: `src/ElenaSmallBusinessLedger.Core/Ports/IInvoiceRepository.cs`, `src/ElenaSmallBusinessLedger.App/App.xaml.cs`, `src/ElenaSmallBusinessLedger.App/Services/IInvoiceWorkflowService.cs`, `src/ElenaSmallBusinessLedger.App/Services/CoreInvoiceWorkflowService.cs`, `src/ElenaSmallBusinessLedger.App/Services/IInvoiceWorkflowLauncher.cs`, `src/ElenaSmallBusinessLedger.App/Services/InvoiceWorkflowWindowLauncher.cs`, `src/ElenaSmallBusinessLedger.App/ViewModels/InvoiceCandidateDialogViewModel.cs`, `src/ElenaSmallBusinessLedger.App/ViewModels/InvoiceLineDisplayModel.cs`, `src/ElenaSmallBusinessLedger.App/ViewModels/InvoicePreviewViewModel.cs`, `src/ElenaSmallBusinessLedger.App/ViewModels/InvoiceViewerViewModel.cs`, `src/ElenaSmallBusinessLedger.App/ViewModels/MainWindowViewModel.cs`, `src/ElenaSmallBusinessLedger.App/Views/InvoiceCandidateDialog.*`, `src/ElenaSmallBusinessLedger.App/Views/InvoicePreviewView.*`, `src/ElenaSmallBusinessLedger.App/Views/InvoiceViewerView.*`, `tests/ElenaSmallBusinessLedger.Tests/App/ViewModels/InvoiceViewModelTests.cs`, `tests/ElenaSmallBusinessLedger.Tests/App/ViewModels/MainWindowViewModelTests.cs`, and existing test fakes updated for `GetIssuedInvoiceAsync`.
+  - Files changed: `src/MySmallBusinessLedger.Core/Ports/IInvoiceRepository.cs`, `src/MySmallBusinessLedger.App/App.xaml.cs`, `src/MySmallBusinessLedger.App/Services/IInvoiceWorkflowService.cs`, `src/MySmallBusinessLedger.App/Services/CoreInvoiceWorkflowService.cs`, `src/MySmallBusinessLedger.App/Services/IInvoiceWorkflowLauncher.cs`, `src/MySmallBusinessLedger.App/Services/InvoiceWorkflowWindowLauncher.cs`, `src/MySmallBusinessLedger.App/ViewModels/InvoiceCandidateDialogViewModel.cs`, `src/MySmallBusinessLedger.App/ViewModels/InvoiceLineDisplayModel.cs`, `src/MySmallBusinessLedger.App/ViewModels/InvoicePreviewViewModel.cs`, `src/MySmallBusinessLedger.App/ViewModels/InvoiceViewerViewModel.cs`, `src/MySmallBusinessLedger.App/ViewModels/MainWindowViewModel.cs`, `src/MySmallBusinessLedger.App/Views/InvoiceCandidateDialog.*`, `src/MySmallBusinessLedger.App/Views/InvoicePreviewView.*`, `src/MySmallBusinessLedger.App/Views/InvoiceViewerView.*`, `tests/MySmallBusinessLedger.Tests/App/ViewModels/InvoiceViewModelTests.cs`, `tests/MySmallBusinessLedger.Tests/App/ViewModels/MainWindowViewModelTests.cs`, and existing test fakes updated for `GetIssuedInvoiceAsync`.
   - Summary: Added the WPF Write Invoice workflow: candidate student dialog, invoice preview with include/exclude lesson rows and mandatory-reason price adjustment, issue command through the Core staged PDF/save/print use case, main-window refresh after successful issue, and read-only saved invoice viewer on invoice double-click. The real startup composition now includes company profile repository, QuestPDF writer, saved-PDF printer, invoice workflow service, and invoice launcher.
-  - Tests/verification run: Red check: `dotnet test tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~InvoiceViewModelTests" -nodeReuse:false` failed before invoice ViewModels existed. Red check: focused main-window invoice command tests failed before `IInvoiceWorkflowLauncher` existed. Review-driven red check: empty invoice and print-failure tests failed before the preview safeguards were added. Green checks: focused invoice ViewModel/main-window tests; `dotnet build ElenaSmallBusinessLedger.sln -nodeReuse:false`; `dotnet test ElenaSmallBusinessLedger.sln -nodeReuse:false`.
+  - Tests/verification run: Red check: `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~InvoiceViewModelTests" -nodeReuse:false` failed before invoice ViewModels existed. Red check: focused main-window invoice command tests failed before `IInvoiceWorkflowLauncher` existed. Review-driven red check: empty invoice and print-failure tests failed before the preview safeguards were added. Green checks: focused invoice ViewModel/main-window tests; `dotnet build MySmallBusinessLedger.sln -nodeReuse:false`; `dotnet test MySmallBusinessLedger.sln -nodeReuse:false`.
   - Results: Full build passed with 0 warnings and 0 errors. Full test suite passed: 90 passed, 0 failed.
   - Dependencies added: None.
   - Review notes: Focused code/UI review found and fixed two issues before completion: every lesson could be excluded, producing an empty invoice attempt; and a post-save print request failure closed the preview before showing the warning. The preview now blocks empty invoice issue and stays open with an error when the PDF is saved but print request fails.
@@ -1200,46 +1200,46 @@ Cleanup/reset instructions:
 
 - 2026-06-16:
   - Stage: Stage 9 course correction - replace sample runtime wiring with real composition
-  - Files changed: `README.md`, `.ai/project-profile.md`, `docs/business-requirements-and-logic.md`, `src/ElenaSmallBusinessLedger.Core/Calendar/*`, `src/ElenaSmallBusinessLedger.Core/Ports/IGoogleCalendarGateway.cs`, `src/ElenaSmallBusinessLedger.Core/UseCases/Lessons/ToggleLessonStateUseCase.cs`, `src/ElenaSmallBusinessLedger.Core/UseCases/Startup/StartupDashboardQuery.cs`, `src/ElenaSmallBusinessLedger.Infrastructure/Calendar/*`, `src/ElenaSmallBusinessLedger.App/App.xaml.cs`, `src/ElenaSmallBusinessLedger.App/Services/Core*Service.cs`, `src/ElenaSmallBusinessLedger.App/Services/ConfiguredGoogleCalendarGateway.cs`, `src/ElenaSmallBusinessLedger.App/Services/SystemUiClock.cs`, deleted `src/ElenaSmallBusinessLedger.App/Services/Sample*Service.cs`, `tests/ElenaSmallBusinessLedger.Tests/App/Services/AppServiceTests.cs`, `tests/ElenaSmallBusinessLedger.Tests/Core/Calendar/CalendarLessonEntryTests.cs`, `tests/ElenaSmallBusinessLedger.Tests/Core/UseCases/UseCaseTests.cs`, `tests/ElenaSmallBusinessLedger.Tests/Infrastructure/Calendar/GoogleCalendarGatewayTests.cs`, `.ai/implementation-plans/active/2026-06-16-v1-invoice-printer.md`
-  - Summary: Removed sample services from the real WPF startup path and deleted the dead sample service files. App startup now creates the local SQLite database under `%LOCALAPPDATA%\ElenaSmallBusinessLedger`, composes SQLite repositories, Core use cases, Core-backed student/lesson/payment services, and a configured Google Calendar gateway. Missing Calendar settings or client secrets now produce truthful failure results instead of invented dashboard rows. Manual Completed/Planned state for uninvoiced lessons is now durable in Google Calendar by preserving the first-line `$` marker and adding/removing a later `Status: Completed` summary line.
-  - Tests/verification run: Red check: `dotnet test tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~CalendarLessonEntry|FullyQualifiedName~LessonStateToggle|FullyQualifiedName~GoogleCalendarGateway" -nodeReuse:false` failed before state-aware Calendar APIs existed. Red check: `dotnet test tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~AppServiceTests" -nodeReuse:false` failed before the real app service adapters/configured gateway existed. Green checks: same focused commands; `dotnet build ElenaSmallBusinessLedger.sln -nodeReuse:false`; `dotnet test ElenaSmallBusinessLedger.sln -nodeReuse:false`.
+  - Files changed: `README.md`, `.ai/project-profile.md`, `docs/business-requirements-and-logic.md`, `src/MySmallBusinessLedger.Core/Calendar/*`, `src/MySmallBusinessLedger.Core/Ports/IGoogleCalendarGateway.cs`, `src/MySmallBusinessLedger.Core/UseCases/Lessons/ToggleLessonStateUseCase.cs`, `src/MySmallBusinessLedger.Core/UseCases/Startup/StartupDashboardQuery.cs`, `src/MySmallBusinessLedger.Infrastructure/Calendar/*`, `src/MySmallBusinessLedger.App/App.xaml.cs`, `src/MySmallBusinessLedger.App/Services/Core*Service.cs`, `src/MySmallBusinessLedger.App/Services/ConfiguredGoogleCalendarGateway.cs`, `src/MySmallBusinessLedger.App/Services/SystemUiClock.cs`, deleted `src/MySmallBusinessLedger.App/Services/Sample*Service.cs`, `tests/MySmallBusinessLedger.Tests/App/Services/AppServiceTests.cs`, `tests/MySmallBusinessLedger.Tests/Core/Calendar/CalendarLessonEntryTests.cs`, `tests/MySmallBusinessLedger.Tests/Core/UseCases/UseCaseTests.cs`, `tests/MySmallBusinessLedger.Tests/Infrastructure/Calendar/GoogleCalendarGatewayTests.cs`, `.ai/implementation-plans/active/2026-06-16-v1-invoice-printer.md`
+  - Summary: Removed sample services from the real WPF startup path and deleted the dead sample service files. App startup now creates the local SQLite database under `%LOCALAPPDATA%\MySmallBusinessLedger`, composes SQLite repositories, Core use cases, Core-backed student/lesson/payment services, and a configured Google Calendar gateway. Missing Calendar settings or client secrets now produce truthful failure results instead of invented dashboard rows. Manual Completed/Planned state for uninvoiced lessons is now durable in Google Calendar by preserving the first-line `$` marker and adding/removing a later `Status: Completed` summary line.
+  - Tests/verification run: Red check: `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~CalendarLessonEntry|FullyQualifiedName~LessonStateToggle|FullyQualifiedName~GoogleCalendarGateway" -nodeReuse:false` failed before state-aware Calendar APIs existed. Red check: `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~AppServiceTests" -nodeReuse:false` failed before the real app service adapters/configured gateway existed. Green checks: same focused commands; `dotnet build MySmallBusinessLedger.sln -nodeReuse:false`; `dotnet test MySmallBusinessLedger.sln -nodeReuse:false`.
   - Results: Focused Calendar/state tests passed: 18 passed, 0 failed. App service tests passed: 2 passed, 0 failed. Full build passed with 0 warnings and 0 errors. Full test suite passed: 83 passed, 0 failed.
   - Dependencies added: None.
-  - Deviations: The real startup path currently requires later setup UI/tooling for `CalendarSettings` and `%LOCALAPPDATA%\ElenaSmallBusinessLedger\google-client-secrets.json`; until then, Calendar-backed dashboard/edit actions fail closed with a configuration message. This is intentional and preferable to sample data masquerading as persistence.
+  - Deviations: The real startup path currently requires later setup UI/tooling for `CalendarSettings` and `%LOCALAPPDATA%\MySmallBusinessLedger\google-client-secrets.json`; until then, Calendar-backed dashboard/edit actions fail closed with a configuration message. This is intentional and preferable to sample data masquerading as persistence.
   - Risks/open questions: Stage 10 remains the next planned implementation stage for Write Invoice and invoice viewing. A small setup/admin workflow is still needed so Ruben/Elena can choose the Google calendar/account and supply OAuth client secrets without manual database/file setup.
 
 - 2026-06-16:
   - Stage: Stage 9 feedback refinement - inline Add Lesson row
-  - Files changed: `docs/business-requirements-and-logic.md`, `src/ElenaSmallBusinessLedger.App/ViewModels/LessonDisplayModel.cs`, `src/ElenaSmallBusinessLedger.App/ViewModels/MainWindowViewModel.cs`, `tests/ElenaSmallBusinessLedger.Tests/App/ViewModels/MainWindowViewModelTests.cs`, `.ai/implementation-plans/active/2026-06-16-v1-invoice-printer.md`
+  - Files changed: `docs/business-requirements-and-logic.md`, `src/MySmallBusinessLedger.App/ViewModels/LessonDisplayModel.cs`, `src/MySmallBusinessLedger.App/ViewModels/MainWindowViewModel.cs`, `tests/MySmallBusinessLedger.Tests/App/ViewModels/MainWindowViewModelTests.cs`, `.ai/implementation-plans/active/2026-06-16-v1-invoice-printer.md`
   - Summary: Changed Add Lesson so it no longer opens the old Lesson dialog. The command now inserts an editable draft row for the current student with empty date/time fields. When the user fills in a valid date and time, the inline save path calls the Calendar add service and marks the draft as a saved lesson.
-  - Tests/verification run: Red check: `dotnet test tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~AddLessonAddsEditableDraftRowWithoutOpeningDialog|FullyQualifiedName~SavingCompleteDraftLessonAddsCalendarLesson" -nodeReuse:false` failed before the draft-row model existed. Green checks: same command; `dotnet test tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~MainWindowViewModelTests" -nodeReuse:false`; `dotnet build ElenaSmallBusinessLedger.sln -nodeReuse:false`; `dotnet test ElenaSmallBusinessLedger.sln -nodeReuse:false`.
+  - Tests/verification run: Red check: `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~AddLessonAddsEditableDraftRowWithoutOpeningDialog|FullyQualifiedName~SavingCompleteDraftLessonAddsCalendarLesson" -nodeReuse:false` failed before the draft-row model existed. Green checks: same command; `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~MainWindowViewModelTests" -nodeReuse:false`; `dotnet build MySmallBusinessLedger.sln -nodeReuse:false`; `dotnet test MySmallBusinessLedger.sln -nodeReuse:false`.
   - Results: Add Lesson focused tests passed: 2 passed, 0 failed. MainWindowViewModel tests passed: 18 passed, 0 failed. Full build passed with 0 warnings and 0 errors. Full test suite passed: 76 passed, 0 failed.
   - Dependencies added: None.
   - Risks/open questions: Visual/manual confirmation is still useful to ensure the new draft row is easy to spot and edit in the WPF grid.
 
 - 2026-06-16:
   - Stage: Stage 9 bug fix - lesson delete visibility
-  - Files changed: `src/ElenaSmallBusinessLedger.App/ViewModels/MainWindowViewModel.cs`, `tests/ElenaSmallBusinessLedger.Tests/App/ViewModels/MainWindowViewModelTests.cs`, `.ai/implementation-plans/active/2026-06-16-v1-invoice-printer.md`
+  - Files changed: `src/MySmallBusinessLedger.App/ViewModels/MainWindowViewModel.cs`, `tests/MySmallBusinessLedger.Tests/App/ViewModels/MainWindowViewModelTests.cs`, `.ai/implementation-plans/active/2026-06-16-v1-invoice-printer.md`
   - Summary: Fixed the row delete interaction reported by Ruben. A successful delete now removes the lesson from the visible dashboard collection instead of immediately refreshing from the sample dashboard and reintroducing the hard-coded row.
-  - Tests/verification run: Red check: `dotnet test tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~SuccessfulLessonDeleteRemovesVisibleLesson" -nodeReuse:false` failed with the deleted row still visible. Green checks: same command; `dotnet test tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~MainWindowViewModelTests" -nodeReuse:false`; `dotnet build ElenaSmallBusinessLedger.sln -nodeReuse:false`; `dotnet test ElenaSmallBusinessLedger.sln -nodeReuse:false`.
+  - Tests/verification run: Red check: `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~SuccessfulLessonDeleteRemovesVisibleLesson" -nodeReuse:false` failed with the deleted row still visible. Green checks: same command; `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~MainWindowViewModelTests" -nodeReuse:false`; `dotnet build MySmallBusinessLedger.sln -nodeReuse:false`; `dotnet test MySmallBusinessLedger.sln -nodeReuse:false`.
   - Results: Targeted delete regression passed: 1 passed, 0 failed. MainWindowViewModel tests passed: 16 passed, 0 failed. Full build passed with 0 warnings and 0 errors. Full test suite passed: 74 passed, 0 failed.
   - Dependencies added: None.
   - Risks/open questions: This keeps the sample WPF shell visually truthful after deletion. Real Google Calendar composition should eventually refresh from actual Calendar data, where the deleted event should naturally be absent.
 
 - 2026-06-16:
   - Stage: Stage 9 bug fix - lesson state race and DatePicker popup behavior
-  - Files changed: `src/ElenaSmallBusinessLedger.App/MainWindow.xaml`, `src/ElenaSmallBusinessLedger.App/MainWindow.xaml.cs`, `src/ElenaSmallBusinessLedger.App/ViewModels/MainWindowViewModel.cs`, `tests/ElenaSmallBusinessLedger.Tests/App/ViewModels/MainWindowViewModelTests.cs`, `.ai/implementation-plans/active/2026-06-16-v1-invoice-printer.md`
+  - Files changed: `src/MySmallBusinessLedger.App/MainWindow.xaml`, `src/MySmallBusinessLedger.App/MainWindow.xaml.cs`, `src/MySmallBusinessLedger.App/ViewModels/MainWindowViewModel.cs`, `tests/MySmallBusinessLedger.Tests/App/ViewModels/MainWindowViewModelTests.cs`, `.ai/implementation-plans/active/2026-06-16-v1-invoice-printer.md`
   - Summary: Fixed two Stage 9 interaction bugs reported by Ruben. Confirmation dialogs now suppress activation refresh while the command is in progress, preventing a refresh from replacing the visible lesson row before Completed -> Planned is applied. The DatePicker no longer has a broad first-click mouse handler, so clicking the date field should focus/edit the field without opening the calendar popup, while the native calendar button owns popup opening.
-  - Tests/verification run: Red check: `dotnet test tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~CompletedLessonReturnToPlannedIsNotLostWhenConfirmationReactivatesWindow" -nodeReuse:false` failed with visible row still `Completed`; green checks: same command, `dotnet test tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~MainWindowViewModelTests" -nodeReuse:false`, `dotnet build ElenaSmallBusinessLedger.sln -nodeReuse:false`, `dotnet test ElenaSmallBusinessLedger.sln -nodeReuse:false`.
+  - Tests/verification run: Red check: `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~CompletedLessonReturnToPlannedIsNotLostWhenConfirmationReactivatesWindow" -nodeReuse:false` failed with visible row still `Completed`; green checks: same command, `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~MainWindowViewModelTests" -nodeReuse:false`, `dotnet build MySmallBusinessLedger.sln -nodeReuse:false`, `dotnet test MySmallBusinessLedger.sln -nodeReuse:false`.
   - Results: Targeted regression passed: 1 passed, 0 failed. MainWindowViewModel tests passed: 15 passed, 0 failed. Full build passed with 0 warnings and 0 errors. Full test suite passed: 73 passed, 0 failed.
   - Dependencies added: None.
   - Risks/open questions: The DatePicker popup behavior still needs Ruben-side visual confirmation in the running WPF app because it is control-template/input-device behavior, not fully covered by ViewModel tests.
 
 - 2026-06-16:
   - Stage: Stage 9 feedback refinement - lesson state and inline picker polish
-  - Files changed: `docs/business-requirements-and-logic.md`, `src/ElenaSmallBusinessLedger.Core/UseCases/Startup/StartupDashboardQuery.cs`, `src/ElenaSmallBusinessLedger.App/App.xaml.cs`, `src/ElenaSmallBusinessLedger.App/MainWindow.xaml`, `src/ElenaSmallBusinessLedger.App/MainWindow.xaml.cs`, `src/ElenaSmallBusinessLedger.App/Services/IConfirmationService.cs`, `src/ElenaSmallBusinessLedger.App/Services/MessageBoxConfirmationService.cs`, `src/ElenaSmallBusinessLedger.App/Services/ILessonStateService.cs`, `src/ElenaSmallBusinessLedger.App/Services/SampleLessonStateService.cs`, `src/ElenaSmallBusinessLedger.App/ViewModels/LessonDisplayModel.cs`, `src/ElenaSmallBusinessLedger.App/ViewModels/MainWindowViewModel.cs`, `tests/ElenaSmallBusinessLedger.Tests/App/ViewModels/MainWindowViewModelTests.cs`, `tests/ElenaSmallBusinessLedger.Tests/Core/UseCases/UseCaseTests.cs`, `.ai/implementation-plans/active/2026-06-16-v1-invoice-printer.md`
+  - Files changed: `docs/business-requirements-and-logic.md`, `src/MySmallBusinessLedger.Core/UseCases/Startup/StartupDashboardQuery.cs`, `src/MySmallBusinessLedger.App/App.xaml.cs`, `src/MySmallBusinessLedger.App/MainWindow.xaml`, `src/MySmallBusinessLedger.App/MainWindow.xaml.cs`, `src/MySmallBusinessLedger.App/Services/IConfirmationService.cs`, `src/MySmallBusinessLedger.App/Services/MessageBoxConfirmationService.cs`, `src/MySmallBusinessLedger.App/Services/ILessonStateService.cs`, `src/MySmallBusinessLedger.App/Services/SampleLessonStateService.cs`, `src/MySmallBusinessLedger.App/ViewModels/LessonDisplayModel.cs`, `src/MySmallBusinessLedger.App/ViewModels/MainWindowViewModel.cs`, `tests/MySmallBusinessLedger.Tests/App/ViewModels/MainWindowViewModelTests.cs`, `tests/MySmallBusinessLedger.Tests/Core/UseCases/UseCaseTests.cs`, `.ai/implementation-plans/active/2026-06-16-v1-invoice-printer.md`
   - Summary: Applied Ruben's follow-up UI feedback: the row delete action is now a quiet icon-style button; inline date controls open their selector on first click; time editing uses an editable selector with quarter-hour choices; Planned/Completed state is now a manual row action; completed lessons may return to Planned only after confirmation; completed lessons remain locked for date/time edits and deletion; uninvoiced past lessons are no longer automatically marked Completed by the startup query.
-  - Tests/verification run: Red check: `dotnet test tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~MainWindowViewModelTests" -nodeReuse:false` failed before `ILessonStateService` existed. Focused green check: `dotnet test tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~MainWindowViewModelTests|FullyQualifiedName~StartupDashboardDoesNotCompleteUninvoicedLessonsByDate" -nodeReuse:false`. Full checks: `dotnet build ElenaSmallBusinessLedger.sln -nodeReuse:false`; `dotnet test ElenaSmallBusinessLedger.sln -nodeReuse:false`.
+  - Tests/verification run: Red check: `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~MainWindowViewModelTests" -nodeReuse:false` failed before `ILessonStateService` existed. Focused green check: `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~MainWindowViewModelTests|FullyQualifiedName~StartupDashboardDoesNotCompleteUninvoicedLessonsByDate" -nodeReuse:false`. Full checks: `dotnet build MySmallBusinessLedger.sln -nodeReuse:false`; `dotnet test MySmallBusinessLedger.sln -nodeReuse:false`.
   - Results: Focused tests passed: 15 passed, 0 failed. Full build passed with 0 warnings and 0 errors. Full test suite passed: 72 passed, 0 failed.
   - Dependencies added: None.
   - Deviations: `Write Invoice` still remains Stage 10 scope. Superseded note: manual lesson-state persistence was initially represented by an app-level seam; the Stage 9 course correction above now persists Completed/Planned state through the Google Calendar status marker.
@@ -1248,9 +1248,9 @@ Cleanup/reset instructions:
 
 - 2026-06-16:
   - Stage: Stage 9 feedback refinement - Student/lesson UI corrections
-  - Files changed: `docs/business-requirements-and-logic.md`, `.ai/project-profile.md`, `.ai/standards/ui-design-standards.md`, `src/ElenaSmallBusinessLedger.App/MainWindow.xaml`, `src/ElenaSmallBusinessLedger.App/MainWindow.xaml.cs`, `src/ElenaSmallBusinessLedger.App/ViewModels/MainWindowViewModel.cs`, `src/ElenaSmallBusinessLedger.App/ViewModels/LessonDisplayModel.cs`, `src/ElenaSmallBusinessLedger.App/ViewModels/StudentEditorViewModel.cs`, `src/ElenaSmallBusinessLedger.App/ViewModels/SchedulePlacementViewModel.cs`, `src/ElenaSmallBusinessLedger.App/Views/StudentEditorView.xaml`, `src/ElenaSmallBusinessLedger.App/Services/IConfirmationService.cs`, `src/ElenaSmallBusinessLedger.App/Services/MessageBoxConfirmationService.cs`, `src/ElenaSmallBusinessLedger.App/Services/WindowPlacementStore.cs`, `src/ElenaSmallBusinessLedger.App/App.xaml.cs`, `src/ElenaSmallBusinessLedger.App/Views/StudentEditorView.xaml.cs`, `src/ElenaSmallBusinessLedger.App/Views/LessonEditorView.xaml.cs`, `tests/ElenaSmallBusinessLedger.Tests/App/ViewModels/EditorViewModelTests.cs`, `tests/ElenaSmallBusinessLedger.Tests/App/ViewModels/MainWindowViewModelTests.cs`, `.ai/implementation-plans/active/2026-06-16-v1-invoice-printer.md`
+  - Files changed: `docs/business-requirements-and-logic.md`, `.ai/project-profile.md`, `.ai/standards/ui-design-standards.md`, `src/MySmallBusinessLedger.App/MainWindow.xaml`, `src/MySmallBusinessLedger.App/MainWindow.xaml.cs`, `src/MySmallBusinessLedger.App/ViewModels/MainWindowViewModel.cs`, `src/MySmallBusinessLedger.App/ViewModels/LessonDisplayModel.cs`, `src/MySmallBusinessLedger.App/ViewModels/StudentEditorViewModel.cs`, `src/MySmallBusinessLedger.App/ViewModels/SchedulePlacementViewModel.cs`, `src/MySmallBusinessLedger.App/Views/StudentEditorView.xaml`, `src/MySmallBusinessLedger.App/Services/IConfirmationService.cs`, `src/MySmallBusinessLedger.App/Services/MessageBoxConfirmationService.cs`, `src/MySmallBusinessLedger.App/Services/WindowPlacementStore.cs`, `src/MySmallBusinessLedger.App/App.xaml.cs`, `src/MySmallBusinessLedger.App/Views/StudentEditorView.xaml.cs`, `src/MySmallBusinessLedger.App/Views/LessonEditorView.xaml.cs`, `tests/MySmallBusinessLedger.Tests/App/ViewModels/EditorViewModelTests.cs`, `tests/MySmallBusinessLedger.Tests/App/ViewModels/MainWindowViewModelTests.cs`, `.ai/implementation-plans/active/2026-06-16-v1-invoice-printer.md`
   - Summary: Applied Ruben's Stage 9 UI feedback: student and plan dates now use date selectors; Plan-owned fields are displayed read-only except student-specific Starts on/Ends on; plan flexibility is human-readable; schedule editing uses fixed placement rows with an Unspecified option instead of Add/Remove; main/subwindow placement is persisted and clamped to the visible desktop; lesson editing moved from a separate double-click dialog to inline planned-lesson date/time controls plus a row-level delete button with confirmation; completed/invoiced lessons cannot be edited or deleted; the inline message banner can be dismissed and clears when row selection changes.
-  - Tests/verification run: `dotnet test tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~EditorViewModel|FullyQualifiedName~MainWindowViewModel|FullyQualifiedName~StudentUseCase" -nodeReuse:false`; `dotnet build ElenaSmallBusinessLedger.sln -nodeReuse:false`; `dotnet test ElenaSmallBusinessLedger.sln -nodeReuse:false`.
+  - Tests/verification run: `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~EditorViewModel|FullyQualifiedName~MainWindowViewModel|FullyQualifiedName~StudentUseCase" -nodeReuse:false`; `dotnet build MySmallBusinessLedger.sln -nodeReuse:false`; `dotnet test MySmallBusinessLedger.sln -nodeReuse:false`.
   - Results: Focused tests passed: 18 passed, 0 failed. Full build passed with 0 warnings and 0 errors. Full test suite passed: 68 passed, 0 failed.
   - Dependencies added: None.
   - Deviations: `Add Plan` is present as a visible command but currently reports that plan administration will be implemented with the plan administration workflow; a real implementation needs a Plan catalog/selection workflow so Plan remains the owner of Plan fields. `Write Invoice` remains Stage 10 scope.
@@ -1259,9 +1259,9 @@ Cleanup/reset instructions:
 
 - 2026-06-16:
   - Stage: Stage 9 - Implement Student Add/Edit And Lesson Editing UI
-  - Files changed: `docs/business-requirements-and-logic.md`, `src/ElenaSmallBusinessLedger.Core/Students/StudentScheduleEntry.cs`, `src/ElenaSmallBusinessLedger.Core/Ports/IStudentRepository.cs`, `src/ElenaSmallBusinessLedger.Core/Ports/StudentRecord.cs`, `src/ElenaSmallBusinessLedger.Core/UseCases/Students/*`, `src/ElenaSmallBusinessLedger.Infrastructure/Persistence/Entities.cs`, `src/ElenaSmallBusinessLedger.Infrastructure/Persistence/LedgerDbContext.cs`, `src/ElenaSmallBusinessLedger.Infrastructure/Persistence/SqliteStudentRepository.cs`, `src/ElenaSmallBusinessLedger.App/App.xaml.cs`, `src/ElenaSmallBusinessLedger.App/MainWindow.xaml`, `src/ElenaSmallBusinessLedger.App/MainWindow.xaml.cs`, `src/ElenaSmallBusinessLedger.App/Services/*Editor*`, `src/ElenaSmallBusinessLedger.App/ViewModels/*Editor*`, `src/ElenaSmallBusinessLedger.App/Views/*Editor*`, `tests/ElenaSmallBusinessLedger.Tests/App/ViewModels/EditorViewModelTests.cs`, `tests/ElenaSmallBusinessLedger.Tests/App/ViewModels/MainWindowViewModelTests.cs`, `tests/ElenaSmallBusinessLedger.Tests/Core/UseCases/StudentUseCaseTests.cs`, `tests/ElenaSmallBusinessLedger.Tests/Core/UseCases/UseCaseTests.cs`, `tests/ElenaSmallBusinessLedger.Tests/Infrastructure/Persistence/SqlitePersistenceTests.cs`, `.ai/implementation-plans/active/2026-06-16-v1-invoice-printer.md`
+  - Files changed: `docs/business-requirements-and-logic.md`, `src/MySmallBusinessLedger.Core/Students/StudentScheduleEntry.cs`, `src/MySmallBusinessLedger.Core/Ports/IStudentRepository.cs`, `src/MySmallBusinessLedger.Core/Ports/StudentRecord.cs`, `src/MySmallBusinessLedger.Core/UseCases/Students/*`, `src/MySmallBusinessLedger.Infrastructure/Persistence/Entities.cs`, `src/MySmallBusinessLedger.Infrastructure/Persistence/LedgerDbContext.cs`, `src/MySmallBusinessLedger.Infrastructure/Persistence/SqliteStudentRepository.cs`, `src/MySmallBusinessLedger.App/App.xaml.cs`, `src/MySmallBusinessLedger.App/MainWindow.xaml`, `src/MySmallBusinessLedger.App/MainWindow.xaml.cs`, `src/MySmallBusinessLedger.App/Services/*Editor*`, `src/MySmallBusinessLedger.App/ViewModels/*Editor*`, `src/MySmallBusinessLedger.App/Views/*Editor*`, `tests/MySmallBusinessLedger.Tests/App/ViewModels/EditorViewModelTests.cs`, `tests/MySmallBusinessLedger.Tests/App/ViewModels/MainWindowViewModelTests.cs`, `tests/MySmallBusinessLedger.Tests/Core/UseCases/StudentUseCaseTests.cs`, `tests/MySmallBusinessLedger.Tests/Core/UseCases/UseCaseTests.cs`, `tests/MySmallBusinessLedger.Tests/Infrastructure/Persistence/SqlitePersistenceTests.cs`, `.ai/implementation-plans/active/2026-06-16-v1-invoice-printer.md`
   - Summary: Added Core student save request/use case with one-active-plan-period validation, student schedule entries, SQLite persistence for schedule entries, student add/edit and lesson add/edit/cancel ViewModels, WPF editor dialogs, sample editor services for the current shell, Core-backed editor service adapters, main-window Add Lesson and double-click lesson editing, and documented the deliberate no-prices-on-main-screen decision.
-  - Tests/verification run: Red check: `dotnet test tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~StudentUseCase|FullyQualifiedName~EditorViewModel" -nodeReuse:false` failed because the planned student use-case contracts, editor services, and editor ViewModels did not exist. Green checks: same targeted command; `dotnet test tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~StudentUseCase|FullyQualifiedName~EditorViewModel|FullyQualifiedName~MainWindowViewModel" -nodeReuse:false`; `dotnet build ElenaSmallBusinessLedger.sln -nodeReuse:false`; `dotnet test ElenaSmallBusinessLedger.sln -nodeReuse:false`.
+  - Tests/verification run: Red check: `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~StudentUseCase|FullyQualifiedName~EditorViewModel" -nodeReuse:false` failed because the planned student use-case contracts, editor services, and editor ViewModels did not exist. Green checks: same targeted command; `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~StudentUseCase|FullyQualifiedName~EditorViewModel|FullyQualifiedName~MainWindowViewModel" -nodeReuse:false`; `dotnet build MySmallBusinessLedger.sln -nodeReuse:false`; `dotnet test MySmallBusinessLedger.sln -nodeReuse:false`.
   - Results: Targeted Stage 9 tests passed: 17 passed, 0 failed. Full build passed with 0 warnings and 0 errors. Full test suite passed: 67 passed, 0 failed.
   - Dependencies added: None.
   - Deviations: The current app startup still uses sample editor services so Ruben can safely exercise dialogs without real Google Calendar writes. Core-backed editor adapters are present for real composition in a later wiring stage. The main screen continues not to show prices by design; price fields appear only in the student editor/admin-style surface and invoice flow.
@@ -1270,9 +1270,9 @@ Cleanup/reset instructions:
 
 - 2026-06-16:
   - Stage: Stage 8 - Implement WPF Shell And Startup Dashboard
-  - Files changed: `src/ElenaSmallBusinessLedger.App/App.xaml`, `src/ElenaSmallBusinessLedger.App/App.xaml.cs`, `src/ElenaSmallBusinessLedger.App/MainWindow.xaml`, `src/ElenaSmallBusinessLedger.App/MainWindow.xaml.cs`, `src/ElenaSmallBusinessLedger.App/Commands/*`, `src/ElenaSmallBusinessLedger.App/Services/*`, `src/ElenaSmallBusinessLedger.App/ViewModels/*`, `src/ElenaSmallBusinessLedger.Core/UseCases/Startup/StartupDashboardResult.cs`, `src/ElenaSmallBusinessLedger.Core/UseCases/Startup/StartupDashboardQuery.cs`, `tests/ElenaSmallBusinessLedger.Tests/ElenaSmallBusinessLedger.Tests.csproj`, `tests/ElenaSmallBusinessLedger.Tests/App/ViewModels/MainWindowViewModelTests.cs`, `tests/ElenaSmallBusinessLedger.Tests/Core/UseCases/UseCaseTests.cs`, `.ai/implementation-plans/active/2026-06-16-v1-invoice-printer.md`
+  - Files changed: `src/MySmallBusinessLedger.App/App.xaml`, `src/MySmallBusinessLedger.App/App.xaml.cs`, `src/MySmallBusinessLedger.App/MainWindow.xaml`, `src/MySmallBusinessLedger.App/MainWindow.xaml.cs`, `src/MySmallBusinessLedger.App/Commands/*`, `src/MySmallBusinessLedger.App/Services/*`, `src/MySmallBusinessLedger.App/ViewModels/*`, `src/MySmallBusinessLedger.Core/UseCases/Startup/StartupDashboardResult.cs`, `src/MySmallBusinessLedger.Core/UseCases/Startup/StartupDashboardQuery.cs`, `tests/MySmallBusinessLedger.Tests/MySmallBusinessLedger.Tests.csproj`, `tests/MySmallBusinessLedger.Tests/App/ViewModels/MainWindowViewModelTests.cs`, `tests/MySmallBusinessLedger.Tests/Core/UseCases/UseCaseTests.cs`, `.ai/implementation-plans/active/2026-06-16-v1-invoice-printer.md`
   - Summary: Added the WPF main shell with sample dashboard composition, current student/month header, Google Calendar open/refresh buttons, lesson list, student navigation, month navigation, student menu entries, student invoice pane, paid/outstanding toggle behavior, paid-to-outstanding confirmation, inline refresh/update errors, app-activation refresh debounce, and a self-contained main-window resource setup for tests.
-  - Tests/verification run: Red check: `dotnet test tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~ViewModels" -nodeReuse:false` failed before planned App ViewModel/window types existed. Additional red check: the WPF smoke test failed because `MainWindow` depended on an app-level `BooleanToVisibilityConverter`; fixed by making the window resource self-contained. Green checks: `dotnet test tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~ViewModels" -nodeReuse:false`; `dotnet test tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~StartupDashboard" -nodeReuse:false`; `dotnet build ElenaSmallBusinessLedger.sln -nodeReuse:false`; `dotnet test ElenaSmallBusinessLedger.sln -nodeReuse:false`.
+  - Tests/verification run: Red check: `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~ViewModels" -nodeReuse:false` failed before planned App ViewModel/window types existed. Additional red check: the WPF smoke test failed because `MainWindow` depended on an app-level `BooleanToVisibilityConverter`; fixed by making the window resource self-contained. Green checks: `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~ViewModels" -nodeReuse:false`; `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~StartupDashboard" -nodeReuse:false`; `dotnet build MySmallBusinessLedger.sln -nodeReuse:false`; `dotnet test MySmallBusinessLedger.sln -nodeReuse:false`.
   - Results: ViewModel/window tests passed: 9 passed, 0 failed. StartupDashboard filtered tests passed: 1 passed, 0 failed. Full build passed with 0 warnings and 0 errors. Full test suite passed: 59 passed, 0 failed.
   - Dependencies added: None.
   - Deviations: Previous/Next student navigation now uses an explicit active-student list from the startup dashboard result instead of inferring students from currently visible lesson rows. This is more reliable once the dashboard filters lessons to the selected student. The test project now targets `net10.0-windows` and references the WPF App project so ViewModel/window tests can compile and instantiate WPF surfaces.
@@ -1281,9 +1281,9 @@ Cleanup/reset instructions:
 
 - 2026-06-16:
   - Stage: Stage 7 - Implement PDF Storage, Invoice Rendering, And Printing
-  - Files changed: `src/ElenaSmallBusinessLedger.Infrastructure/ElenaSmallBusinessLedger.Infrastructure.csproj`, `src/ElenaSmallBusinessLedger.Infrastructure/Invoices/Pdf/*`, `src/ElenaSmallBusinessLedger.Infrastructure/Invoices/Printing/*`, `tests/ElenaSmallBusinessLedger.Tests/Infrastructure/Invoices/InvoiceInfrastructureTests.cs`, `.ai/project-profile.md`, `README.md`, `.ai/implementation-plans/active/2026-06-16-v1-invoice-printer.md`
+  - Files changed: `src/MySmallBusinessLedger.Infrastructure/MySmallBusinessLedger.Infrastructure.csproj`, `src/MySmallBusinessLedger.Infrastructure/Invoices/Pdf/*`, `src/MySmallBusinessLedger.Infrastructure/Invoices/Printing/*`, `tests/MySmallBusinessLedger.Tests/Infrastructure/Invoices/InvoiceInfrastructureTests.cs`, `.ai/project-profile.md`, `README.md`, `.ai/implementation-plans/active/2026-06-16-v1-invoice-printer.md`
   - Summary: Added QuestPDF invoice rendering, local staged invoice PDF storage, staged PDF verification, stable sanitized final filenames, fail-closed no-overwrite publishing, and a printer adapter that only requests printing for an existing saved PDF.
-  - Tests/verification run: Red check: `dotnet test tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~Invoice" -nodeReuse:false` failed because planned PDF/file/printing Infrastructure types did not exist. Green checks: same invoice-filtered command; `dotnet build ElenaSmallBusinessLedger.sln -nodeReuse:false`; `dotnet test ElenaSmallBusinessLedger.sln -nodeReuse:false`; targeted sample-PDF smoke test with `ELENA_LEDGER_KEEP_SAMPLE_PDF`; rendered `tmp\pdfs\stage7-sample-invoice.pdf` to `tmp\pdfs\stage7-sample-invoice.png` using `pypdfium2` and visually inspected the output.
+  - Tests/verification run: Red check: `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~Invoice" -nodeReuse:false` failed because planned PDF/file/printing Infrastructure types did not exist. Green checks: same invoice-filtered command; `dotnet build MySmallBusinessLedger.sln -nodeReuse:false`; `dotnet test MySmallBusinessLedger.sln -nodeReuse:false`; targeted sample-PDF smoke test with `ELENA_LEDGER_KEEP_SAMPLE_PDF`; rendered `tmp\pdfs\stage7-sample-invoice.pdf` to `tmp\pdfs\stage7-sample-invoice.png` using `pypdfium2` and visually inspected the output.
   - Results: Invoice-filtered tests passed: 26 passed, 0 failed. Full build passed with 0 warnings and 0 errors. Full test suite passed: 50 passed, 0 failed. Visual PDF check showed required Danish invoice sections, company/student information, lesson row, VAT/totals, and footer with no clipping or overlap.
   - Dependencies added: `QuestPDF` 2026.6.0.
   - Deviations: The printer adapter can prove only that the OS print request was launched for an existing PDF; it cannot prove paper was physically printed. Final file collision handling fails closed instead of generating a suffix, because issued invoice PDFs must not be silently overwritten.
@@ -1292,9 +1292,9 @@ Cleanup/reset instructions:
 
 - 2026-06-16:
   - Stage: Stage 6 - Implement Google Calendar Gateway
-  - Files changed: `src/ElenaSmallBusinessLedger.Infrastructure/ElenaSmallBusinessLedger.Infrastructure.csproj`, `src/ElenaSmallBusinessLedger.Infrastructure/Calendar/*`, `src/ElenaSmallBusinessLedger.Infrastructure/Persistence/Entities.cs`, `src/ElenaSmallBusinessLedger.Infrastructure/Persistence/LedgerDbContext.cs`, `src/ElenaSmallBusinessLedger.Infrastructure/Persistence/CalendarSettings.cs`, `src/ElenaSmallBusinessLedger.Infrastructure/Persistence/SqliteCalendarSettingsRepository.cs`, `tests/ElenaSmallBusinessLedger.Tests/Infrastructure/Calendar/GoogleCalendarGatewayTests.cs`, `tests/ElenaSmallBusinessLedger.Tests/Infrastructure/Persistence/SqlitePersistenceTests.cs`, `.ai/project-profile.md`, `README.md`, `.ai/implementation-plans/active/2026-06-16-v1-invoice-printer.md`
+  - Files changed: `src/MySmallBusinessLedger.Infrastructure/MySmallBusinessLedger.Infrastructure.csproj`, `src/MySmallBusinessLedger.Infrastructure/Calendar/*`, `src/MySmallBusinessLedger.Infrastructure/Persistence/Entities.cs`, `src/MySmallBusinessLedger.Infrastructure/Persistence/LedgerDbContext.cs`, `src/MySmallBusinessLedger.Infrastructure/Persistence/CalendarSettings.cs`, `src/MySmallBusinessLedger.Infrastructure/Persistence/SqliteCalendarSettingsRepository.cs`, `tests/MySmallBusinessLedger.Tests/Infrastructure/Calendar/GoogleCalendarGatewayTests.cs`, `tests/MySmallBusinessLedger.Tests/Infrastructure/Persistence/SqlitePersistenceTests.cs`, `.ai/project-profile.md`, `README.md`, `.ai/implementation-plans/active/2026-06-16-v1-invoice-printer.md`
   - Summary: Added the Google Calendar Infrastructure adapter behind the Core gateway port. The implementation uses the official `Google.Apis.Calendar.v3` package, external browser OAuth through Google's installed-app flow, Windows DPAPI-protected local token storage, SQLite storage for selected calendar/account labels, strict first-line `$` marker filtering, event create/update/delete mapping, and Core failure results for Calendar write failures.
-  - Tests/verification run: Red check: `dotnet test tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~Calendar|FullyQualifiedName~CalendarSettings" -nodeReuse:false` failed because the planned Stage 6 Infrastructure types did not exist. Additional red check: `dotnet test tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~RefreshFailureAfterSuccessfulCalendarWriteIsReportedTruthfully" -nodeReuse:false` failed because a successful Google write followed by refresh failure was reported as `Calendar.UpdateFailed`. Green checks: same targeted refresh-failure test; Calendar/CalendarSettings filtered tests; `dotnet build ElenaSmallBusinessLedger.sln -nodeReuse:false`; `dotnet test ElenaSmallBusinessLedger.sln -nodeReuse:false`.
+  - Tests/verification run: Red check: `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~Calendar|FullyQualifiedName~CalendarSettings" -nodeReuse:false` failed because the planned Stage 6 Infrastructure types did not exist. Additional red check: `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~RefreshFailureAfterSuccessfulCalendarWriteIsReportedTruthfully" -nodeReuse:false` failed because a successful Google write followed by refresh failure was reported as `Calendar.UpdateFailed`. Green checks: same targeted refresh-failure test; Calendar/CalendarSettings filtered tests; `dotnet build MySmallBusinessLedger.sln -nodeReuse:false`; `dotnet test MySmallBusinessLedger.sln -nodeReuse:false`.
   - Results: Calendar/CalendarSettings filtered tests passed: 20 passed, 0 failed. Full build passed with 0 warnings and 0 errors. Full test suite passed: 44 passed, 0 failed.
   - Dependencies added: `Google.Apis.Calendar.v3` 1.74.0.4154; `System.Security.Cryptography.ProtectedData` 10.0.9.
   - Deviations: Real Google account authorization was not manually exercised in this stage. Event creation uses a configurable default lesson duration because the current Core add-lesson request carries student/start time but not a plan-derived duration.
@@ -1303,9 +1303,9 @@ Cleanup/reset instructions:
 
 - 2026-06-16:
   - Stage: Stage 5 - Implement SQLite Persistence
-  - Files changed: `src/ElenaSmallBusinessLedger.Infrastructure/ElenaSmallBusinessLedger.Infrastructure.csproj`, `src/ElenaSmallBusinessLedger.Infrastructure/Persistence/*`, `tests/ElenaSmallBusinessLedger.Tests/Infrastructure/Persistence/SqlitePersistenceTests.cs`, `.ai/project-profile.md`, `README.md`, `.ai/implementation-plans/active/2026-06-16-v1-invoice-printer.md`
+  - Files changed: `src/MySmallBusinessLedger.Infrastructure/MySmallBusinessLedger.Infrastructure.csproj`, `src/MySmallBusinessLedger.Infrastructure/Persistence/*`, `tests/MySmallBusinessLedger.Tests/Infrastructure/Persistence/SqlitePersistenceTests.cs`, `.ai/project-profile.md`, `README.md`, `.ai/implementation-plans/active/2026-06-16-v1-invoice-printer.md`
   - Summary: Added EF Core SQLite persistence for company profile, students, plan periods, issued invoice snapshots, invoice lines, PDF paths, and paid/outstanding state. The invoice lesson timestamp schema was cleaned up to one ISO 8601 round-trip text value instead of storing both a readable value and duplicate UTC ticks.
-  - Tests/verification run: Red check: `dotnet test tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~Persistence" -nodeReuse:false` failed before persistence types existed. Additional red checks caught SQLite cleanup friction from pooled test connections, SQLite/EF translation limits for `DateTimeOffset` filtering, and the unwanted duplicate `LessonDateTimeUtcTicks` schema field. Green checks: `dotnet test tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~Persistence" -nodeReuse:false`; `dotnet build ElenaSmallBusinessLedger.sln -nodeReuse:false`; `dotnet test ElenaSmallBusinessLedger.sln -nodeReuse:false`.
+  - Tests/verification run: Red check: `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~Persistence" -nodeReuse:false` failed before persistence types existed. Additional red checks caught SQLite cleanup friction from pooled test connections, SQLite/EF translation limits for `DateTimeOffset` filtering, and the unwanted duplicate `LessonDateTimeUtcTicks` schema field. Green checks: `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~Persistence" -nodeReuse:false`; `dotnet build MySmallBusinessLedger.sln -nodeReuse:false`; `dotnet test MySmallBusinessLedger.sln -nodeReuse:false`.
   - Results: Persistence tests passed: 6 passed, 0 failed. Full build passed with 0 warnings and 0 errors. Full test suite passed: 36 passed, 0 failed.
   - Deviations: No EF migration was generated yet; the schema is verified through EF model configuration and per-test SQLite databases while there is no production data. Lesson date/time values are stored as a single round-trip text value and parsed back to the original `DateTimeOffset`.
   - Review notes: Code-review pass found no required Stage 5 fixes after the timestamp cleanup. Remaining low-risk note: invoice number allocation is suitable for the current single-user desktop shape, but would need stronger serialization if multiple app instances could issue invoices concurrently.
@@ -1313,9 +1313,9 @@ Cleanup/reset instructions:
 
 - 2026-06-16:
   - Stage: Stage 4 - Add Core Use Cases And Ports
-  - Files changed: `src/ElenaSmallBusinessLedger.Core/Common/OperationResult.cs`, `src/ElenaSmallBusinessLedger.Core/Calendar/CalendarLesson.cs`, `src/ElenaSmallBusinessLedger.Core/Lessons/LessonState.cs`, `src/ElenaSmallBusinessLedger.Core/Time/IClock.cs`, `src/ElenaSmallBusinessLedger.Core/Ports/*`, `src/ElenaSmallBusinessLedger.Core/UseCases/*`, `src/ElenaSmallBusinessLedger.Core/Invoices/InvoiceLessonStatus.cs`, `src/ElenaSmallBusinessLedger.Core/Invoices/IssuedInvoiceSummary.cs`, `tests/ElenaSmallBusinessLedger.Tests/Core/UseCases/UseCaseTests.cs`, `.ai/implementation-plans/active/2026-06-16-v1-invoice-printer.md`
+  - Files changed: `src/MySmallBusinessLedger.Core/Common/OperationResult.cs`, `src/MySmallBusinessLedger.Core/Calendar/CalendarLesson.cs`, `src/MySmallBusinessLedger.Core/Lessons/LessonState.cs`, `src/MySmallBusinessLedger.Core/Time/IClock.cs`, `src/MySmallBusinessLedger.Core/Ports/*`, `src/MySmallBusinessLedger.Core/UseCases/*`, `src/MySmallBusinessLedger.Core/Invoices/InvoiceLessonStatus.cs`, `src/MySmallBusinessLedger.Core/Invoices/IssuedInvoiceSummary.cs`, `tests/MySmallBusinessLedger.Tests/Core/UseCases/UseCaseTests.cs`, `.ai/implementation-plans/active/2026-06-16-v1-invoice-printer.md`
   - Summary: Added Core ports and use-case contracts for startup dashboard data, Google Calendar-backed lesson add/edit/delete, invoice candidate selection, invoice preview creation, staged invoice issue, and paid/outstanding status changes. The staged invoice issue contract creates a staging path, writes PDF, verifies staged PDF, publishes to final path, saves issued invoice metadata only after final PDF storage succeeds, and then requests print.
-  - Tests/verification run: Red check: `dotnet test tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~UseCases" -nodeReuse:false` failed because planned Core ports/use-case namespaces/types did not exist. Additional red check: `dotnet test tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~InvoicePreviewFailsWhenCalendarLessonHasNoActivePlan" -nodeReuse:false` failed because invoice preview silently succeeded when a lesson had no active plan. Green checks: `dotnet test tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~UseCases" -nodeReuse:false`; `dotnet test tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~InvoicePreviewFailsWhenCalendarLessonHasNoActivePlan" -nodeReuse:false`; `dotnet build ElenaSmallBusinessLedger.sln -nodeReuse:false`; `dotnet test ElenaSmallBusinessLedger.sln -nodeReuse:false`.
+  - Tests/verification run: Red check: `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~UseCases" -nodeReuse:false` failed because planned Core ports/use-case namespaces/types did not exist. Additional red check: `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~InvoicePreviewFailsWhenCalendarLessonHasNoActivePlan" -nodeReuse:false` failed because invoice preview silently succeeded when a lesson had no active plan. Green checks: `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~UseCases" -nodeReuse:false`; `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~InvoicePreviewFailsWhenCalendarLessonHasNoActivePlan" -nodeReuse:false`; `dotnet build MySmallBusinessLedger.sln -nodeReuse:false`; `dotnet test MySmallBusinessLedger.sln -nodeReuse:false`.
   - Results: Use-case tests passed: 11 passed, 0 failed. Targeted no-active-plan regression passed: 1 passed, 0 failed. Full build passed with 0 warnings and 0 errors. Full test suite passed: 30 passed, 0 failed.
   - Deviations: The implemented staged issue order publishes the verified PDF to its final path before saving issued invoice metadata, rather than saving metadata before final publish. This keeps the existing hard requirement precise: the app must not mark an invoice issued unless final PDF storage has already succeeded.
   - Review notes: Code-review pass found and fixed one safety issue before completion: invoice preview now fails closed when a Google Calendar lesson has no active student plan instead of silently omitting that lesson from the draft.
@@ -1323,18 +1323,18 @@ Cleanup/reset instructions:
 
 - 2026-06-16:
   - Stage: Stage 3 - Build Core Domain Model And Pure Business Rules
-  - Files changed: `src/ElenaSmallBusinessLedger.Core/Common/*`, `src/ElenaSmallBusinessLedger.Core/Students/*`, `src/ElenaSmallBusinessLedger.Core/Plans/*`, `src/ElenaSmallBusinessLedger.Core/Calendar/CalendarLessonEntry.cs`, `src/ElenaSmallBusinessLedger.Core/Money/Money.cs`, `src/ElenaSmallBusinessLedger.Core/Company/*`, `src/ElenaSmallBusinessLedger.Core/Invoices/*`, `tests/ElenaSmallBusinessLedger.Tests/Core/Students/StudentTests.cs`, `tests/ElenaSmallBusinessLedger.Tests/Core/Plans/StudentPlanPeriodTests.cs`, `tests/ElenaSmallBusinessLedger.Tests/Core/Calendar/CalendarLessonEntryTests.cs`, `tests/ElenaSmallBusinessLedger.Tests/Core/Invoices/*`, `.ai/implementation-plans/active/2026-06-16-v1-invoice-printer.md`
+  - Files changed: `src/MySmallBusinessLedger.Core/Common/*`, `src/MySmallBusinessLedger.Core/Students/*`, `src/MySmallBusinessLedger.Core/Plans/*`, `src/MySmallBusinessLedger.Core/Calendar/CalendarLessonEntry.cs`, `src/MySmallBusinessLedger.Core/Money/Money.cs`, `src/MySmallBusinessLedger.Core/Company/*`, `src/MySmallBusinessLedger.Core/Invoices/*`, `tests/MySmallBusinessLedger.Tests/Core/Students/StudentTests.cs`, `tests/MySmallBusinessLedger.Tests/Core/Plans/StudentPlanPeriodTests.cs`, `tests/MySmallBusinessLedger.Tests/Core/Calendar/CalendarLessonEntryTests.cs`, `tests/MySmallBusinessLedger.Tests/Core/Invoices/*`, `.ai/implementation-plans/active/2026-06-16-v1-invoice-printer.md`
   - Summary: Added pure Core domain types and rules for student age validation, student plan periods, strict Google Calendar marker parsing, money/VAT calculation, invoice drafts and immutable issued invoice snapshots, price adjustment validation, and paid/outstanding toggle confirmation.
-  - Tests/verification run: Red check: `dotnet test tests\ElenaSmallBusinessLedger.Tests\ElenaSmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~Core" -nodeReuse:false` failed because planned Core namespaces/types did not exist. Green checks: same Core-filtered command passed with 19 tests; `dotnet build ElenaSmallBusinessLedger.sln -nodeReuse:false`; `dotnet test ElenaSmallBusinessLedger.sln -nodeReuse:false`.
+  - Tests/verification run: Red check: `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~Core" -nodeReuse:false` failed because planned Core namespaces/types did not exist. Green checks: same Core-filtered command passed with 19 tests; `dotnet build MySmallBusinessLedger.sln -nodeReuse:false`; `dotnet test MySmallBusinessLedger.sln -nodeReuse:false`.
   - Results: Core-filtered tests passed: 19 passed, 0 failed. Full build passed with 0 warnings and 0 errors. Full test suite passed: 19 passed, 0 failed.
   - Deviations: Added an Infrastructure assembly marker and corresponding smoke test during Stage 2; Stage 3 kept implementation in Core only. Used internal type aliases where the `Money` namespace and `Money` type would otherwise collide.
   - Risks/open questions: Stage 4 is blocked by the open invoice issue staging semantics decision because invoice issue use-case contracts depend on it.
 
 - 2026-06-16:
   - Stage: Stage 2 - Scaffold Solution, Projects, And Test Baseline
-  - Files changed: `ElenaSmallBusinessLedger.sln`, `.editorconfig`, `README.md`, `src/ElenaSmallBusinessLedger.App/*`, `src/ElenaSmallBusinessLedger.Core/AssemblyMarker.cs`, `src/ElenaSmallBusinessLedger.Core/ElenaSmallBusinessLedger.Core.csproj`, `src/ElenaSmallBusinessLedger.Infrastructure/AssemblyMarker.cs`, `src/ElenaSmallBusinessLedger.Infrastructure/ElenaSmallBusinessLedger.Infrastructure.csproj`, `tests/ElenaSmallBusinessLedger.Tests/Core/SolutionSmokeTests.cs`, `tests/ElenaSmallBusinessLedger.Tests/ElenaSmallBusinessLedger.Tests.csproj`, `.ai/implementation-plans/active/2026-06-16-v1-invoice-printer.md`
+  - Files changed: `MySmallBusinessLedger.sln`, `.editorconfig`, `README.md`, `src/MySmallBusinessLedger.App/*`, `src/MySmallBusinessLedger.Core/AssemblyMarker.cs`, `src/MySmallBusinessLedger.Core/MySmallBusinessLedger.Core.csproj`, `src/MySmallBusinessLedger.Infrastructure/AssemblyMarker.cs`, `src/MySmallBusinessLedger.Infrastructure/MySmallBusinessLedger.Infrastructure.csproj`, `tests/MySmallBusinessLedger.Tests/Core/SolutionSmokeTests.cs`, `tests/MySmallBusinessLedger.Tests/MySmallBusinessLedger.Tests.csproj`, `.ai/implementation-plans/active/2026-06-16-v1-invoice-printer.md`
   - Summary: Created the classic solution file, WPF App project, Core class library, Infrastructure class library, xUnit test project, project references, editorconfig, and smoke tests. Updated README with verified build/test commands.
-  - Tests/verification run: `dotnet --list-sdks`; `dotnet build ElenaSmallBusinessLedger.sln -nodeReuse:false`; `dotnet test ElenaSmallBusinessLedger.sln -nodeReuse:false`
+  - Tests/verification run: `dotnet --list-sdks`; `dotnet build MySmallBusinessLedger.sln -nodeReuse:false`; `dotnet test MySmallBusinessLedger.sln -nodeReuse:false`
   - Results: .NET SDKs available: 6.0.321, 10.0.109, 10.0.301. Build passed with 0 warnings and 0 errors. Tests passed: 2 passed, 0 failed.
   - Deviations: `dotnet new sln` initially created `.slnx` by default under .NET 10; replaced it with classic `.sln` using `--format sln` to match the plan. The WPF template required `-f net10.0`; it generated `net10.0-windows` in the project file as desired. xUnit restore initially failed in the sandbox and was rerun with approved `dotnet restore` network access.
   - Risks/open questions: SQLite access approach, PDF dependency, invoice issue staging, and Google Calendar UI approach remain open for later stages.
