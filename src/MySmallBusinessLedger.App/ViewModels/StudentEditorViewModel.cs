@@ -14,6 +14,7 @@ public sealed class StudentEditorViewModel : ViewModelBase
     private string shortName = string.Empty;
     private string fullName = string.Empty;
     private string address = string.Empty;
+    private string addressLine2 = string.Empty;
     private string phone = string.Empty;
     private string email = string.Empty;
     private AgeBracket ageBracket = AgeBracket.Standard;
@@ -28,37 +29,52 @@ public sealed class StudentEditorViewModel : ViewModelBase
     private DateTime planEffectiveDate = new DateOnly(2026, 1, 1).ToDateTime(TimeOnly.MinValue);
     private DateTime planStartsOnDate = new DateOnly(2026, 1, 1).ToDateTime(TimeOnly.MinValue);
     private DateTime? planEndsOnDate;
+    private PlanCatalogItem? selectedAssignablePlan;
+    private bool requiresCatalogPlanAssignment;
     private string? errorMessage;
     private bool isBusy;
 
-    private StudentEditorViewModel(IStudentEditorService studentEditorService)
+    private StudentEditorViewModel(
+        IStudentEditorService studentEditorService,
+        IReadOnlyList<PlanCatalogItem> assignablePlans)
     {
         this.studentEditorService = studentEditorService;
+        AssignablePlans = new ObservableCollection<PlanCatalogItem>(
+            assignablePlans.Where(plan => plan.CanBeAssigned).OrderBy(plan => plan.Name));
         SaveCommand = new AsyncRelayCommand(SaveAsync, () => !IsBusy);
-        AddPlanCommand = new AsyncRelayCommand(ShowAddPlanPlaceholderAsync, () => !IsBusy);
         RefreshSchedulePlacements();
     }
 
     public event EventHandler<bool?>? CloseRequested;
 
-    public static StudentEditorViewModel CreateNew(IStudentEditorService studentEditorService) =>
-        new(studentEditorService);
+    public static StudentEditorViewModel CreateNew(
+        IStudentEditorService studentEditorService,
+        IReadOnlyList<PlanCatalogItem>? assignablePlans = null)
+    {
+        var viewModel = new StudentEditorViewModel(studentEditorService, assignablePlans ?? []);
+        viewModel.requiresCatalogPlanAssignment = true;
+        viewModel.SetSelectedAssignablePlan(viewModel.AssignablePlans.FirstOrDefault(), applyPlan: true);
+        return viewModel;
+    }
 
     public static StudentEditorViewModel FromSnapshot(
         IStudentEditorService studentEditorService,
-        StudentEditorSnapshot snapshot)
+        StudentEditorSnapshot snapshot,
+        IReadOnlyList<PlanCatalogItem>? assignablePlans = null)
     {
-        var viewModel = new StudentEditorViewModel(studentEditorService)
+        var viewModel = new StudentEditorViewModel(studentEditorService, assignablePlans ?? [])
         {
             ShortName = snapshot.ShortName,
             FullName = snapshot.FullName,
-            Address = snapshot.Address,
             Phone = snapshot.Phone,
             Email = snapshot.Email,
             AgeBracket = snapshot.AgeBracket,
             BirthdateDate = snapshot.Birthdate?.ToDateTime(TimeOnly.MinValue),
             IsActive = snapshot.IsActive
         };
+        var addressLines = SplitAddress(snapshot.Address);
+        viewModel.Address = addressLines.Line1;
+        viewModel.AddressLine2 = addressLines.Line2;
 
         var currentPlan = snapshot.PlanPeriods
             .OrderByDescending(plan => plan.StartsOn)
@@ -74,6 +90,10 @@ public sealed class StudentEditorViewModel : ViewModelBase
             viewModel.PlanEffectiveDate = currentPlan.PlanEffectiveFrom.Date;
             viewModel.PlanStartsOnDate = currentPlan.StartsOn.ToDateTime(TimeOnly.MinValue);
             viewModel.PlanEndsOnDate = currentPlan.EndsOn?.ToDateTime(TimeOnly.MinValue);
+            viewModel.SetSelectedAssignablePlan(
+                viewModel.AssignablePlans.FirstOrDefault(plan =>
+                    string.Equals(plan.Name, currentPlan.PlanName, StringComparison.OrdinalIgnoreCase)),
+                applyPlan: false);
         }
 
         viewModel.ApplySchedule(snapshot.Schedule);
@@ -97,6 +117,8 @@ public sealed class StudentEditorViewModel : ViewModelBase
 
     public ObservableCollection<SchedulePlacementViewModel> SchedulePlacements { get; } = [];
 
+    public ObservableCollection<PlanCatalogItem> AssignablePlans { get; }
+
     public string ShortName
     {
         get => shortName;
@@ -113,6 +135,12 @@ public sealed class StudentEditorViewModel : ViewModelBase
     {
         get => address;
         set => SetProperty(ref address, value);
+    }
+
+    public string AddressLine2
+    {
+        get => addressLine2;
+        set => SetProperty(ref addressLine2, value);
     }
 
     public string Phone
@@ -251,6 +279,16 @@ public sealed class StudentEditorViewModel : ViewModelBase
         set => SetProperty(ref planEndsOnDate, value);
     }
 
+    public PlanCatalogItem? SelectedAssignablePlan
+    {
+        get => selectedAssignablePlan;
+        set => SetSelectedAssignablePlan(value, applyPlan: true);
+    }
+
+    public bool HasAssignablePlans => AssignablePlans.Count > 0;
+
+    public bool HasNoAssignablePlans => !HasAssignablePlans;
+
     public string? ErrorMessage
     {
         get => errorMessage;
@@ -273,7 +311,6 @@ public sealed class StudentEditorViewModel : ViewModelBase
             if (SetProperty(ref isBusy, value))
             {
                 SaveCommand.RaiseCanExecuteChanged();
-                AddPlanCommand.RaiseCanExecuteChanged();
             }
         }
     }
@@ -281,14 +318,6 @@ public sealed class StudentEditorViewModel : ViewModelBase
     public bool WasSaved { get; private set; }
 
     public AsyncRelayCommand SaveCommand { get; }
-
-    public AsyncRelayCommand AddPlanCommand { get; }
-
-    private Task ShowAddPlanPlaceholderAsync()
-    {
-        ErrorMessage = "Adding a new plan will be implemented with the plan administration workflow.";
-        return Task.CompletedTask;
-    }
 
     private async Task SaveAsync()
     {
@@ -320,6 +349,12 @@ public sealed class StudentEditorViewModel : ViewModelBase
 
     private SaveStudentRequest? CreateRequest()
     {
+        if (requiresCatalogPlanAssignment && SelectedAssignablePlan?.CanBeAssigned != true)
+        {
+            ErrorMessage = "An active plan is required before this student can be saved.";
+            return null;
+        }
+
         var schedule = new List<StudentScheduleInput>();
         foreach (var placement in SchedulePlacements)
         {
@@ -341,7 +376,7 @@ public sealed class StudentEditorViewModel : ViewModelBase
         return new SaveStudentRequest(
             ShortName,
             FullName,
-            Address,
+            CombineAddress(Address, AddressLine2),
             Phone,
             Email,
             AgeBracket,
@@ -399,5 +434,52 @@ public sealed class StudentEditorViewModel : ViewModelBase
                 SchedulePlacements.Count == 0 ? "Lesson 1" : "Lesson 2",
                 WeekdayOptions));
         }
+    }
+
+    private void SetSelectedAssignablePlan(PlanCatalogItem? plan, bool applyPlan)
+    {
+        if (!SetProperty(ref selectedAssignablePlan, plan, nameof(SelectedAssignablePlan)))
+        {
+            return;
+        }
+
+        if (applyPlan && plan is not null)
+        {
+            ApplyCatalogPlan(plan);
+        }
+    }
+
+    private void ApplyCatalogPlan(PlanCatalogItem plan)
+    {
+        PlanName = plan.Name;
+        PlanPriceWithoutVat = plan.PriceWithoutVat;
+        LessonsPerWeek = plan.LessonsPerWeek;
+        PlanDurationMinutes = plan.DurationMinutes;
+        PlanFlexibility = plan.Flexibility;
+        PlanNumberOfStudents = plan.NumberOfStudents;
+        PlanEffectiveDate = plan.EffectiveFrom.Date;
+    }
+
+    private static (string Line1, string Line2) SplitAddress(string address)
+    {
+        var normalized = address.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n');
+        var separatorIndex = normalized.IndexOf('\n', StringComparison.Ordinal);
+        if (separatorIndex < 0)
+        {
+            return (address, string.Empty);
+        }
+
+        var line1 = normalized[..separatorIndex];
+        var line2 = normalized[(separatorIndex + 1)..].Replace("\n", Environment.NewLine, StringComparison.Ordinal);
+        return (line1, line2);
+    }
+
+    private static string CombineAddress(string line1, string line2)
+    {
+        var trimmedLine1 = line1.Trim();
+        var trimmedLine2 = line2.Trim();
+        return string.IsNullOrWhiteSpace(trimmedLine2)
+            ? trimmedLine1
+            : trimmedLine1 + Environment.NewLine + trimmedLine2;
     }
 }

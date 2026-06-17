@@ -68,7 +68,14 @@ The Lessons table is updated with student lessons when the invoice is printed.
 
 The Plan is an agreement between teacher and student and determines how many lessons there are per week and how much the student will pay for them. If the 'lessons per week' is 'by appointment', there is no fixed number.
 
-Plans are not editable (they are a contract/agreement between teacher and student), but students may be moved to a different Plan.
+Plan catalog entries have a lifecycle:
+  * Draft: editable and deletable, but not assignable to students.
+  * Active: immutable and assignable to students; the only allowed catalog action is Archive.
+  * Archived: immutable and not assignable to students; the only allowed catalog action is Publish.
+
+Plans are managed independently from Students from the Plan menu. When an Active catalog Plan is assigned to a Student, the Plan fields are copied into that Student's plan period. After that assignment, catalog edits while Draft, publish/archive/republish actions, and future catalog cleanup must not mutate existing Student plan periods or issued invoices.
+
+Students may be moved to a different Active Plan by creating a new assigned student plan period.
 
 If a new Plan is added to a Student, it takes effect at the Plan effective date/time.
 If the new Plan effective date/time is in the future, the new Plan is not in effect until then.
@@ -131,6 +138,11 @@ There are also Previous / Next buttons for the month, to switch the display back
 The application contains a Student menu with these entries:
   * Add Student
   * Edit Student
+
+The application contains a Plan menu with:
+  * Manage Plans
+
+Manage Plans lists Draft, Active, and Archived catalog Plans. Draft Plans can be edited, deleted, and published. Active Plans are read-only and can be archived. Archived Plans are read-only and can be published. Only Active Plans appear in the Student editor assignment selector.
 
 The application window also displays a pane with Student Invoices.
 Each Invoice in the list has a flag: Paid / Outstanding

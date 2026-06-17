@@ -55,6 +55,8 @@ Runtime data lives under `%APPDATA%\visualtech.dk\MySmallBusinessLedger`:
 The invoice folder is configured in Settings and may be outside the app data folder.
 The app writes invoice PDFs through a staging/verification/publish flow and does not silently overwrite an existing issued invoice PDF.
 
+Plans are managed from `Plan > Manage Plans`. New plans start as Draft, where they can be edited, deleted, or published. Published Active plans are immutable and can be assigned to students; they can only be archived. Archived plans are immutable and hidden from student assignment until published again. Assigning a plan to a student copies the plan fields into the student's plan period, so later catalog lifecycle changes do not rewrite existing student or invoice data.
+
 ## Current key assumptions
 
 - Under-30 teaching support remains in the data model because future students may require it (but out of scope for version 1.0).
@@ -66,6 +68,7 @@ The app writes invoice PDFs through a staging/verification/publish flow and does
 - Runtime data is stored under `%APPDATA%\visualtech.dk\MySmallBusinessLedger`.
 - The WPF app now uses real SQLite/Core/Calendar-backed services; if Google Calendar is not configured, the dashboard reports that instead of showing sample lesson rows.
 - Company and Google Calendar account setup, connection, and authorization reset are available from `Application > Settings`.
+- Plan catalog management is available from `Plan > Manage Plans`; only Active catalog plans are assignable to students.
 - The app stores issued invoice PDFs in a configurable invoices folder.
 - Invoice PDFs are generated with QuestPDF, staged and verified before final storage, and never silently overwritten.
 - The initial UI recommendation is WPF + .NET 10.

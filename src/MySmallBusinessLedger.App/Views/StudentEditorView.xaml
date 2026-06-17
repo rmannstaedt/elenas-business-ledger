@@ -59,6 +59,8 @@
                              Margin="0,3,0,8" />
                     <TextBlock Text="Address" />
                     <TextBox Text="{Binding Address, UpdateSourceTrigger=PropertyChanged}"
+                             Margin="0,3,0,4" />
+                    <TextBox Text="{Binding AddressLine2, UpdateSourceTrigger=PropertyChanged}"
                              Margin="0,3,0,8" />
                     <TextBlock Text="Phone" />
                     <TextBox Text="{Binding Phone, UpdateSourceTrigger=PropertyChanged}"
@@ -79,20 +81,21 @@
                 </StackPanel>
 
                 <StackPanel Grid.Column="2">
-                    <Grid Margin="0,0,0,10">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                        </Grid.ColumnDefinitions>
-                        <TextBlock Text="Current Plan"
-                                   FontSize="18"
-                                   FontWeight="SemiBold" />
-                        <Button Grid.Column="1"
-                                Content="Add Plan"
-                                Command="{Binding AddPlanCommand}"
-                                MinWidth="82"
-                                Height="28" />
-                    </Grid>
+                    <TextBlock Text="Current Plan"
+                               FontSize="18"
+                               FontWeight="SemiBold"
+                               Margin="0,0,0,10" />
+
+                    <TextBlock Text="Active plan" />
+                    <ComboBox ItemsSource="{Binding AssignablePlans}"
+                              SelectedItem="{Binding SelectedAssignablePlan, UpdateSourceTrigger=PropertyChanged}"
+                              DisplayMemberPath="Name"
+                              IsEnabled="{Binding HasAssignablePlans}"
+                              Margin="0,3,0,4" />
+                    <TextBlock Text="No active plans are available."
+                               Foreground="#555555"
+                               Margin="0,0,0,8"
+                               Visibility="{Binding HasNoAssignablePlans, Converter={StaticResource BooleanToVisibilityConverter}}" />
 
                     <TextBlock Text="Plan name" />
                     <TextBlock Text="{Binding PlanName}"

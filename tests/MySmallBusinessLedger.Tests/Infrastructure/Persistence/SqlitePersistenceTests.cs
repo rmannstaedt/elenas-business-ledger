@@ -68,6 +68,69 @@ public sealed class SqlitePersistenceTests
     }
 
     [Fact]
+    public async Task PlanCatalogLifecycleCanBeSavedAndListed()
+    {
+        using var database = await TestDatabase.CreateAsync();
+        var repository = new SqlitePlanCatalogRepository(database.CreateContext);
+
+        var draft = (await repository.SaveAsync(CreatePlanCatalogItem("Draft", PlanCatalogState.Draft), CancellationToken.None)).Value!;
+        var active = (await repository.SaveAsync(CreatePlanCatalogItem("Active", PlanCatalogState.Active), CancellationToken.None)).Value!;
+        var archived = (await repository.SaveAsync(CreatePlanCatalogItem("Archived", PlanCatalogState.Archived), CancellationToken.None)).Value!;
+
+        var allPlans = await repository.ListAllAsync(CancellationToken.None);
+        var assignablePlans = await repository.ListAssignableAsync(CancellationToken.None);
+        await repository.DeleteAsync(draft.Id, CancellationToken.None);
+        var afterDraftDelete = await repository.ListAllAsync(CancellationToken.None);
+
+        Assert.Equal(
+            [PlanCatalogState.Active, PlanCatalogState.Archived, PlanCatalogState.Draft],
+            allPlans.Select(plan => plan.State).OrderBy(state => state.ToString(), StringComparer.Ordinal).ToArray());
+        var assignablePlan = Assert.Single(assignablePlans);
+        Assert.Equal(active.Id, assignablePlan.Id);
+        Assert.DoesNotContain(afterDraftDelete, plan => plan.Id == draft.Id);
+        Assert.Contains(afterDraftDelete, plan => plan.Id == active.Id);
+        Assert.Contains(afterDraftDelete, plan => plan.Id == archived.Id);
+    }
+
+    [Fact]
+    public async Task PlanCatalogLifecycleChangesDoNotChangeStudentPlanPeriodSnapshots()
+    {
+        using var database = await TestDatabase.CreateAsync();
+        var students = new SqliteStudentRepository(database.CreateContext);
+        var plans = new SqlitePlanCatalogRepository(database.CreateContext);
+        await students.SaveAsync(CreateStudentRecord("Anna", currentPlanName: "Standard"), CancellationToken.None);
+        var catalogPlan = (await plans.SaveAsync(CreatePlanCatalogItem("Standard", PlanCatalogState.Active), CancellationToken.None)).Value!;
+
+        await plans.SaveAsync(catalogPlan with { State = PlanCatalogState.Archived }, CancellationToken.None);
+
+        var student = await students.GetByShortNameAsync("Anna", CancellationToken.None);
+        Assert.NotNull(student);
+        var currentPlan = student.PlanPeriods.Single(period => period.EndsOn is null).Plan;
+        Assert.Equal("Standard", currentPlan.Name);
+        Assert.Equal(400m, currentPlan.PriceWithoutVat);
+        Assert.Equal(LessonsPerWeek.One, currentPlan.LessonsPerWeek);
+    }
+
+    [Fact]
+    public async Task SchemaInitializerAddsPlanCatalogTableToExistingDatabase()
+    {
+        using var database = await TestDatabase.CreateAsync();
+        await using (var context = database.CreateContext())
+        {
+            await context.Database.ExecuteSqlRawAsync("DROP TABLE PlanCatalog");
+        }
+
+        new SqliteSchemaInitializer(database.CreateContext).EnsureCreated();
+
+        var repository = new SqlitePlanCatalogRepository(database.CreateContext);
+        var result = await repository.SaveAsync(CreatePlanCatalogItem("Standard", PlanCatalogState.Draft), CancellationToken.None);
+        var plans = await repository.ListAllAsync(CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        Assert.Single(plans);
+    }
+
+    [Fact]
     public async Task IssuedInvoiceWithLinesAndPdfPathCanBeSavedAndLoaded()
     {
         using var database = await TestDatabase.CreateAsync();
@@ -206,6 +269,18 @@ public sealed class SqlitePersistenceTests
             new InvoiceTotals(Money.Dkk(400m), Money.Dkk(0m), Money.Dkk(400m)),
             "C:\\Invoices\\000001.pdf");
     }
+
+    private static PlanCatalogItem CreatePlanCatalogItem(string name, PlanCatalogState state) =>
+        new(
+            Id: 0,
+            name,
+            PriceWithoutVat: 400m,
+            LessonsPerWeek.One,
+            DurationMinutes: 60,
+            PlanFlexibility.MoveOrCancelByAgreement,
+            NumberOfStudents: 1,
+            EffectiveFrom: new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
+            state);
 
     private sealed class TestDatabase : IDisposable
     {

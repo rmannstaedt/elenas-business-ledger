@@ -59,6 +59,10 @@
                 <MenuItem Header="_Edit Student"
                           Command="{Binding EditStudentCommand}" />
             </MenuItem>
+            <MenuItem Header="_Plan">
+                <MenuItem Header="_Manage Plans"
+                          Command="{Binding OpenManagePlansCommand}" />
+            </MenuItem>
         </Menu>
 
         <Grid Margin="20">

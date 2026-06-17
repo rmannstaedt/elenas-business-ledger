@@ -1,16 +1,73 @@
 using MySmallBusinessLedger.App.Services;
 using MySmallBusinessLedger.App.ViewModels;
+using MySmallBusinessLedger.App.Views;
 using MySmallBusinessLedger.Core.Calendar;
 using MySmallBusinessLedger.Core.Common;
 using MySmallBusinessLedger.Core.Plans;
 using MySmallBusinessLedger.Core.Students;
 using MySmallBusinessLedger.Core.UseCases.Lessons;
 using MySmallBusinessLedger.Core.UseCases.Students;
+using System.Windows;
+using WpfTextBox = System.Windows.Controls.TextBox;
 
 namespace MySmallBusinessLedger.Tests.App.ViewModels;
 
 public sealed class EditorViewModelTests
 {
+    [Fact]
+    public void StudentEditorShowsTwoStackedAddressFields()
+    {
+        RunOnStaThread(() =>
+        {
+            var viewModel = StudentEditorViewModel.CreateNew(new FakeStudentEditorService());
+            var window = new StudentEditorView(viewModel);
+
+            var addressFields = FindTextBoxesBoundTo(window, "Address", "AddressLine2");
+
+            Assert.Equal(2, addressFields.Count);
+
+            window.Close();
+        });
+    }
+
+    [Fact]
+    public void StudentEditorSplitsSavedMultilineAddressAcrossAddressFields()
+    {
+        var snapshot = new StudentEditorSnapshot(
+            "Anna",
+            "Anna Andersen",
+            "Testvej 1" + Environment.NewLine + "1234 Testby",
+            "12345678",
+            "anna@example.test",
+            AgeBracket.Standard,
+            null,
+            true,
+            [],
+            []);
+        var viewModel = StudentEditorViewModel.FromSnapshot(new FakeStudentEditorService(), snapshot);
+
+        Assert.Equal("Testvej 1", viewModel.Address);
+        Assert.Equal("1234 Testby", viewModel.AddressLine2);
+    }
+
+    [Fact]
+    public async Task StudentEditorCombinesAddressLinesWhenSaving()
+    {
+        var service = new FakeStudentEditorService();
+        var viewModel = CreateNewStudentEditorWithActivePlan(service);
+        viewModel.ShortName = "Anna";
+        viewModel.FullName = "Anna Andersen";
+        viewModel.Address = "Testvej 1";
+        viewModel.AddressLine2 = "1234 Testby";
+        viewModel.Phone = "12345678";
+        viewModel.Email = "anna@example.test";
+
+        await viewModel.SaveCommand.ExecuteAsync();
+
+        Assert.NotNull(service.LastRequest);
+        Assert.Equal("Testvej 1" + Environment.NewLine + "1234 Testby", service.LastRequest.Address);
+    }
+
     [Fact]
     public async Task StudentEditorPreservesInputWhenValidationFails()
     {
@@ -19,7 +76,7 @@ public sealed class EditorViewModelTests
             SaveResult = OperationResult<string>.Failure(
                 new ValidationError("Student.BirthdateRequiredForYoung", "Birthdate is required."))
         };
-        var viewModel = StudentEditorViewModel.CreateNew(service);
+        var viewModel = CreateNewStudentEditorWithActivePlan(service);
         viewModel.ShortName = "Anna";
         viewModel.FullName = "Anna Andersen";
         viewModel.AgeBracket = AgeBracket.Young;
@@ -36,7 +93,7 @@ public sealed class EditorViewModelTests
     public async Task StudentEditorSendsPlanAndScheduleToService()
     {
         var service = new FakeStudentEditorService();
-        var viewModel = StudentEditorViewModel.CreateNew(service);
+        var viewModel = CreateNewStudentEditorWithActivePlan(service);
         viewModel.ShortName = "Anna";
         viewModel.FullName = "Anna Andersen";
         viewModel.Address = "Testvej 1";
@@ -57,10 +114,118 @@ public sealed class EditorViewModelTests
     }
 
     [Fact]
-    public async Task StudentEditorAllowsUnspecifiedSchedulePlacement()
+    public async Task StudentEditorCopiesSelectedActiveCatalogPlanIntoSavedSnapshot()
+    {
+        var service = new FakeStudentEditorService();
+        var plan = CreateCatalogPlan(
+            "Duo",
+            PlanCatalogState.Active,
+            PriceWithoutVat: 650m,
+            LessonsPerWeek.Two,
+            DurationMinutes: 45,
+            PlanFlexibility.None,
+            NumberOfStudents: 2,
+            EffectiveFrom: new DateTimeOffset(2026, 2, 1, 0, 0, 0, TimeSpan.Zero));
+        var viewModel = StudentEditorViewModel.CreateNew(service, [plan]);
+        viewModel.ShortName = "Anna";
+        viewModel.FullName = "Anna Andersen";
+        viewModel.Address = "Testvej 1";
+        viewModel.Phone = "12345678";
+        viewModel.Email = "anna@example.test";
+
+        await viewModel.SaveCommand.ExecuteAsync();
+
+        Assert.NotNull(service.LastRequest);
+        var savedPlan = Assert.Single(service.LastRequest.PlanPeriods);
+        Assert.Equal("Duo", savedPlan.PlanName);
+        Assert.Equal(650m, savedPlan.PriceWithoutVat);
+        Assert.Equal(LessonsPerWeek.Two, savedPlan.LessonsPerWeek);
+        Assert.Equal(45, savedPlan.DurationMinutes);
+        Assert.Equal(PlanFlexibility.None, savedPlan.Flexibility);
+        Assert.Equal(2, savedPlan.NumberOfStudents);
+        Assert.Equal(new DateTimeOffset(2026, 2, 1, 0, 0, 0, TimeSpan.Zero), savedPlan.PlanEffectiveFrom);
+    }
+
+    [Fact]
+    public void StudentEditorOffersOnlyActiveCatalogPlansForAssignment()
+    {
+        var viewModel = StudentEditorViewModel.CreateNew(
+            new FakeStudentEditorService(),
+            [
+                CreateCatalogPlan("Draft", PlanCatalogState.Draft),
+                CreateCatalogPlan("Active", PlanCatalogState.Active),
+                CreateCatalogPlan("Archived", PlanCatalogState.Archived)
+            ]);
+
+        var plan = Assert.Single(viewModel.AssignablePlans);
+        Assert.Equal("Active", plan.Name);
+        Assert.Equal("Active", viewModel.SelectedAssignablePlan?.Name);
+    }
+
+    [Fact]
+    public async Task NewStudentRequiresActiveCatalogPlanBeforeSave()
     {
         var service = new FakeStudentEditorService();
         var viewModel = StudentEditorViewModel.CreateNew(service);
+        viewModel.ShortName = "Anna";
+        viewModel.FullName = "Anna Andersen";
+        viewModel.Address = "Testvej 1";
+        viewModel.Phone = "12345678";
+        viewModel.Email = "anna@example.test";
+
+        await viewModel.SaveCommand.ExecuteAsync();
+
+        Assert.Null(service.LastRequest);
+        Assert.True(viewModel.HasError);
+        Assert.Equal("An active plan is required before this student can be saved.", viewModel.ErrorMessage);
+        Assert.False(viewModel.WasSaved);
+    }
+
+    [Fact]
+    public async Task StudentEditorDoesNotRewriteExistingSnapshotWhenOpenedWithMatchingCatalogPlan()
+    {
+        var service = new FakeStudentEditorService();
+        var snapshot = new StudentEditorSnapshot(
+            "Anna",
+            "Anna Andersen",
+            "Testvej 1",
+            "12345678",
+            "anna@example.test",
+            AgeBracket.Standard,
+            null,
+            true,
+            [
+                new StudentPlanPeriodInput(
+                    "Standard",
+                    400m,
+                    LessonsPerWeek.One,
+                    DurationMinutes: 60,
+                    PlanFlexibility.MoveOrCancelByAgreement,
+                    NumberOfStudents: 1,
+                    PlanEffectiveFrom: new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
+                    StartsOn: new DateOnly(2026, 1, 1),
+                    EndsOn: null)
+            ],
+            []);
+        var viewModel = StudentEditorViewModel.FromSnapshot(
+            service,
+            snapshot,
+            [CreateCatalogPlan("Standard", PlanCatalogState.Active, PriceWithoutVat: 900m)]);
+
+        await viewModel.SaveCommand.ExecuteAsync();
+
+        Assert.NotNull(service.LastRequest);
+        var savedPlan = Assert.Single(service.LastRequest.PlanPeriods);
+        Assert.Equal("Standard", savedPlan.PlanName);
+        Assert.Equal(400m, savedPlan.PriceWithoutVat);
+        Assert.Equal("Standard", viewModel.SelectedAssignablePlan?.Name);
+    }
+
+    [Fact]
+    public async Task StudentEditorAllowsUnspecifiedSchedulePlacement()
+    {
+        var service = new FakeStudentEditorService();
+        var viewModel = CreateNewStudentEditorWithActivePlan(service);
         viewModel.ShortName = "Anna";
         viewModel.FullName = "Anna Andersen";
         viewModel.Address = "Testvej 1";
@@ -119,6 +284,29 @@ public sealed class EditorViewModelTests
         Assert.False(viewModel.WasSaved);
     }
 
+    private static PlanCatalogItem CreateCatalogPlan(
+        string name,
+        PlanCatalogState state,
+        decimal PriceWithoutVat = 400m,
+        LessonsPerWeek LessonsPerWeek = LessonsPerWeek.One,
+        int DurationMinutes = 60,
+        PlanFlexibility Flexibility = PlanFlexibility.MoveOrCancelByAgreement,
+        int NumberOfStudents = 1,
+        DateTimeOffset? EffectiveFrom = null) =>
+        new(
+            Id: 1,
+            name,
+            PriceWithoutVat,
+            LessonsPerWeek,
+            DurationMinutes,
+            Flexibility,
+            NumberOfStudents,
+            EffectiveFrom ?? new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
+            state);
+
+    private static StudentEditorViewModel CreateNewStudentEditorWithActivePlan(FakeStudentEditorService service) =>
+        StudentEditorViewModel.CreateNew(service, [CreateCatalogPlan("Standard", PlanCatalogState.Active)]);
+
     private sealed class FakeStudentEditorService : IStudentEditorService
     {
         public OperationResult<string> SaveResult { get; init; } =
@@ -163,5 +351,52 @@ public sealed class EditorViewModelTests
             DateOnly refreshMonth,
             CancellationToken cancellationToken) =>
             Task.FromResult(OperationResult<IReadOnlyList<CalendarLesson>>.Success([]));
+    }
+
+    private static IReadOnlyList<WpfTextBox> FindTextBoxesBoundTo(DependencyObject root, params string[] bindingPaths)
+    {
+        var matches = new List<WpfTextBox>();
+        foreach (var child in LogicalTreeHelper.GetChildren(root))
+        {
+            if (child is WpfTextBox textBox)
+            {
+                var expression = textBox.GetBindingExpression(WpfTextBox.TextProperty);
+                if (expression?.ParentBinding.Path.Path is { } path && bindingPaths.Contains(path, StringComparer.Ordinal))
+                {
+                    matches.Add(textBox);
+                }
+            }
+
+            if (child is DependencyObject dependencyObject)
+            {
+                matches.AddRange(FindTextBoxesBoundTo(dependencyObject, bindingPaths));
+            }
+        }
+
+        return matches;
+    }
+
+    private static void RunOnStaThread(Action action)
+    {
+        Exception? exception = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                action();
+            }
+            catch (Exception ex)
+            {
+                exception = ex;
+            }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+
+        if (exception is not null)
+        {
+            throw exception;
+        }
     }
 }

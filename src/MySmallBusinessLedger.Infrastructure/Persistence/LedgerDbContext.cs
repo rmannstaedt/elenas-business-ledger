@@ -13,6 +13,8 @@ public sealed class LedgerDbContext : DbContext
 
     public DbSet<CalendarSettingsEntity> CalendarSettings => Set<CalendarSettingsEntity>();
 
+    public DbSet<PlanCatalogEntity> PlanCatalog => Set<PlanCatalogEntity>();
+
     public DbSet<StudentEntity> Students => Set<StudentEntity>();
 
     public DbSet<StudentPlanPeriodEntity> StudentPlanPeriods => Set<StudentPlanPeriodEntity>();
@@ -42,6 +44,16 @@ public sealed class LedgerDbContext : DbContext
             entity.HasKey(settings => settings.Id);
             entity.Property(settings => settings.SelectedCalendarId).HasMaxLength(500).IsRequired();
             entity.Property(settings => settings.GoogleAccountEmail).HasMaxLength(200).IsRequired();
+        });
+
+        modelBuilder.Entity<PlanCatalogEntity>(entity =>
+        {
+            entity.HasKey(plan => plan.Id);
+            entity.Property(plan => plan.Name).HasMaxLength(200).IsRequired();
+            entity.Property(plan => plan.LessonsPerWeek).HasConversion<string>().HasMaxLength(50).IsRequired();
+            entity.Property(plan => plan.Flexibility).HasConversion<string>().HasMaxLength(100).IsRequired();
+            entity.Property(plan => plan.State).HasConversion<string>().HasMaxLength(50).IsRequired();
+            entity.HasIndex(plan => plan.Name);
         });
 
         modelBuilder.Entity<StudentEntity>(entity =>

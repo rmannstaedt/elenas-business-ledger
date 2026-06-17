@@ -35,6 +35,27 @@ public sealed class CalendarSettingsEntity
     public string GoogleAccountEmail { get; set; } = string.Empty;
 }
 
+public sealed class PlanCatalogEntity
+{
+    public int Id { get; set; }
+
+    public string Name { get; set; } = string.Empty;
+
+    public decimal PriceWithoutVat { get; set; }
+
+    public LessonsPerWeek LessonsPerWeek { get; set; }
+
+    public int DurationMinutes { get; set; }
+
+    public PlanFlexibility Flexibility { get; set; }
+
+    public int NumberOfStudents { get; set; }
+
+    public DateTimeOffset EffectiveFrom { get; set; }
+
+    public PlanCatalogState State { get; set; }
+}
+
 public sealed class StudentEntity
 {
     public int Id { get; set; }

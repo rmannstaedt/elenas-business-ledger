@@ -177,6 +177,17 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task ManagePlansCommandOpensPlanCatalog()
+    {
+        var planCatalog = new FakePlanCatalogLauncher();
+        var viewModel = CreateViewModel(planCatalogLauncher: planCatalog);
+
+        await viewModel.OpenManagePlansCommand.ExecuteAsync();
+
+        Assert.True(planCatalog.WasShown);
+    }
+
+    [Fact]
     public async Task OpenInvoiceLaunchesViewerForSelectedInvoice()
     {
         var invoices = new FakeInvoiceWorkflowLauncher();
@@ -204,6 +215,7 @@ public sealed class MainWindowViewModelTests
             new FakeLessonStateService(),
             new FakeInvoiceWorkflowLauncher(),
             new FakeSettingsLauncher(),
+            new FakePlanCatalogLauncher(),
             new FakeUiClock(new DateTimeOffset(2026, 6, 16, 12, 0, 0, TimeSpan.Zero)));
         await viewModel.LoadAsync();
 
@@ -271,6 +283,7 @@ public sealed class MainWindowViewModelTests
             new FakeLessonStateService(),
             new FakeInvoiceWorkflowLauncher(),
             new FakeSettingsLauncher(),
+            new FakePlanCatalogLauncher(),
             new FakeUiClock(new DateTimeOffset(2026, 6, 16, 12, 0, 0, TimeSpan.Zero)));
         await viewModel.LoadAsync();
 
@@ -377,6 +390,7 @@ public sealed class MainWindowViewModelTests
         FakeLessonStateService? lessonStates = null,
         FakeInvoiceWorkflowLauncher? invoiceWorkflowLauncher = null,
         FakeSettingsLauncher? settingsLauncher = null,
+        FakePlanCatalogLauncher? planCatalogLauncher = null,
         FakeUiClock? clock = null) =>
         new(
             dashboard ?? new FakeDashboardService(),
@@ -389,6 +403,7 @@ public sealed class MainWindowViewModelTests
             lessonStates ?? new FakeLessonStateService(),
             invoiceWorkflowLauncher ?? new FakeInvoiceWorkflowLauncher(),
             settingsLauncher ?? new FakeSettingsLauncher(),
+            planCatalogLauncher ?? new FakePlanCatalogLauncher(),
             clock ?? new FakeUiClock(new DateTimeOffset(2026, 6, 16, 12, 0, 0, TimeSpan.Zero)));
 
     private static void RunOnStaThread(Action action)
@@ -668,6 +683,17 @@ public sealed class MainWindowViewModelTests
         {
             WasShown = true;
             return Task.FromResult(NextResult);
+        }
+    }
+
+    private sealed class FakePlanCatalogLauncher : IPlanCatalogLauncher
+    {
+        public bool WasShown { get; private set; }
+
+        public Task ShowPlanCatalogAsync(CancellationToken cancellationToken)
+        {
+            WasShown = true;
+            return Task.CompletedTask;
         }
     }
 

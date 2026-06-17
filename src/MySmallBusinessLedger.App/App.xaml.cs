@@ -34,15 +34,13 @@ public partial class App : Application
             return new LedgerDbContext(options);
         }
 
-        using (var context = CreateContext())
-        {
-            context.Database.EnsureCreated();
-        }
+        new SqliteSchemaInitializer(CreateContext).EnsureCreated();
 
         var studentRepository = new SqliteStudentRepository(CreateContext);
         var invoiceRepository = new SqliteInvoiceRepository(CreateContext);
         var companyProfileRepository = new SqliteCompanyProfileRepository(CreateContext);
         var calendarSettingsRepository = new SqliteCalendarSettingsRepository(CreateContext);
+        var planCatalogRepository = new SqlitePlanCatalogRepository(CreateContext);
         var googleOAuthClientConfigurationProvider = new GoogleOAuthClientConfigurationProvider(
             GoogleOAuthClientConfigurationProvider.CreateDefaultConfigurationPath());
         var googleCalendarClientFactory = new GoogleCalendarClientFactory(
@@ -70,6 +68,7 @@ public partial class App : Application
             new QuestPdfInvoicePdfWriter(),
             new SavedPdfPrinter(new ShellPrintProcessLauncher()));
         var invoiceWorkflowLauncher = new InvoiceWorkflowWindowLauncher(invoiceWorkflowService, systemClock);
+        var planCatalogService = new CorePlanCatalogService(planCatalogRepository);
         var settingsService = new CoreAppSettingsService(
             companyProfileRepository,
             calendarSettingsRepository,
@@ -86,12 +85,13 @@ public partial class App : Application
             new CoreInvoicePaymentStatusService(new ToggleInvoicePaymentStatusUseCase(invoiceRepository)),
             new MessageBoxConfirmationService(),
             new ExternalBrowserCalendarLauncher(calendarSettingsRepository.GetAsync),
-            new StudentEditorWindowLauncher(studentEditorService),
+            new StudentEditorWindowLauncher(studentEditorService, planCatalogService),
             new LessonEditorWindowLauncher(lessonEditorService),
             lessonEditorService,
             new CoreLessonStateService(new ToggleLessonStateUseCase(calendarGateway)),
             invoiceWorkflowLauncher,
             new SettingsWindowLauncher(settingsService),
+            new PlanCatalogWindowLauncher(planCatalogService),
             systemClock);
 
         var window = new MainWindow(viewModel);

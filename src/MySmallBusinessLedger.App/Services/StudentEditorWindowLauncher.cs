@@ -7,21 +7,30 @@ namespace MySmallBusinessLedger.App.Services;
 public sealed class StudentEditorWindowLauncher : IStudentEditorLauncher
 {
     private readonly IStudentEditorService studentEditorService;
+    private readonly IPlanCatalogService planCatalogService;
 
-    public StudentEditorWindowLauncher(IStudentEditorService studentEditorService)
+    public StudentEditorWindowLauncher(
+        IStudentEditorService studentEditorService,
+        IPlanCatalogService planCatalogService)
     {
         this.studentEditorService = studentEditorService;
+        this.planCatalogService = planCatalogService;
     }
 
-    public Task<bool> ShowAddStudentAsync(CancellationToken cancellationToken)
+    public async Task<bool> ShowAddStudentAsync(CancellationToken cancellationToken)
     {
-        var viewModel = StudentEditorViewModel.CreateNew(studentEditorService);
-        return Task.FromResult(ShowDialog(viewModel));
+        var assignablePlans = await planCatalogService.ListAssignableAsync(cancellationToken);
+        var viewModel = StudentEditorViewModel.CreateNew(studentEditorService, assignablePlans);
+        return ShowDialog(viewModel);
     }
 
     public async Task<bool> ShowEditStudentAsync(string studentShortName, CancellationToken cancellationToken)
     {
-        var snapshot = await studentEditorService.LoadAsync(studentShortName, cancellationToken);
+        var assignablePlansTask = planCatalogService.ListAssignableAsync(cancellationToken);
+        var snapshotTask = studentEditorService.LoadAsync(studentShortName, cancellationToken);
+        await Task.WhenAll(assignablePlansTask, snapshotTask);
+
+        var snapshot = await snapshotTask;
         if (snapshot is null)
         {
             MessageBox.Show(
@@ -32,7 +41,10 @@ public sealed class StudentEditorWindowLauncher : IStudentEditorLauncher
             return false;
         }
 
-        var viewModel = StudentEditorViewModel.FromSnapshot(studentEditorService, snapshot);
+        var viewModel = StudentEditorViewModel.FromSnapshot(
+            studentEditorService,
+            snapshot,
+            await assignablePlansTask);
         return ShowDialog(viewModel);
     }
 

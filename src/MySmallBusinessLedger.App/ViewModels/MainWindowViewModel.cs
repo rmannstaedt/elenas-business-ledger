@@ -22,6 +22,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private readonly ILessonStateService lessonStateService;
     private readonly IInvoiceWorkflowLauncher invoiceWorkflowLauncher;
     private readonly ISettingsLauncher settingsLauncher;
+    private readonly IPlanCatalogLauncher planCatalogLauncher;
     private readonly IUiClock clock;
     private DateTimeOffset? lastRefreshAt;
     private string? currentStudentShortName;
@@ -42,6 +43,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         ILessonStateService lessonStateService,
         IInvoiceWorkflowLauncher invoiceWorkflowLauncher,
         ISettingsLauncher settingsLauncher,
+        IPlanCatalogLauncher planCatalogLauncher,
         IUiClock clock)
     {
         this.dashboardService = dashboardService;
@@ -54,6 +56,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         this.lessonStateService = lessonStateService;
         this.invoiceWorkflowLauncher = invoiceWorkflowLauncher;
         this.settingsLauncher = settingsLauncher;
+        this.planCatalogLauncher = planCatalogLauncher;
         this.clock = clock;
         displayMonth = new DateOnly(clock.Now.Year, clock.Now.Month, 1);
 
@@ -75,6 +78,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         AddStudentCommand = new AsyncRelayCommand(AddStudentAsync, () => !IsBusy);
         EditStudentCommand = new AsyncRelayCommand(EditStudentAsync, () => !IsBusy && CurrentStudentShortName is not null);
         OpenSettingsCommand = new AsyncRelayCommand(OpenSettingsAsync, () => !IsBusy);
+        OpenManagePlansCommand = new AsyncRelayCommand(OpenManagePlansAsync, () => !IsBusy);
         AddLessonCommand = new AsyncRelayCommand(AddLessonAsync, () => !IsBusy && CurrentStudentShortName is not null);
         SaveLessonCommand = new AsyncRelayCommand(
             parameter => SaveLessonAsync((LessonDisplayModel)parameter!),
@@ -165,6 +169,8 @@ public sealed class MainWindowViewModel : ViewModelBase
     public AsyncRelayCommand EditStudentCommand { get; }
 
     public AsyncRelayCommand OpenSettingsCommand { get; }
+
+    public AsyncRelayCommand OpenManagePlansCommand { get; }
 
     public AsyncRelayCommand AddLessonCommand { get; }
 
@@ -294,6 +300,9 @@ public sealed class MainWindowViewModel : ViewModelBase
             await RefreshAsync();
         }
     }
+
+    private Task OpenManagePlansAsync() =>
+        planCatalogLauncher.ShowPlanCatalogAsync(CancellationToken.None);
 
     private async Task WriteInvoiceAsync()
     {
@@ -532,6 +541,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         AddStudentCommand.RaiseCanExecuteChanged();
         EditStudentCommand.RaiseCanExecuteChanged();
         OpenSettingsCommand.RaiseCanExecuteChanged();
+        OpenManagePlansCommand.RaiseCanExecuteChanged();
         AddLessonCommand.RaiseCanExecuteChanged();
         SaveLessonCommand.RaiseCanExecuteChanged();
         DeleteLessonCommand.RaiseCanExecuteChanged();
