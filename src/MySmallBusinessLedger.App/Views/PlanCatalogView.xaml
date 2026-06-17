@@ -157,7 +157,9 @@
                              Margin="0,3,0,8" />
                     <TextBlock Text="Lessons per week" />
                     <ComboBox ItemsSource="{Binding LessonsPerWeekOptions}"
-                              SelectedItem="{Binding LessonsPerWeek}"
+                              DisplayMemberPath="DisplayName"
+                              SelectedValuePath="Value"
+                              SelectedValue="{Binding LessonsPerWeek}"
                               IsEnabled="{Binding CanEditSelectedPlanFields}"
                               Margin="0,3,0,8" />
                     <TextBlock Text="Duration minutes" />
@@ -166,7 +168,9 @@
                              Margin="0,3,0,8" />
                     <TextBlock Text="Flexibility" />
                     <ComboBox ItemsSource="{Binding FlexibilityOptions}"
-                              SelectedItem="{Binding Flexibility}"
+                              DisplayMemberPath="DisplayName"
+                              SelectedValuePath="Value"
+                              SelectedValue="{Binding Flexibility}"
                               IsEnabled="{Binding CanEditSelectedPlanFields}"
                               Margin="0,3,0,8" />
                     <TextBlock Text="Number of students" />

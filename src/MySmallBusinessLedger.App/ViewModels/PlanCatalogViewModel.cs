@@ -41,11 +41,18 @@ public sealed class PlanCatalogViewModel : ViewModelBase
 
     public ICollectionView PlansView { get; }
 
-    public IReadOnlyList<LessonsPerWeek> LessonsPerWeekOptions { get; } =
-        [LessonsPerWeek.One, LessonsPerWeek.Two, LessonsPerWeek.ByAppointment];
+    public IReadOnlyList<DisplayOption<LessonsPerWeek>> LessonsPerWeekOptions { get; } =
+        [
+            new(LessonsPerWeek.One, "One lesson per week"),
+            new(LessonsPerWeek.Two, "Two lessons per week"),
+            new(LessonsPerWeek.ByAppointment, "By appointment")
+        ];
 
-    public IReadOnlyList<PlanFlexibility> FlexibilityOptions { get; } =
-        [PlanFlexibility.None, PlanFlexibility.MoveOrCancelByAgreement];
+    public IReadOnlyList<DisplayOption<PlanFlexibility>> FlexibilityOptions { get; } =
+        [
+            new(PlanFlexibility.None, "No flexibility"),
+            new(PlanFlexibility.MoveOrCancelByAgreement, "Move or cancel by agreement")
+        ];
 
     public PlanCatalogDisplayModel? SelectedPlan
     {

@@ -6,6 +6,7 @@ using MySmallBusinessLedger.Core.Plans;
 using MySmallBusinessLedger.Core.UseCases.Plans;
 using System.Windows;
 using WpfButton = System.Windows.Controls.Button;
+using WpfComboBox = System.Windows.Controls.ComboBox;
 using WpfDataGrid = System.Windows.Controls.DataGrid;
 using WpfGrid = System.Windows.Controls.Grid;
 
@@ -174,8 +175,32 @@ public sealed class PlanCatalogViewModelTests
             Assert.Equal(0, WpfGrid.GetRow(publishDraftButton));
             Assert.Equal(1, WpfGrid.GetColumn(publishDraftButton));
 
+            var comboBoxes = FindChildren<WpfComboBox>(window);
+            var lessonsComboBox = Assert.Single(comboBoxes, comboBox =>
+                comboBox.GetBindingExpression(WpfComboBox.SelectedValueProperty)?.ParentBinding.Path.Path == nameof(PlanCatalogViewModel.LessonsPerWeek));
+            Assert.Equal("DisplayName", lessonsComboBox.DisplayMemberPath);
+            Assert.Equal("Value", lessonsComboBox.SelectedValuePath);
+
+            var flexibilityComboBox = Assert.Single(comboBoxes, comboBox =>
+                comboBox.GetBindingExpression(WpfComboBox.SelectedValueProperty)?.ParentBinding.Path.Path == nameof(PlanCatalogViewModel.Flexibility));
+            Assert.Equal("DisplayName", flexibilityComboBox.DisplayMemberPath);
+            Assert.Equal("Value", flexibilityComboBox.SelectedValuePath);
+
             window.Close();
         });
+    }
+
+    [Fact]
+    public void PlanCatalogOptionsUseHumanReadableLabels()
+    {
+        var viewModel = new PlanCatalogViewModel(new FakePlanCatalogService());
+
+        Assert.Equal(
+            ["One lesson per week", "Two lessons per week", "By appointment"],
+            viewModel.LessonsPerWeekOptions.Select(option => option.DisplayName).ToArray());
+        Assert.Equal(
+            ["No flexibility", "Move or cancel by agreement"],
+            viewModel.FlexibilityOptions.Select(option => option.DisplayName).ToArray());
     }
 
     private static PlanCatalogItem CreatePlan(string name, PlanCatalogState state) =>
