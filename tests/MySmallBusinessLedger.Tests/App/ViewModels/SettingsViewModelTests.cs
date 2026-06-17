@@ -42,8 +42,8 @@ public sealed class SettingsViewModelTests
                 @"C:\Invoices"),
                 new CalendarSettings("primary", "studio@example.test"),
                 HasGoogleClientSecrets: true,
-                AppDataFolderPath: @"C:\Users\ExampleUser\AppData\Local\MySmallBusinessLedger",
-                DatabasePath: @"C:\Users\ExampleUser\AppData\Local\MySmallBusinessLedger\ledger.db")
+                AppDataFolderPath: @"C:\Users\ExampleUser\AppData\Roaming\visualtech.dk\MySmallBusinessLedger",
+                DatabasePath: @"C:\Users\ExampleUser\AppData\Roaming\visualtech.dk\MySmallBusinessLedger\ledger.db")
         };
         var viewModel = new SettingsViewModel(service);
 
@@ -54,8 +54,8 @@ public sealed class SettingsViewModelTests
         Assert.True(viewModel.IsVatRegistered);
         Assert.True(viewModel.HasGoogleClientSecrets);
         Assert.Equal("Google login setup file saved: Yes", viewModel.GoogleLoginSetupFileStatusText);
-        Assert.Equal(@"C:\Users\ExampleUser\AppData\Local\MySmallBusinessLedger", viewModel.AppDataFolderPath);
-        Assert.Equal(@"C:\Users\ExampleUser\AppData\Local\MySmallBusinessLedger\ledger.db", viewModel.DatabasePath);
+        Assert.Equal(@"C:\Users\ExampleUser\AppData\Roaming\visualtech.dk\MySmallBusinessLedger", viewModel.AppDataFolderPath);
+        Assert.Equal(@"C:\Users\ExampleUser\AppData\Roaming\visualtech.dk\MySmallBusinessLedger\ledger.db", viewModel.DatabasePath);
     }
 
     [Fact]

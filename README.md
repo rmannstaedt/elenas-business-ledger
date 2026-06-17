@@ -14,19 +14,19 @@ Primary goal:
 
 ```text
 src/
-  ElenaSmallBusinessLedger.App
-  ElenaSmallBusinessLedger.Core
-  ElenaSmallBusinessLedger.Infrastructure
+  MySmallBusinessLedger.App
+  MySmallBusinessLedger.Core
+  MySmallBusinessLedger.Infrastructure
 
 tests/
-  ElenaSmallBusinessLedger.Tests
+  MySmallBusinessLedger.Tests
 ```
 
 ## Build and test
 
 ```powershell
-dotnet build ElenaSmallBusinessLedger.sln -nodeReuse:false
-dotnet test ElenaSmallBusinessLedger.sln -nodeReuse:false
+dotnet build MySmallBusinessLedger.sln -nodeReuse:false
+dotnet test MySmallBusinessLedger.sln -nodeReuse:false
 ```
 
 ## Pilot setup
@@ -34,7 +34,7 @@ dotnet test ElenaSmallBusinessLedger.sln -nodeReuse:false
 Run the WPF app from Visual Studio or with:
 
 ```powershell
-dotnet run --project src\ElenaSmallBusinessLedger.App\ElenaSmallBusinessLedger.App.csproj
+dotnet run --project src\MySmallBusinessLedger.App\MySmallBusinessLedger.App.csproj
 ```
 
 On first setup, open `Application > Settings` and configure:
@@ -43,14 +43,15 @@ On first setup, open `Application > Settings` and configure:
 - Google Calendar ID and account label/email;
 - Google Calendar login setup file, which is the Google-downloaded OAuth JSON file.
 
-The app copies the selected Google Calendar login setup file to `%LOCALAPPDATA%\ElenaSmallBusinessLedger\google-client-secrets.json`.
+The app copies the selected Google Calendar login setup file to `%APPDATA%\visualtech.dk\MySmallBusinessLedger\google-client-secrets.json`.
 Google OAuth access/refresh tokens are stored separately with Windows user data protection.
 
-Runtime data lives under `%LOCALAPPDATA%\ElenaSmallBusinessLedger`:
+Runtime data lives under `%APPDATA%\visualtech.dk\MySmallBusinessLedger`:
 
 - `ledger.db` - local SQLite database;
 - `google-client-secrets.json` - copied Google Calendar login setup file;
 - `GoogleTokens\` - Windows-protected Google OAuth token store.
+- `window-placement.json` - remembered window sizes and positions.
 
 The invoice folder is configured in Settings and may be outside the app data folder.
 The app writes invoice PDFs through a staging/verification/publish flow and does not silently overwrite an existing issued invoice PDF.
@@ -61,7 +62,7 @@ The app writes invoice PDFs through a staging/verification/publish flow and does
 - Lønsumsafgift is out of scope for version 1.0.
 - Google Calendar is the operational lesson schedule, with two-way sync.
 - Google Calendar integration uses the official Google Calendar API client, external browser OAuth, and Windows-protected local token storage.
-- Runtime data is stored under `%LOCALAPPDATA%\ElenaSmallBusinessLedger`.
+- Runtime data is stored under `%APPDATA%\visualtech.dk\MySmallBusinessLedger`.
 - The WPF app now uses real SQLite/Core/Calendar-backed services; if Google Calendar is not configured, the dashboard reports that instead of showing sample lesson rows.
 - Company and Google Calendar setup is available from `Application > Settings`.
 - The app stores issued invoice PDFs in a configurable invoices folder.

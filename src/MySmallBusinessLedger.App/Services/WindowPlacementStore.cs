@@ -7,10 +7,7 @@ namespace MySmallBusinessLedger.App.Services;
 public static class WindowPlacementStore
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
-    private static readonly string StorePath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "MySmallBusinessLedger",
-        "window-placement.json");
+    private static readonly string StorePath = AppPaths.CreateDefault().WindowPlacementPath;
 
     public static void Attach(Window window, string key)
     {

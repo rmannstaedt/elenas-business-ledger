@@ -33,10 +33,11 @@ Invoice PDF generation: QuestPDF
 Invoice PDF safety: write to staging, verify PDF bytes, publish without overwriting, then persist invoice metadata and request print
 Google Calendar account tokens: stored locally with Windows user data protection, never in SQLite or plaintext config
 Google Calendar selected calendar/account label: stored in SQLite app settings
-Runtime app data folder: `%LOCALAPPDATA%\visualtech.dk\MySmallBusinessLedger`
-Runtime SQLite database path: `%LOCALAPPDATA%\visualtech.dk\MySmallBusinessLedger\ledger.db`
-Google Calendar login setup file path: `%LOCALAPPDATA%\visualtech.dk\MySmallBusinessLedger\google-client-secrets.json`
-Google OAuth protected token folder: `%LOCALAPPDATA%\visualtech.dk\MySmallBusinessLedger\GoogleTokens`
+Runtime app data folder: `%APPDATA%\visualtech.dk\MySmallBusinessLedger`
+Runtime SQLite database path: `%APPDATA%\visualtech.dk\MySmallBusinessLedger\ledger.db`
+Google Calendar login setup file path: `%APPDATA%\visualtech.dk\MySmallBusinessLedger\google-client-secrets.json`
+Google OAuth protected token folder: `%APPDATA%\visualtech.dk\MySmallBusinessLedger\GoogleTokens`
+Window placement file path: `%APPDATA%\visualtech.dk\MySmallBusinessLedger\window-placement.json`
 Backup: no automated backup in version 1.0; keep persistence design compatible with later manual backup/export
 
 ## External integrations
