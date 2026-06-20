@@ -16,7 +16,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private readonly IInvoicePaymentStatusService paymentStatusService;
     private readonly IConfirmationService confirmationService;
     private readonly ICalendarLauncher calendarLauncher;
-    private readonly IStudentEditorLauncher studentEditorLauncher;
+    private readonly IStudentOverviewLauncher studentOverviewLauncher;
     private readonly ILessonEditorLauncher lessonEditorLauncher;
     private readonly ILessonEditorService lessonEditorService;
     private readonly ILessonStateService lessonStateService;
@@ -37,7 +37,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         IInvoicePaymentStatusService paymentStatusService,
         IConfirmationService confirmationService,
         ICalendarLauncher calendarLauncher,
-        IStudentEditorLauncher studentEditorLauncher,
+        IStudentOverviewLauncher studentOverviewLauncher,
         ILessonEditorLauncher lessonEditorLauncher,
         ILessonEditorService lessonEditorService,
         ILessonStateService lessonStateService,
@@ -50,7 +50,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         this.paymentStatusService = paymentStatusService;
         this.confirmationService = confirmationService;
         this.calendarLauncher = calendarLauncher;
-        this.studentEditorLauncher = studentEditorLauncher;
+        this.studentOverviewLauncher = studentOverviewLauncher;
         this.lessonEditorLauncher = lessonEditorLauncher;
         this.lessonEditorService = lessonEditorService;
         this.lessonStateService = lessonStateService;
@@ -75,8 +75,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         OpenInvoiceCommand = new AsyncRelayCommand(
             parameter => OpenInvoiceAsync((InvoiceDisplayModel)parameter!),
             parameter => parameter is InvoiceDisplayModel && !IsBusy);
-        AddStudentCommand = new AsyncRelayCommand(AddStudentAsync, () => !IsBusy);
-        EditStudentCommand = new AsyncRelayCommand(EditStudentAsync, () => !IsBusy && CurrentStudentShortName is not null);
+        OpenManageStudentsCommand = new AsyncRelayCommand(OpenManageStudentsAsync, () => !IsBusy);
         OpenSettingsCommand = new AsyncRelayCommand(OpenSettingsAsync, () => !IsBusy);
         OpenManagePlansCommand = new AsyncRelayCommand(OpenManagePlansAsync, () => !IsBusy);
         AddLessonCommand = new AsyncRelayCommand(AddLessonAsync, () => !IsBusy && CurrentStudentShortName is not null);
@@ -164,9 +163,7 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     public AsyncRelayCommand OpenInvoiceCommand { get; }
 
-    public AsyncRelayCommand AddStudentCommand { get; }
-
-    public AsyncRelayCommand EditStudentCommand { get; }
+    public AsyncRelayCommand OpenManageStudentsCommand { get; }
 
     public AsyncRelayCommand OpenSettingsCommand { get; }
 
@@ -269,27 +266,24 @@ public sealed class MainWindowViewModel : ViewModelBase
         ErrorMessage = null;
     }
 
-    private async Task AddStudentAsync()
+    private async Task OpenManageStudentsAsync()
     {
-        var saved = await studentEditorLauncher.ShowAddStudentAsync(CancellationToken.None);
-        if (saved)
-        {
-            await RefreshAsync();
-        }
+        var selectedStudentShortName = await studentOverviewLauncher.ShowStudentOverviewAsync(
+            CurrentStudentShortName,
+            ApplyStudentOverviewSelectionAsync,
+            CancellationToken.None);
+        await ApplyStudentOverviewSelectionAsync(selectedStudentShortName, CancellationToken.None);
     }
 
-    private async Task EditStudentAsync()
+    private async Task ApplyStudentOverviewSelectionAsync(string? selectedStudentShortName, CancellationToken cancellationToken)
     {
-        if (CurrentStudentShortName is null)
+        if (string.IsNullOrWhiteSpace(selectedStudentShortName))
         {
             return;
         }
 
-        var saved = await studentEditorLauncher.ShowEditStudentAsync(CurrentStudentShortName, CancellationToken.None);
-        if (saved)
-        {
-            await RefreshAsync();
-        }
+        CurrentStudentShortName = selectedStudentShortName;
+        await RefreshAsync();
     }
 
     private async Task OpenSettingsAsync()
@@ -538,8 +532,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         ToggleInvoicePaymentStatusCommand.RaiseCanExecuteChanged();
         OpenCalendarCommand.RaiseCanExecuteChanged();
         WriteInvoiceCommand.RaiseCanExecuteChanged();
-        AddStudentCommand.RaiseCanExecuteChanged();
-        EditStudentCommand.RaiseCanExecuteChanged();
+        OpenManageStudentsCommand.RaiseCanExecuteChanged();
         OpenSettingsCommand.RaiseCanExecuteChanged();
         OpenManagePlansCommand.RaiseCanExecuteChanged();
         AddLessonCommand.RaiseCanExecuteChanged();

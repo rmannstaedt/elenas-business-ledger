@@ -4,6 +4,8 @@ using MySmallBusinessLedger.Core.Common;
 using MySmallBusinessLedger.Core.Invoices;
 using MySmallBusinessLedger.Core.Lessons;
 using MySmallBusinessLedger.Core.UseCases.Startup;
+using System.Windows;
+using WpfMenuItem = System.Windows.Controls.MenuItem;
 using AppMainWindow = MySmallBusinessLedger.App.MainWindow;
 
 namespace MySmallBusinessLedger.Tests.App.ViewModels;
@@ -21,6 +23,28 @@ public sealed class MainWindowViewModelTests
             Assert.Equal("My Small Business Ledger", window.Title);
             Assert.Same(viewModel, window.DataContext);
             Assert.NotNull(window.Content);
+
+            window.Close();
+        });
+    }
+
+    [Fact]
+    public void StudentMenuOnlyShowsManageStudents()
+    {
+        RunOnStaThread(() =>
+        {
+            var viewModel = CreateViewModel();
+            var window = new AppMainWindow(viewModel);
+
+            var studentMenu = Assert.Single(FindChildren<WpfMenuItem>(window), item => item.Header?.ToString() == "_Student");
+            var studentActions = studentMenu.Items
+                .OfType<WpfMenuItem>()
+                .Select(item => item.Header?.ToString())
+                .Where(header => header is not null)
+                .Cast<string>()
+                .ToArray();
+
+            Assert.Equal(["_Manage Students"], studentActions);
 
             window.Close();
         });
@@ -188,6 +212,48 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task ManageStudentsCommandRefreshesDashboardWithSelectedOverviewStudent()
+    {
+        var dashboard = new FakeDashboardService { StudentShortNames = ["Anna", "Bo"] };
+        var studentOverview = new FakeStudentOverviewLauncher { SelectedStudentShortName = "Bo" };
+        var viewModel = CreateViewModel(dashboard: dashboard, studentOverviewLauncher: studentOverview);
+        await viewModel.LoadAsync();
+
+        await viewModel.OpenManageStudentsCommand.ExecuteAsync();
+
+        Assert.True(studentOverview.WasShown);
+        Assert.Equal("Anna", studentOverview.InitialSelectedStudentShortName);
+        Assert.Equal("Bo", dashboard.LastSelectedStudentShortName);
+        Assert.Equal("Bo", viewModel.CurrentStudentShortName);
+        Assert.Equal(2, dashboard.LoadCount);
+    }
+
+    [Fact]
+    public async Task ManageStudentsSelectionImmediatelyRefreshesDashboard()
+    {
+        var dashboard = new FakeDashboardService { StudentShortNames = ["Anna", "Erik"] };
+        var selectionRefreshWasSeenBeforeClose = false;
+        var studentOverview = new FakeStudentOverviewLauncher
+        {
+            SelectionChangedStudentShortName = "Erik",
+            OnAfterSelectionChanged = () =>
+            {
+                selectionRefreshWasSeenBeforeClose =
+                    dashboard.LastSelectedStudentShortName == "Erik" &&
+                    dashboard.LoadCount == 2;
+            },
+            SelectedStudentShortName = "Erik"
+        };
+        var viewModel = CreateViewModel(dashboard: dashboard, studentOverviewLauncher: studentOverview);
+        await viewModel.LoadAsync();
+
+        await viewModel.OpenManageStudentsCommand.ExecuteAsync();
+
+        Assert.True(selectionRefreshWasSeenBeforeClose);
+        Assert.Equal("Erik", viewModel.CurrentStudentShortName);
+    }
+
+    [Fact]
     public async Task OpenInvoiceLaunchesViewerForSelectedInvoice()
     {
         var invoices = new FakeInvoiceWorkflowLauncher();
@@ -197,32 +263,6 @@ public sealed class MainWindowViewModelTests
         await viewModel.OpenInvoiceCommand.ExecuteAsync(viewModel.Invoices[0]);
 
         Assert.Equal(new InvoiceNumber(1), invoices.LastViewedInvoiceNumber);
-    }
-
-    [Fact]
-    public async Task AddStudentRefreshesDashboardAfterDialogSave()
-    {
-        var dashboard = new FakeDashboardService();
-        var studentEditor = new FakeStudentEditorLauncher { NextResult = true };
-        var viewModel = new MainWindowViewModel(
-            dashboard,
-            new FakePaymentService(),
-            new FakeConfirmationService(),
-            new FakeCalendarLauncher(),
-            studentEditor,
-            new FakeLessonEditorLauncher(),
-            new FakeLessonEditorService(),
-            new FakeLessonStateService(),
-            new FakeInvoiceWorkflowLauncher(),
-            new FakeSettingsLauncher(),
-            new FakePlanCatalogLauncher(),
-            new FakeUiClock(new DateTimeOffset(2026, 6, 16, 12, 0, 0, TimeSpan.Zero)));
-        await viewModel.LoadAsync();
-
-        await viewModel.AddStudentCommand.ExecuteAsync();
-
-        Assert.True(studentEditor.AddWasShown);
-        Assert.Equal(2, dashboard.LoadCount);
     }
 
     [Fact]
@@ -277,7 +317,7 @@ public sealed class MainWindowViewModelTests
             new FakePaymentService(),
             new FakeConfirmationService(),
             new FakeCalendarLauncher(),
-            new FakeStudentEditorLauncher(),
+            new FakeStudentOverviewLauncher(),
             lessonEditor,
             new FakeLessonEditorService(),
             new FakeLessonStateService(),
@@ -385,6 +425,7 @@ public sealed class MainWindowViewModelTests
         FakePaymentService? payments = null,
         FakeConfirmationService? confirmation = null,
         FakeCalendarLauncher? calendar = null,
+        FakeStudentOverviewLauncher? studentOverviewLauncher = null,
         FakeLessonEditorLauncher? lessonEditorLauncher = null,
         FakeLessonEditorService? lessonEditorService = null,
         FakeLessonStateService? lessonStates = null,
@@ -397,7 +438,7 @@ public sealed class MainWindowViewModelTests
             payments ?? new FakePaymentService(),
             confirmation ?? new FakeConfirmationService(),
             calendar ?? new FakeCalendarLauncher(),
-            new FakeStudentEditorLauncher(),
+            studentOverviewLauncher ?? new FakeStudentOverviewLauncher(),
             lessonEditorLauncher ?? new FakeLessonEditorLauncher(),
             lessonEditorService ?? new FakeLessonEditorService(),
             lessonStates ?? new FakeLessonStateService(),
@@ -429,6 +470,26 @@ public sealed class MainWindowViewModelTests
         {
             throw exception;
         }
+    }
+
+    private static IReadOnlyList<T> FindChildren<T>(DependencyObject root)
+        where T : DependencyObject
+    {
+        var matches = new List<T>();
+        foreach (var child in LogicalTreeHelper.GetChildren(root))
+        {
+            if (child is T match)
+            {
+                matches.Add(match);
+            }
+
+            if (child is DependencyObject dependencyObject)
+            {
+                matches.AddRange(FindChildren<T>(dependencyObject));
+            }
+        }
+
+        return matches;
     }
 
     private sealed class FakeDashboardService : IStartupDashboardService
@@ -551,20 +612,33 @@ public sealed class MainWindowViewModelTests
         }
     }
 
-    private sealed class FakeStudentEditorLauncher : IStudentEditorLauncher
+    private sealed class FakeStudentOverviewLauncher : IStudentOverviewLauncher
     {
-        public bool NextResult { get; init; }
+        public bool WasShown { get; private set; }
 
-        public bool AddWasShown { get; private set; }
+        public string? InitialSelectedStudentShortName { get; private set; }
 
-        public Task<bool> ShowAddStudentAsync(CancellationToken cancellationToken)
+        public string? SelectedStudentShortName { get; init; }
+
+        public string? SelectionChangedStudentShortName { get; init; }
+
+        public Action? OnAfterSelectionChanged { get; init; }
+
+        public async Task<string?> ShowStudentOverviewAsync(
+            string? selectedStudentShortName,
+            Func<string?, CancellationToken, Task> selectedStudentChangedAsync,
+            CancellationToken cancellationToken)
         {
-            AddWasShown = true;
-            return Task.FromResult(NextResult);
-        }
+            WasShown = true;
+            InitialSelectedStudentShortName = selectedStudentShortName;
+            if (SelectionChangedStudentShortName is not null)
+            {
+                await selectedStudentChangedAsync(SelectionChangedStudentShortName, cancellationToken);
+                OnAfterSelectionChanged?.Invoke();
+            }
 
-        public Task<bool> ShowEditStudentAsync(string studentShortName, CancellationToken cancellationToken) =>
-            Task.FromResult(NextResult);
+            return SelectedStudentShortName;
+        }
     }
 
     private sealed class FakeLessonEditorLauncher : ILessonEditorLauncher

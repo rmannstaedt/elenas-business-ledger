@@ -15,6 +15,19 @@ public sealed class SqliteStudentRepository : IStudentRepository
         this.createContext = createContext;
     }
 
+    public async Task<IReadOnlyList<StudentRecord>> ListStudentsAsync(CancellationToken cancellationToken)
+    {
+        await using var context = createContext();
+        var students = await context.Students
+            .AsNoTracking()
+            .Include(student => student.PlanPeriods)
+            .Include(student => student.ScheduleEntries)
+            .OrderBy(student => student.ShortName)
+            .ToArrayAsync(cancellationToken);
+
+        return students.Select(ToDomain).ToArray();
+    }
+
     public async Task<IReadOnlyList<StudentRecord>> ListActiveStudentsAsync(CancellationToken cancellationToken)
     {
         await using var context = createContext();

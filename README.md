@@ -58,6 +58,8 @@ The app writes invoice PDFs through a staging/verification/publish flow and does
 
 Plans are managed from `Plan > Manage Plans`. New plans start as incomplete Drafts, where they can be edited, deleted, or published. Draft payment terms are selected from `Paid monthly in advance` or `Paid per lesson`, with `Paid monthly in advance` as the default. Publishing requires all plan fields except `Retire on`. Published Active plans are immutable and can be assigned to students; their `Retire on` date can still be changed, and they can be retired immediately. Retired plans are immutable and hidden from student assignment until reactivated. Assigning a plan to a student copies the plan fields, including payment terms, into the student's plan period, so later catalog lifecycle changes do not rewrite existing student or invoice data.
 
+Students are managed from `Student > Manage Students`. The overview lists active and inactive students, embeds the student editor for the selected student, shows issued invoices, and keeps explicit Save/Cancel for edits. Add Student creates an in-pane draft. Selecting an Active catalog plan copies that plan into the student's plan period; changing the Active checkbox only persists when Save is pressed. Plan periods, schedules, and issued invoices remain intact unless the user explicitly saves edited student data. Double-clicking an invoice opens the existing invoice viewer. Selecting a student in Manage Students immediately refreshes the main window around that student, and closing Manage Students applies the final selection again.
+
 ## Current key assumptions
 
 - Under-30 teaching support remains in the data model because future students may require it (but out of scope for version 1.0).
@@ -70,6 +72,7 @@ Plans are managed from `Plan > Manage Plans`. New plans start as incomplete Draf
 - The WPF app now uses real SQLite/Core/Calendar-backed services; if Google Calendar is not configured, the dashboard reports that instead of showing sample lesson rows.
 - Company and Google Calendar account setup, connection, and authorization reset are available from `Application > Settings`.
 - Plan catalog management is available from `Plan > Manage Plans`; only Active catalog plans are assignable to students.
+- Student overview management is available from `Student > Manage Students`; it lists all students, supports in-pane student/plan/schedule editing with explicit Save/Cancel, mirrors student selection into the main window immediately and on close, and preserves copied plan snapshots and issued invoices unless edited student data is saved.
 - The app stores issued invoice PDFs in a configurable invoices folder.
 - Invoice PDFs are generated with QuestPDF, staged and verified before final storage, and never silently overwritten.
 - The initial UI recommendation is WPF + .NET 10.

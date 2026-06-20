@@ -1,15 +1,16 @@
 # Handoff
 
-Date: 2026-06-17
+Date: 2026-06-20
 
 ## Current State
 
-- Active implementation plans: `.ai/implementation-plans/active/2026-06-17-publisher-google-oauth-app.md` and `.ai/implementation-plans/active/2026-06-17-plan-catalog-management.md`.
+- Active implementation plans: `.ai/implementation-plans/active/2026-06-17-publisher-google-oauth-app.md`, `.ai/implementation-plans/active/2026-06-17-plan-catalog-management.md`, `.ai/implementation-plans/active/2026-06-20-student-overview-management.md`, and `.ai/implementation-plans/active/2026-06-20-student-overview-embedded-editing.md`.
 - The app is now a real WPF/Core/Infrastructure local-first pilot build, not sample-backed.
 - User-facing product name, internal namespace, project prefix, and app-data folder are `My Small Business Ledger` / `MySmallBusinessLedger`.
 - Runtime composition uses SQLite under `%APPDATA%\visualtech.dk\MySmallBusinessLedger`, Google Calendar through the official API client, QuestPDF invoice generation, staged PDF storage, invoice metadata persistence, and OS print request after PDF save.
 - `Application > Settings` configures company profile, address plus an unlabeled second address/city line, invoice folder with manual entry or Browse picker, Google calendar/account label, publisher Google sign-in app status, local Google authorization status, and Connect Google Calendar / Forget Google sign-in actions; it also shows read-only app data/database paths. The Google calendar field defaults to `primary`, meaning the signed-in account's main calendar, and its tooltip explains where to find a separate calendar ID.
 - Student editor also uses two stacked address fields; the ViewModel combines them into one multiline student address for existing Core/SQLite/invoice behavior.
+- `Student > Manage Students` is the only Student menu action. It opens a comprehensive overview listing active and inactive students. The selected student pane embeds the Student editor behavior for student fields, Active flag, active-plan assignment, copied plan snapshot, plan start/end dates, and schedule. Edits use explicit Save/Cancel; Add Student creates an in-pane draft. Invoice double-click opens the existing invoice viewer. Selection changes in Manage Students immediately refresh the main window around the selected student, and closing Manage Students applies the final selection again. The old standalone Add/Edit Student window and main-menu entries have been removed. The window and student/invoice grid columns are remembered under the existing app-data placement/width stores.
 - `Plan > Manage Plans` now manages a durable SQLite plan catalog with Draft, Active, and Retired states. Draft plans can be incomplete, edited, deleted, and published; publishing requires all fields except `Retire on`. New Drafts default to blank name/price, one lesson per week, 60 minutes, one student, move/cancel flexibility, `Paid monthly in advance`, first day of the current month, and blank `Retire on`. Active plans are immutable except for `Retire on` scheduling and can be retired; Retired plans are immutable and can be reactivated. `Add Plan` saves changed Draft fields before creating the next Draft and prompts before discarding/saving an unsaved Active `Retire on` change.
 - The student editor offers only publish-complete Active catalog plans for assignment. Selecting one copies plan fields, including payment terms, into the student's saved plan period; existing student plan periods and issued invoices remain copied snapshots and are not rewritten by later catalog lifecycle changes. If no Active plan is selected, the current-plan detail labels/values are hidden.
 - The main-window Open Calendar action opens Google Calendar in the browser with the configured Google account email as an `authuser` hint, avoiding the old hardcoded `/u/0/` first-browser-account behavior when possible.
@@ -30,6 +31,7 @@ Date: 2026-06-17
 - Do not restore the old user-selected Google OAuth JSON setup flow unless Ruben explicitly asks for a migration fallback.
 - Do not allow Draft or Retired catalog plans to be assigned to students.
 - Do not mutate existing student plan periods or issued invoices when a catalog plan changes lifecycle state.
+- Deactivating/reactivating a student must not mutate plan periods, schedule entries, or issued invoices.
 
 ## Verification Snapshot
 
@@ -37,15 +39,24 @@ Date: 2026-06-17
 - Focused OAuth/Settings test run passed: 24 tests.
 - Full build passed on 2026-06-17 after Google calendar settings follow-up: `dotnet build MySmallBusinessLedger.sln -nodeReuse:false` with 0 warnings and 0 errors.
 - Full test suite passed on 2026-06-18 after Plan catalog draft-default/payment-term dropdown follow-up: `dotnet test MySmallBusinessLedger.sln -nodeReuse:false` with 161/161 tests passing.
+- Focused Student overview tests passed on 2026-06-20: `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~StudentOverview|FullyQualifiedName~StudentsCanBeListedIncludingInactiveStudents|FullyQualifiedName~ManageStudentsCommand" -nodeReuse:false` with 7/7 tests passing.
+- Full build passed on 2026-06-20 after Student overview implementation: `dotnet build MySmallBusinessLedger.sln -nodeReuse:false` with 0 warnings and 0 errors.
+- Full test suite passed on 2026-06-20 after Student overview implementation: `dotnet test MySmallBusinessLedger.sln -nodeReuse:false` with 168/168 tests passing.
+- Focused embedded student editing tests passed on 2026-06-20: `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~StudentOverview|FullyQualifiedName~StudentEditor" -nodeReuse:false` with 19/19 tests passing.
+- Full test suite passed on 2026-06-20 after embedded student editing implementation: `dotnet test MySmallBusinessLedger.sln -nodeReuse:false` with 171/171 tests passing.
+- Focused Student menu/overview/editor cleanup tests passed on 2026-06-20: `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~MainWindowViewModel|FullyQualifiedName~StudentOverview|FullyQualifiedName~StudentEditor" -nodeReuse:false` with 40/40 tests passing.
+- Full test suite passed on 2026-06-20 after Student menu/dialog cleanup: `dotnet test MySmallBusinessLedger.sln -nodeReuse:false` with 170/170 tests passing.
+- Full test suite passed on 2026-06-20 after Manage Students selection handoff: `dotnet test MySmallBusinessLedger.sln -nodeReuse:false` with 170/170 tests passing.
+- Full test suite passed on 2026-06-20 after live Manage Students selection sync: `dotnet test MySmallBusinessLedger.sln -nodeReuse:false` with 171/171 tests passing.
 - Focused Plan catalog tests passed on 2026-06-17: Stage 1 Core plan tests 9/9, Stage 2 SQLite persistence tests 10/10, Stage 3 Manage Plans tests 10/10, Stage 4 student assignment/editor/persistence tests 23/23.
 - Real browser OAuth consent reached Google's "Received verification code" page for maintainer testing; Stage 6 remains open for app-side dashboard/settings verification after these follow-up fixes.
 - `dotnet format MySmallBusinessLedger.sln --verify-no-changes --no-restore` may still report broad line-ending/whitespace issues across existing files; avoid a sweeping format rewrite unless Ruben explicitly wants that cleanup.
 
 ## Recommended Next Actions
 
-1. Run full build and full test suite.
-2. Place the real publisher OAuth Desktop JSON at `src\MySmallBusinessLedger.App\Configuration\google-oauth-client.json`.
-3. Complete maintainer pilot setup through `Application > Settings`, then use Connect Google Calendar.
-4. Run the final user test from the active plan against a safe Google Calendar/test invoice folder.
+1. Place the real publisher OAuth Desktop JSON at `src\MySmallBusinessLedger.App\Configuration\google-oauth-client.json`.
+2. Complete maintainer pilot setup through `Application > Settings`, then use Connect Google Calendar.
+3. Run the Student overview final user test from `.ai/implementation-plans/active/2026-06-20-student-overview-management.md`.
+4. Run the remaining OAuth/calendar pilot test against a safe Google Calendar/test invoice folder.
 5. Visually review the invoice PDF layout and WPF dialogs; PDF layout polish is intentionally deferred.
-6. Create follow-up plans for admin overview, multi-period student plan history editing, backup/export, VAT reporting, and invoice layout touch-ups.
+6. Create follow-up plans for broader administration views, multi-period student plan history editing, backup/export, VAT reporting, and invoice layout touch-ups.

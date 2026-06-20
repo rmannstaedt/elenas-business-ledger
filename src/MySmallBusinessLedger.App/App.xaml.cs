@@ -66,6 +66,7 @@ public partial class App : Application
             TimeZoneInfo.Local,
             DefaultLessonDuration);
         var studentEditorService = new CoreStudentEditorService(studentRepository);
+        var studentOverviewService = new CoreStudentOverviewService(studentRepository, invoiceRepository);
         var lessonEditorService = new CoreLessonEditorService(
             new AddLessonUseCase(calendarGateway),
             new EditLessonUseCase(calendarGateway),
@@ -94,7 +95,12 @@ public partial class App : Application
             new CoreInvoicePaymentStatusService(new ToggleInvoicePaymentStatusUseCase(invoiceRepository)),
             new MessageBoxConfirmationService(),
             new ExternalBrowserCalendarLauncher(calendarSettingsRepository.GetAsync),
-            new StudentEditorWindowLauncher(studentEditorService, planCatalogService),
+            new StudentOverviewWindowLauncher(
+                studentOverviewService,
+                studentEditorService,
+                planCatalogService,
+                invoiceWorkflowLauncher,
+                systemClock),
             new LessonEditorWindowLauncher(lessonEditorService),
             lessonEditorService,
             new CoreLessonStateService(new ToggleLessonStateUseCase(calendarGateway)),

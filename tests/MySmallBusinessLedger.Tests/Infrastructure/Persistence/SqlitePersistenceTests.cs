@@ -68,6 +68,21 @@ public sealed class SqlitePersistenceTests
     }
 
     [Fact]
+    public async Task StudentsCanBeListedIncludingInactiveStudents()
+    {
+        using var database = await TestDatabase.CreateAsync();
+        var repository = new SqliteStudentRepository(database.CreateContext);
+        await repository.SaveAsync(CreateStudentRecord("Anna"), CancellationToken.None);
+        await repository.SaveAsync(CreateStudentRecord("Bo", isActive: false), CancellationToken.None);
+
+        var students = await repository.ListStudentsAsync(CancellationToken.None);
+
+        Assert.Equal(["Anna", "Bo"], students.Select(record => record.Student.ShortName).ToArray());
+        Assert.True(students.Single(record => record.Student.ShortName == "Anna").Student.IsActive);
+        Assert.False(students.Single(record => record.Student.ShortName == "Bo").Student.IsActive);
+    }
+
+    [Fact]
     public async Task PlanCatalogLifecycleCanBeSavedAndListed()
     {
         using var database = await TestDatabase.CreateAsync();
@@ -284,7 +299,8 @@ public sealed class SqlitePersistenceTests
     private static StudentRecord CreateStudentRecord(
         string shortName,
         string? fullName = null,
-        string currentPlanName = "Standard")
+        string currentPlanName = "Standard",
+        bool isActive = true)
     {
         var student = Student.Create(
             shortName,
@@ -294,7 +310,7 @@ public sealed class SqlitePersistenceTests
             $"{shortName.ToLowerInvariant()}@example.test",
             AgeBracket.Standard,
             birthdate: null,
-            isActive: true).Value!;
+            isActive).Value!;
 
         return new StudentRecord(
             student,

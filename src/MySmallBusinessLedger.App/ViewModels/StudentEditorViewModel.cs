@@ -11,6 +11,7 @@ namespace MySmallBusinessLedger.App.ViewModels;
 public sealed class StudentEditorViewModel : ViewModelBase
 {
     private readonly IStudentEditorService studentEditorService;
+    private readonly bool requestCloseOnSave;
     private string shortName = string.Empty;
     private string fullName = string.Empty;
     private string address = string.Empty;
@@ -37,9 +38,11 @@ public sealed class StudentEditorViewModel : ViewModelBase
 
     private StudentEditorViewModel(
         IStudentEditorService studentEditorService,
-        IReadOnlyList<PlanCatalogItem> assignablePlans)
+        IReadOnlyList<PlanCatalogItem> assignablePlans,
+        bool requestCloseOnSave)
     {
         this.studentEditorService = studentEditorService;
+        this.requestCloseOnSave = requestCloseOnSave;
         AssignablePlans = new ObservableCollection<PlanCatalogItem>(
             assignablePlans.Where(plan => plan.CanBeAssigned).OrderBy(plan => plan.Name));
         SaveCommand = new AsyncRelayCommand(SaveAsync, () => !IsBusy);
@@ -50,9 +53,10 @@ public sealed class StudentEditorViewModel : ViewModelBase
 
     public static StudentEditorViewModel CreateNew(
         IStudentEditorService studentEditorService,
-        IReadOnlyList<PlanCatalogItem>? assignablePlans = null)
+        IReadOnlyList<PlanCatalogItem>? assignablePlans = null,
+        bool requestCloseOnSave = true)
     {
-        var viewModel = new StudentEditorViewModel(studentEditorService, assignablePlans ?? []);
+        var viewModel = new StudentEditorViewModel(studentEditorService, assignablePlans ?? [], requestCloseOnSave);
         viewModel.requiresCatalogPlanAssignment = true;
         viewModel.SetSelectedAssignablePlan(viewModel.AssignablePlans.FirstOrDefault(), applyPlan: true);
         return viewModel;
@@ -61,9 +65,10 @@ public sealed class StudentEditorViewModel : ViewModelBase
     public static StudentEditorViewModel FromSnapshot(
         IStudentEditorService studentEditorService,
         StudentEditorSnapshot snapshot,
-        IReadOnlyList<PlanCatalogItem>? assignablePlans = null)
+        IReadOnlyList<PlanCatalogItem>? assignablePlans = null,
+        bool requestCloseOnSave = true)
     {
-        var viewModel = new StudentEditorViewModel(studentEditorService, assignablePlans ?? [])
+        var viewModel = new StudentEditorViewModel(studentEditorService, assignablePlans ?? [], requestCloseOnSave)
         {
             ShortName = snapshot.ShortName,
             FullName = snapshot.FullName,
@@ -349,7 +354,10 @@ public sealed class StudentEditorViewModel : ViewModelBase
 
             WasSaved = true;
             ErrorMessage = null;
-            CloseRequested?.Invoke(this, true);
+            if (requestCloseOnSave)
+            {
+                CloseRequested?.Invoke(this, true);
+            }
         }
         finally
         {

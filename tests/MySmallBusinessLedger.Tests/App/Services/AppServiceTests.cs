@@ -70,6 +70,9 @@ public sealed class AppServiceTests
 
     private sealed class EmptyStudentRepository : IStudentRepository
     {
+        public Task<IReadOnlyList<StudentRecord>> ListStudentsAsync(CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<StudentRecord>>([]);
+
         public Task<IReadOnlyList<StudentRecord>> ListActiveStudentsAsync(CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<StudentRecord>>([]);
 

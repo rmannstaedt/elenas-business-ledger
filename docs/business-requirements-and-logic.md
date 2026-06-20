@@ -142,9 +142,10 @@ The application will automatically refresh the lesson list from Google Calendar 
 There are Previous / Next buttons for the selected student, which will switch to the previous student and the next student respectively (by date/time of lesson).
 There are also Previous / Next buttons for the month, to switch the display back/forth by a month.
 
-The application contains a Student menu with these entries:
-  * Add Student
-  * Edit Student
+The application contains a Student menu with this entry:
+  * Manage Students
+
+Manage Students lists all known Students, including inactive Students. Selecting a Student opens that Student in an embedded editor showing Student fields, Active flag, current assigned Plan snapshot, plan assignment selector, schedule fields, and issued Invoices. Add Student creates a new in-pane draft. Changes are explicit: Save persists the edited Student data and Cancel discards unsaved changes. Selecting an Active catalog Plan copies the Plan fields into the Student's plan period. Changing the Active flag, plan period dates, or schedule only persists when Save is pressed. Double-clicking an Invoice in the selected Student's invoice list opens it in the Invoice Viewer. Selecting a Student in Manage Students immediately refreshes the main window around that Student; closing Manage Students applies the final selected Student again.
 
 The application contains a Plan menu with:
   * Manage Plans

@@ -60,6 +60,7 @@ Danish user-facing invoice text
 My-facing UI must stay simple
 Company profile, two-line company address entry, invoice folder with typed or folder-picker selection, Google calendar/account label, Google sign-in app status, local Google authorization status, connect/reconnect controls, and read-only app data/database paths are configured or shown from `Application > Settings`; the Google calendar defaults to `primary`
 Student editor uses two stacked address fields and stores them as one multiline student address value.
+Student management is available from `Student > Manage Students`; it lists active and inactive students, embeds the Student editor for selected-student fields/current assigned plan/plan assignment/schedule, keeps explicit Save/Cancel, opens invoices on double-click through the existing viewer, mirrors student selection into the main window immediately and on close, and persists `Student.IsActive` changes only when the embedded editor is saved.
 Plans are managed from `Plan > Manage Plans`; new Draft plans start with blank name/price, default lesson/duration/student/flexibility values, payment terms selected from `Paid monthly in advance` or `Paid per lesson`, and an effective date set to the first day of the current month. `Add Plan` saves changed Draft data before creating the next Draft, and changed Active `Retire on` values are prompted before adding. The student editor offers only publish-complete Active catalog plans and copies the selected plan into the student's plan period. The Manage Plans window remembers its size/position and list column widths.
 Desktop windows must remember size and position, including subwindows, and restore inside the current visible screen area
 
@@ -91,3 +92,4 @@ Use fake Google Calendar client for calendar integration tests
 - Do not persist OAuth access or refresh tokens in plaintext.
 - Do not allow Draft or Retired catalog plans to be assigned to students.
 - Do not mutate existing student plan periods or issued invoices when a catalog plan is edited as Draft, published, retired, or reactivated.
+- Deactivating or reactivating a student must not mutate that student's plan periods, schedule, or issued invoices.

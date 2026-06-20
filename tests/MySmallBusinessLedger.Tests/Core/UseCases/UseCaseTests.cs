@@ -358,6 +358,9 @@ public sealed class UseCaseTests
 
     private sealed class FakeStudentRepository(IReadOnlyList<StudentRecord> students) : IStudentRepository
     {
+        public Task<IReadOnlyList<StudentRecord>> ListStudentsAsync(CancellationToken cancellationToken) =>
+            Task.FromResult(students);
+
         public Task<IReadOnlyList<StudentRecord>> ListActiveStudentsAsync(CancellationToken cancellationToken) =>
             Task.FromResult(students);
 

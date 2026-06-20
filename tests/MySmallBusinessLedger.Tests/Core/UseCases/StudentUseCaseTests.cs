@@ -75,6 +75,9 @@ public sealed class StudentUseCaseTests
     {
         public StudentRecord? SavedStudent { get; private set; }
 
+        public Task<IReadOnlyList<StudentRecord>> ListStudentsAsync(CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<StudentRecord>>([]);
+
         public Task<IReadOnlyList<StudentRecord>> ListActiveStudentsAsync(CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<StudentRecord>>([]);
 

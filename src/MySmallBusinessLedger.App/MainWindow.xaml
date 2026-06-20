@@ -54,10 +54,8 @@
                           Command="{Binding OpenSettingsCommand}" />
             </MenuItem>
             <MenuItem Header="_Student">
-                <MenuItem Header="_Add Student"
-                          Command="{Binding AddStudentCommand}" />
-                <MenuItem Header="_Edit Student"
-                          Command="{Binding EditStudentCommand}" />
+                <MenuItem Header="_Manage Students"
+                          Command="{Binding OpenManageStudentsCommand}" />
             </MenuItem>
             <MenuItem Header="_Plan">
                 <MenuItem Header="_Manage Plans"

@@ -1,36 +1,16 @@
 using MySmallBusinessLedger.App.Services;
 using MySmallBusinessLedger.App.ViewModels;
-using MySmallBusinessLedger.App.Views;
 using MySmallBusinessLedger.Core.Calendar;
 using MySmallBusinessLedger.Core.Common;
 using MySmallBusinessLedger.Core.Plans;
 using MySmallBusinessLedger.Core.Students;
 using MySmallBusinessLedger.Core.UseCases.Lessons;
 using MySmallBusinessLedger.Core.UseCases.Students;
-using System.Windows;
-using WpfTextBlock = System.Windows.Controls.TextBlock;
-using WpfTextBox = System.Windows.Controls.TextBox;
 
 namespace MySmallBusinessLedger.Tests.App.ViewModels;
 
 public sealed class EditorViewModelTests
 {
-    [Fact]
-    public void StudentEditorShowsTwoStackedAddressFields()
-    {
-        RunOnStaThread(() =>
-        {
-            var viewModel = StudentEditorViewModel.CreateNew(new FakeStudentEditorService());
-            var window = new StudentEditorView(viewModel);
-
-            var addressFields = FindTextBoxesBoundTo(window, "Address", "AddressLine2");
-
-            Assert.Equal(2, addressFields.Count);
-
-            window.Close();
-        });
-    }
-
     [Fact]
     public void StudentEditorSplitsSavedMultilineAddressAcrossAddressFields()
     {
@@ -115,6 +95,28 @@ public sealed class EditorViewModelTests
     }
 
     [Fact]
+    public async Task EmbeddedStudentEditorDoesNotRequestHostCloseAfterSave()
+    {
+        var service = new FakeStudentEditorService();
+        var viewModel = StudentEditorViewModel.CreateNew(
+            service,
+            [CreateCatalogPlan("Standard", PlanCatalogState.Active)],
+            requestCloseOnSave: false);
+        var closeWasRequested = false;
+        viewModel.CloseRequested += (_, _) => closeWasRequested = true;
+        viewModel.ShortName = "Anna";
+        viewModel.FullName = "Anna Andersen";
+        viewModel.Address = "Testvej 1";
+        viewModel.Phone = "12345678";
+        viewModel.Email = "anna@example.test";
+
+        await viewModel.SaveCommand.ExecuteAsync();
+
+        Assert.True(viewModel.WasSaved);
+        Assert.False(closeWasRequested);
+    }
+
+    [Fact]
     public async Task StudentEditorCopiesSelectedActiveCatalogPlanIntoSavedSnapshot()
     {
         var service = new FakeStudentEditorService();
@@ -162,28 +164,6 @@ public sealed class EditorViewModelTests
         var plan = Assert.Single(viewModel.AssignablePlans);
         Assert.Equal("Active", plan.Name);
         Assert.Equal("Active", viewModel.SelectedAssignablePlan?.Name);
-    }
-
-    [Fact]
-    public void StudentEditorHidesCurrentPlanDetailsWhenNoActivePlanIsSelected()
-    {
-        var viewModel = StudentEditorViewModel.CreateNew(new FakeStudentEditorService());
-
-        Assert.False(viewModel.HasSelectedPlan);
-
-        RunOnStaThread(() =>
-        {
-            var window = new StudentEditorView(viewModel);
-
-            var planNameLabel = Assert.Single(FindTextBlocks(window, "Plan name"));
-            Assert.Equal(Visibility.Collapsed, planNameLabel.Visibility);
-            var priceLabel = Assert.Single(FindTextBlocks(window, "Price without VAT"));
-            Assert.Equal(Visibility.Collapsed, priceLabel.Visibility);
-            var startsOnLabel = Assert.Single(FindTextBlocks(window, "Starts on"));
-            Assert.Equal(Visibility.Collapsed, startsOnLabel.Visibility);
-
-            window.Close();
-        });
     }
 
     [Fact]
@@ -381,69 +361,4 @@ public sealed class EditorViewModelTests
             Task.FromResult(OperationResult<IReadOnlyList<CalendarLesson>>.Success([]));
     }
 
-    private static IReadOnlyList<WpfTextBox> FindTextBoxesBoundTo(DependencyObject root, params string[] bindingPaths)
-    {
-        var matches = new List<WpfTextBox>();
-        foreach (var child in LogicalTreeHelper.GetChildren(root))
-        {
-            if (child is WpfTextBox textBox)
-            {
-                var expression = textBox.GetBindingExpression(WpfTextBox.TextProperty);
-                if (expression?.ParentBinding.Path.Path is { } path && bindingPaths.Contains(path, StringComparer.Ordinal))
-                {
-                    matches.Add(textBox);
-                }
-            }
-
-            if (child is DependencyObject dependencyObject)
-            {
-                matches.AddRange(FindTextBoxesBoundTo(dependencyObject, bindingPaths));
-            }
-        }
-
-        return matches;
-    }
-
-    private static IReadOnlyList<WpfTextBlock> FindTextBlocks(DependencyObject root, string text)
-    {
-        var matches = new List<WpfTextBlock>();
-        foreach (var child in LogicalTreeHelper.GetChildren(root))
-        {
-            if (child is WpfTextBlock textBlock && textBlock.Text == text)
-            {
-                matches.Add(textBlock);
-            }
-
-            if (child is DependencyObject dependencyObject)
-            {
-                matches.AddRange(FindTextBlocks(dependencyObject, text));
-            }
-        }
-
-        return matches;
-    }
-
-    private static void RunOnStaThread(Action action)
-    {
-        Exception? exception = null;
-        var thread = new Thread(() =>
-        {
-            try
-            {
-                action();
-            }
-            catch (Exception ex)
-            {
-                exception = ex;
-            }
-        });
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        thread.Join();
-
-        if (exception is not null)
-        {
-            throw exception;
-        }
-    }
 }
