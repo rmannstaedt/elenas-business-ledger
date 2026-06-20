@@ -17,7 +17,7 @@ public sealed class InvoiceInfrastructureTests
 
         var stagingPath = await fileStore.CreateStagingPathAsync(draft, invoiceNumber, CancellationToken.None);
         Assert.True(stagingPath.Succeeded);
-        await File.WriteAllBytesAsync(stagingPath.Value!, "%PDF-1.7\ncontent"u8.ToArray());
+        await File.WriteAllBytesAsync(stagingPath.Value!, "%PDF-1.7\ncontent"u8.ToArray(), TestContext.Current.CancellationToken);
 
         var verify = await fileStore.VerifyStagedPdfAsync(stagingPath.Value!, CancellationToken.None);
         var publish = await fileStore.PublishAsync(stagingPath.Value!, draft, invoiceNumber, CancellationToken.None);
@@ -37,17 +37,17 @@ public sealed class InvoiceInfrastructureTests
         var draft = CreateDraft();
         var invoiceNumber = new InvoiceNumber(7);
         var existingFinalPath = Path.Combine(folder.Path, "000007-Anna-Anna-Andersen.pdf");
-        await File.WriteAllTextAsync(existingFinalPath, "existing");
+        await File.WriteAllTextAsync(existingFinalPath, "existing", TestContext.Current.CancellationToken);
 
         var stagingPath = await fileStore.CreateStagingPathAsync(draft, invoiceNumber, CancellationToken.None);
         Assert.True(stagingPath.Succeeded);
-        await File.WriteAllBytesAsync(stagingPath.Value!, "%PDF-1.7\nnew"u8.ToArray());
+        await File.WriteAllBytesAsync(stagingPath.Value!, "%PDF-1.7\nnew"u8.ToArray(), TestContext.Current.CancellationToken);
 
         var publish = await fileStore.PublishAsync(stagingPath.Value!, draft, invoiceNumber, CancellationToken.None);
 
         Assert.False(publish.Succeeded);
         Assert.Contains(publish.Errors, error => error.Code == "InvoicePdf.FinalFileAlreadyExists");
-        Assert.Equal("existing", await File.ReadAllTextAsync(existingFinalPath));
+        Assert.Equal("existing", await File.ReadAllTextAsync(existingFinalPath, TestContext.Current.CancellationToken));
         Assert.True(File.Exists(stagingPath.Value));
     }
 
@@ -57,7 +57,7 @@ public sealed class InvoiceInfrastructureTests
         using var folder = TestInvoiceFolder.Create();
         var fileStore = new LocalInvoiceFileStore(new InvoiceFileStoreOptions(folder.Path));
         var invalidPath = Path.Combine(folder.Path, "not-a-pdf.pdf");
-        await File.WriteAllTextAsync(invalidPath, "not a pdf");
+        await File.WriteAllTextAsync(invalidPath, "not a pdf", TestContext.Current.CancellationToken);
 
         var missing = await fileStore.VerifyStagedPdfAsync(Path.Combine(folder.Path, "missing.pdf"), CancellationToken.None);
         var invalid = await fileStore.VerifyStagedPdfAsync(invalidPath, CancellationToken.None);
@@ -82,7 +82,7 @@ public sealed class InvoiceInfrastructureTests
         Assert.True(result.Succeeded);
         Assert.True(File.Exists(outputPath));
         Assert.True(new FileInfo(outputPath).Length > 1000);
-        var bytes = await File.ReadAllBytesAsync(outputPath);
+        var bytes = await File.ReadAllBytesAsync(outputPath, TestContext.Current.CancellationToken);
         Assert.Equal("%PDF"u8.ToArray(), bytes[..4]);
 
         var keepSamplePath = Environment.GetEnvironmentVariable("ELENA_LEDGER_KEEP_SAMPLE_PDF");
@@ -111,7 +111,7 @@ public sealed class InvoiceInfrastructureTests
     {
         using var folder = TestInvoiceFolder.Create();
         var path = Path.Combine(folder.Path, "invoice.pdf");
-        await File.WriteAllBytesAsync(path, "%PDF-1.7\ncontent"u8.ToArray());
+        await File.WriteAllBytesAsync(path, "%PDF-1.7\ncontent"u8.ToArray(), TestContext.Current.CancellationToken);
         var launcher = new FakePrintProcessLauncher();
         var printer = new SavedPdfPrinter(launcher);
 

@@ -39,7 +39,8 @@ public sealed class CoreStudentEditorService : IStudentEditorService
                     plan.Plan.EffectiveFrom,
                     plan.StartsOn,
                     plan.EndsOn,
-                    plan.Plan.PaymentTerms)).ToArray(),
+                    plan.Plan.PaymentTerms,
+                    plan.Plan.PlanCatalogId)).ToArray(),
                 student.Schedule.Select(schedule => new StudentScheduleInput(schedule.Weekday, schedule.StartsAt)).ToArray());
     }
 

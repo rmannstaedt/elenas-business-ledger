@@ -19,6 +19,8 @@ public sealed class LedgerDbContext : DbContext
 
     public DbSet<StudentPlanPeriodEntity> StudentPlanPeriods => Set<StudentPlanPeriodEntity>();
 
+    public DbSet<PlanNameChangeEntity> PlanNameChanges => Set<PlanNameChangeEntity>();
+
     public DbSet<StudentScheduleEntryEntity> StudentScheduleEntries => Set<StudentScheduleEntryEntity>();
 
     public DbSet<IssuedInvoiceEntity> IssuedInvoices => Set<IssuedInvoiceEntity>();
@@ -58,6 +60,18 @@ public sealed class LedgerDbContext : DbContext
             entity.HasIndex(plan => plan.Name);
         });
 
+        modelBuilder.Entity<PlanNameChangeEntity>(entity =>
+        {
+            entity.HasKey(change => change.Id);
+            entity.Property(change => change.OldName).HasMaxLength(200).IsRequired();
+            entity.Property(change => change.NewName).HasMaxLength(200).IsRequired();
+            entity.HasOne(change => change.PlanCatalog)
+                .WithMany()
+                .HasForeignKey(change => change.PlanCatalogId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasIndex(change => change.PlanCatalogId);
+        });
+
         modelBuilder.Entity<StudentEntity>(entity =>
         {
             entity.HasKey(student => student.Id);
@@ -85,6 +99,11 @@ public sealed class LedgerDbContext : DbContext
             entity.Property(plan => plan.PaymentTerms).HasMaxLength(500).IsRequired();
             entity.Property(plan => plan.LessonsPerWeek).HasConversion<string>().HasMaxLength(50).IsRequired();
             entity.Property(plan => plan.Flexibility).HasConversion<string>().HasMaxLength(100).IsRequired();
+            entity.HasOne(plan => plan.PlanCatalog)
+                .WithMany()
+                .HasForeignKey(plan => plan.PlanCatalogId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasIndex(plan => plan.PlanCatalogId);
         });
 
         modelBuilder.Entity<StudentScheduleEntryEntity>(entity =>
@@ -117,6 +136,7 @@ public sealed class LedgerDbContext : DbContext
         {
             entity.HasKey(line => line.Id);
             entity.HasIndex(line => line.LessonDateTime);
+            entity.HasIndex(line => line.PlanCatalogId);
             entity.Property(line => line.LessonDateTime).HasMaxLength(40).IsRequired();
             entity.Property(line => line.PlanName).HasMaxLength(200).IsRequired();
             entity.Property(line => line.Currency).HasMaxLength(3).IsRequired();

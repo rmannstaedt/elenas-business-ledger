@@ -242,7 +242,8 @@ public sealed class StudentOverviewViewModel : ViewModelBase
                 plan.Plan.EffectiveFrom,
                 plan.StartsOn,
                 plan.EndsOn,
-                plan.Plan.PaymentTerms)).ToArray(),
+                plan.Plan.PaymentTerms,
+                plan.Plan.PlanCatalogId)).ToArray(),
             snapshot.Record.Schedule.Select(schedule => new StudentScheduleInput(
                 schedule.Weekday,
                 schedule.StartsAt)).ToArray());

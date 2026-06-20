@@ -31,8 +31,8 @@ public sealed class StudentUseCaseTests
         var useCase = new SaveStudentUseCase(repository);
         var request = CreateRequest(planPeriods:
         [
-            CreatePlanPeriod("Standard", startsOn: new DateOnly(2026, 1, 1), endsOn: new DateOnly(2026, 6, 30)),
-            CreatePlanPeriod("Extended", startsOn: new DateOnly(2026, 6, 1), endsOn: null)
+            CreatePlanPeriod("Standard", startsOn: new DateOnly(2026, 1, 1), endsOn: new DateOnly(2026, 6, 30), planCatalogId: 1),
+            CreatePlanPeriod("Extended", startsOn: new DateOnly(2026, 6, 1), endsOn: null, planCatalogId: 2)
         ]);
 
         var result = await useCase.ExecuteAsync(request, CancellationToken.None);
@@ -53,13 +53,17 @@ public sealed class StudentUseCaseTests
             AgeBracket.Standard,
             Birthdate: null,
             IsActive: true,
-            PlanPeriods: planPeriods ?? [CreatePlanPeriod("Standard", new DateOnly(2026, 1, 1), null)],
+            PlanPeriods: planPeriods ?? [CreatePlanPeriod("Standard", new DateOnly(2026, 1, 1), null, planCatalogId: 1)],
             Schedule:
             [
                 new StudentScheduleInput(DayOfWeek.Tuesday, new TimeOnly(15, 0))
             ]);
 
-    private static StudentPlanPeriodInput CreatePlanPeriod(string name, DateOnly startsOn, DateOnly? endsOn) =>
+    private static StudentPlanPeriodInput CreatePlanPeriod(
+        string name,
+        DateOnly startsOn,
+        DateOnly? endsOn,
+        int planCatalogId) =>
         new(
             PlanName: name,
             PriceWithoutVat: 400m,
@@ -69,7 +73,8 @@ public sealed class StudentUseCaseTests
             NumberOfStudents: 1,
             PlanEffectiveFrom: new DateTimeOffset(startsOn.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero),
             StartsOn: startsOn,
-            EndsOn: endsOn);
+            EndsOn: endsOn,
+            PlanCatalogId: planCatalogId);
 
     private sealed class FakeStudentRepository : IStudentRepository
     {

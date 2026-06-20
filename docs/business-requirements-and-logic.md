@@ -42,7 +42,7 @@
     date
     company info
     student info
-    (list) lesson date/time + lesson plan name + lesson price (without VAT)
+    (list) lesson date/time + lesson plan identity + issued lesson plan name + lesson price (without VAT)
   
   AND (optional, left out if not specified)
     price adjustment
@@ -71,12 +71,12 @@ The Plan is an agreement between teacher and student and determines how many les
 
 Plan catalog entries have a lifecycle:
   * Draft: editable and deletable, but not assignable to students. A Draft may be incomplete.
-  * Active: immutable and assignable to students; the only editable field is `Retire on`, and the allowed catalog action is Retire.
-  * Retired: immutable and not assignable to students; the only allowed catalog action is Reactivate.
+  * Active: immutable and assignable to students; the only editable fields are the display name and `Retire on`, and the allowed catalog action is Retire.
+  * Retired: immutable and not assignable to students; the display name may still be renamed, and the only lifecycle action is Reactivate.
 
 A Draft Plan starts with blank name, blank price, one lesson per week, 60 minute duration, one student, move/cancel flexibility, `Paid monthly in advance`, the first day of the current month as effective date, and no `Retire on` date. All fields except `Retire on` must be filled with valid values before the Draft can be published.
 
-Plans are managed independently from Students from the Plan menu. When an Active catalog Plan is assigned to a Student, the Plan fields are copied into that Student's plan period. After that assignment, catalog edits while Draft, publish/retire/reactivate actions, and future catalog cleanup must not mutate existing Student plan periods or issued invoices.
+Plans are managed independently from Students from the Plan menu. When an Active catalog Plan is assigned to a Student, the catalog Plan identity is stored on that Student's plan period and the commercial Plan fields are copied into that Student's plan period. After that assignment, catalog edits while Draft, publish/retire/reactivate actions, name-only renames, and future catalog cleanup must not mutate existing Student plan period commercial terms or issued invoices. Name-only renames are tracked with old name, new name, and change date/time so invoice-time names can still be understood later.
 
 An Active Plan's `Retire on` date is equivalent to choosing Retire on that date. When the application starts, due Active Plans are moved to Retired so they no longer appear for new student assignment. Existing Student plan periods keep their copied Plan data until the Student is explicitly moved to another Active Plan.
 
@@ -114,6 +114,8 @@ If that later status line is absent, the lesson is treated as Planned.
 
 When an Invoice is printed, it is added to the Invoice table and the Lessons table is updated with the Lessons noted on the Invoice.
 The Lessons table is only ever updated when invoices are printed.
+
+Issued Invoice lines store the catalog Plan identity for lineage/reporting and also store the Plan name as it appeared when the Invoice was issued. Invoice viewing and PDF output use the stored issued-time Plan name snapshot, not current catalog names and not a derived lookup through Plan name-change history.
 
 ## Actions
 

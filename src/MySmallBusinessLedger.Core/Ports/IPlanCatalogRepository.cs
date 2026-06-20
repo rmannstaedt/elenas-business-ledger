@@ -13,5 +13,11 @@ public interface IPlanCatalogRepository
 
     Task<OperationResult<PlanCatalogItem>> SaveAsync(PlanCatalogItem plan, CancellationToken cancellationToken);
 
+    Task<OperationResult<PlanCatalogItem>> RenameAsync(
+        int id,
+        string newName,
+        DateTimeOffset changedAt,
+        CancellationToken cancellationToken);
+
     Task<OperationResult<bool>> DeleteAsync(int id, CancellationToken cancellationToken);
 }

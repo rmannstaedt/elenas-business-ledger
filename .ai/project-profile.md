@@ -28,8 +28,9 @@ tests/
 
 Database: SQLite
 Database access: EF Core SQLite
-Plan catalog: stored in SQLite with Draft, Active, and Retired lifecycle state; Draft plans are editable/deletable and may be incomplete, publishing requires all fields except Retire on, Active plans are immutable/assignable except for Retire on scheduling and immediate retirement, and Retired plans are immutable/reactivatable but not assignable
-Student plan periods: stored as copied plan snapshots including payment terms; catalog lifecycle changes must not rewrite existing student plan periods or issued invoice data
+Plan catalog: stored in SQLite with Draft, Active, and Retired lifecycle state; Draft plans are editable/deletable and may be incomplete, publishing requires all fields except Retire on, Active plans are immutable/assignable except for name-only rename, Retire on scheduling, and immediate retirement, and Retired plans are immutable/reactivatable except for name-only rename but not assignable
+Student plan periods: stored with a required catalog plan identity plus copied commercial-term snapshots including price, cadence, duration, flexibility, student count, effective date, payment terms, and start/end dates; catalog lifecycle changes and name-only renames must not rewrite copied commercial terms or issued invoice data
+Issued invoice lines: stored with catalog plan identity for lineage plus issued-time plan name and price snapshots for durable invoice display/PDF output; old invoice display must use the stored invoice snapshot, not current catalog names or derived rename history
 Invoice PDFs: stored as files, not BLOBs
 Invoice PDF generation: QuestPDF
 Invoice PDF safety: write to staging, verify PDF bytes, publish without overwriting, then persist invoice metadata and request print
@@ -61,7 +62,7 @@ My-facing UI must stay simple
 Company profile, two-line company address entry, invoice folder with typed or folder-picker selection, Google calendar/account label, Google sign-in app status, local Google authorization status, connect/reconnect controls, and read-only app data/database paths are configured or shown from `Application > Settings`; the Google calendar defaults to `primary`
 Student editor uses two stacked address fields and stores them as one multiline student address value.
 Student management is available from `Student > Manage Students`; it lists active and inactive students, embeds the Student editor for selected-student fields/current assigned plan/plan assignment/schedule, keeps explicit Save/Cancel, opens invoices on double-click through the existing viewer, mirrors student selection into the main window immediately and on close, and persists `Student.IsActive` changes only when the embedded editor is saved.
-Plans are managed from `Plan > Manage Plans`; new Draft plans start with blank name/price, default lesson/duration/student/flexibility values, payment terms selected from `Paid monthly in advance` or `Paid per lesson`, and an effective date set to the first day of the current month. `Add Plan` saves changed Draft data before creating the next Draft, and changed Active `Retire on` values are prompted before adding. The student editor offers only publish-complete Active catalog plans and copies the selected plan into the student's plan period. The Manage Plans window remembers its size/position and list column widths.
+Plans are managed from `Plan > Manage Plans`; new Draft plans start with blank name/price, default lesson/duration/student/flexibility values, payment terms selected from `Paid monthly in advance` or `Paid per lesson`, and an effective date set to the first day of the current month. `Add Plan` saves changed Draft data before creating the next Draft, and changed Active `Retire on` values are prompted before adding. Active and Retired plan names may be renamed through a name-only save action; the rename is stored in plan-name history and does not unlock commercial fields. The student editor offers only publish-complete Active catalog plans, stores the selected plan identity, and copies the selected plan's commercial terms into the student's plan period. The Manage Plans window remembers its size/position and list column widths.
 Desktop windows must remember size and position, including subwindows, and restore inside the current visible screen area
 
 ## Build and test commands
@@ -83,6 +84,7 @@ Use fake Google Calendar client for calendar integration tests
 - Do not mark invoice issued unless PDF storage succeeds.
 - Do not silently overwrite an existing issued invoice PDF.
 - Do not silently edit issued invoices.
+- Do not derive old invoice display text from current plan catalog names or rename history; issued invoice snapshots are authoritative for invoice text.
 - Do not charge VAT when business profile says NotRegistered.
 - Do not store CPR numbers.
 - Ignore Google Calendar entries that do not use the documented first-line `$` student marker.
@@ -91,5 +93,5 @@ Use fake Google Calendar client for calendar integration tests
 - Do not make Google Calendar sync failure corrupt local data.
 - Do not persist OAuth access or refresh tokens in plaintext.
 - Do not allow Draft or Retired catalog plans to be assigned to students.
-- Do not mutate existing student plan periods or issued invoices when a catalog plan is edited as Draft, published, retired, or reactivated.
+- Do not mutate existing student plan period commercial-term snapshots or issued invoices when a catalog plan is edited as Draft, published, retired, reactivated, or renamed; plan renames may update catalog display names and plan-name history while student periods keep referring to the same catalog plan identity.
 - Deactivating or reactivating a student must not mutate that student's plan periods, schedule, or issued invoices.

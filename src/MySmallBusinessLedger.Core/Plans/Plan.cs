@@ -10,8 +10,10 @@ public sealed class Plan
         PlanFlexibility flexibility,
         int numberOfStudents,
         DateTimeOffset effectiveFrom,
-        string paymentTerms = "")
+        string paymentTerms = "",
+        int planCatalogId = 0)
     {
+        PlanCatalogId = planCatalogId;
         Name = name;
         PriceWithoutVat = priceWithoutVat;
         LessonsPerWeek = lessonsPerWeek;
@@ -21,6 +23,8 @@ public sealed class Plan
         EffectiveFrom = effectiveFrom;
         PaymentTerms = paymentTerms;
     }
+
+    public int PlanCatalogId { get; }
 
     public string Name { get; }
 

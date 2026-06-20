@@ -4,11 +4,16 @@ namespace MySmallBusinessLedger.Core.Invoices;
 
 public sealed class InvoiceLineDraft
 {
-    public InvoiceLineDraft(DateTimeOffset lessonDateTime, string planName, MoneyAmount priceWithoutVat)
+    public InvoiceLineDraft(
+        DateTimeOffset lessonDateTime,
+        string planName,
+        MoneyAmount priceWithoutVat,
+        int planCatalogId = 0)
     {
         LessonDateTime = lessonDateTime;
         PlanName = planName;
         PriceWithoutVat = priceWithoutVat;
+        PlanCatalogId = planCatalogId;
     }
 
     public DateTimeOffset LessonDateTime { get; }
@@ -16,4 +21,6 @@ public sealed class InvoiceLineDraft
     public string PlanName { get; }
 
     public MoneyAmount PriceWithoutVat { get; }
+
+    public int PlanCatalogId { get; }
 }

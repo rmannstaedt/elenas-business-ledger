@@ -80,7 +80,7 @@ public sealed class StudentOverviewViewModelTests
         Assert.Equal("Anna Andersen", viewModel.SelectedStudentEditor?.FullName);
         Assert.True(viewModel.SelectedStudentEditor?.IsActive);
         Assert.Equal("Standard", viewModel.SelectedStudentEditor?.PlanName);
-        Assert.Equal("400", viewModel.SelectedStudentEditor?.PlanPriceWithoutVatText);
+        Assert.Equal("400 kr.", viewModel.SelectedStudentEditor?.PlanPriceWithoutVatText);
         Assert.Equal("Paid monthly in advance", viewModel.SelectedStudentEditor?.PlanPaymentTerms);
         var invoice = Assert.Single(viewModel.Invoices);
         Assert.Equal("000001", invoice.InvoiceNumberText);
@@ -409,6 +409,9 @@ public sealed class StudentOverviewViewModelTests
             throw new NotSupportedException();
 
         public Task<OperationResult<PlanCatalogItem>> UpdateDraftAsync(int planId, PlanDraftInput input, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
+        public Task<OperationResult<PlanCatalogItem>> RenameAsync(int planId, string newName, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
 
         public Task<OperationResult<bool>> DeleteDraftAsync(int planId, CancellationToken cancellationToken) =>

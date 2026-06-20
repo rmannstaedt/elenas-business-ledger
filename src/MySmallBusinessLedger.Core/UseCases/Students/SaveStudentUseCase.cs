@@ -42,7 +42,8 @@ public sealed class SaveStudentUseCase
                     planPeriod.Flexibility,
                     planPeriod.NumberOfStudents,
                     planPeriod.PlanEffectiveFrom,
-                    planPeriod.PaymentTerms.Trim()),
+                    planPeriod.PaymentTerms.Trim(),
+                    planPeriod.PlanCatalogId),
                 planPeriod.StartsOn,
                 planPeriod.EndsOn))
             .OrderBy(planPeriod => planPeriod.StartsOn)
@@ -70,6 +71,11 @@ public sealed class SaveStudentUseCase
         if (planPeriods.Count == 0)
         {
             return new ValidationError("StudentPlan.Required", "At least one student plan is required.");
+        }
+
+        if (planPeriods.Any(planPeriod => planPeriod.Plan.PlanCatalogId <= 0))
+        {
+            return new ValidationError("StudentPlan.CatalogPlanRequired", "A catalog plan is required.");
         }
 
         for (var index = 0; index < planPeriods.Count; index++)

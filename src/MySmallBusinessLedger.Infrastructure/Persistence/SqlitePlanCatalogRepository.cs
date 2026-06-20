@@ -95,6 +95,68 @@ public sealed class SqlitePlanCatalogRepository : IPlanCatalogRepository
         return OperationResult<PlanCatalogItem>.Success(ToModel(entity));
     }
 
+    public async Task<OperationResult<PlanCatalogItem>> RenameAsync(
+        int id,
+        string newName,
+        DateTimeOffset changedAt,
+        CancellationToken cancellationToken)
+    {
+        var trimmedName = newName.Trim();
+        if (string.IsNullOrWhiteSpace(trimmedName))
+        {
+            return OperationResult<PlanCatalogItem>.Failure(
+                new ValidationError("Plan.NameRequired", "Plan name is required."));
+        }
+
+        await using var context = createContext();
+        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+        var entity = await context.PlanCatalog
+            .SingleOrDefaultAsync(plan => plan.Id == id, cancellationToken);
+        if (entity is null)
+        {
+            return OperationResult<PlanCatalogItem>.Failure(
+                new ValidationError("Plan.NotFound", "Plan was not found."));
+        }
+
+        var duplicateExists = await context.PlanCatalog
+            .AnyAsync(
+                plan => plan.Id != id && EF.Functions.Collate(plan.Name, "NOCASE") == trimmedName,
+                cancellationToken);
+        if (duplicateExists)
+        {
+            return OperationResult<PlanCatalogItem>.Failure(
+                new ValidationError("Plan.DuplicateName", "A plan with this name already exists."));
+        }
+
+        if (string.Equals(entity.Name, trimmedName, StringComparison.Ordinal))
+        {
+            return OperationResult<PlanCatalogItem>.Success(ToModel(entity));
+        }
+
+        var oldName = entity.Name;
+        entity.Name = trimmedName;
+        context.PlanNameChanges.Add(new PlanNameChangeEntity
+        {
+            PlanCatalogId = id,
+            OldName = oldName,
+            NewName = trimmedName,
+            ChangedAt = changedAt
+        });
+
+        try
+        {
+            await context.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        }
+        catch (DbUpdateException ex)
+        {
+            return OperationResult<PlanCatalogItem>.Failure(
+                new ValidationError("Plan.RenameFailed", ex.Message));
+        }
+
+        return OperationResult<PlanCatalogItem>.Success(ToModel(entity));
+    }
+
     public async Task<OperationResult<bool>> DeleteAsync(int id, CancellationToken cancellationToken)
     {
         await using var context = createContext();

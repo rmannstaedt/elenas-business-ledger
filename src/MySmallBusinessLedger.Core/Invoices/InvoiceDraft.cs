@@ -83,7 +83,11 @@ public sealed class InvoiceDraft
     public IssuedInvoice Issue(InvoiceNumber invoiceNumber, InvoiceTotals totals, string pdfFilePath)
     {
         var issuedLines = Lines
-            .Select(line => new IssuedInvoiceLine(line.LessonDateTime, line.PlanName, line.PriceWithoutVat))
+            .Select(line => new IssuedInvoiceLine(
+                line.LessonDateTime,
+                line.PlanName,
+                line.PriceWithoutVat,
+                line.PlanCatalogId))
             .ToArray();
 
         return new IssuedInvoice(

@@ -216,6 +216,7 @@ public sealed class UseCaseTests
         Assert.Equal("Anna", result.Value!.Draft.Student.ShortName);
         Assert.Single(result.Value.Draft.Lines);
         Assert.Equal("Standard", result.Value.Draft.Lines[0].PlanName);
+        Assert.Equal(42, result.Value.Draft.Lines[0].PlanCatalogId);
         Assert.Equal(Money.Dkk(400m), result.Value.Draft.Lines[0].PriceWithoutVat);
     }
 
@@ -343,7 +344,8 @@ public sealed class UseCaseTests
             durationMinutes: 60,
             PlanFlexibility.MoveOrCancelByAgreement,
             numberOfStudents: 1,
-            effectiveFrom: new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+            effectiveFrom: new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
+            planCatalogId: 42);
 
         return new StudentRecord(
             student,

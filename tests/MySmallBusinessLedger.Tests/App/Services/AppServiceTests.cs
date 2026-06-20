@@ -56,7 +56,10 @@ public sealed class AppServiceTests
         using var appData = new TemporaryDirectory();
         var appPaths = AppPaths.FromAppDataFolder(appData.Path);
         Directory.CreateDirectory(appPaths.GoogleTokenFolderPath);
-        await File.WriteAllBytesAsync(Path.Combine(appPaths.GoogleTokenFolderPath, "token.bin"), [1, 2, 3]);
+        await File.WriteAllBytesAsync(
+            Path.Combine(appPaths.GoogleTokenFolderPath, "token.bin"),
+            [1, 2, 3],
+            TestContext.Current.CancellationToken);
         var service = new CoreAppSettingsService(
             new SqliteCompanyProfileRepository(database.CreateContext),
             new SqliteCalendarSettingsRepository(database.CreateContext),

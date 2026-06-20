@@ -93,6 +93,10 @@ public sealed class StudentPlanPeriodEntity
 
     public StudentEntity Student { get; set; } = null!;
 
+    public int PlanCatalogId { get; set; }
+
+    public PlanCatalogEntity PlanCatalog { get; set; } = null!;
+
     public string PlanName { get; set; } = string.Empty;
 
     public decimal PriceWithoutVat { get; set; }
@@ -112,6 +116,21 @@ public sealed class StudentPlanPeriodEntity
     public DateOnly StartsOn { get; set; }
 
     public DateOnly? EndsOn { get; set; }
+}
+
+public sealed class PlanNameChangeEntity
+{
+    public int Id { get; set; }
+
+    public int PlanCatalogId { get; set; }
+
+    public PlanCatalogEntity PlanCatalog { get; set; } = null!;
+
+    public string OldName { get; set; } = string.Empty;
+
+    public string NewName { get; set; } = string.Empty;
+
+    public DateTimeOffset ChangedAt { get; set; }
 }
 
 public sealed class StudentScheduleEntryEntity
@@ -173,6 +192,8 @@ public sealed class IssuedInvoiceLineEntity
     public string LessonDateTime { get; set; } = string.Empty;
 
     public string PlanName { get; set; } = string.Empty;
+
+    public int PlanCatalogId { get; set; }
 
     public decimal PriceWithoutVatAmount { get; set; }
 

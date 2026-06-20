@@ -175,6 +175,7 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
             {
                 LessonDateTime = FormatLessonDateTime(line.LessonDateTime),
                 PlanName = line.PlanName,
+                PlanCatalogId = line.PlanCatalogId,
                 PriceWithoutVatAmount = line.PriceWithoutVat.Amount,
                 Currency = line.PriceWithoutVat.Currency
             });
@@ -191,7 +192,8 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
             .Select(line => new IssuedInvoiceLine(
                 ParseLessonDateTime(line.LessonDateTime),
                 line.PlanName,
-                new MoneyAmount(line.PriceWithoutVatAmount, line.Currency)))
+                new MoneyAmount(line.PriceWithoutVatAmount, line.Currency),
+                line.PlanCatalogId))
             .ToArray();
 
         return new IssuedInvoice(

@@ -21,6 +21,7 @@ public sealed class StudentEditorViewModel : ViewModelBase
     private AgeBracket ageBracket = AgeBracket.Standard;
     private DateTime? birthdateDate;
     private bool isActive = true;
+    private int planCatalogId;
     private string planName = "Standard";
     private decimal planPriceWithoutVat = 400m;
     private LessonsPerWeek lessonsPerWeek = LessonsPerWeek.One;
@@ -88,6 +89,7 @@ public sealed class StudentEditorViewModel : ViewModelBase
         if (currentPlan is not null)
         {
             viewModel.PlanName = currentPlan.PlanName;
+            viewModel.planCatalogId = currentPlan.PlanCatalogId;
             viewModel.PlanPriceWithoutVat = currentPlan.PriceWithoutVat;
             viewModel.LessonsPerWeek = currentPlan.LessonsPerWeek;
             viewModel.PlanDurationMinutes = currentPlan.DurationMinutes;
@@ -98,6 +100,7 @@ public sealed class StudentEditorViewModel : ViewModelBase
             viewModel.PlanStartsOnDate = currentPlan.StartsOn.ToDateTime(TimeOnly.MinValue);
             viewModel.PlanEndsOnDate = currentPlan.EndsOn?.ToDateTime(TimeOnly.MinValue);
             viewModel.SetSelectedAssignablePlan(
+                viewModel.AssignablePlans.FirstOrDefault(plan => plan.Id == currentPlan.PlanCatalogId) ??
                 viewModel.AssignablePlans.FirstOrDefault(plan =>
                     string.Equals(plan.Name, currentPlan.PlanName, StringComparison.OrdinalIgnoreCase)),
                 applyPlan: false);
@@ -198,7 +201,7 @@ public sealed class StudentEditorViewModel : ViewModelBase
         }
     }
 
-    public string PlanPriceWithoutVatText => PlanPriceWithoutVat.ToString("0.##", CultureInfo.InvariantCulture);
+    public string PlanPriceWithoutVatText => PlanPriceWithoutVat.ToString("0.##", CultureInfo.InvariantCulture) + " kr.";
 
     public LessonsPerWeek LessonsPerWeek
     {
@@ -233,7 +236,7 @@ public sealed class StudentEditorViewModel : ViewModelBase
         }
     }
 
-    public string PlanDurationMinutesText => PlanDurationMinutes.ToString(CultureInfo.InvariantCulture);
+    public string PlanDurationMinutesText => $"{PlanDurationMinutes.ToString(CultureInfo.InvariantCulture)} minutes";
 
     public PlanFlexibility PlanFlexibility
     {
@@ -411,7 +414,8 @@ public sealed class StudentEditorViewModel : ViewModelBase
                     new DateTimeOffset(PlanEffectiveDate.Date, TimeSpan.Zero),
                     DateOnly.FromDateTime(PlanStartsOnDate),
                     PlanEndsOnDate is null ? null : DateOnly.FromDateTime(PlanEndsOnDate.Value),
-                    PlanPaymentTerms)
+                    PlanPaymentTerms,
+                    planCatalogId)
             ],
             schedule);
     }
@@ -472,6 +476,7 @@ public sealed class StudentEditorViewModel : ViewModelBase
 
     private void ApplyCatalogPlan(PlanCatalogItem plan)
     {
+        planCatalogId = plan.Id;
         PlanName = plan.Name;
         PlanPriceWithoutVat = plan.PriceWithoutVat ?? 0m;
         LessonsPerWeek = plan.LessonsPerWeek;

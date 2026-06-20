@@ -11,6 +11,7 @@ public sealed class CorePlanCatalogService : IPlanCatalogService
     private readonly ListAssignablePlansUseCase listAssignablePlansUseCase;
     private readonly CreateDraftPlanUseCase createDraftPlanUseCase;
     private readonly UpdateDraftPlanUseCase updateDraftPlanUseCase;
+    private readonly RenamePlanUseCase renamePlanUseCase;
     private readonly DeleteDraftPlanUseCase deleteDraftPlanUseCase;
     private readonly PublishPlanUseCase publishPlanUseCase;
     private readonly RetirePlanUseCase retirePlanUseCase;
@@ -24,6 +25,7 @@ public sealed class CorePlanCatalogService : IPlanCatalogService
         listAssignablePlansUseCase = new ListAssignablePlansUseCase(planCatalogRepository);
         createDraftPlanUseCase = new CreateDraftPlanUseCase(planCatalogRepository);
         updateDraftPlanUseCase = new UpdateDraftPlanUseCase(planCatalogRepository);
+        renamePlanUseCase = new RenamePlanUseCase(planCatalogRepository);
         deleteDraftPlanUseCase = new DeleteDraftPlanUseCase(planCatalogRepository);
         publishPlanUseCase = new PublishPlanUseCase(planCatalogRepository);
         retirePlanUseCase = new RetirePlanUseCase(planCatalogRepository);
@@ -54,6 +56,12 @@ public sealed class CorePlanCatalogService : IPlanCatalogService
         PlanDraftInput input,
         CancellationToken cancellationToken) =>
         updateDraftPlanUseCase.ExecuteAsync(planId, input, cancellationToken);
+
+    public Task<OperationResult<PlanCatalogItem>> RenameAsync(
+        int planId,
+        string newName,
+        CancellationToken cancellationToken) =>
+        renamePlanUseCase.ExecuteAsync(planId, newName, DateTimeOffset.Now, cancellationToken);
 
     public Task<OperationResult<bool>> DeleteDraftAsync(int planId, CancellationToken cancellationToken) =>
         deleteDraftPlanUseCase.ExecuteAsync(planId, cancellationToken);

@@ -333,6 +333,24 @@ public sealed class PlanCatalogUseCaseTests
             return Task.FromResult(OperationResult<PlanCatalogItem>.Success(plan));
         }
 
+        public Task<OperationResult<PlanCatalogItem>> RenameAsync(
+            int id,
+            string newName,
+            DateTimeOffset changedAt,
+            CancellationToken cancellationToken)
+        {
+            var index = plans.FindIndex(storedPlan => storedPlan.Id == id);
+            if (index < 0)
+            {
+                return Task.FromResult(OperationResult<PlanCatalogItem>.Failure(
+                    new ValidationError("Plan.NotFound", "Plan was not found.")));
+            }
+
+            var renamed = plans[index] with { Name = newName.Trim() };
+            plans[index] = renamed;
+            return Task.FromResult(OperationResult<PlanCatalogItem>.Success(renamed));
+        }
+
         public Task<OperationResult<bool>> DeleteAsync(int id, CancellationToken cancellationToken)
         {
             var removed = plans.RemoveAll(plan => plan.Id == id) > 0;

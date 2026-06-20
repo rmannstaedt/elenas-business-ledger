@@ -57,7 +57,11 @@ public sealed class InvoicePreviewUseCase
                 continue;
             }
 
-            lines.Add(new InvoiceLineDraft(lesson.StartsAt, plan.Name, MoneyAmount.Dkk(plan.PriceWithoutVat)));
+            lines.Add(new InvoiceLineDraft(
+                lesson.StartsAt,
+                plan.Name,
+                MoneyAmount.Dkk(plan.PriceWithoutVat),
+                plan.PlanCatalogId));
         }
 
         if (errors.Count > 0)

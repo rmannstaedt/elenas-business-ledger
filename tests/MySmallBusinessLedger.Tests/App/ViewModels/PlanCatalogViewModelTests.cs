@@ -217,6 +217,25 @@ public sealed class PlanCatalogViewModelTests
     }
 
     [Fact]
+    public async Task SaveNameRenamesActivePlanWithoutEditingImmutableFields()
+    {
+        var service = new FakePlanCatalogService();
+        var active = service.Seed(CreatePlan("Active", PlanCatalogState.Active));
+        var viewModel = new PlanCatalogViewModel(service);
+        await viewModel.LoadAsync();
+        viewModel.Name = "Active renamed";
+        viewModel.PriceWithoutVat = 999m;
+
+        await viewModel.SaveNameCommand.ExecuteAsync();
+
+        Assert.Equal(active.Id, service.RenamedPlanId);
+        Assert.Equal("Active renamed", service.RenamedPlanName);
+        Assert.Null(service.UpdatedDraftInput);
+        Assert.Equal("Active renamed", viewModel.SelectedPlan?.Name);
+        Assert.Equal(400m, viewModel.SelectedPlan?.Plan.PriceWithoutVat);
+    }
+
+    [Fact]
     public void PlanCatalogViewInitializesWithStateAwareControls()
     {
         RunOnStaThread(() =>
@@ -323,6 +342,10 @@ public sealed class PlanCatalogViewModelTests
 
         public DateTimeOffset? UpdatedRetireOn { get; private set; }
 
+        public int? RenamedPlanId { get; private set; }
+
+        public string? RenamedPlanName { get; private set; }
+
         public List<string> Calls { get; } = [];
 
         public PlanCatalogItem Seed(PlanCatalogItem plan)
@@ -399,6 +422,19 @@ public sealed class PlanCatalogViewModelTests
             UpdatedRetireOn = retireOn;
             var index = plans.FindIndex(plan => plan.Id == planId);
             plans[index] = plans[index] with { RetireOn = retireOn };
+            return Task.FromResult(OperationResult<PlanCatalogItem>.Success(plans[index]));
+        }
+
+        public Task<OperationResult<PlanCatalogItem>> RenameAsync(
+            int planId,
+            string newName,
+            CancellationToken cancellationToken)
+        {
+            Calls.Add("Rename");
+            RenamedPlanId = planId;
+            RenamedPlanName = newName;
+            var index = plans.FindIndex(plan => plan.Id == planId);
+            plans[index] = plans[index] with { Name = newName };
             return Task.FromResult(OperationResult<PlanCatalogItem>.Success(plans[index]));
         }
 

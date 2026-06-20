@@ -149,7 +149,7 @@
                 <StackPanel Grid.Row="1">
                     <TextBlock Text="Name" />
                     <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
-                             IsEnabled="{Binding CanEditSelectedPlanFields}"
+                             IsEnabled="{Binding CanEditSelectedPlanName}"
                              Margin="0,3,0,8" />
                     <TextBlock Text="Price without VAT" />
                     <TextBox Text="{Binding PriceWithoutVat, UpdateSourceTrigger=PropertyChanged, TargetNullValue=''}"
@@ -200,6 +200,11 @@
                     <Button Content="Save Draft"
                             Command="{Binding SaveDraftPlanCommand}"
                             Visibility="{Binding CanEditSelectedPlanFields, Converter={StaticResource BooleanToVisibilityConverter}}"
+                            HorizontalAlignment="Left"
+                            Style="{StaticResource PlanActionButtonStyle}" />
+                    <Button Content="Save name"
+                            Command="{Binding SaveNameCommand}"
+                            Visibility="{Binding CanSaveSelectedPlanName, Converter={StaticResource BooleanToVisibilityConverter}}"
                             HorizontalAlignment="Left"
                             Style="{StaticResource PlanActionButtonStyle}" />
                     <Button Content="Save retire date"

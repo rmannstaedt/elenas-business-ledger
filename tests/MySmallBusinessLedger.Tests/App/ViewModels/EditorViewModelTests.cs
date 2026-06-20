@@ -151,6 +151,37 @@ public sealed class EditorViewModelTests
     }
 
     [Fact]
+    public void StudentEditorFormatsPlanDurationWithMinutes()
+    {
+        var viewModel = StudentEditorViewModel.CreateNew(
+            new FakeStudentEditorService(),
+            [CreateCatalogPlan("Standard", PlanCatalogState.Active, DurationMinutes: 60)]);
+
+        Assert.Equal("60 minutes", viewModel.PlanDurationMinutesText);
+    }
+
+    [Fact]
+    public void StudentEditorFormatsPlanPriceWithKronerSuffix()
+    {
+        var viewModel = StudentEditorViewModel.CreateNew(
+            new FakeStudentEditorService(),
+            [CreateCatalogPlan("Standard", PlanCatalogState.Active, PriceWithoutVat: 400m)]);
+
+        Assert.Equal("400 kr.", viewModel.PlanPriceWithoutVatText);
+    }
+
+    [Fact]
+    public void StudentEditorProvidesScheduleTimeSelectorOptions()
+    {
+        var viewModel = CreateNewStudentEditorWithActivePlan(new FakeStudentEditorService());
+        var placement = Assert.Single(viewModel.SchedulePlacements);
+
+        Assert.Contains("08:00", placement.TimeOptions);
+        Assert.Contains("15:00", placement.TimeOptions);
+        Assert.Contains("21:30", placement.TimeOptions);
+    }
+
+    [Fact]
     public void StudentEditorOffersOnlyActiveCatalogPlansForAssignment()
     {
         var viewModel = StudentEditorViewModel.CreateNew(

@@ -21,6 +21,7 @@ public sealed class SqliteStudentRepository : IStudentRepository
         var students = await context.Students
             .AsNoTracking()
             .Include(student => student.PlanPeriods)
+            .ThenInclude(plan => plan.PlanCatalog)
             .Include(student => student.ScheduleEntries)
             .OrderBy(student => student.ShortName)
             .ToArrayAsync(cancellationToken);
@@ -34,6 +35,7 @@ public sealed class SqliteStudentRepository : IStudentRepository
         var students = await context.Students
             .AsNoTracking()
             .Include(student => student.PlanPeriods)
+            .ThenInclude(plan => plan.PlanCatalog)
             .Include(student => student.ScheduleEntries)
             .Where(student => student.IsActive)
             .OrderBy(student => student.ShortName)
@@ -48,6 +50,7 @@ public sealed class SqliteStudentRepository : IStudentRepository
         var student = await context.Students
             .AsNoTracking()
             .Include(entity => entity.PlanPeriods)
+            .ThenInclude(plan => plan.PlanCatalog)
             .Include(entity => entity.ScheduleEntries)
             .SingleOrDefaultAsync(entity => entity.ShortName == shortName, cancellationToken);
 
@@ -83,6 +86,7 @@ public sealed class SqliteStudentRepository : IStudentRepository
         {
             entity.PlanPeriods.Add(new StudentPlanPeriodEntity
             {
+                PlanCatalogId = planPeriod.Plan.PlanCatalogId,
                 PlanName = planPeriod.Plan.Name,
                 PriceWithoutVat = planPeriod.Plan.PriceWithoutVat,
                 LessonsPerWeek = planPeriod.Plan.LessonsPerWeek,
@@ -123,18 +127,23 @@ public sealed class SqliteStudentRepository : IStudentRepository
 
         var plans = entity.PlanPeriods
             .OrderBy(plan => plan.StartsOn)
-            .Select(plan => new StudentPlanPeriod(
-                new Plan(
-                    plan.PlanName,
-                    plan.PriceWithoutVat,
-                    plan.LessonsPerWeek,
-                    plan.DurationMinutes,
-                    plan.Flexibility,
-                    plan.NumberOfStudents,
-                    plan.PlanEffectiveFrom,
-                    plan.PaymentTerms),
-                plan.StartsOn,
-                plan.EndsOn))
+            .Select(plan =>
+            {
+                var planName = plan.PlanCatalog?.Name ?? plan.PlanName;
+                return new StudentPlanPeriod(
+                    new Plan(
+                        planName,
+                        plan.PriceWithoutVat,
+                        plan.LessonsPerWeek,
+                        plan.DurationMinutes,
+                        plan.Flexibility,
+                        plan.NumberOfStudents,
+                        plan.PlanEffectiveFrom,
+                        plan.PaymentTerms,
+                        plan.PlanCatalogId),
+                    plan.StartsOn,
+                    plan.EndsOn);
+            })
             .ToArray();
 
         var schedule = entity.ScheduleEntries

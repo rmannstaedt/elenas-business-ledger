@@ -7,6 +7,7 @@ public sealed record WeekdayOption(string Label, DayOfWeek? Weekday)
 
 public sealed class SchedulePlacementViewModel : ViewModelBase
 {
+    private static readonly IReadOnlyList<string> DefaultTimeOptions = CreateTimeOptions();
     private WeekdayOption selectedWeekday;
     private string timeText = string.Empty;
 
@@ -21,6 +22,8 @@ public sealed class SchedulePlacementViewModel : ViewModelBase
 
     public IReadOnlyList<WeekdayOption> WeekdayOptions { get; }
 
+    public IReadOnlyList<string> TimeOptions => DefaultTimeOptions;
+
     public WeekdayOption SelectedWeekday
     {
         get => selectedWeekday;
@@ -31,5 +34,16 @@ public sealed class SchedulePlacementViewModel : ViewModelBase
     {
         get => timeText;
         set => SetProperty(ref timeText, value);
+    }
+
+    private static IReadOnlyList<string> CreateTimeOptions()
+    {
+        var options = new List<string>();
+        for (var minutes = 8 * 60; minutes <= 21 * 60 + 30; minutes += 30)
+        {
+            options.Add(new TimeOnly(minutes / 60, minutes % 60).ToString("HH\\:mm"));
+        }
+
+        return options;
     }
 }

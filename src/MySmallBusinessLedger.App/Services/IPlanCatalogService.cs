@@ -14,6 +14,8 @@ public interface IPlanCatalogService
 
     Task<OperationResult<PlanCatalogItem>> UpdateDraftAsync(int planId, PlanDraftInput input, CancellationToken cancellationToken);
 
+    Task<OperationResult<PlanCatalogItem>> RenameAsync(int planId, string newName, CancellationToken cancellationToken);
+
     Task<OperationResult<bool>> DeleteDraftAsync(int planId, CancellationToken cancellationToken);
 
     Task<OperationResult<PlanCatalogItem>> PublishDraftAsync(int planId, CancellationToken cancellationToken);
