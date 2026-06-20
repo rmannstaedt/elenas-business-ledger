@@ -6,10 +6,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="Configuration\google-oauth-client.json"
-          CopyToOutputDirectory="PreserveNewest"
-          Condition="Exists('Configuration\google-oauth-client.json')" />
-    <None Include="Configuration\google-oauth-client.template.json" />
+    <None Include="Configuration\google-oauth-client.json" CopyToOutputDirectory="PreserveNewest" Condition="Exists('Configuration\google-oauth-client.json')" />
   </ItemGroup>
 
   <PropertyGroup>
