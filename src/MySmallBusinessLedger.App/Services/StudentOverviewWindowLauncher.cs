@@ -36,7 +36,8 @@ public sealed class StudentOverviewWindowLauncher : IStudentOverviewLauncher
             studentEditorService,
             planCatalogService,
             invoiceWorkflowLauncher,
-            clock);
+            clock,
+            new MessageBoxStudentOverviewInteractionService());
         await viewModel.LoadAsync(selectedStudentShortName);
         var window = new StudentOverviewView(viewModel)
         {

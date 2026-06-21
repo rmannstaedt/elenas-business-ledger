@@ -34,6 +34,7 @@ public sealed class StudentEditorViewModel : ViewModelBase
     private DateTime? planEndsOnDate;
     private PlanCatalogItem? selectedAssignablePlan;
     private bool requiresCatalogPlanAssignment;
+    private string savedChangeStamp = string.Empty;
     private string? errorMessage;
     private bool isBusy;
 
@@ -60,6 +61,7 @@ public sealed class StudentEditorViewModel : ViewModelBase
         var viewModel = new StudentEditorViewModel(studentEditorService, assignablePlans ?? [], requestCloseOnSave);
         viewModel.requiresCatalogPlanAssignment = true;
         viewModel.SetSelectedAssignablePlan(viewModel.AssignablePlans.FirstOrDefault(), applyPlan: true);
+        viewModel.AcceptChanges();
         return viewModel;
     }
 
@@ -107,6 +109,7 @@ public sealed class StudentEditorViewModel : ViewModelBase
         }
 
         viewModel.ApplySchedule(snapshot.Schedule);
+        viewModel.AcceptChanges();
         return viewModel;
     }
 
@@ -335,6 +338,8 @@ public sealed class StudentEditorViewModel : ViewModelBase
 
     public bool WasSaved { get; private set; }
 
+    public bool HasChanges => CreateChangeStamp() != savedChangeStamp;
+
     public AsyncRelayCommand SaveCommand { get; }
 
     private async Task SaveAsync()
@@ -356,6 +361,7 @@ public sealed class StudentEditorViewModel : ViewModelBase
             }
 
             WasSaved = true;
+            AcceptChanges();
             ErrorMessage = null;
             if (requestCloseOnSave)
             {
@@ -508,5 +514,44 @@ public sealed class StudentEditorViewModel : ViewModelBase
         return string.IsNullOrWhiteSpace(trimmedLine2)
             ? trimmedLine1
             : trimmedLine1 + Environment.NewLine + trimmedLine2;
+    }
+
+    private void AcceptChanges()
+    {
+        savedChangeStamp = CreateChangeStamp();
+    }
+
+    private string CreateChangeStamp()
+    {
+        var schedule = string.Join(
+            "|",
+            SchedulePlacements.Select(placement =>
+                string.Create(
+                    CultureInfo.InvariantCulture,
+                    $"{placement.SelectedWeekday.Weekday?.ToString() ?? string.Empty}:{placement.TimeText}")));
+
+        return string.Join(
+            "\u001F",
+            ShortName,
+            FullName,
+            Address,
+            AddressLine2,
+            Phone,
+            Email,
+            AgeBracket.ToString(),
+            BirthdateDate?.ToString("O", CultureInfo.InvariantCulture) ?? string.Empty,
+            IsActive ? bool.TrueString : bool.FalseString,
+            SelectedAssignablePlan?.Id.ToString(CultureInfo.InvariantCulture) ?? string.Empty,
+            PlanName,
+            PlanPriceWithoutVat.ToString(CultureInfo.InvariantCulture),
+            LessonsPerWeek.ToString(),
+            PlanDurationMinutes.ToString(CultureInfo.InvariantCulture),
+            PlanFlexibility.ToString(),
+            PlanNumberOfStudents.ToString(CultureInfo.InvariantCulture),
+            PlanEffectiveDate.ToString("O", CultureInfo.InvariantCulture),
+            PlanPaymentTerms,
+            PlanStartsOnDate.ToString("O", CultureInfo.InvariantCulture),
+            PlanEndsOnDate?.ToString("O", CultureInfo.InvariantCulture) ?? string.Empty,
+            schedule);
     }
 }

@@ -182,6 +182,112 @@ public sealed class StudentOverviewViewModelTests
     }
 
     [Fact]
+    public async Task SelectingAnotherStudentPromptsAndSavesChangedStudent()
+    {
+        var service = new FakeStudentOverviewService(
+            [
+                CreateSnapshot("Anna", isActive: true),
+                CreateSnapshot("Bo", isActive: true)
+            ]);
+        var editor = new FakeStudentEditorService();
+        var interactions = new FakeStudentOverviewInteractionService
+        {
+            NextSaveChangesChoice = StudentEditSaveChangesChoice.Save
+        };
+        var viewModel = new StudentOverviewViewModel(
+            service,
+            editor,
+            new FakePlanCatalogService(),
+            new FakeInvoiceWorkflowLauncher(),
+            new FakeUiClock(new DateTimeOffset(2026, 6, 20, 12, 0, 0, TimeSpan.Zero)),
+            interactions);
+        await viewModel.LoadAsync();
+        viewModel.SelectedStudentEditor!.FullName = "Anna Changed";
+
+        await viewModel.SelectStudentAsync(viewModel.Students.Single(student => student.ShortName == "Bo"));
+
+        Assert.Equal(1, interactions.PromptSaveChangesCount);
+        Assert.NotNull(editor.LastRequest);
+        Assert.Equal("Anna Changed", editor.LastRequest.FullName);
+        Assert.Equal("Bo", viewModel.SelectedStudent?.ShortName);
+    }
+
+    [Fact]
+    public async Task SelectingAnotherStudentCanCancelSaveChangesPrompt()
+    {
+        var interactions = new FakeStudentOverviewInteractionService
+        {
+            NextSaveChangesChoice = StudentEditSaveChangesChoice.Cancel
+        };
+        var viewModel = new StudentOverviewViewModel(
+            new FakeStudentOverviewService(
+                [
+                    CreateSnapshot("Anna", isActive: true),
+                    CreateSnapshot("Bo", isActive: true)
+                ]),
+            new FakeStudentEditorService(),
+            new FakePlanCatalogService(),
+            new FakeInvoiceWorkflowLauncher(),
+            new FakeUiClock(new DateTimeOffset(2026, 6, 20, 12, 0, 0, TimeSpan.Zero)),
+            interactions);
+        await viewModel.LoadAsync();
+        viewModel.SelectedStudentEditor!.FullName = "Unsaved";
+
+        await viewModel.SelectStudentAsync(viewModel.Students.Single(student => student.ShortName == "Bo"));
+
+        Assert.Equal(1, interactions.PromptSaveChangesCount);
+        Assert.Equal("Anna", viewModel.SelectedStudent?.ShortName);
+        Assert.Equal("Unsaved", viewModel.SelectedStudentEditor?.FullName);
+    }
+
+    [Fact]
+    public async Task CancelStudentEditPromptsBeforeDiscardingUnsavedChanges()
+    {
+        var interactions = new FakeStudentOverviewInteractionService
+        {
+            NextSaveChangesChoice = StudentEditSaveChangesChoice.Discard
+        };
+        var viewModel = new StudentOverviewViewModel(
+            new FakeStudentOverviewService([CreateSnapshot("Anna", isActive: true)]),
+            new FakeStudentEditorService(),
+            new FakePlanCatalogService(),
+            new FakeInvoiceWorkflowLauncher(),
+            new FakeUiClock(new DateTimeOffset(2026, 6, 20, 12, 0, 0, TimeSpan.Zero)),
+            interactions);
+        await viewModel.LoadAsync();
+        viewModel.SelectedStudentEditor!.FullName = "Unsaved";
+
+        await viewModel.CancelStudentEditCommand.ExecuteAsync();
+
+        Assert.Equal(1, interactions.PromptSaveChangesCount);
+        Assert.Equal("Anna Andersen", viewModel.SelectedStudentEditor?.FullName);
+    }
+
+    [Fact]
+    public async Task ClosePromptCanCancelWindowCloseWhenStudentHasUnsavedChanges()
+    {
+        var interactions = new FakeStudentOverviewInteractionService
+        {
+            NextSaveChangesChoice = StudentEditSaveChangesChoice.Cancel
+        };
+        var viewModel = new StudentOverviewViewModel(
+            new FakeStudentOverviewService([CreateSnapshot("Anna", isActive: true)]),
+            new FakeStudentEditorService(),
+            new FakePlanCatalogService(),
+            new FakeInvoiceWorkflowLauncher(),
+            new FakeUiClock(new DateTimeOffset(2026, 6, 20, 12, 0, 0, TimeSpan.Zero)),
+            interactions);
+        await viewModel.LoadAsync();
+        viewModel.SelectedStudentEditor!.FullName = "Unsaved";
+
+        var canClose = await viewModel.PrepareForCloseAsync();
+
+        Assert.False(canClose);
+        Assert.Equal(1, interactions.PromptSaveChangesCount);
+        Assert.Equal("Unsaved", viewModel.SelectedStudentEditor?.FullName);
+    }
+
+    [Fact]
     public async Task AddStudentCreatesEmbeddedDraftAndSaveSelectsSavedStudent()
     {
         var service = new FakeStudentOverviewService([CreateSnapshot("Anna", isActive: true)]);
@@ -464,6 +570,19 @@ public sealed class StudentOverviewViewModelTests
 
         public Task<OperationResult<int>> RetireDueAsync(DateTimeOffset now, CancellationToken cancellationToken) =>
             throw new NotSupportedException();
+    }
+
+    private sealed class FakeStudentOverviewInteractionService : IStudentOverviewInteractionService
+    {
+        public StudentEditSaveChangesChoice NextSaveChangesChoice { get; init; } = StudentEditSaveChangesChoice.Discard;
+
+        public int PromptSaveChangesCount { get; private set; }
+
+        public Task<StudentEditSaveChangesChoice> PromptSaveChangesAsync(CancellationToken cancellationToken)
+        {
+            PromptSaveChangesCount++;
+            return Task.FromResult(NextSaveChangesChoice);
+        }
     }
 
     private sealed class FakeInvoiceWorkflowLauncher : IInvoiceWorkflowLauncher

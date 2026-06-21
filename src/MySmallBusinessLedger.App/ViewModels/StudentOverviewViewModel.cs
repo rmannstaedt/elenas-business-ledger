@@ -12,10 +12,12 @@ public sealed class StudentOverviewViewModel : ViewModelBase
     private readonly IStudentEditorService studentEditorService;
     private readonly IPlanCatalogService planCatalogService;
     private readonly IInvoiceWorkflowLauncher invoiceWorkflowLauncher;
+    private readonly IStudentOverviewInteractionService interactionService;
     private StudentOverviewStudentDisplayModel? selectedStudent;
     private StudentEditorViewModel? selectedStudentEditor;
     private IReadOnlyList<PlanCatalogItem> assignablePlans = [];
     private string? selectedStudentBeforeAdd;
+    private bool isSelectingStudent;
     private string? errorMessage;
     private bool isBusy;
 
@@ -25,11 +27,29 @@ public sealed class StudentOverviewViewModel : ViewModelBase
         IPlanCatalogService planCatalogService,
         IInvoiceWorkflowLauncher invoiceWorkflowLauncher,
         IUiClock clock)
+        : this(
+            studentOverviewService,
+            studentEditorService,
+            planCatalogService,
+            invoiceWorkflowLauncher,
+            clock,
+            new DiscardStudentOverviewInteractionService())
+    {
+    }
+
+    public StudentOverviewViewModel(
+        IStudentOverviewService studentOverviewService,
+        IStudentEditorService studentEditorService,
+        IPlanCatalogService planCatalogService,
+        IInvoiceWorkflowLauncher invoiceWorkflowLauncher,
+        IUiClock clock,
+        IStudentOverviewInteractionService interactionService)
     {
         this.studentOverviewService = studentOverviewService;
         this.studentEditorService = studentEditorService;
         this.planCatalogService = planCatalogService;
         this.invoiceWorkflowLauncher = invoiceWorkflowLauncher;
+        this.interactionService = interactionService;
 
         AddStudentCommand = new AsyncRelayCommand(AddStudentAsync, () => !IsBusy);
         SaveStudentCommand = new AsyncRelayCommand(SaveStudentAsync, () => !IsBusy && SelectedStudentEditor is not null);
@@ -55,11 +75,67 @@ public sealed class StudentOverviewViewModel : ViewModelBase
         get => selectedStudent;
         set
         {
-            if (SetProperty(ref selectedStudent, value))
+            if (isSelectingStudent)
+            {
+                SetSelectedStudentCore(value);
+                return;
+            }
+
+            _ = SelectStudentAsync(value);
+            OnPropertyChanged(nameof(SelectedStudent));
+        }
+    }
+
+    public async Task SelectStudentAsync(StudentOverviewStudentDisplayModel? student)
+    {
+        if (ReferenceEquals(selectedStudent, student))
+        {
+            return;
+        }
+
+        var targetShortName = student?.ShortName;
+        var preparation = await PrepareCurrentEditorForNavigationAsync(targetShortName);
+        if (preparation == NavigationPreparation.Cancel)
+        {
+            OnPropertyChanged(nameof(SelectedStudent));
+            return;
+        }
+
+        if (preparation == NavigationPreparation.Handled)
+        {
+            return;
+        }
+
+        SetSelectedStudentCore(targetShortName is null
+            ? null
+            : SelectStudent(targetShortName) ?? student);
+    }
+
+    public async Task<bool> PrepareForCloseAsync()
+    {
+        var preparation = await PrepareCurrentEditorForNavigationAsync(SelectedStudent?.ShortName);
+        if (preparation == NavigationPreparation.Cancel)
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    private void SetSelectedStudentCore(StudentOverviewStudentDisplayModel? student)
+    {
+        isSelectingStudent = true;
+        try
+        {
+            if (SetProperty(ref selectedStudent, student, nameof(SelectedStudent)))
             {
                 ApplySelectedStudent();
                 SelectedStudentChanged?.Invoke(this, SelectedStudent?.ShortName);
             }
+        }
+        finally
+        {
+            isSelectingStudent = false;
         }
     }
 
@@ -77,6 +153,8 @@ public sealed class StudentOverviewViewModel : ViewModelBase
     }
 
     public bool HasSelectedStudentEditor => SelectedStudentEditor is not null;
+
+    public bool HasUnsavedStudentChanges => SelectedStudentEditor?.HasChanges == true;
 
     public bool IsBusy
     {
@@ -131,7 +209,7 @@ public sealed class StudentOverviewViewModel : ViewModelBase
                 Students.Add(new StudentOverviewStudentDisplayModel(snapshot));
             }
 
-            SelectedStudent = SelectStudent(selectedStudentShortName) ?? Students.FirstOrDefault();
+            SetSelectedStudentCore(SelectStudent(selectedStudentShortName) ?? Students.FirstOrDefault());
             ErrorMessage = null;
         }
         catch (Exception ex)
@@ -146,8 +224,14 @@ public sealed class StudentOverviewViewModel : ViewModelBase
 
     private async Task AddStudentAsync()
     {
+        var preparation = await PrepareCurrentEditorForNavigationAsync(null);
+        if (preparation == NavigationPreparation.Cancel)
+        {
+            return;
+        }
+
         selectedStudentBeforeAdd = SelectedStudent?.ShortName;
-        SelectedStudent = null;
+        SetSelectedStudentCore(null);
         Invoices.Clear();
         SelectedStudentEditor = StudentEditorViewModel.CreateNew(
             studentEditorService,
@@ -157,31 +241,41 @@ public sealed class StudentOverviewViewModel : ViewModelBase
 
     private async Task SaveStudentAsync()
     {
+        await SaveStudentAndSelectAsync(null);
+    }
+
+    private async Task<bool> SaveStudentAndSelectAsync(string? selectedStudentShortName)
+    {
         if (SelectedStudentEditor is null)
         {
-            return;
+            return true;
         }
 
         await SelectedStudentEditor.SaveCommand.ExecuteAsync();
         if (!SelectedStudentEditor.WasSaved)
         {
-            return;
+            return false;
         }
 
         var savedShortName = SelectedStudentEditor.ShortName;
         selectedStudentBeforeAdd = null;
-        await LoadAsync(savedShortName);
+        await LoadAsync(selectedStudentShortName ?? savedShortName);
+        return true;
     }
 
-    private Task CancelStudentEditAsync()
+    private async Task CancelStudentEditAsync()
     {
+        if (!await PrepareCurrentEditorForCancelAsync())
+        {
+            return;
+        }
+
         var selectAfterCancel = SelectedStudent?.ShortName ?? selectedStudentBeforeAdd;
         selectedStudentBeforeAdd = null;
-        SelectedStudent = selectAfterCancel is null
+        SetSelectedStudentCore(selectAfterCancel is null
             ? Students.FirstOrDefault()
-            : SelectStudent(selectAfterCancel) ?? Students.FirstOrDefault();
+            : SelectStudent(selectAfterCancel) ?? Students.FirstOrDefault());
         ApplySelectedStudent();
-        return Task.CompletedTask;
     }
 
     private Task OpenInvoiceAsync(InvoiceDisplayModel invoice) =>
@@ -254,5 +348,46 @@ public sealed class StudentOverviewViewModel : ViewModelBase
         SaveStudentCommand.RaiseCanExecuteChanged();
         CancelStudentEditCommand.RaiseCanExecuteChanged();
         OpenInvoiceCommand.RaiseCanExecuteChanged();
+    }
+
+    private async Task<bool> PrepareCurrentEditorForCancelAsync()
+    {
+        if (SelectedStudentEditor?.HasChanges != true)
+        {
+            return true;
+        }
+
+        var choice = await interactionService.PromptSaveChangesAsync(CancellationToken.None);
+        return choice switch
+        {
+            StudentEditSaveChangesChoice.Save => await SaveStudentAndSelectAsync(SelectedStudent?.ShortName),
+            StudentEditSaveChangesChoice.Discard => true,
+            _ => false
+        };
+    }
+
+    private async Task<NavigationPreparation> PrepareCurrentEditorForNavigationAsync(string? selectedStudentShortName)
+    {
+        if (SelectedStudentEditor?.HasChanges != true)
+        {
+            return NavigationPreparation.Continue;
+        }
+
+        var choice = await interactionService.PromptSaveChangesAsync(CancellationToken.None);
+        return choice switch
+        {
+            StudentEditSaveChangesChoice.Save => await SaveStudentAndSelectAsync(selectedStudentShortName)
+                ? NavigationPreparation.Handled
+                : NavigationPreparation.Cancel,
+            StudentEditSaveChangesChoice.Discard => NavigationPreparation.Continue,
+            _ => NavigationPreparation.Cancel
+        };
+    }
+
+    private enum NavigationPreparation
+    {
+        Continue,
+        Handled,
+        Cancel
     }
 }
