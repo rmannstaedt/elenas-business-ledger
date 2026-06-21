@@ -20,6 +20,7 @@
     flexibility: none / move or cancel by agreement
     number of students: 1 / 2
     effective date: <date/time>
+    payment terms: paid monthly in advance / paid per lesson
 
 ### Lesson
     date/time
@@ -41,7 +42,7 @@
     date
     company info
     student info
-    (list) lesson date/time + lesson plan name + lesson price (without VAT)
+    (list) lesson date/time + lesson plan identity + issued lesson plan name + lesson price (without VAT)
   
   AND (optional, left out if not specified)
     price adjustment
@@ -58,6 +59,7 @@
 ### Google Calendar Entry
   student short name
   date/time
+  lesson state marker, when completed
   
 ## Business Logic
 
@@ -67,7 +69,20 @@ The Lessons table is updated with student lessons when the invoice is printed.
 
 The Plan is an agreement between teacher and student and determines how many lessons there are per week and how much the student will pay for them. If the 'lessons per week' is 'by appointment', there is no fixed number.
 
-Plans are not editable (they are a contract/agreement between teacher and student), but students may be moved to a different Plan.
+Plan catalog entries have a lifecycle:
+  * Draft: editable and deletable, but not assignable to students. A Draft may be incomplete.
+  * Active: immutable and assignable to students; the only editable fields are the display name and `Retire on`, and the allowed catalog action is Retire.
+  * Retired: immutable and not assignable to students; the display name may still be renamed, and the only lifecycle action is Reactivate.
+
+A Draft Plan starts with blank name, blank price, one lesson per week, 60 minute duration, one student, move/cancel flexibility, `Paid monthly in advance`, the first day of the current month as effective date, and no `Retire on` date. All fields except `Retire on` must be filled with valid values before the Draft can be published.
+
+Plans are managed independently from Students from the Plan menu. When an Active catalog Plan is assigned to a Student, the catalog Plan identity is stored on that Student's plan period and the commercial Plan fields are copied into that Student's plan period. After that assignment, catalog edits while Draft, publish/retire/reactivate actions, name-only renames, and future catalog cleanup must not mutate existing Student plan period commercial terms or issued invoices. Name-only renames are tracked with old name, new name, and change date/time so invoice-time names can still be understood later.
+
+An Active Plan's `Retire on` date is equivalent to choosing Retire on that date. When the application starts, due Active Plans are moved to Retired so they no longer appear for new student assignment. Existing Student plan periods keep their copied Plan data until the Student is explicitly moved to another Active Plan.
+
+When adding another Plan from Manage Plans, changed Draft fields are saved before the new Draft is created. If the selected Active Plan has an unsaved `Retire on` change, the user is asked whether to save or discard that change before adding the new Draft.
+
+Students may be moved to a different Active Plan by creating a new assigned student plan period.
 
 If a new Plan is added to a Student, it takes effect at the Plan effective date/time.
 If the new Plan effective date/time is in the future, the new Plan is not in effect until then.
@@ -92,8 +107,15 @@ Relevant Google Calendar entries are identified by their first line, which may b
 
 Google Calendar entries that are *NOT* identified as relevant by their first line are *ALWAYS* ignored.
 
+The first line remains the ownership/matching marker. A completed uninvoiced lesson may additionally contain this later line in the Google Calendar entry:
+  Status: Completed
+
+If that later status line is absent, the lesson is treated as Planned.
+
 When an Invoice is printed, it is added to the Invoice table and the Lessons table is updated with the Lessons noted on the Invoice.
 The Lessons table is only ever updated when invoices are printed.
+
+Issued Invoice lines store the catalog Plan identity for lineage/reporting and also store the Plan name as it appeared when the Invoice was issued. Invoice viewing and PDF output use the stored issued-time Plan name snapshot, not current catalog names and not a derived lookup through Plan name-change history.
 
 ## Actions
 
@@ -110,6 +132,10 @@ Each lesson in the list contains:
   - invoiced: yes / no
   - paid: yes / outstanding (only if invoiced)
 
+Lesson state does not change automatically merely because the lesson date/time has passed. The user marks a Planned lesson as Completed manually.
+
+The main application window does not display student prices or monthly payment amounts. Prices belong in invoice preparation/printing and later administration views, not on the everyday lesson screen where students may see the display.
+
 The application also opens Google Calendar in a separate browser window on the screen.
 (if we technically can open Google Calendar as a separate pane in the application, that may be preferable)
 
@@ -118,9 +144,15 @@ The application will automatically refresh the lesson list from Google Calendar 
 There are Previous / Next buttons for the selected student, which will switch to the previous student and the next student respectively (by date/time of lesson).
 There are also Previous / Next buttons for the month, to switch the display back/forth by a month.
 
-The application contains a Student menu with these entries:
-  * Add Student
-  * Edit Student
+The application contains a Student menu with this entry:
+  * Manage Students
+
+Manage Students lists all known Students, including inactive Students. Selecting a Student opens that Student in an embedded editor showing Student fields, Active flag, current assigned Plan snapshot, plan assignment selector, schedule fields, and issued Invoices. Add Student creates a new in-pane draft. Changes are explicit: Save persists the edited Student data and Cancel discards unsaved changes. Selecting an Active catalog Plan copies the Plan fields into the Student's plan period. Changing the Active flag, plan period dates, or schedule only persists when Save is pressed. Double-clicking an Invoice in the selected Student's invoice list opens it in the Invoice Viewer. Selecting a Student in Manage Students immediately refreshes the main window around that Student; closing Manage Students applies the final selected Student again.
+
+The application contains a Plan menu with:
+  * Manage Plans
+
+Manage Plans lists Draft, Active, and Retired catalog Plans. Draft Plans can be edited, deleted, and published. Active Plans are read-only except for `Retire on`, and can be retired. Retired Plans are read-only and can be reactivated. Only Active Plans appear in the Student editor assignment selector.
 
 The application window also displays a pane with Student Invoices.
 Each Invoice in the list has a flag: Paid / Outstanding
@@ -131,14 +163,20 @@ Double-clicking on an Invoice opens it in the Invoice Viewer.
 The application also contains a button:
   * Write Invoice
 
-Lessons that are invoiced:yes CAN NOT be edited.
+Lessons that are completed or invoiced:yes CAN NOT be edited or deleted in the main lesson list.
 
-The invoiced:no entries in the lesson list may be edited directly:
+The only allowed operation on a Completed lesson is to mark it back to Planned. This requires an explicit confirmation prompt. Once a Completed lesson has been marked back to Planned, and provided it is still invoiced:no, it can again be edited as a planned lesson.
+
+The planned and invoiced:no entries in the lesson list may be edited directly in the main window:
   * date/time may be changed
   * lesson may be cancelled (deleted)
   * new lesson may be added
 
-All changes to the lessons in the lesson list are saved directly in Google Calendar.
+Adding a lesson creates a new empty planned row for the current student in the main lesson list. The user fills in the date/time directly in that row.
+
+Lesson date editing uses a date selector. Lesson time editing provides a time selector while still allowing typed time input. Lesson cancellation uses an explicit delete action with a confirmation prompt.
+
+Schedule changes to the lessons in the lesson list are saved directly in Google Calendar.
 If the update of Google Calendar fails, the user is notified immediately so they can take corrective action.
 
 ### Write and Print an Invoice
@@ -185,7 +223,7 @@ Once an Invoice has been *successfully* saved, it can no longer be edited.
 
   * VAT exemptions for individual students are outside the current scope.
   * No VAT reporting.
-  * No payment due/terms.
+  * No automated payment reminders or due-date workflow.
   * No support for credit notes/correction invoices.
   * No integration with MobilePay/Bank for payment registration.
   * No tax reserve estimate.

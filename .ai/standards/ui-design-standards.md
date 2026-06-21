@@ -113,6 +113,8 @@ Page structure should be steady. Avoid layout shifts caused by changing text, la
 
 Preserve useful user-adjusted layout such as column order, widths, splitters, filters, sorting, density, and window size where repeated use benefits from it. Provide a reset path when persisted layout can become confusing.
 
+Desktop applications should preserve window size and position for main windows and subwindows, then restore them inside the current visible screen area so windows are never stranded off-screen after monitor or resolution changes.
+
 ## Visual design and design systems
 
 This document does not define a visual theme. It defines interaction and clarity standards.

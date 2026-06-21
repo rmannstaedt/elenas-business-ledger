@@ -1,0 +1,246 @@
+<Window x:Class="MySmallBusinessLedger.App.Views.PlanCatalogView"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Manage Plans"
+        Height="560"
+        Width="860"
+        MinHeight="500"
+        MinWidth="760"
+        WindowStartupLocation="CenterOwner">
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+        <Style x:Key="PlanActionButtonStyle"
+               TargetType="Button">
+            <Setter Property="MinWidth"
+                    Value="88" />
+            <Setter Property="Height"
+                    Value="28" />
+            <Setter Property="Padding"
+                    Value="10,0" />
+            <Setter Property="Margin"
+                    Value="0,0,8,8" />
+        </Style>
+        <Style x:Key="TopPlanActionButtonStyle"
+               TargetType="Button"
+               BasedOn="{StaticResource PlanActionButtonStyle}">
+            <Setter Property="HorizontalAlignment"
+                    Value="Right" />
+            <Setter Property="Margin"
+                    Value="8,0,0,10" />
+        </Style>
+        <Style x:Key="RightPlanActionButtonStyle"
+               TargetType="Button"
+               BasedOn="{StaticResource PlanActionButtonStyle}">
+            <Setter Property="Margin"
+                    Value="8,0,0,8" />
+        </Style>
+    </Window.Resources>
+
+    <DockPanel Margin="16">
+        <Border DockPanel.Dock="Top"
+                Background="#FFF4E5"
+                BorderBrush="#D58512"
+                BorderThickness="1"
+                Padding="10"
+                Margin="0,0,0,12"
+                Visibility="{Binding HasError, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <TextBlock Text="{Binding ErrorMessage}"
+                       TextWrapping="Wrap" />
+        </Border>
+
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="2*" />
+                <ColumnDefinition Width="18" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <Grid Grid.Column="0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <TextBlock Text="Plans"
+                           FontSize="18"
+                           FontWeight="SemiBold"
+                           VerticalAlignment="Center"
+                           Margin="0,0,0,10" />
+
+                <DataGrid x:Name="PlansGrid"
+                          Grid.Row="1"
+                          ItemsSource="{Binding PlansView}"
+                          SelectedItem="{Binding SelectedPlan}"
+                          AutoGenerateColumns="False"
+                          CanUserAddRows="False"
+                          CanUserDeleteRows="False"
+                          IsReadOnly="True"
+                          HeadersVisibility="Column"
+                          GridLinesVisibility="Horizontal"
+                          AutomationProperties.Name="Plan list">
+                    <DataGrid.GroupStyle>
+                        <GroupStyle>
+                            <GroupStyle.HeaderTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Name}"
+                                               FontWeight="SemiBold"
+                                               Margin="4,8,0,4" />
+                                </DataTemplate>
+                            </GroupStyle.HeaderTemplate>
+                        </GroupStyle>
+                    </DataGrid.GroupStyle>
+                    <DataGrid.Columns>
+                        <DataGridTextColumn Header="Plan"
+                                            Binding="{Binding Name}"
+                                            Width="*" />
+                        <DataGridTextColumn Header="Price"
+                                            Binding="{Binding PriceWithoutVatText}"
+                                            Width="90" />
+                        <DataGridTextColumn Header="Duration"
+                                            Binding="{Binding DurationMinutesText}"
+                                            Width="90" />
+                        <DataGridTextColumn Header="Lessons"
+                                            Binding="{Binding LessonsPerWeekText}"
+                                            Width="120" />
+                        <DataGridTextColumn Header="Students"
+                                            Binding="{Binding NumberOfStudentsText}"
+                                            Width="90" />
+                        <DataGridTextColumn Header="State"
+                                            Binding="{Binding StateText}"
+                                            Width="100" />
+                    </DataGrid.Columns>
+                </DataGrid>
+
+            </Grid>
+
+            <Grid Grid.Column="2">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <Grid Grid.Row="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Selected Plan"
+                               FontSize="18"
+                               FontWeight="SemiBold"
+                               VerticalAlignment="Center"
+                               Margin="0,0,0,10" />
+                    <Button Grid.Column="1"
+                            Content="Publish draft"
+                            Command="{Binding PublishDraftPlanCommand}"
+                            Visibility="{Binding CanPublishDraftSelectedPlan, Converter={StaticResource BooleanToVisibilityConverter}}"
+                            Style="{StaticResource TopPlanActionButtonStyle}" />
+                    <Button Grid.Column="1"
+                            Content="Reactivate"
+                            Command="{Binding ReactivatePlanCommand}"
+                            Visibility="{Binding CanReactivateSelectedPlan, Converter={StaticResource BooleanToVisibilityConverter}}"
+                            Style="{StaticResource TopPlanActionButtonStyle}" />
+                </Grid>
+
+                <StackPanel Grid.Row="1">
+                    <TextBlock Text="Name" />
+                    <TextBox Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
+                             IsEnabled="{Binding CanEditSelectedPlanName}"
+                             Margin="0,3,0,8" />
+                    <TextBlock Text="Price without VAT" />
+                    <TextBox Text="{Binding PriceWithoutVat, UpdateSourceTrigger=PropertyChanged, TargetNullValue=''}"
+                             IsEnabled="{Binding CanEditSelectedPlanFields}"
+                             Margin="0,3,0,8" />
+                    <TextBlock Text="Lessons per week" />
+                    <ComboBox ItemsSource="{Binding LessonsPerWeekOptions}"
+                              DisplayMemberPath="DisplayName"
+                              SelectedValuePath="Value"
+                              SelectedValue="{Binding LessonsPerWeek}"
+                              IsEnabled="{Binding CanEditSelectedPlanFields}"
+                              Margin="0,3,0,8" />
+                    <TextBlock Text="Duration minutes" />
+                    <TextBox Text="{Binding DurationMinutes, UpdateSourceTrigger=PropertyChanged}"
+                             IsEnabled="{Binding CanEditSelectedPlanFields}"
+                             Margin="0,3,0,8" />
+                    <TextBlock Text="Number of students" />
+                    <TextBox Text="{Binding NumberOfStudents, UpdateSourceTrigger=PropertyChanged}"
+                             IsEnabled="{Binding CanEditSelectedPlanFields}"
+                             Margin="0,3,0,8" />
+                    <TextBlock Text="Flexibility" />
+                    <ComboBox ItemsSource="{Binding FlexibilityOptions}"
+                              DisplayMemberPath="DisplayName"
+                              SelectedValuePath="Value"
+                              SelectedValue="{Binding Flexibility}"
+                              IsEnabled="{Binding CanEditSelectedPlanFields}"
+                              Margin="0,3,0,8" />
+                    <TextBlock Text="Payment terms" />
+                    <ComboBox ItemsSource="{Binding PaymentTermOptions}"
+                              SelectedItem="{Binding PaymentTerms}"
+                              IsEnabled="{Binding CanEditSelectedPlanFields}"
+                              Margin="0,3,0,8" />
+                    <TextBlock Text="Effective date" />
+                    <DatePicker SelectedDate="{Binding EffectiveDate, UpdateSourceTrigger=PropertyChanged}"
+                                IsEnabled="{Binding CanEditSelectedPlanFields}"
+                                Margin="0,3,0,8" />
+                    <TextBlock Text="Retire on" />
+                    <DatePicker SelectedDate="{Binding RetireOnDate, UpdateSourceTrigger=PropertyChanged}"
+                                IsEnabled="{Binding CanEditSelectedPlanRetireOn}"
+                                Margin="0,3,0,14" />
+                </StackPanel>
+
+                <Grid Grid.Row="2">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Button Content="Save Draft"
+                            Command="{Binding SaveDraftPlanCommand}"
+                            Visibility="{Binding CanEditSelectedPlanFields, Converter={StaticResource BooleanToVisibilityConverter}}"
+                            HorizontalAlignment="Left"
+                            Style="{StaticResource PlanActionButtonStyle}" />
+                    <Button Grid.Column="1"
+                            Content="Delete draft"
+                            Command="{Binding DeleteDraftPlanCommand}"
+                            Visibility="{Binding CanDeleteSelectedPlan, Converter={StaticResource BooleanToVisibilityConverter}}"
+                            Style="{StaticResource RightPlanActionButtonStyle}" />
+                    <Button Grid.ColumnSpan="2"
+                            Content="Retire"
+                            Command="{Binding RetirePlanCommand}"
+                            Visibility="{Binding CanRetireSelectedPlan, Converter={StaticResource BooleanToVisibilityConverter}}"
+                            HorizontalAlignment="Center"
+                            Style="{StaticResource PlanActionButtonStyle}" />
+                </Grid>
+            </Grid>
+
+            <Button Grid.Row="1"
+                    Grid.Column="0"
+                    Content="Add Plan"
+                    Command="{Binding AddDraftPlanCommand}"
+                    MinWidth="88"
+                    Height="28"
+                    HorizontalAlignment="Left"
+                    Margin="0,14,0,0" />
+            <Button Grid.Row="1"
+                    Grid.Column="2"
+                    Content="Save"
+                    Command="{Binding SaveSelectedPlanCommand}"
+                    Visibility="{Binding CanSaveSelectedPlan, Converter={StaticResource BooleanToVisibilityConverter}}"
+                    MinWidth="88"
+                    Height="28"
+                    HorizontalAlignment="Left"
+                    Margin="0,14,0,0" />
+            <Button Grid.Row="1"
+                    Grid.Column="2"
+                    Content="Close"
+                    Click="OnClose"
+                    MinWidth="84"
+                    Height="28"
+                    HorizontalAlignment="Right"
+                    Margin="0,14,0,0" />
+        </Grid>
+    </DockPanel>
+</Window>
