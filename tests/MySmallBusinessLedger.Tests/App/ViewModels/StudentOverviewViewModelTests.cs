@@ -10,6 +10,8 @@ using MySmallBusinessLedger.Core.UseCases.Plans;
 using MySmallBusinessLedger.Core.UseCases.Students;
 using System.Windows;
 using WpfButton = System.Windows.Controls.Button;
+using WpfGrid = System.Windows.Controls.Grid;
+using WpfGridSplitter = System.Windows.Controls.GridSplitter;
 
 namespace MySmallBusinessLedger.Tests.App.ViewModels;
 
@@ -53,6 +55,37 @@ public sealed class StudentOverviewViewModelTests
 
             Assert.Equal(HorizontalAlignment.Right, closeButton.HorizontalAlignment);
             Assert.Equal(84, closeButton.MinWidth);
+
+            window.Close();
+        });
+    }
+
+    [Fact]
+    public void StudentOverviewLayoutKeepsEditorPanesFixedAndInvoicesResizable()
+    {
+        RunOnStaThread(() =>
+        {
+            var viewModel = new StudentOverviewViewModel(
+                new FakeStudentOverviewService([CreateSnapshot("Anna", isActive: true)]),
+                new FakeStudentEditorService(),
+                new FakePlanCatalogService(),
+                new FakeInvoiceWorkflowLauncher(),
+                new FakeUiClock(new DateTimeOffset(2026, 6, 20, 12, 0, 0, TimeSpan.Zero)));
+            var window = new StudentOverviewView(viewModel);
+
+            var outerColumns = Assert.Single(FindChildren<WpfGrid>(window), grid => grid.Name == "StudentOverviewColumns");
+            Assert.Equal(GridUnitType.Star, outerColumns.ColumnDefinitions[0].Width.GridUnitType);
+            Assert.Equal(8, outerColumns.ColumnDefinitions[1].Width.Value);
+            Assert.Equal(360, outerColumns.ColumnDefinitions[2].Width.Value);
+
+            var detailColumns = Assert.Single(FindChildren<WpfGrid>(window), grid => grid.Name == "StudentDetailColumns");
+            Assert.Equal(GridUnitType.Pixel, detailColumns.ColumnDefinitions[2].Width.GridUnitType);
+            Assert.Equal(GridUnitType.Pixel, detailColumns.ColumnDefinitions[4].Width.GridUnitType);
+            Assert.Equal(detailColumns.ColumnDefinitions[2].Width.Value, detailColumns.ColumnDefinitions[4].Width.Value);
+
+            var splitter = Assert.Single(FindChildren<WpfGridSplitter>(window), gridSplitter => gridSplitter.Name == "InvoicesPaneSplitter");
+            Assert.Equal(System.Windows.Controls.GridResizeDirection.Columns, splitter.ResizeDirection);
+            Assert.Equal(System.Windows.Controls.GridResizeBehavior.PreviousAndNext, splitter.ResizeBehavior);
 
             window.Close();
         });

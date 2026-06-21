@@ -41,6 +41,7 @@ public sealed class PlanCatalogViewModel : ViewModelBase
         AddDraftPlanCommand = new AsyncRelayCommand(AddDraftPlanAsync);
         SaveDraftPlanCommand = new AsyncRelayCommand(SaveDraftPlanAsync, () => CanEditSelectedPlanFields);
         SaveNameCommand = new AsyncRelayCommand(SaveNameAsync, () => CanSaveSelectedPlanName);
+        SaveSelectedPlanCommand = new AsyncRelayCommand(SaveSelectedPlanAsync, () => CanSaveSelectedPlan);
         DeleteDraftPlanCommand = new AsyncRelayCommand(DeleteDraftPlanAsync, () => CanDeleteSelectedPlan);
         PublishDraftPlanCommand = new AsyncRelayCommand(PublishDraftPlanAsync, () => CanPublishDraftSelectedPlan);
         SaveRetireOnCommand = new AsyncRelayCommand(SaveRetireOnAsync, () => CanSaveSelectedPlanRetireOn);
@@ -115,6 +116,8 @@ public sealed class PlanCatalogViewModel : ViewModelBase
 
     public bool CanReactivateSelectedPlan => SelectedPlan?.State == PlanCatalogState.Retired;
 
+    public bool CanSaveSelectedPlan => SelectedPlan is not null && SelectedPlan.State != PlanCatalogState.Draft;
+
     public string? ErrorMessage
     {
         get => errorMessage;
@@ -134,6 +137,8 @@ public sealed class PlanCatalogViewModel : ViewModelBase
     public AsyncRelayCommand SaveDraftPlanCommand { get; }
 
     public AsyncRelayCommand SaveNameCommand { get; }
+
+    public AsyncRelayCommand SaveSelectedPlanCommand { get; }
 
     public AsyncRelayCommand DeleteDraftPlanCommand { get; }
 
@@ -205,6 +210,52 @@ public sealed class PlanCatalogViewModel : ViewModelBase
 
         ErrorMessage = null;
         await ReloadAsync(result.Value!.Id);
+    }
+
+    private async Task SaveSelectedPlanAsync()
+    {
+        if (SelectedPlan is null)
+        {
+            return;
+        }
+
+        await SaveSelectedPlanCoreAsync(SelectedPlan.Id);
+    }
+
+    private async Task<bool> SaveSelectedPlanCoreAsync(int planId)
+    {
+        if (SelectedPlan is null)
+        {
+            return true;
+        }
+
+        var selectedPlan = SelectedPlan;
+        if (!string.Equals(Name, selectedPlan.Name, StringComparison.Ordinal))
+        {
+            var renameResult = await planCatalogService.RenameAsync(planId, Name, CancellationToken.None);
+            if (!renameResult.Succeeded)
+            {
+                SetError(renameResult.Errors.FirstOrDefault()?.Message ?? "Plan name could not be saved.");
+                return false;
+            }
+        }
+
+        if (selectedPlan.State == PlanCatalogState.Active && HasRetireOnChanged(selectedPlan.Plan))
+        {
+            var retireOnResult = await planCatalogService.UpdateRetireOnAsync(
+                planId,
+                ToRetireOn(),
+                CancellationToken.None);
+            if (!retireOnResult.Succeeded)
+            {
+                SetError(retireOnResult.Errors.FirstOrDefault()?.Message ?? "Retire on could not be saved.");
+                return false;
+            }
+        }
+
+        ErrorMessage = null;
+        await ReloadAsync(planId);
+        return true;
     }
 
     private async Task<bool> SaveDraftPlanCoreAsync(int planId)
@@ -374,8 +425,10 @@ public sealed class PlanCatalogViewModel : ViewModelBase
         OnPropertyChanged(nameof(CanSaveSelectedPlanRetireOn));
         OnPropertyChanged(nameof(CanRetireSelectedPlan));
         OnPropertyChanged(nameof(CanReactivateSelectedPlan));
+        OnPropertyChanged(nameof(CanSaveSelectedPlan));
         SaveDraftPlanCommand.RaiseCanExecuteChanged();
         SaveNameCommand.RaiseCanExecuteChanged();
+        SaveSelectedPlanCommand.RaiseCanExecuteChanged();
         DeleteDraftPlanCommand.RaiseCanExecuteChanged();
         PublishDraftPlanCommand.RaiseCanExecuteChanged();
         SaveRetireOnCommand.RaiseCanExecuteChanged();
@@ -410,12 +463,12 @@ public sealed class PlanCatalogViewModel : ViewModelBase
             return await SaveDraftPlanCoreAsync(SelectedPlan.Id);
         }
 
-        if (SelectedPlan.State == PlanCatalogState.Active && HasRetireOnChanged(SelectedPlan.Plan))
+        if (SelectedPlan.State != PlanCatalogState.Draft && HasSelectedPlanChanges(SelectedPlan))
         {
             var choice = await interactionService.PromptAddPlanSaveChangesAsync(CancellationToken.None);
             return choice switch
             {
-                PlanCatalogAddPlanChoice.Save => await SaveRetireOnCoreAsync(SelectedPlan.Id),
+                PlanCatalogAddPlanChoice.Save => await SaveSelectedPlanCoreAsync(SelectedPlan.Id),
                 PlanCatalogAddPlanChoice.Discard => true,
                 _ => false
             };
@@ -437,6 +490,10 @@ public sealed class PlanCatalogViewModel : ViewModelBase
 
     private bool HasRetireOnChanged(PlanCatalogItem plan) =>
         ToRetireOn() != plan.RetireOn;
+
+    private bool HasSelectedPlanChanges(PlanCatalogDisplayModel plan) =>
+        !string.Equals(Name, plan.Name, StringComparison.Ordinal) ||
+        plan.State == PlanCatalogState.Active && HasRetireOnChanged(plan.Plan);
 
     private void SetError(string message)
     {

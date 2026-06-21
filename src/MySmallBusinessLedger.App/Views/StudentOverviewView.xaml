@@ -4,9 +4,9 @@
         xmlns:primitives="clr-namespace:System.Windows.Controls.Primitives;assembly=PresentationFramework"
         Title="Manage Students"
         Height="680"
-        Width="1220"
+        Width="1660"
         MinHeight="600"
-        MinWidth="1100">
+        MinWidth="1220">
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
         <Style x:Key="PaneHeaderStyle" TargetType="TextBlock">
@@ -62,16 +62,25 @@
             </DockPanel>
         </Border>
 
-        <Grid Grid.Row="1">
+        <Grid x:Name="StudentOverviewColumns"
+              Grid.Row="1">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="1.55*" />
-                <ColumnDefinition Width="18" />
-                <ColumnDefinition Width="2.05*" />
-                <ColumnDefinition Width="18" />
-                <ColumnDefinition Width="1.05*" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="8" />
+                <ColumnDefinition Width="360" MinWidth="260" />
             </Grid.ColumnDefinitions>
 
-            <Grid Grid.Column="0">
+            <Grid x:Name="StudentDetailColumns"
+                  Grid.Column="0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="18" />
+                    <ColumnDefinition Width="376" />
+                    <ColumnDefinition Width="18" />
+                    <ColumnDefinition Width="376" />
+                </Grid.ColumnDefinitions>
+
+                <Grid Grid.Column="0">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
@@ -111,6 +120,7 @@
             </Grid>
 
             <Grid Grid.Column="2"
+                  Grid.ColumnSpan="3"
                   Visibility="{Binding HasSelectedStudentEditor, Converter={StaticResource BooleanToVisibilityConverter}}">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
@@ -118,9 +128,9 @@
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="376" />
                     <ColumnDefinition Width="18" />
-                    <ColumnDefinition Width="272" />
+                    <ColumnDefinition Width="376" />
                 </Grid.ColumnDefinitions>
 
                 <TextBlock Text="Student" Style="{StaticResource PaneHeaderStyle}" />
@@ -143,9 +153,9 @@
                               VerticalScrollBarVisibility="Auto">
                     <Grid DataContext="{Binding SelectedStudentEditor}">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="376" />
                             <ColumnDefinition Width="18" />
-                            <ColumnDefinition Width="272" />
+                            <ColumnDefinition Width="376" />
                         </Grid.ColumnDefinitions>
 
                         <StackPanel Grid.Column="0">
@@ -270,8 +280,20 @@
                     </Grid>
                 </ScrollViewer>
             </Grid>
+            </Grid>
 
-            <Grid Grid.Column="4">
+            <GridSplitter x:Name="InvoicesPaneSplitter"
+                          Grid.Column="1"
+                          Width="8"
+                          HorizontalAlignment="Stretch"
+                          VerticalAlignment="Stretch"
+                          Background="Transparent"
+                          ShowsPreview="True"
+                          ResizeDirection="Columns"
+                          ResizeBehavior="PreviousAndNext"
+                          AutomationProperties.Name="Resize invoices pane" />
+
+            <Grid Grid.Column="2">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
@@ -307,32 +329,39 @@
 
         <Grid Grid.Row="2" Margin="0,14,0,0">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="1.55*" />
-                <ColumnDefinition Width="18" />
-                <ColumnDefinition Width="2.05*" />
-                <ColumnDefinition Width="18" />
-                <ColumnDefinition Width="1.05*" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="8" />
+                <ColumnDefinition Width="360" />
             </Grid.ColumnDefinitions>
-            <Button Grid.Column="0"
-                    Content="Add Student"
-                    Command="{Binding AddStudentCommand}"
-                    MinWidth="96"
-                    Height="30"
-                    HorizontalAlignment="Left" />
-            <StackPanel Grid.Column="2"
-                        Orientation="Horizontal"
-                        HorizontalAlignment="Left">
-                <Button Content="Save"
-                        Command="{Binding SaveStudentCommand}"
-                        MinWidth="84"
+            <Grid Grid.Column="0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="18" />
+                    <ColumnDefinition Width="376" />
+                    <ColumnDefinition Width="18" />
+                    <ColumnDefinition Width="376" />
+                </Grid.ColumnDefinitions>
+                <Button Grid.Column="0"
+                        Content="Add Student"
+                        Command="{Binding AddStudentCommand}"
+                        MinWidth="96"
                         Height="30"
-                        Margin="0,0,8,0" />
-                <Button Content="Cancel"
-                        Command="{Binding CancelStudentEditCommand}"
-                        MinWidth="84"
-                        Height="30" />
-            </StackPanel>
-            <Button Grid.Column="4"
+                        HorizontalAlignment="Left" />
+                <StackPanel Grid.Column="2"
+                            Orientation="Horizontal"
+                            HorizontalAlignment="Left">
+                    <Button Content="Save"
+                            Command="{Binding SaveStudentCommand}"
+                            MinWidth="84"
+                            Height="30"
+                            Margin="0,0,8,0" />
+                    <Button Content="Cancel"
+                            Command="{Binding CancelStudentEditCommand}"
+                            MinWidth="84"
+                            Height="30" />
+                </StackPanel>
+            </Grid>
+            <Button Grid.Column="2"
                     Content="Close"
                     MinWidth="84"
                     Height="30"

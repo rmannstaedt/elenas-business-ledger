@@ -32,9 +32,9 @@ public sealed class PlanCatalogViewModelTests
     }
 
     [Theory]
-    [InlineData(PlanCatalogState.Draft, true, true, true, true, false, false, false)]
-    [InlineData(PlanCatalogState.Active, false, true, false, false, true, true, false)]
-    [InlineData(PlanCatalogState.Retired, false, false, false, false, false, false, true)]
+    [InlineData(PlanCatalogState.Draft, true, true, true, true, false, false, false, false)]
+    [InlineData(PlanCatalogState.Active, false, true, false, false, true, true, false, true)]
+    [InlineData(PlanCatalogState.Retired, false, false, false, false, false, false, true, true)]
     public async Task SelectedPlanExposesOnlyStateRelevantEditingAndActions(
         PlanCatalogState state,
         bool canEditFields,
@@ -43,7 +43,8 @@ public sealed class PlanCatalogViewModelTests
         bool canPublishDraft,
         bool canSaveRetireOn,
         bool canRetire,
-        bool canReactivate)
+        bool canReactivate,
+        bool canSaveSelectedPlan)
     {
         var service = new FakePlanCatalogService();
         service.Seed(CreatePlan("Selected", state));
@@ -58,6 +59,7 @@ public sealed class PlanCatalogViewModelTests
         Assert.Equal(canSaveRetireOn, viewModel.CanSaveSelectedPlanRetireOn);
         Assert.Equal(canRetire, viewModel.CanRetireSelectedPlan);
         Assert.Equal(canReactivate, viewModel.CanReactivateSelectedPlan);
+        Assert.Equal(canSaveSelectedPlan, viewModel.CanSaveSelectedPlan);
     }
 
     [Fact]
@@ -132,14 +134,17 @@ public sealed class PlanCatalogViewModelTests
         var interactions = new FakePlanCatalogInteractionService { NextAddPlanChoice = PlanCatalogAddPlanChoice.Save };
         var viewModel = new PlanCatalogViewModel(service, interactions);
         await viewModel.LoadAsync();
+        viewModel.Name = "Active renamed before add";
         viewModel.RetireOnDate = new DateTime(2026, 10, 1);
 
         await viewModel.AddDraftPlanCommand.ExecuteAsync();
 
         Assert.Equal(1, interactions.PromptAddPlanSaveChangesCount);
+        Assert.Equal(active.Id, service.RenamedPlanId);
+        Assert.Equal("Active renamed before add", service.RenamedPlanName);
         Assert.Equal(active.Id, service.UpdatedRetireOnPlanId);
         Assert.Equal(new DateTimeOffset(2026, 10, 1, 0, 0, 0, TimeSpan.Zero), service.UpdatedRetireOn);
-        Assert.Equal(["UpdateRetireOn", "CreateDraft"], service.Calls);
+        Assert.Equal(["Rename", "UpdateRetireOn", "CreateDraft"], service.Calls);
         Assert.Equal(string.Empty, viewModel.SelectedPlan?.Name);
     }
 
@@ -198,21 +203,23 @@ public sealed class PlanCatalogViewModelTests
     }
 
     [Fact]
-    public async Task SaveRetireOnUpdatesActivePlanWithoutEditingImmutableFields()
+    public async Task SaveActivePlanUpdatesNameAndRetireDateWithoutEditingImmutableFields()
     {
         var service = new FakePlanCatalogService();
         var active = service.Seed(CreatePlan("Active", PlanCatalogState.Active));
         var viewModel = new PlanCatalogViewModel(service);
         await viewModel.LoadAsync();
-        viewModel.Name = "Should not be saved as a draft";
+        viewModel.Name = "Active renamed";
         viewModel.RetireOnDate = new DateTime(2026, 9, 15);
 
-        await viewModel.SaveRetireOnCommand.ExecuteAsync();
+        await viewModel.SaveSelectedPlanCommand.ExecuteAsync();
 
+        Assert.Equal(active.Id, service.RenamedPlanId);
+        Assert.Equal("Active renamed", service.RenamedPlanName);
         Assert.Equal(active.Id, service.UpdatedRetireOnPlanId);
         Assert.Equal(new DateTimeOffset(2026, 9, 15, 0, 0, 0, TimeSpan.Zero), service.UpdatedRetireOn);
         Assert.Null(service.UpdatedDraftInput);
-        Assert.Equal("Active", viewModel.SelectedPlan?.Name);
+        Assert.Equal("Active renamed", viewModel.SelectedPlan?.Name);
         Assert.Equal(new DateTimeOffset(2026, 9, 15, 0, 0, 0, TimeSpan.Zero), viewModel.SelectedPlan?.Plan.RetireOn);
     }
 
@@ -256,6 +263,15 @@ public sealed class PlanCatalogViewModelTests
             var closeButton = Assert.Single(FindChildren<WpfButton>(window), button => button.Content?.ToString() == "Close");
             Assert.Equal(WpfGrid.GetRow(addPlanButton), WpfGrid.GetRow(closeButton));
             Assert.Equal(2, WpfGrid.GetColumn(closeButton));
+            Assert.Equal(addPlanButton.Height, closeButton.Height);
+
+            var saveButton = Assert.Single(FindChildren<WpfButton>(window), button => button.Content?.ToString() == "Save");
+            Assert.Equal(WpfGrid.GetRow(addPlanButton), WpfGrid.GetRow(saveButton));
+            Assert.Equal(2, WpfGrid.GetColumn(saveButton));
+
+            var retireButton = Assert.Single(FindChildren<WpfButton>(window), button => button.Content?.ToString() == "Retire");
+            Assert.Equal(HorizontalAlignment.Center, retireButton.HorizontalAlignment);
+            Assert.Equal(2, WpfGrid.GetColumnSpan(retireButton));
 
             var publishDraftButton = Assert.Single(FindChildren<WpfButton>(window), button => button.Content?.ToString() == "Publish draft");
             Assert.Equal(0, WpfGrid.GetRow(publishDraftButton));
