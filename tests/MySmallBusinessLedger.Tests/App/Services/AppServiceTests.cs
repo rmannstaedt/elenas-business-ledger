@@ -152,18 +152,13 @@ public sealed class AppServiceTests
         {
             var database = new TestDatabase(Path.Combine(Path.GetTempPath(), "MySmallBusinessLedgerAppServiceTests", Guid.NewGuid().ToString("N")));
             Directory.CreateDirectory(database.directory);
-            await using var context = database.CreateContext();
-            await context.Database.EnsureCreatedAsync();
+            await new LedgerDatabaseMigrator(database.CreateContext).MigrateAsync(TestContext.Current.CancellationToken);
             return database;
         }
 
         public LedgerDbContext CreateContext()
         {
-            var options = new DbContextOptionsBuilder<LedgerDbContext>()
-                .UseSqlite($"Data Source={DatabasePath};Pooling=False")
-                .Options;
-
-            return new LedgerDbContext(options);
+            return new LedgerDbContext(SqliteLedgerDbContextFactory.CreateOptions(DatabasePath, pooling: false));
         }
 
         public void Dispose()

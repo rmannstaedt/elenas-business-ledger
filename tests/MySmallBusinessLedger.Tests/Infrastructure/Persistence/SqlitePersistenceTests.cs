@@ -200,80 +200,46 @@ public sealed class SqlitePersistenceTests
     }
 
     [Fact]
-    public async Task SchemaInitializerAddsPlanCatalogTableToExistingDatabase()
+    public async Task MigrationsCreateCurrentSchemaForFreshDatabase()
     {
         using var database = await TestDatabase.CreateAsync();
-        await using (var context = database.CreateContext())
-        {
-            await context.Database.ExecuteSqlRawAsync("DROP TABLE PlanCatalog", TestContext.Current.CancellationToken);
-        }
+        await using var context = database.CreateContext();
 
-        new SqliteSchemaInitializer(database.CreateContext).EnsureCreated();
+        var tableNames = await context.Database
+            .SqlQueryRaw<string>("SELECT name AS Value FROM sqlite_master WHERE type = 'table'")
+            .ToListAsync(TestContext.Current.CancellationToken);
 
         var repository = new SqlitePlanCatalogRepository(database.CreateContext);
         var result = await repository.SaveAsync(CreatePlanCatalogItem("Standard", PlanCatalogState.Draft), CancellationToken.None);
         var plans = await repository.ListAllAsync(CancellationToken.None);
 
+        Assert.Contains("__EFMigrationsHistory", tableNames);
+        Assert.Contains("PlanCatalog", tableNames);
+        Assert.Contains("StudentPlanPeriods", tableNames);
+        Assert.Contains("IssuedInvoiceLines", tableNames);
         Assert.True(result.Succeeded);
         Assert.Single(plans);
     }
 
     [Fact]
-    public async Task SchemaInitializerAddsRetireOnAndMapsLegacyRetiredState()
+    public async Task BaselineMigrationAdoptsExistingCurrentSchemaDatabase()
     {
-        using var database = await TestDatabase.CreateAsync();
-        await using (var context = database.CreateContext())
-        {
-            await context.Database.ExecuteSqlRawAsync("DROP TABLE PlanCatalog", TestContext.Current.CancellationToken);
-            await context.Database.ExecuteSqlRawAsync(
-                """
-                CREATE TABLE PlanCatalog (
-                    Id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    Name TEXT NOT NULL,
-                    PriceWithoutVat TEXT NOT NULL,
-                    LessonsPerWeek TEXT NOT NULL,
-                    DurationMinutes INTEGER NOT NULL,
-                    Flexibility TEXT NOT NULL,
-                    NumberOfStudents INTEGER NOT NULL,
-                    EffectiveFrom TEXT NOT NULL,
-                    State TEXT NOT NULL
-                );
-                """,
-                TestContext.Current.CancellationToken);
-            await context.Database.ExecuteSqlRawAsync(
-                """
-                INSERT INTO PlanCatalog (
-                    Name,
-                    PriceWithoutVat,
-                    LessonsPerWeek,
-                    DurationMinutes,
-                    Flexibility,
-                    NumberOfStudents,
-                    EffectiveFrom,
-                    State
-                ) VALUES (
-                    'Legacy',
-                    '400',
-                    'One',
-                    60,
-                    'MoveOrCancelByAgreement',
-                    1,
-                    '2026-01-01 00:00:00+00:00',
-                    'Archived'
-                );
-                """,
-                TestContext.Current.CancellationToken);
-        }
-
-        new SqliteSchemaInitializer(database.CreateContext).EnsureCreated();
-
+        using var database = await TestDatabase.CreateLegacyEnsureCreatedAsync();
         var repository = new SqlitePlanCatalogRepository(database.CreateContext);
+        var saved = await repository.SaveAsync(CreatePlanCatalogItem("Existing", PlanCatalogState.Active), CancellationToken.None);
+        Assert.True(saved.Succeeded);
+
+        await database.MigrateAsync();
+
         var plans = await repository.ListAllAsync(CancellationToken.None);
+        await using var context = database.CreateContext();
+        var appliedMigrations = await context.Database.GetAppliedMigrationsAsync(TestContext.Current.CancellationToken);
 
         var plan = Assert.Single(plans);
-        Assert.Equal(PlanCatalogState.Retired, plan.State);
+        Assert.Equal("Existing", plan.Name);
+        Assert.Equal(PlanCatalogState.Active, plan.State);
         Assert.Equal("Paid monthly in advance", plan.PaymentTerms);
-        Assert.Null(plan.RetireOn);
+        Assert.Contains(appliedMigrations, migration => migration.EndsWith("_Baseline", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -473,18 +439,27 @@ public sealed class SqlitePersistenceTests
         {
             var database = new TestDatabase(Path.Combine(Path.GetTempPath(), "ElenaLedgerTests", Guid.NewGuid().ToString("N")));
             Directory.CreateDirectory(database.directory);
+            await database.MigrateAsync();
+            return database;
+        }
+
+        public static async Task<TestDatabase> CreateLegacyEnsureCreatedAsync()
+        {
+            var database = new TestDatabase(Path.Combine(Path.GetTempPath(), "ElenaLedgerTests", Guid.NewGuid().ToString("N")));
+            Directory.CreateDirectory(database.directory);
             await using var context = database.CreateContext();
             await context.Database.EnsureCreatedAsync();
             return database;
         }
 
+        public async Task MigrateAsync()
+        {
+            await new LedgerDatabaseMigrator(CreateContext).MigrateAsync(TestContext.Current.CancellationToken);
+        }
+
         public LedgerDbContext CreateContext()
         {
-            var options = new DbContextOptionsBuilder<LedgerDbContext>()
-                .UseSqlite($"Data Source={DatabasePath};Pooling=False")
-                .Options;
-
-            return new LedgerDbContext(options);
+            return new LedgerDbContext(SqliteLedgerDbContextFactory.CreateOptions(DatabasePath, pooling: false));
         }
 
         public void Dispose()

@@ -55,6 +55,7 @@ Runtime data lives under `%APPDATA%\visualtech.dk\MySmallBusinessLedger`:
 
 The invoice folder is configured in Settings and may be outside the app data folder.
 The app writes invoice PDFs through a staging/verification/publish flow and does not silently overwrite an existing issued invoice PDF.
+SQLite schema evolution uses EF Core migrations. The WPF app applies pending migrations at startup before repositories are used.
 
 Plans are managed from `Plan > Manage Plans`. New plans start as incomplete Drafts, where they can be edited, deleted, or published. Draft payment terms are selected from `Paid monthly in advance` or `Paid per lesson`, with `Paid monthly in advance` as the default. Publishing requires all plan fields except `Retire on`. Published Active plans are immutable and can be assigned to students; their `Retire on` date can still be changed, and they can be retired immediately. Retired plans are immutable and hidden from student assignment until reactivated. Assigning a plan to a student stores the catalog plan identity and copies the commercial fields, including payment terms, into the student's plan period. Plan names can be renamed as display names and are recorded in name-change history; student plan displays follow the renamed catalog plan, while copied commercial terms and issued invoice data are not rewritten. Issued invoice lines store both the catalog plan identity for lineage and the issued-time plan name snapshot used for invoice display/PDF output.
 
@@ -77,5 +78,5 @@ Students are managed from `Student > Manage Students`. The overview lists active
 - Invoice PDFs are generated with QuestPDF, staged and verified before final storage, and never silently overwritten.
 - The initial UI recommendation is WPF + .NET 10.
 - The initial database recommendation is SQLite.
-- Database access uses EF Core SQLite.
+- Database access and schema evolution use EF Core SQLite migrations.
 - The PDF dependency is QuestPDF.

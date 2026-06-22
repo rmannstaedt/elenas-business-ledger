@@ -1,13 +1,15 @@
 # Handoff
 
-Date: 2026-06-20
+Date: 2026-06-22
 
 ## Current State
 
-- Active implementation plans: `.ai/implementation-plans/active/2026-06-17-publisher-google-oauth-app.md`, `.ai/implementation-plans/active/2026-06-17-plan-catalog-management.md`, `.ai/implementation-plans/active/2026-06-20-student-overview-management.md`, and `.ai/implementation-plans/active/2026-06-20-student-overview-embedded-editing.md`.
+- Active implementation plans include prior OAuth/plan/student follow-up plans plus `.ai/implementation-plans/active/2026-06-22-invoice-issue-finalization-and-print-status.md`; several older active plans are implementation-complete and still need plan-folder cleanup. The EF migrations/startup bootstrapper cleanup is completed under `.ai/implementation-plans/completed/2026-06-22-ef-migrations-and-startup-bootstrapper.md`.
 - The app is now a real WPF/Core/Infrastructure local-first pilot build, not sample-backed.
 - User-facing product name, internal namespace, project prefix, and app-data folder are `My Small Business Ledger` / `MySmallBusinessLedger`.
 - Runtime composition uses SQLite under `%APPDATA%\visualtech.dk\MySmallBusinessLedger`, Google Calendar through the official API client, QuestPDF invoice generation, staged PDF storage, invoice metadata persistence, and OS print request after PDF save.
+- SQLite schema evolution now uses EF Core migrations. The WPF startup bootstrapper applies pending migrations before repositories are used; the old manual `SqliteSchemaInitializer` has been removed.
+- `App.xaml.cs` now handles WPF lifecycle/error display and delegates database migration, service graph creation, startup jobs, and main-window construction to App-layer startup/bootstrapper classes.
 - `Application > Settings` configures company profile, address plus an unlabeled second address/city line, invoice folder with manual entry or Browse picker, Google calendar/account label, publisher Google sign-in app status, local Google authorization status, and Connect Google Calendar / Forget Google sign-in actions; it also shows read-only app data/database paths. The Google calendar field defaults to `primary`, meaning the signed-in account's main calendar, and its tooltip explains where to find a separate calendar ID.
 - Student editor also uses two stacked address fields; the ViewModel combines them into one multiline student address for existing Core/SQLite/invoice behavior.
 - `Student > Manage Students` is the only Student menu action. It opens a comprehensive overview listing active and inactive students. The selected student pane embeds the Student editor behavior for student fields, Active flag, active-plan assignment, copied plan snapshot, plan start/end dates, and schedule. Edits use explicit Save/Cancel; Add Student creates an in-pane draft. Invoice double-click opens the existing invoice viewer. Selection changes in Manage Students immediately refresh the main window around the selected student, and closing Manage Students applies the final selection again. The old standalone Add/Edit Student window and main-menu entries have been removed. The window and student/invoice grid columns are remembered under the existing app-data placement/width stores.
@@ -34,9 +36,13 @@ Date: 2026-06-20
 - Do not mutate existing student plan period commercial-term snapshots or issued invoices when a catalog plan changes lifecycle state or display name.
 - Do not derive old invoice display text from current plan catalog names or rename history; issued invoice line snapshots are authoritative for invoice text.
 - Deactivating/reactivating a student must not mutate plan periods, schedule entries, or issued invoices.
+- Schema changes must be implemented as EF migrations and verified against fresh and current-schema SQLite databases.
 
 ## Verification Snapshot
 
+- Focused SQLite persistence/migration tests passed on 2026-06-22 after EF migration baseline adoption: `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter SqlitePersistence -nodeReuse:false` with 14/14 tests passing.
+- Full build passed on 2026-06-22 after EF migration and startup bootstrapper extraction: `dotnet build MySmallBusinessLedger.sln -nodeReuse:false` with 0 warnings and 0 errors.
+- Full test suite passed on 2026-06-22 after EF migration and startup bootstrapper extraction: `dotnet test MySmallBusinessLedger.sln -nodeReuse:false` with 181/181 tests passing.
 - Latest focused invoice test run passed: 42 invoice-related tests.
 - Focused OAuth/Settings test run passed: 24 tests.
 - Full build passed on 2026-06-17 after Google calendar settings follow-up: `dotnet build MySmallBusinessLedger.sln -nodeReuse:false` with 0 warnings and 0 errors.

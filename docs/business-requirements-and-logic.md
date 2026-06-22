@@ -121,6 +121,8 @@ Issued Invoice lines store the catalog Plan identity for lineage/reporting and a
 
 ### Application Startup
 
+Before the main window is shown, the application creates the app-data folder if needed and applies pending EF Core migrations to the local SQLite database. Startup then composes the local repositories, Google Calendar gateway, invoice PDF/printing services, and WPF view models through the App-layer bootstrapper. Schema changes must be represented as EF migrations, not ad hoc startup table/column mutation.
+
 Upon startup the application displays a window containing the current student short name and a list of lessons for:
   * previous month
   * current month
