@@ -73,6 +73,39 @@ public sealed class SqlitePersistenceTests
     }
 
     [Fact]
+    public async Task SavingLoadedStudentWithChangedShortNameRenamesExistingStudent()
+    {
+        using var database = await TestDatabase.CreateAsync();
+        var repository = new SqliteStudentRepository(database.CreateContext);
+        var plans = new SqlitePlanCatalogRepository(database.CreateContext);
+        var intro = await SaveCatalogPlanAsync(plans, "Intro");
+        var standard = await SaveCatalogPlanAsync(plans, "Standard");
+        await repository.SaveAsync(CreateStudentRecord("Anna", introPlanId: intro.Id, currentPlanId: standard.Id), CancellationToken.None);
+        var loaded = await repository.GetByShortNameAsync("Anna", CancellationToken.None);
+        Assert.NotNull(loaded);
+
+        var renamedStudent = Student.Create(
+            "Anja",
+            loaded.Student.FullName,
+            loaded.Student.Address,
+            loaded.Student.Phone,
+            loaded.Student.Email,
+            loaded.Student.AgeBracket,
+            loaded.Student.Birthdate,
+            loaded.Student.IsActive).Value!;
+        var renamed = loaded with { Student = renamedStudent };
+
+        var result = await repository.SaveAsync(renamed, CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        var students = await repository.ListStudentsAsync(CancellationToken.None);
+        var student = Assert.Single(students);
+        Assert.Equal("Anja", student.Student.ShortName);
+        Assert.Equal(loaded.Id, student.Id);
+        Assert.Null(await repository.GetByShortNameAsync("Anna", CancellationToken.None));
+    }
+
+    [Fact]
     public async Task StudentsCanBeListedIncludingInactiveStudents()
     {
         using var database = await TestDatabase.CreateAsync();
@@ -295,7 +328,13 @@ public sealed class SqlitePersistenceTests
             fullName: "Anna Andersen",
             planName: "Standard",
             planCatalogId: standard.Id), CancellationToken.None);
-        await students.SaveAsync(CreateStudentRecord("Anna", fullName: "Anna Updated", introPlanId: intro.Id, currentPlanId: premium.Id, currentPlanName: "Premium"), CancellationToken.None);
+        var loadedStudent = await students.GetByShortNameAsync("Anna", CancellationToken.None);
+        Assert.NotNull(loadedStudent);
+        var updatedStudent = CreateStudentRecord("Anna", fullName: "Anna Updated", introPlanId: intro.Id, currentPlanId: premium.Id, currentPlanName: "Premium") with
+        {
+            Id = loadedStudent.Id
+        };
+        await students.SaveAsync(updatedStudent, CancellationToken.None);
 
         var loaded = await invoices.GetIssuedInvoiceAsync(new InvoiceNumber(1), CancellationToken.None);
         Assert.NotNull(loaded);
@@ -342,6 +381,7 @@ public sealed class SqlitePersistenceTests
             isActive).Value!;
 
         return new StudentRecord(
+            0,
             student,
             [
                 new StudentPlanPeriod(

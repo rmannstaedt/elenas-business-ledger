@@ -8,12 +8,27 @@ namespace MySmallBusinessLedger.Infrastructure.Calendar;
 public sealed class GoogleCalendarServiceEventClient : IGoogleCalendarEventClient
 {
     private readonly CalendarService calendarService;
+    private readonly EventPageLoader? eventPageLoader;
     private readonly string timeZoneId;
+
+    internal delegate Task<Events> EventPageLoader(
+        string calendarId,
+        DateTimeOffset fromInclusive,
+        DateTimeOffset toExclusive,
+        string? pageToken,
+        CancellationToken cancellationToken);
 
     public GoogleCalendarServiceEventClient(CalendarService calendarService, string timeZoneId)
     {
         this.calendarService = calendarService;
         this.timeZoneId = timeZoneId;
+    }
+
+    internal GoogleCalendarServiceEventClient(string timeZoneId, EventPageLoader eventPageLoader)
+    {
+        this.calendarService = null!;
+        this.timeZoneId = timeZoneId;
+        this.eventPageLoader = eventPageLoader;
     }
 
     public async Task<IReadOnlyList<GoogleCalendarEvent>> ListEventsAsync(
@@ -22,18 +37,51 @@ public sealed class GoogleCalendarServiceEventClient : IGoogleCalendarEventClien
         DateTimeOffset toExclusive,
         CancellationToken cancellationToken)
     {
+        var events = new List<GoogleCalendarEvent>();
+        string? pageToken = null;
+        do
+        {
+            var response = await ListEventsPageAsync(
+                calendarId,
+                fromInclusive,
+                toExclusive,
+                pageToken,
+                cancellationToken);
+
+            events.AddRange((response.Items ?? [])
+                .Where(item => !string.IsNullOrWhiteSpace(item.Id) && item.Start?.DateTimeDateTimeOffset is not null)
+                .Select(item => new GoogleCalendarEvent(
+                    item.Id,
+                    item.Summary ?? string.Empty,
+                    item.Start!.DateTimeDateTimeOffset!.Value)));
+
+            pageToken = response.NextPageToken;
+        }
+        while (!string.IsNullOrWhiteSpace(pageToken));
+
+        return events;
+    }
+
+    private async Task<Events> ListEventsPageAsync(
+        string calendarId,
+        DateTimeOffset fromInclusive,
+        DateTimeOffset toExclusive,
+        string? pageToken,
+        CancellationToken cancellationToken)
+    {
+        if (eventPageLoader is not null)
+        {
+            return await eventPageLoader(calendarId, fromInclusive, toExclusive, pageToken, cancellationToken);
+        }
+
         var request = calendarService.Events.List(calendarId);
         request.SingleEvents = true;
         request.OrderBy = EventsResource.ListRequest.OrderByEnum.StartTime;
         request.TimeMinDateTimeOffset = fromInclusive;
         request.TimeMaxDateTimeOffset = toExclusive;
+        request.PageToken = pageToken;
 
-        var response = await request.ExecuteAsync(cancellationToken);
-
-        return (response.Items ?? [])
-            .Where(item => !string.IsNullOrWhiteSpace(item.Id) && item.Start?.DateTimeDateTimeOffset is not null)
-            .Select(item => new GoogleCalendarEvent(item.Id, item.Summary ?? string.Empty, item.Start!.DateTimeDateTimeOffset!.Value))
-            .ToArray();
+        return await request.ExecuteAsync(cancellationToken);
     }
 
     public async Task<string> CreateLessonEventAsync(

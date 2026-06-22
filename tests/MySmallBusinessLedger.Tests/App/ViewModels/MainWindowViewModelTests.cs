@@ -254,6 +254,45 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task ManageStudentsIgnoresStaleLiveSelectionRefreshes()
+    {
+        var erikStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseErik = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var boStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var dashboard = new FakeDashboardService
+        {
+            StudentShortNames = ["Anna", "Bo", "Erik"],
+            BeforeReturnAsync = async selectedStudentShortName =>
+            {
+                if (selectedStudentShortName == "Erik")
+                {
+                    erikStarted.SetResult();
+                    await releaseErik.Task;
+                }
+                else if (selectedStudentShortName == "Bo")
+                {
+                    boStarted.SetResult();
+                }
+            }
+        };
+        var studentOverview = new FakeStudentOverviewLauncher
+        {
+            SelectionChangedStudentShortNames = ["Erik", "Bo"],
+            FireSelectionChangesConcurrently = true
+        };
+        var viewModel = CreateViewModel(dashboard: dashboard, studentOverviewLauncher: studentOverview);
+        await viewModel.LoadAsync();
+
+        var openTask = viewModel.OpenManageStudentsCommand.ExecuteAsync();
+        await erikStarted.Task;
+        await boStarted.Task;
+        releaseErik.SetResult();
+        await openTask;
+
+        Assert.Equal("Bo", viewModel.CurrentStudentShortName);
+    }
+
+    [Fact]
     public async Task OpenInvoiceLaunchesViewerForSelectedInvoice()
     {
         var invoices = new FakeInvoiceWorkflowLauncher();
@@ -287,12 +326,36 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task SavingDraftLessonUsesEditedDateOffsetForLocalTimeZone()
+    {
+        var timeZone = TimeZoneInfo.FindSystemTimeZoneById("Romance Standard Time");
+        var lessonEditor = new FakeLessonEditorService();
+        var viewModel = CreateViewModel(
+            dashboard: new FakeDashboardService { LessonState = LessonState.Planned, LessonIsInvoiced = false, LessonPaymentStatus = null },
+            lessonEditorService: lessonEditor,
+            clock: new FakeUiClock(new DateTimeOffset(2026, 7, 1, 12, 0, 0, TimeSpan.FromHours(2))),
+            lessonTimeZone: timeZone);
+        await viewModel.LoadAsync();
+        await viewModel.AddLessonCommand.ExecuteAsync();
+        var draft = viewModel.Lessons[1];
+        draft.StartsOnDate = new DateTime(2026, 1, 15);
+        draft.StartsAtTimeText = "15:30";
+
+        await viewModel.SaveLessonCommand.ExecuteAsync(draft);
+
+        Assert.Equal(
+            new DateTimeOffset(2026, 1, 15, 15, 30, 0, TimeSpan.FromHours(1)),
+            lessonEditor.LastAddRequest?.StartsAt);
+    }
+
+    [Fact]
     public async Task SavingCompleteDraftLessonAddsCalendarLesson()
     {
         var lessonEditor = new FakeLessonEditorService();
         var viewModel = CreateViewModel(
             dashboard: new FakeDashboardService { LessonState = LessonState.Planned, LessonIsInvoiced = false, LessonPaymentStatus = null },
-            lessonEditorService: lessonEditor);
+            lessonEditorService: lessonEditor,
+            lessonTimeZone: TimeZoneInfo.FindSystemTimeZoneById("Romance Standard Time"));
         await viewModel.LoadAsync();
         await viewModel.AddLessonCommand.ExecuteAsync();
         var draft = viewModel.Lessons[1];
@@ -303,7 +366,7 @@ public sealed class MainWindowViewModelTests
 
         Assert.True(lessonEditor.AddWasCalled);
         Assert.Equal("Anna", lessonEditor.LastAddRequest?.StudentShortName);
-        Assert.Equal(new DateTimeOffset(2026, 6, 24, 15, 30, 0, TimeSpan.Zero), lessonEditor.LastAddRequest?.StartsAt);
+        Assert.Equal(new DateTimeOffset(2026, 6, 24, 15, 30, 0, TimeSpan.FromHours(2)), lessonEditor.LastAddRequest?.StartsAt);
         Assert.False(draft.IsDraft);
         Assert.False(viewModel.HasError);
     }
@@ -432,7 +495,8 @@ public sealed class MainWindowViewModelTests
         FakeInvoiceWorkflowLauncher? invoiceWorkflowLauncher = null,
         FakeSettingsLauncher? settingsLauncher = null,
         FakePlanCatalogLauncher? planCatalogLauncher = null,
-        FakeUiClock? clock = null) =>
+        FakeUiClock? clock = null,
+        TimeZoneInfo? lessonTimeZone = null) =>
         new(
             dashboard ?? new FakeDashboardService(),
             payments ?? new FakePaymentService(),
@@ -445,7 +509,8 @@ public sealed class MainWindowViewModelTests
             invoiceWorkflowLauncher ?? new FakeInvoiceWorkflowLauncher(),
             settingsLauncher ?? new FakeSettingsLauncher(),
             planCatalogLauncher ?? new FakePlanCatalogLauncher(),
-            clock ?? new FakeUiClock(new DateTimeOffset(2026, 6, 16, 12, 0, 0, TimeSpan.Zero)));
+            clock ?? new FakeUiClock(new DateTimeOffset(2026, 6, 16, 12, 0, 0, TimeSpan.Zero)),
+            lessonTimeZone);
 
     private static void RunOnStaThread(Action action)
     {
@@ -510,15 +575,26 @@ public sealed class MainWindowViewModelTests
 
         public PaymentStatus? LessonPaymentStatus { get; init; } = PaymentStatus.Outstanding;
 
+        public Func<string?, Task>? BeforeReturnAsync { get; init; }
+
         public Task<OperationResult<StartupDashboardResult>> LoadAsync(
             DateOnly month,
             string? selectedStudentShortName,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken) =>
+            LoadCoreAsync(month, selectedStudentShortName);
+
+        private async Task<OperationResult<StartupDashboardResult>> LoadCoreAsync(
+            DateOnly month,
+            string? selectedStudentShortName)
         {
             LoadCount++;
             LastMonth = month;
             LastSelectedStudentShortName = selectedStudentShortName;
             var currentStudent = selectedStudentShortName ?? "Anna";
+            if (BeforeReturnAsync is not null)
+            {
+                await BeforeReturnAsync(selectedStudentShortName);
+            }
 
             var result = NextResult ?? OperationResult<StartupDashboardResult>.Success(
                 new StartupDashboardResult(
@@ -543,7 +619,7 @@ public sealed class MainWindowViewModelTests
                     ]));
 
             NextResult = null;
-            return Task.FromResult(result);
+            return result;
         }
     }
 
@@ -622,6 +698,10 @@ public sealed class MainWindowViewModelTests
 
         public string? SelectionChangedStudentShortName { get; init; }
 
+        public IReadOnlyList<string> SelectionChangedStudentShortNames { get; init; } = [];
+
+        public bool FireSelectionChangesConcurrently { get; init; }
+
         public Action? OnAfterSelectionChanged { get; init; }
 
         public async Task<string?> ShowStudentOverviewAsync(
@@ -631,6 +711,27 @@ public sealed class MainWindowViewModelTests
         {
             WasShown = true;
             InitialSelectedStudentShortName = selectedStudentShortName;
+            if (SelectionChangedStudentShortNames.Count > 0)
+            {
+                var tasks = SelectionChangedStudentShortNames
+                    .Select(shortName => selectedStudentChangedAsync(shortName, cancellationToken))
+                    .ToArray();
+
+                if (FireSelectionChangesConcurrently)
+                {
+                    await Task.WhenAll(tasks);
+                }
+                else
+                {
+                    foreach (var task in tasks)
+                    {
+                        await task;
+                    }
+                }
+
+                OnAfterSelectionChanged?.Invoke();
+            }
+
             if (SelectionChangedStudentShortName is not null)
             {
                 await selectedStudentChangedAsync(SelectionChangedStudentShortName, cancellationToken);

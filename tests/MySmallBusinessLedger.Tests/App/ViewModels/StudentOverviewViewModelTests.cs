@@ -365,6 +365,7 @@ public sealed class StudentOverviewViewModelTests
             isActive).Value!;
 
         var record = new StudentRecord(
+            0,
             student,
             [
                 new StudentPlanPeriod(

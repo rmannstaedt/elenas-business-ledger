@@ -13,7 +13,7 @@ public sealed class LessonDisplayModel : ViewModelBase
         .Select(index => TimeOnly.MinValue.AddMinutes(index * 15).ToString("HH\\:mm", CultureInfo.InvariantCulture))
         .ToArray();
 
-    private TimeSpan offset;
+    private TimeZoneInfo lessonTimeZone;
     private string id;
     private DateTimeOffset? savedStartsAt;
     private DateTime? startsOnDate;
@@ -21,11 +21,11 @@ public sealed class LessonDisplayModel : ViewModelBase
     private LessonState state;
     private bool isDraft;
 
-    public LessonDisplayModel(DashboardLesson lesson)
+    public LessonDisplayModel(DashboardLesson lesson, TimeZoneInfo? lessonTimeZone = null)
     {
         id = lesson.Id;
         StudentShortName = lesson.StudentShortName;
-        offset = lesson.StartsAt.Offset;
+        this.lessonTimeZone = lessonTimeZone ?? TimeZoneInfo.Local;
         startsOnDate = lesson.StartsAt.Date;
         startsAtTimeText = lesson.StartsAt.ToString("HH:mm", CultureInfo.InvariantCulture);
         savedStartsAt = lesson.StartsAt;
@@ -34,11 +34,11 @@ public sealed class LessonDisplayModel : ViewModelBase
         PaymentStatus = lesson.PaymentStatus;
     }
 
-    private LessonDisplayModel(string studentShortName, TimeSpan offset)
+    private LessonDisplayModel(string studentShortName, TimeZoneInfo lessonTimeZone)
     {
         id = $"draft-{Guid.NewGuid():N}";
         StudentShortName = studentShortName;
-        this.offset = offset;
+        this.lessonTimeZone = lessonTimeZone;
         startsOnDate = null;
         startsAtTimeText = string.Empty;
         state = LessonState.Planned;
@@ -47,8 +47,8 @@ public sealed class LessonDisplayModel : ViewModelBase
         isDraft = true;
     }
 
-    public static LessonDisplayModel CreateDraft(string studentShortName, TimeSpan offset) =>
-        new(studentShortName, offset);
+    public static LessonDisplayModel CreateDraft(string studentShortName, TimeZoneInfo lessonTimeZone) =>
+        new(studentShortName, lessonTimeZone);
 
     public string Id => id;
 
@@ -157,7 +157,6 @@ public sealed class LessonDisplayModel : ViewModelBase
     public void AcceptCreatedLesson(CalendarLesson lesson)
     {
         id = lesson.Id;
-        offset = lesson.StartsAt.Offset;
         startsOnDate = lesson.StartsAt.Date;
         startsAtTimeText = lesson.StartsAt.ToString("HH:mm", CultureInfo.InvariantCulture);
         savedStartsAt = lesson.StartsAt;
@@ -182,7 +181,8 @@ public sealed class LessonDisplayModel : ViewModelBase
             return false;
         }
 
-        startsAt = new DateTimeOffset(DateOnly.FromDateTime(date).ToDateTime(time), offset);
+        var localDateTime = DateOnly.FromDateTime(date).ToDateTime(time);
+        startsAt = new DateTimeOffset(localDateTime, lessonTimeZone.GetUtcOffset(localDateTime));
         return true;
     }
 }

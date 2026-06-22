@@ -60,10 +60,19 @@ public sealed class SqliteStudentRepository : IStudentRepository
     public async Task<OperationResult<StudentRecord>> SaveAsync(StudentRecord student, CancellationToken cancellationToken)
     {
         await using var context = createContext();
-        var entity = await context.Students
+        var entityQuery = context.Students
             .Include(storedStudent => storedStudent.PlanPeriods)
-            .Include(storedStudent => storedStudent.ScheduleEntries)
-            .SingleOrDefaultAsync(storedStudent => storedStudent.ShortName == student.Student.ShortName, cancellationToken);
+            .Include(storedStudent => storedStudent.ScheduleEntries);
+
+        var entity = student.Id > 0
+            ? await entityQuery.SingleOrDefaultAsync(storedStudent => storedStudent.Id == student.Id, cancellationToken)
+            : null;
+
+        if (student.Id > 0 && entity is null)
+        {
+            return OperationResult<StudentRecord>.Failure(
+                new ValidationError("Student.NotFound", "Student was not found."));
+        }
 
         if (entity is null)
         {
@@ -110,7 +119,7 @@ public sealed class SqliteStudentRepository : IStudentRepository
         }
 
         await context.SaveChangesAsync(cancellationToken);
-        return OperationResult<StudentRecord>.Success(student);
+        return OperationResult<StudentRecord>.Success(ToDomain(entity));
     }
 
     private static StudentRecord ToDomain(StudentEntity entity)
@@ -152,6 +161,6 @@ public sealed class SqliteStudentRepository : IStudentRepository
             .Select(entry => new StudentScheduleEntry(entry.Weekday, entry.StartsAt))
             .ToArray();
 
-        return new StudentRecord(student, plans, schedule);
+        return new StudentRecord(entity.Id, student, plans, schedule);
     }
 }

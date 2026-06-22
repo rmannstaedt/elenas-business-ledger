@@ -24,6 +24,8 @@ public sealed class MainWindowViewModel : ViewModelBase
     private readonly ISettingsLauncher settingsLauncher;
     private readonly IPlanCatalogLauncher planCatalogLauncher;
     private readonly IUiClock clock;
+    private readonly TimeZoneInfo lessonTimeZone;
+    private long studentOverviewSelectionVersion;
     private DateTimeOffset? lastRefreshAt;
     private string? currentStudentShortName;
     private string[] studentShortNames = [];
@@ -44,7 +46,8 @@ public sealed class MainWindowViewModel : ViewModelBase
         IInvoiceWorkflowLauncher invoiceWorkflowLauncher,
         ISettingsLauncher settingsLauncher,
         IPlanCatalogLauncher planCatalogLauncher,
-        IUiClock clock)
+        IUiClock clock,
+        TimeZoneInfo? lessonTimeZone = null)
     {
         this.dashboardService = dashboardService;
         this.paymentStatusService = paymentStatusService;
@@ -58,9 +61,10 @@ public sealed class MainWindowViewModel : ViewModelBase
         this.settingsLauncher = settingsLauncher;
         this.planCatalogLauncher = planCatalogLauncher;
         this.clock = clock;
+        this.lessonTimeZone = lessonTimeZone ?? TimeZoneInfo.Local;
         displayMonth = new DateOnly(clock.Now.Year, clock.Now.Month, 1);
 
-        RefreshCommand = new AsyncRelayCommand(RefreshAsync, () => !IsBusy);
+        RefreshCommand = new AsyncRelayCommand(() => RefreshAsync(), () => !IsBusy);
         PreviousMonthCommand = new AsyncRelayCommand(() => ChangeMonthAsync(-1), () => !IsBusy);
         NextMonthCommand = new AsyncRelayCommand(() => ChangeMonthAsync(1), () => !IsBusy);
         PreviousStudentCommand = new AsyncRelayCommand(() => SelectAdjacentStudentAsync(-1), CanNavigateStudents);
@@ -196,7 +200,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         await RefreshAsync();
     }
 
-    private async Task RefreshAsync()
+    private async Task RefreshAsync(Func<bool>? shouldApply = null)
     {
         IsBusy = true;
         try
@@ -205,6 +209,11 @@ public sealed class MainWindowViewModel : ViewModelBase
             if (!result.Succeeded)
             {
                 ErrorMessage = result.Errors.FirstOrDefault()?.Message ?? "Could not refresh dashboard.";
+                return;
+            }
+
+            if (shouldApply is not null && !shouldApply())
+            {
                 return;
             }
 
@@ -283,7 +292,8 @@ public sealed class MainWindowViewModel : ViewModelBase
         }
 
         CurrentStudentShortName = selectedStudentShortName;
-        await RefreshAsync();
+        var selectionVersion = Interlocked.Increment(ref studentOverviewSelectionVersion);
+        await RefreshAsync(() => selectionVersion == Interlocked.Read(ref studentOverviewSelectionVersion));
     }
 
     private async Task OpenSettingsAsync()
@@ -317,7 +327,7 @@ public sealed class MainWindowViewModel : ViewModelBase
             return Task.CompletedTask;
         }
 
-        Lessons.Add(LessonDisplayModel.CreateDraft(CurrentStudentShortName, clock.Now.Offset));
+        Lessons.Add(LessonDisplayModel.CreateDraft(CurrentStudentShortName, lessonTimeZone));
         RaiseCommandAvailabilityChanged();
         return Task.CompletedTask;
     }
@@ -507,7 +517,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         Lessons.Clear();
         foreach (var lesson in dashboard.Lessons.OrderBy(lesson => lesson.StartsAt))
         {
-            Lessons.Add(new LessonDisplayModel(lesson));
+            Lessons.Add(new LessonDisplayModel(lesson, lessonTimeZone));
         }
 
         Invoices.Clear();

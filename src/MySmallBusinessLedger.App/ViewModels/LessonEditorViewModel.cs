@@ -13,6 +13,7 @@ public sealed class LessonEditorViewModel : ViewModelBase
     private readonly string? lessonId;
     private readonly bool isNewLesson;
     private readonly DateOnly refreshMonth;
+    private readonly TimeZoneInfo lessonTimeZone;
     private string studentShortName;
     private string dateText;
     private string timeText;
@@ -26,13 +27,15 @@ public sealed class LessonEditorViewModel : ViewModelBase
         DateTimeOffset startsAt,
         bool isInvoiced,
         DateOnly refreshMonth,
-        bool isNewLesson)
+        bool isNewLesson,
+        TimeZoneInfo? lessonTimeZone)
     {
         this.lessonEditorService = lessonEditorService;
         this.lessonId = lessonId;
         this.studentShortName = studentShortName;
         this.refreshMonth = refreshMonth;
         this.isNewLesson = isNewLesson;
+        this.lessonTimeZone = lessonTimeZone ?? TimeZoneInfo.Local;
         IsInvoiced = isInvoiced;
         dateText = startsAt.ToString(DateFormat, CultureInfo.InvariantCulture);
         timeText = startsAt.ToString("HH:mm", CultureInfo.InvariantCulture);
@@ -47,8 +50,9 @@ public sealed class LessonEditorViewModel : ViewModelBase
         ILessonEditorService lessonEditorService,
         string studentShortName,
         DateTimeOffset startsAt,
-        DateOnly refreshMonth) =>
-        new(lessonEditorService, null, studentShortName, startsAt, isInvoiced: false, refreshMonth, isNewLesson: true);
+        DateOnly refreshMonth,
+        TimeZoneInfo? lessonTimeZone = null) =>
+        new(lessonEditorService, null, studentShortName, startsAt, isInvoiced: false, refreshMonth, isNewLesson: true, lessonTimeZone);
 
     public static LessonEditorViewModel EditExisting(
         ILessonEditorService lessonEditorService,
@@ -56,8 +60,9 @@ public sealed class LessonEditorViewModel : ViewModelBase
         string studentShortName,
         DateTimeOffset startsAt,
         bool isInvoiced,
-        DateOnly refreshMonth) =>
-        new(lessonEditorService, lessonId, studentShortName, startsAt, isInvoiced, refreshMonth, isNewLesson: false);
+        DateOnly refreshMonth,
+        TimeZoneInfo? lessonTimeZone = null) =>
+        new(lessonEditorService, lessonId, studentShortName, startsAt, isInvoiced, refreshMonth, isNewLesson: false, lessonTimeZone);
 
     public string StudentShortName
     {
@@ -199,7 +204,8 @@ public sealed class LessonEditorViewModel : ViewModelBase
             return false;
         }
 
-        startsAt = new DateTimeOffset(date.ToDateTime(time), TimeSpan.Zero);
+        var localDateTime = date.ToDateTime(time);
+        startsAt = new DateTimeOffset(localDateTime, lessonTimeZone.GetUtcOffset(localDateTime));
         ErrorMessage = null;
         return true;
     }

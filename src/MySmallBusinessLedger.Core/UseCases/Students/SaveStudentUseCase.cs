@@ -62,7 +62,7 @@ public sealed class SaveStudentUseCase
             .Select(entry => new StudentScheduleEntry(entry.Weekday, entry.StartsAt))
             .ToArray();
 
-        var record = new StudentRecord(studentResult.Value!, planPeriods, schedule);
+        var record = new StudentRecord(request.StudentId, studentResult.Value!, planPeriods, schedule);
         return studentRepository.SaveAsync(record, cancellationToken);
     }
 

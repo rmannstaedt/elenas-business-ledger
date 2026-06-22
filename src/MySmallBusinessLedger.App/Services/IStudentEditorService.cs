@@ -5,6 +5,7 @@ using MySmallBusinessLedger.Core.UseCases.Students;
 namespace MySmallBusinessLedger.App.Services;
 
 public sealed record StudentEditorSnapshot(
+    int StudentId,
     string ShortName,
     string FullName,
     string Address,

@@ -318,6 +318,7 @@ public sealed class StudentOverviewViewModel : ViewModelBase
 
     private static StudentEditorSnapshot ToEditorSnapshot(StudentOverviewSnapshot snapshot) =>
         new(
+            snapshot.Record.Id,
             snapshot.Student.ShortName,
             snapshot.Student.FullName,
             snapshot.Student.Address,

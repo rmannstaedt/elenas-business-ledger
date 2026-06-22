@@ -45,6 +45,7 @@ public sealed class StudentUseCaseTests
     private static SaveStudentRequest CreateRequest(
         IReadOnlyList<StudentPlanPeriodInput>? planPeriods = null) =>
         new(
+            StudentId: 0,
             ShortName: "Anna",
             FullName: "Anna Andersen",
             Address: "Testvej 1",

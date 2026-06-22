@@ -195,6 +195,56 @@ public sealed class UseCaseTests
     }
 
     [Fact]
+    public async Task InvoiceCandidateSelectionPreselectsLessonActiveAtCurrentTime()
+    {
+        var students = new FakeStudentRepository([CreateStudentRecord("Anna")]);
+        var calendar = new FakeCalendarGateway(
+        [
+            new CalendarLesson("anna-today", "Anna", new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.Zero))
+        ]);
+        var invoices = new FakeInvoiceRepository();
+        var useCase = new InvoiceCandidateSelectionUseCase(
+            students,
+            calendar,
+            invoices,
+            lessonDuration: TimeSpan.FromMinutes(60));
+
+        var result = await useCase.ExecuteAsync(
+            new DateOnly(2026, 6, 16),
+            new DateTimeOffset(2026, 6, 16, 15, 25, 0, TimeSpan.Zero),
+            CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal("Anna", result.Value!.PreselectedStudentShortName);
+    }
+
+    [Fact]
+    public async Task InvoiceCandidateSelectionFallsBackToNextLessonWithinThirtyMinutesWhenCurrentStudentIsAlreadyInvoiced()
+    {
+        var students = new FakeStudentRepository([CreateStudentRecord("Anna"), CreateStudentRecord("Bo")]);
+        var calendar = new FakeCalendarGateway(
+        [
+            new CalendarLesson("anna-today", "Anna", new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.Zero)),
+            new CalendarLesson("bo-today", "Bo", new DateTimeOffset(2026, 6, 16, 15, 25, 0, TimeSpan.Zero)),
+            new CalendarLesson("cara-today", "Cara", new DateTimeOffset(2026, 6, 16, 16, 0, 0, TimeSpan.Zero))
+        ]);
+        var invoices = new FakeInvoiceRepository { StudentsWithInvoiceThisMonth = ["Anna"] };
+        var useCase = new InvoiceCandidateSelectionUseCase(
+            students,
+            calendar,
+            invoices,
+            lessonDuration: TimeSpan.FromMinutes(60));
+
+        var result = await useCase.ExecuteAsync(
+            new DateOnly(2026, 6, 16),
+            new DateTimeOffset(2026, 6, 16, 15, 10, 0, TimeSpan.Zero),
+            CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal("Bo", result.Value!.PreselectedStudentShortName);
+    }
+
+    [Fact]
     public async Task InvoicePreviewCreatesDraftFromCalendarLessonsAndActivePlan()
     {
         var students = new FakeStudentRepository([CreateStudentRecord("Anna")]);
@@ -348,6 +398,7 @@ public sealed class UseCaseTests
             planCatalogId: 42);
 
         return new StudentRecord(
+            0,
             student,
             [new StudentPlanPeriod(plan, new DateOnly(2026, 1, 1), EndsOn: null)],
             [new StudentScheduleEntry(DayOfWeek.Tuesday, new TimeOnly(15, 0))]);

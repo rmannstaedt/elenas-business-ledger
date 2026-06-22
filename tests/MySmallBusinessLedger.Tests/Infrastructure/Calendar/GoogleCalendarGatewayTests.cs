@@ -2,6 +2,7 @@ using MySmallBusinessLedger.Core.Common;
 using MySmallBusinessLedger.Core.Lessons;
 using MySmallBusinessLedger.Core.UseCases.Lessons;
 using MySmallBusinessLedger.Infrastructure.Calendar;
+using Google.Apis.Calendar.v3.Data;
 using Google.Apis.Util.Store;
 
 namespace MySmallBusinessLedger.Tests.Infrastructure.Calendar;
@@ -166,6 +167,59 @@ public sealed class GoogleCalendarGatewayTests
         Assert.Equal("lesson-1", client.MovedEventId);
         Assert.DoesNotContain(result.Errors, error => error.Code == "Calendar.UpdateFailed");
         Assert.Contains(result.Errors, error => error.Code == "Calendar.RefreshFailed");
+    }
+
+    [Fact]
+    public async Task GoogleCalendarServiceEventClientReadsAllEventPages()
+    {
+        var requestedPageTokens = new List<string?>();
+        var client = new GoogleCalendarServiceEventClient(
+            "Romance Standard Time",
+            (calendarId, fromInclusive, toExclusive, pageToken, cancellationToken) =>
+            {
+                requestedPageTokens.Add(pageToken);
+                return Task.FromResult(pageToken is null
+                    ? new Events
+                    {
+                        NextPageToken = "page-2",
+                        Items =
+                        [
+                            new Event
+                            {
+                                Id = "lesson-1",
+                                Summary = "$ Anna",
+                                Start = new EventDateTime
+                                {
+                                    DateTimeDateTimeOffset = new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.FromHours(2))
+                                }
+                            }
+                        ]
+                    }
+                    : new Events
+                    {
+                        Items =
+                        [
+                            new Event
+                            {
+                                Id = "lesson-2",
+                                Summary = "$ Bo",
+                                Start = new EventDateTime
+                                {
+                                    DateTimeDateTimeOffset = new DateTimeOffset(2026, 6, 17, 16, 0, 0, TimeSpan.FromHours(2))
+                                }
+                            }
+                        ]
+                    });
+            });
+
+        var events = await client.ListEventsAsync(
+            "primary",
+            new DateTimeOffset(2026, 6, 1, 0, 0, 0, TimeSpan.FromHours(2)),
+            new DateTimeOffset(2026, 7, 1, 0, 0, 0, TimeSpan.FromHours(2)),
+            CancellationToken.None);
+
+        Assert.Equal(["lesson-1", "lesson-2"], events.Select(calendarEvent => calendarEvent.Id));
+        Assert.Equal([null, "page-2"], requestedPageTokens);
     }
 
     [Fact]
