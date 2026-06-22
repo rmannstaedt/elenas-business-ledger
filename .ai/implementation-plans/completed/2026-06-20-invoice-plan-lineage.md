@@ -1,8 +1,8 @@
 # Implementation Plan: Invoice Plan Lineage
 
-Status: Complete
+Status: Completed
 Created: 2026-06-20
-Last updated: 2026-06-20
+Last updated: 2026-06-23
 Owner/context: Ruben / Codex, My Small Business Ledger local-first WPF app
 
 ## Related Docs And Standards
@@ -172,3 +172,11 @@ Expected result:
   - Results: Focused lineage tests passed with 5/5 tests; invoice-related tests passed with 45/45 tests; `dotnet build MySmallBusinessLedger.sln -nodeReuse:false` passed with 0 warnings and 0 errors; `dotnet test MySmallBusinessLedger.sln -nodeReuse:false` passed with 174/174 tests.
   - Deviations: Existing invoice lines use `PlanCatalogId = 0` as legacy/unknown lineage if they predate the schema field.
   - Risks/open questions: Manual issued-invoice smoke test still recommended in the running WPF app once real invoice data exists.
+- 2026-06-23:
+  - Stage: Completion housekeeping
+  - Files changed: `.ai/implementation-plans/completed/2026-06-20-invoice-plan-lineage.md`, `MySmallBusinessLedger.sln`
+  - Summary: Rechecked the implemented invoice-line plan lineage behavior, confirmed the plan's stages and documented verification are complete, and moved the plan to completed history.
+  - Tests/verification run: solution build after moving the plan and updating solution items.
+  - Results: Completed.
+  - Deviations: None.
+  - Risks/open questions: None for the implementation plan.

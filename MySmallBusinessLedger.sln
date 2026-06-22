@@ -38,11 +38,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "implementation-plans", "imp
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "active", "active", "{1A14E3F5-AED5-4DA8-AC1B-1094506722F4}"
 	ProjectSection(SolutionItems) = preProject
-		.ai\implementation-plans\active\2026-06-17-plan-catalog-management.md = .ai\implementation-plans\active\2026-06-17-plan-catalog-management.md
-		.ai\implementation-plans\active\2026-06-17-publisher-google-oauth-app.md = .ai\implementation-plans\active\2026-06-17-publisher-google-oauth-app.md
-		.ai\implementation-plans\active\2026-06-20-invoice-plan-lineage.md = .ai\implementation-plans\active\2026-06-20-invoice-plan-lineage.md
-		.ai\implementation-plans\active\2026-06-20-plan-identity-foreign-key.md = .ai\implementation-plans\active\2026-06-20-plan-identity-foreign-key.md
-		.ai\implementation-plans\active\2026-06-20-student-overview-embedded-editing.md = .ai\implementation-plans\active\2026-06-20-student-overview-embedded-editing.md
 		.ai\implementation-plans\active\2026-06-20-student-overview-management.md = .ai\implementation-plans\active\2026-06-20-student-overview-management.md
 		.ai\implementation-plans\active\2026-06-22-invoice-issue-finalization-and-print-status.md = .ai\implementation-plans\active\2026-06-22-invoice-issue-finalization-and-print-status.md
 	EndProjectSection
@@ -50,6 +45,11 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "completed", "completed", "{AC8E7A53-7F97-4E8A-9852-C3E145482613}"
 	ProjectSection(SolutionItems) = preProject
 		.ai\implementation-plans\completed\2026-06-16-v1-invoice-printer.md = .ai\implementation-plans\completed\2026-06-16-v1-invoice-printer.md
+		.ai\implementation-plans\completed\2026-06-17-plan-catalog-management.md = .ai\implementation-plans\completed\2026-06-17-plan-catalog-management.md
+		.ai\implementation-plans\completed\2026-06-17-publisher-google-oauth-app.md = .ai\implementation-plans\completed\2026-06-17-publisher-google-oauth-app.md
+		.ai\implementation-plans\completed\2026-06-20-invoice-plan-lineage.md = .ai\implementation-plans\completed\2026-06-20-invoice-plan-lineage.md
+		.ai\implementation-plans\completed\2026-06-20-plan-identity-foreign-key.md = .ai\implementation-plans\completed\2026-06-20-plan-identity-foreign-key.md
+		.ai\implementation-plans\completed\2026-06-20-student-overview-embedded-editing.md = .ai\implementation-plans\completed\2026-06-20-student-overview-embedded-editing.md
 		.ai\implementation-plans\completed\2026-06-22-ef-migrations-and-startup-bootstrapper.md = .ai\implementation-plans\completed\2026-06-22-ef-migrations-and-startup-bootstrapper.md
 		.ai\implementation-plans\completed\2026-06-23-code-review-fixes.md = .ai\implementation-plans\completed\2026-06-23-code-review-fixes.md
 	EndProjectSection

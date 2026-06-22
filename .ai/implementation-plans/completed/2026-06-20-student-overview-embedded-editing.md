@@ -1,8 +1,8 @@
 # Implementation Plan: Student Overview Embedded Editing
 
-Status: Implemented; awaiting final user test
+Status: Completed
 Created: 2026-06-20
-Last updated: 2026-06-20
+Last updated: 2026-06-23
 Owner/context: Ruben and Codex; Ruben approved the recommended approach to make the Manage Students detail pane editable with explicit Save/Cancel, reusing the existing Student editor behavior in-place instead of opening a separate dialog.
 
 ## Related Docs, Standards, And Skills
@@ -204,3 +204,11 @@ Expected result: Manage Students becomes the main student workbench with explici
   - Summary: Manage Students now publishes selected-student changes while the window remains open, so the main window updates as soon as the user selects another student.
   - Tests/verification run: `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~MainWindowViewModelTests.ManageStudentsSelectionImmediatelyRefreshesDashboard" -nodeReuse:false`; `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~MainWindowViewModel|FullyQualifiedName~StudentOverview" -nodeReuse:false`.
   - Results: New focused test passed 1/1; affected focused tests passed 32/32.
+- 2026-06-23:
+  - Stage: Completion housekeeping
+  - Files changed: `.ai/implementation-plans/completed/2026-06-20-student-overview-embedded-editing.md`, `MySmallBusinessLedger.sln`
+  - Summary: Rechecked the embedded Manage Students implementation, including in-pane editing, explicit Save/Cancel, Add Student drafts, old menu/dialog cleanup, immediate main-window selection sync, invoice viewer double-click preservation, and later unsaved-change prompts. Moved the plan to completed history.
+  - Tests/verification run: solution build after moving the plan and updating solution items.
+  - Results: Completed.
+  - Deviations: None.
+  - Risks/open questions: None for the implementation plan.
