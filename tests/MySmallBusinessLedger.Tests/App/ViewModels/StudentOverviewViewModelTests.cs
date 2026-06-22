@@ -81,7 +81,8 @@ public sealed class StudentOverviewViewModelTests
             var detailColumns = Assert.Single(FindChildren<WpfGrid>(window), grid => grid.Name == "StudentDetailColumns");
             Assert.Equal(GridUnitType.Pixel, detailColumns.ColumnDefinitions[2].Width.GridUnitType);
             Assert.Equal(GridUnitType.Pixel, detailColumns.ColumnDefinitions[4].Width.GridUnitType);
-            Assert.Equal(detailColumns.ColumnDefinitions[2].Width.Value, detailColumns.ColumnDefinitions[4].Width.Value);
+            Assert.Equal(252, detailColumns.ColumnDefinitions[2].Width.Value);
+            Assert.Equal(252, detailColumns.ColumnDefinitions[4].Width.Value);
 
             var splitter = Assert.Single(FindChildren<WpfGridSplitter>(window), gridSplitter => gridSplitter.Name == "InvoicesPaneSplitter");
             Assert.Equal(System.Windows.Controls.GridResizeDirection.Columns, splitter.ResizeDirection);

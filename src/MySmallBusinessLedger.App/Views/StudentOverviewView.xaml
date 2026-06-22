@@ -75,9 +75,9 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="18" />
-                    <ColumnDefinition Width="376" />
+                    <ColumnDefinition Width="252" />
                     <ColumnDefinition Width="18" />
-                    <ColumnDefinition Width="376" />
+                    <ColumnDefinition Width="252" />
                 </Grid.ColumnDefinitions>
 
                 <Grid Grid.Column="0">
@@ -128,9 +128,9 @@
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="376" />
+                    <ColumnDefinition Width="252" />
                     <ColumnDefinition Width="18" />
-                    <ColumnDefinition Width="376" />
+                    <ColumnDefinition Width="252" />
                 </Grid.ColumnDefinitions>
 
                 <TextBlock Text="Student" Style="{StaticResource PaneHeaderStyle}" />
@@ -153,9 +153,9 @@
                               VerticalScrollBarVisibility="Auto">
                     <Grid DataContext="{Binding SelectedStudentEditor}">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="376" />
+                            <ColumnDefinition Width="252" />
                             <ColumnDefinition Width="18" />
-                            <ColumnDefinition Width="376" />
+                            <ColumnDefinition Width="252" />
                         </Grid.ColumnDefinitions>
 
                         <StackPanel Grid.Column="0">
@@ -256,10 +256,10 @@
                                     <DataTemplate>
                                         <Grid Margin="0,0,0,8">
                                             <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="60" />
-                                                <ColumnDefinition Width="128" />
+                                                <ColumnDefinition Width="54" />
+                                                <ColumnDefinition Width="112" />
                                                 <ColumnDefinition Width="8" />
-                                                <ColumnDefinition Width="76" />
+                                                <ColumnDefinition Width="70" />
                                             </Grid.ColumnDefinitions>
                                             <TextBlock Text="{Binding Label}"
                                                        VerticalAlignment="Center" />
@@ -337,9 +337,9 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="18" />
-                    <ColumnDefinition Width="376" />
+                    <ColumnDefinition Width="252" />
                     <ColumnDefinition Width="18" />
-                    <ColumnDefinition Width="376" />
+                    <ColumnDefinition Width="252" />
                 </Grid.ColumnDefinitions>
                 <Button Grid.Column="0"
                         Content="Add Student"
