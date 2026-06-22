@@ -65,7 +65,7 @@
 
 The student schedule is the agreed weekday(s) and time(s) that the student will have their Lesson. This is an indication and individual Lessons may be cancelled or moved. Likewise, the student schedule may be edited for permanent alteration.
 
-The Lessons table is updated with student lessons when the invoice is printed.
+Issued invoice lines are stored when an invoice is issued. The local app does not maintain a separate Lessons table; lesson invoice/payment status is derived from issued invoice data and Google Calendar remains the lesson schedule source.
 
 The Plan is an agreement between teacher and student and determines how many lessons there are per week and how much the student will pay for them. If the 'lessons per week' is 'by appointment', there is no fixed number.
 
@@ -98,8 +98,8 @@ When a Student starts, the Student Plan start date marks the first lesson.
 The application will sync with Google Calendar.
 
 Google Calendar is the repository of truth for all future lessons.
-Google Calendar is also the repository of truth for past lessons *until* the invoice is printed.
-Once the invoice is printed, the Lessons table is the repository of truth for past lessons.
+Google Calendar is also the repository of truth for past lessons *until* an invoice is issued for them.
+Once an invoice is issued, issued invoice lines are the durable local repository of truth for the invoiced lesson snapshots.
 
 Relevant Google Calendar entries are identified by their first line, which may be one of these:
   $ <student short name>
@@ -112,8 +112,7 @@ The first line remains the ownership/matching marker. A completed uninvoiced les
 
 If that later status line is absent, the lesson is treated as Planned.
 
-When an Invoice is printed, it is added to the Invoice table and the Lessons table is updated with the Lessons noted on the Invoice.
-The Lessons table is only ever updated when invoices are printed.
+When an Invoice is issued, it is added to the Invoice table with its issued invoice lines. Those issued invoice lines are the durable local record of which lessons were invoiced.
 
 Issued Invoice lines store the catalog Plan identity for lineage/reporting and also store the Plan name as it appeared when the Invoice was issued. Invoice viewing and PDF output use the stored issued-time Plan name snapshot, not current catalog names and not a derived lookup through Plan name-change history.
 

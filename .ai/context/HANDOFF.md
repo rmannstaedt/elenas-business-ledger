@@ -1,10 +1,10 @@
 # Handoff
 
-Date: 2026-06-22
+Date: 2026-06-23
 
 ## Current State
 
-- Active implementation plans include prior OAuth/plan/student follow-up plans plus `.ai/implementation-plans/active/2026-06-22-invoice-issue-finalization-and-print-status.md`; several older active plans are implementation-complete and still need plan-folder cleanup. The EF migrations/startup bootstrapper cleanup is completed under `.ai/implementation-plans/completed/2026-06-22-ef-migrations-and-startup-bootstrapper.md`.
+- Active implementation plans include prior OAuth/plan/student follow-up plans plus `.ai/implementation-plans/active/2026-06-22-invoice-issue-finalization-and-print-status.md`; several older active plans are implementation-complete and still need plan-folder cleanup. The EF migrations/startup bootstrapper cleanup is completed under `.ai/implementation-plans/completed/2026-06-22-ef-migrations-and-startup-bootstrapper.md`, and the invoice finalization plan has been refreshed to target EF Core migrations rather than the removed manual schema initializer.
 - The app is now a real WPF/Core/Infrastructure local-first pilot build, not sample-backed.
 - User-facing product name, internal namespace, project prefix, and app-data folder are `My Small Business Ledger` / `MySmallBusinessLedger`.
 - Runtime composition uses SQLite under `%APPDATA%\visualtech.dk\MySmallBusinessLedger`, Google Calendar through the official API client, QuestPDF invoice generation, staged PDF storage, invoice metadata persistence, and OS print request after PDF save.
@@ -21,6 +21,7 @@ Date: 2026-06-22
 - Window placement is stored under `%APPDATA%\visualtech.dk\MySmallBusinessLedger\window-placement.json`; Manage Plans column widths are stored under `%APPDATA%\visualtech.dk\MySmallBusinessLedger\grid-column-widths.json`.
 - Completed/Planned lesson state is manual. Google Calendar keeps the first-line `$` student marker and uses a later `Status: Completed` summary line for completed lessons.
 - Write Invoice opens candidate selection, invoice preview, optional price adjustment, staged issue/save/print, dashboard refresh, and read-only invoice viewer.
+- Documentation refresh on 2026-06-23 corrected the business requirements to describe issued invoice lines as the durable local lesson-invoice record; references to a separate local Lessons table should be treated as stale if found only in historical plan logs.
 
 ## Safety Invariants To Preserve
 

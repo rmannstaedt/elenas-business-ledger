@@ -2,7 +2,7 @@
 
 Status: Active
 Created: 2026-06-22
-Last updated: 2026-06-22
+Last updated: 2026-06-23
 Owner/context: Ruben / Codex, My Small Business Ledger local-first WPF app
 
 ## Related Docs And Standards
@@ -114,7 +114,8 @@ The following must remain unchanged unless this plan explicitly says otherwise:
   - `src/MySmallBusinessLedger.Infrastructure/Persistence/LedgerDbContext.cs`
   - `src/MySmallBusinessLedger.Infrastructure/Persistence/SqliteInvoiceRepository.cs`
   - `src/MySmallBusinessLedger.Infrastructure/Persistence/SqliteCompanyProfileRepository.cs`
-  - `src/MySmallBusinessLedger.Infrastructure/Persistence/SqliteSchemaInitializer.cs`
+  - `src/MySmallBusinessLedger.Infrastructure/Persistence/Migrations/*`
+  - `src/MySmallBusinessLedger.Infrastructure/Persistence/LedgerDbContextModelSnapshot.cs`
   - `src/MySmallBusinessLedger.Infrastructure/Invoices/Printing/*`
 - App/settings/UI:
   - `src/MySmallBusinessLedger.App/ViewModels/SettingsViewModel.cs`
@@ -155,8 +156,8 @@ The following must remain unchanged unless this plan explicitly says otherwise:
   - Mitigation: UI/docs define Printed as "Windows reported the print job completed"; do not claim paper output.
 - Risk: settings UI becomes cluttered.
   - Mitigation: add only one configured invoice printer field/selector and a concise status/check result.
-- Risk: schema initializer grows more complex.
-  - Mitigation: keep migration steps narrow and tested; consider schema versioning as a follow-on if initializer complexity grows further.
+- Risk: invoice schema migrations accidentally rewrite or weaken issued invoice snapshots.
+  - Mitigation: use narrow EF Core migrations, keep issued snapshot fields intact, and verify fresh and migrated SQLite databases.
 
 ## Open Questions
 
@@ -251,7 +252,8 @@ Affected files/classes/schemas/commands/UI surfaces:
 - `Entities.cs`
 - `LedgerDbContext.cs`
 - `SqliteInvoiceRepository.cs`
-- `SqliteSchemaInitializer.cs`
+- EF Core migration files
+- `LedgerDbContextModelSnapshot.cs`
 - SQLite persistence tests
 
 Concrete steps:
@@ -262,7 +264,7 @@ Concrete steps:
 4. Implement finalization so `Issued` is set only after final PDF path is present and verified by the application workflow.
 5. Update list/read queries so normal invoice lists show only `Issued` rows.
 6. Add recovery helper/query for `Issuing` rows so the issue workflow can reconcile before retrying.
-7. Add schema initializer migrations for new columns with conservative defaults:
+7. Add an EF Core migration for new columns with conservative defaults:
    - existing rows become `Issued`
    - existing rows start as `NotPrinted`
    - printer setting defaults to blank/unconfigured
@@ -291,7 +293,7 @@ dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj
 Risks:
 
 - Current table name `IssuedInvoices` may become semantically awkward if it contains `Issuing` rows.
-- Manual initializer complexity increases.
+- Migration defaults must be conservative for existing pilot databases.
 
 Rollback point:
 
@@ -307,7 +309,7 @@ Documentation impact:
 
 Follow-on actions:
 
-- Consider a later schema-versioning plan if schema initializer becomes too implicit.
+- Keep future invoice schema changes in EF Core migrations with focused migration tests.
 
 Runner may continue automatically after this stage: yes.
 
