@@ -13,17 +13,20 @@ public sealed class StartupDashboardQuery
     private readonly IGoogleCalendarGateway calendarGateway;
     private readonly IInvoiceRepository invoiceRepository;
     private readonly IClock clock;
+    private readonly TimeZoneInfo lessonTimeZone;
 
     public StartupDashboardQuery(
         IStudentRepository studentRepository,
         IGoogleCalendarGateway calendarGateway,
         IInvoiceRepository invoiceRepository,
-        IClock clock)
+        IClock clock,
+        TimeZoneInfo? lessonTimeZone = null)
     {
         this.studentRepository = studentRepository;
         this.calendarGateway = calendarGateway;
         this.invoiceRepository = invoiceRepository;
         this.clock = clock;
+        this.lessonTimeZone = lessonTimeZone ?? TimeZoneInfo.Local;
     }
 
     public async Task<OperationResult<StartupDashboardResult>> ExecuteAsync(
@@ -61,6 +64,7 @@ public sealed class StartupDashboardQuery
             .Select(student => student.Student.ShortName)
             .Order(StringComparer.OrdinalIgnoreCase)
             .ToArray();
+        var studentNavigationEntries = CreateStudentNavigationEntries(selectedMonth, calendarLessons, students);
 
         return OperationResult<StartupDashboardResult>.Success(
             new StartupDashboardResult(
@@ -68,7 +72,8 @@ public sealed class StartupDashboardQuery
                 studentShortNames,
                 lessons,
                 invoices,
-                CurrentStudentHasSchedule(students, currentStudent)));
+                CurrentStudentHasSchedule(students, currentStudent),
+                studentNavigationEntries));
     }
 
     private static bool CurrentStudentHasSchedule(IReadOnlyList<StudentRecord> students, string? currentStudent) =>
@@ -89,6 +94,81 @@ public sealed class StartupDashboardQuery
             .Select(lesson => lesson.StudentShortName)
             .FirstOrDefault() ??
             students.FirstOrDefault()?.Student.ShortName;
+    }
+
+    private IReadOnlyList<DashboardStudentNavigationEntry> CreateStudentNavigationEntries(
+        DateOnly selectedMonth,
+        IReadOnlyList<CalendarLesson> calendarLessons,
+        IReadOnlyList<StudentRecord> students)
+    {
+        var from = selectedMonth.WithDay(1);
+        var to = from.AddMonths(1).AddDays(-1);
+        var activeStudentShortNames = students
+            .Select(student => student.Student.ShortName)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var scheduledEntries = calendarLessons
+            .Where(lesson => activeStudentShortNames.Contains(lesson.StudentShortName))
+            .Where(lesson => IsInDateWindow(lesson.StartsAt, from, to))
+            .Select(lesson => new DashboardStudentNavigationEntry(lesson.StudentShortName, lesson.StartsAt))
+            .OrderBy(entry => entry.StartsAt)
+            .ThenBy(entry => entry.StudentShortName, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        var defaultEntries = students
+            .SelectMany(student => CreateScheduledStarts(student.Schedule, from, to)
+                .Select(startsAt => new DashboardStudentNavigationEntry(
+                    student.Student.ShortName,
+                    startsAt,
+                    HasCalendarLesson: false)))
+            .ToArray();
+        if (scheduledEntries.Length == 0)
+        {
+            return OrderNavigationEntries(defaultEntries);
+        }
+
+        var firstScheduledStart = scheduledEntries[0].StartsAt;
+        var lastScheduledStart = scheduledEntries[^1].StartsAt;
+        var scheduledKeys = scheduledEntries
+            .Select(entry => (entry.StudentShortName, entry.StartsAt))
+            .ToHashSet();
+        var fallbackEntries = defaultEntries
+            .Where(entry => entry.StartsAt < firstScheduledStart || entry.StartsAt > lastScheduledStart)
+            .Where(entry => !scheduledKeys.Contains((entry.StudentShortName, entry.StartsAt)));
+
+        return OrderNavigationEntries(scheduledEntries.Concat(fallbackEntries));
+    }
+
+    private static IReadOnlyList<DashboardStudentNavigationEntry> OrderNavigationEntries(
+        IEnumerable<DashboardStudentNavigationEntry> entries) =>
+        entries
+            .OrderBy(entry => entry.StartsAt)
+            .ThenBy(entry => entry.StudentShortName, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+    private static bool IsInDateWindow(DateTimeOffset startsAt, DateOnly from, DateOnly to)
+    {
+        var date = DateOnly.FromDateTime(startsAt.DateTime);
+        return date >= from && date <= to;
+    }
+
+    private IEnumerable<DateTimeOffset> CreateScheduledStarts(
+        IReadOnlyList<MySmallBusinessLedger.Core.Students.StudentScheduleEntry> schedule,
+        DateOnly from,
+        DateOnly to)
+    {
+        for (var date = from; date <= to; date = date.AddDays(1))
+        {
+            foreach (var entry in schedule)
+            {
+                if (entry.Weekday != date.DayOfWeek)
+                {
+                    continue;
+                }
+
+                var localDateTime = date.ToDateTime(entry.StartsAt);
+                yield return new DateTimeOffset(localDateTime, lessonTimeZone.GetUtcOffset(localDateTime));
+            }
+        }
     }
 }
 

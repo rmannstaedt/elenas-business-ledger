@@ -77,6 +77,93 @@ public sealed class UseCaseTests
     }
 
     [Fact]
+    public async Task StartupDashboardNavigationFollowsCalendarLessonOrderAndRepeatsStudents()
+    {
+        var clock = new FakeClock(new DateTimeOffset(2026, 6, 16, 12, 0, 0, TimeSpan.Zero));
+        var students = new FakeStudentRepository(
+        [
+            CreateStudentRecord("Anna", []),
+            CreateStudentRecord("Bo", [])
+        ]);
+        var calendar = new FakeCalendarGateway(
+        [
+            new CalendarLesson("anna-2", "Anna", new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.Zero)),
+            new CalendarLesson("bo-1", "Bo", new DateTimeOffset(2026, 6, 8, 14, 0, 0, TimeSpan.Zero)),
+            new CalendarLesson("anna-1", "Anna", new DateTimeOffset(2026, 6, 9, 15, 0, 0, TimeSpan.Zero))
+        ]);
+        var query = new StartupDashboardQuery(students, calendar, new FakeInvoiceRepository(), clock, TimeZoneInfo.Utc);
+
+        var result = await query.ExecuteAsync(new DateOnly(2026, 6, 1), "Anna", CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(
+            ["Bo", "Anna", "Anna"],
+            result.Value!.StudentNavigationEntries.Select(entry => entry.StudentShortName).ToArray());
+        Assert.Equal(
+            [
+                new DateTimeOffset(2026, 6, 8, 14, 0, 0, TimeSpan.Zero),
+                new DateTimeOffset(2026, 6, 9, 15, 0, 0, TimeSpan.Zero),
+                new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.Zero)
+            ],
+            result.Value.StudentNavigationEntries.Select(entry => entry.StartsAt).ToArray());
+    }
+
+    [Fact]
+    public async Task StartupDashboardNavigationFallsBackToDefaultSchedulesAroundCalendarLessonRange()
+    {
+        var clock = new FakeClock(new DateTimeOffset(2026, 6, 16, 12, 0, 0, TimeSpan.Zero));
+        var students = new FakeStudentRepository(
+        [
+            CreateStudentRecord("Anna", [new StudentScheduleEntry(DayOfWeek.Tuesday, new TimeOnly(15, 0))]),
+            CreateStudentRecord("Bo", [new StudentScheduleEntry(DayOfWeek.Monday, new TimeOnly(14, 0))])
+        ]);
+        var calendar = new FakeCalendarGateway(
+        [
+            new CalendarLesson("bo-1", "Bo", new DateTimeOffset(2026, 6, 8, 14, 0, 0, TimeSpan.Zero))
+        ]);
+        var query = new StartupDashboardQuery(students, calendar, new FakeInvoiceRepository(), clock, TimeZoneInfo.Utc);
+
+        var result = await query.ExecuteAsync(new DateOnly(2026, 6, 1), "Bo", CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        var entries = result.Value!.StudentNavigationEntries.ToArray();
+        var scheduledIndex = Array.FindIndex(entries, entry => entry.StudentShortName == "Bo" && entry.HasCalendarLesson);
+        Assert.True(scheduledIndex >= 0);
+        Assert.Equal(new DateTimeOffset(2026, 6, 8, 14, 0, 0, TimeSpan.Zero), entries[scheduledIndex].StartsAt);
+        Assert.False(entries[scheduledIndex - 1].HasCalendarLesson);
+        Assert.Equal(new DateTimeOffset(2026, 6, 2, 15, 0, 0, TimeSpan.Zero), entries[scheduledIndex - 1].StartsAt);
+        Assert.False(entries[scheduledIndex + 1].HasCalendarLesson);
+        Assert.Equal(new DateTimeOffset(2026, 6, 9, 15, 0, 0, TimeSpan.Zero), entries[scheduledIndex + 1].StartsAt);
+    }
+
+    [Fact]
+    public async Task StartupDashboardNavigationFallsBackToDefaultSchedulesWhenMonthHasNoCalendarLessons()
+    {
+        var clock = new FakeClock(new DateTimeOffset(2026, 6, 16, 12, 0, 0, TimeSpan.Zero));
+        var students = new FakeStudentRepository(
+        [
+            CreateStudentRecord("Anna", [new StudentScheduleEntry(DayOfWeek.Tuesday, new TimeOnly(15, 0))]),
+            CreateStudentRecord("Bo", [new StudentScheduleEntry(DayOfWeek.Monday, new TimeOnly(14, 0))])
+        ]);
+        var query = new StartupDashboardQuery(students, new FakeCalendarGateway([]), new FakeInvoiceRepository(), clock, TimeZoneInfo.Utc);
+
+        var result = await query.ExecuteAsync(new DateOnly(2026, 6, 1), "Anna", CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(
+            ["Bo", "Anna", "Bo", "Anna"],
+            result.Value!.StudentNavigationEntries.Take(4).Select(entry => entry.StudentShortName).ToArray());
+        Assert.Equal(
+            [
+                new DateTimeOffset(2026, 6, 1, 14, 0, 0, TimeSpan.Zero),
+                new DateTimeOffset(2026, 6, 2, 15, 0, 0, TimeSpan.Zero),
+                new DateTimeOffset(2026, 6, 8, 14, 0, 0, TimeSpan.Zero),
+                new DateTimeOffset(2026, 6, 9, 15, 0, 0, TimeSpan.Zero)
+            ],
+            result.Value.StudentNavigationEntries.Take(4).Select(entry => entry.StartsAt).ToArray());
+    }
+
+    [Fact]
     public async Task EditingUninvoicedLessonRefreshesFromCalendarAfterCalendarUpdateSucceeds()
     {
         var updatedLesson = new CalendarLesson("lesson-1", "Anna", new DateTimeOffset(2026, 6, 17, 15, 0, 0, TimeSpan.Zero));
@@ -632,7 +719,9 @@ public sealed class UseCaseTests
             "C:\\Invoices",
             configuredInvoicePrinterName: "Office Printer");
 
-    private static StudentRecord CreateStudentRecord(string shortName)
+    private static StudentRecord CreateStudentRecord(
+        string shortName,
+        IReadOnlyList<StudentScheduleEntry>? schedule = null)
     {
         var student = Student.Create(
             shortName,
@@ -658,7 +747,7 @@ public sealed class UseCaseTests
             0,
             student,
             [new StudentPlanPeriod(plan, new DateOnly(2026, 1, 1), EndsOn: null)],
-            [new StudentScheduleEntry(DayOfWeek.Tuesday, new TimeOnly(15, 0))]);
+            schedule ?? [new StudentScheduleEntry(DayOfWeek.Tuesday, new TimeOnly(15, 0))]);
     }
 
     private sealed class FakeClock(DateTimeOffset now) : IClock

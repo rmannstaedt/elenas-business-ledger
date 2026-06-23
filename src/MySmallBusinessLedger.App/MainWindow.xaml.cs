@@ -1,6 +1,5 @@
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -12,15 +11,27 @@ namespace MySmallBusinessLedger.App;
 
 public partial class MainWindow : Window
 {
+    private static readonly Color PickerBorderColor = Color.FromRgb(0xC7, 0xD3, 0xE1);
+    private const double DatePickerMaxHeight = 320;
+    private const double TimePickerMaxHeight = 420;
+
     private bool hasLoaded;
     private bool activationRefreshQueued;
-    private Popup? openLessonDatePopup;
+    private Border? openLessonDatePanel;
+    private Button? openLessonDateTarget;
+    private Border? openLessonTimePanel;
+    private Button? openLessonTimeTarget;
 
     public MainWindow(MainWindowViewModel viewModel)
     {
         InitializeComponent();
         DataContext = viewModel;
         WindowPlacementStore.Attach(this, nameof(MainWindow));
+        Closed += OnClosed;
+        if (Application.Current is { } application)
+        {
+            application.Deactivated += OnApplicationDeactivated;
+        }
     }
 
     private MainWindowViewModel ViewModel => (MainWindowViewModel)DataContext;
@@ -67,18 +78,45 @@ public partial class MainWindow : Window
         }
     }
 
+    private void OnWindowPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        var source = e.OriginalSource as DependencyObject;
+        CloseOpenLessonDatePanelIfOutside(source);
+        CloseOpenLessonTimePanelIfOutside(source);
+    }
+
+    private void OnWindowDeactivated(object? sender, EventArgs e)
+    {
+        CloseOpenLessonDatePanel();
+        CloseOpenLessonTimePanel();
+    }
+
+    private void OnApplicationDeactivated(object? sender, EventArgs e)
+    {
+        CloseOpenLessonDatePanel();
+        CloseOpenLessonTimePanel();
+    }
+
+    private void OnClosed(object? sender, EventArgs e)
+    {
+        Closed -= OnClosed;
+        if (Application.Current is { } application)
+        {
+            application.Deactivated -= OnApplicationDeactivated;
+        }
+
+        CloseOpenLessonDatePanel();
+        CloseOpenLessonTimePanel();
+    }
+
     private void OnGridSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        CloseOpenLessonDatePopup();
+        CloseOpenLessonDatePanel();
+        CloseOpenLessonTimePanel();
         ViewModel.ClearError();
     }
 
     private async void OnLessonEditCommitted(object sender, RoutedEventArgs e)
-    {
-        await CommitLessonEditAsync(sender);
-    }
-
-    private async void OnLessonTimeDropDownClosed(object? sender, EventArgs e)
     {
         await CommitLessonEditAsync(sender);
     }
@@ -91,57 +129,87 @@ public partial class MainWindow : Window
         }
     }
 
-    private void OnLessonTimeSelectorPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    private void OnLessonTimeButtonClick(object sender, RoutedEventArgs e)
     {
-        if (sender is not ComboBox comboBox || !comboBox.IsEnabled || comboBox.IsKeyboardFocusWithin)
+        if (sender is Button button)
         {
-            return;
+            ToggleLessonTimePanel(button);
         }
+    }
 
-        e.Handled = true;
-        comboBox.Focus();
-        comboBox.Dispatcher.BeginInvoke(
-            new Action(() => comboBox.IsDropDownOpen = true),
-            DispatcherPriority.Input);
+    private void OnLessonTimeButtonPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        CloseOpenLessonDatePanel();
+        if (sender is Button button && ToggleLessonTimePanel(button))
+        {
+            e.Handled = true;
+        }
     }
 
     private void OnLessonDateButtonClick(object sender, RoutedEventArgs e)
     {
         if (sender is Button button)
         {
-            ToggleLessonDatePopup(button);
+            ToggleLessonDatePanel(button);
         }
     }
 
     private void OnLessonDateButtonPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if (sender is Button button && ToggleLessonDatePopup(button))
+        CloseOpenLessonTimePanel();
+        if (sender is Button button && ToggleLessonDatePanel(button))
         {
             e.Handled = true;
         }
     }
 
-    private bool ToggleLessonDatePopup(Button button)
+    private bool ToggleLessonDatePanel(Button button)
     {
-        if (!button.IsEnabled || GetOrCreateLessonDatePopup(button) is not { } popup)
+        if (!button.IsEnabled || button.DataContext is not LessonDisplayModel lesson)
         {
             return false;
         }
 
-        if (popup.IsOpen)
+        if (button.Tag is Border panel && ReferenceEquals(openLessonDatePanel, panel))
         {
-            popup.IsOpen = false;
-            if (ReferenceEquals(openLessonDatePopup, popup))
-            {
-                openLessonDatePopup = null;
-            }
-
+            CloseOpenLessonDatePanel();
             return true;
         }
 
-        CloseOpenLessonDatePopup();
-        popup.IsOpen = true;
-        openLessonDatePopup = popup;
+        CloseOpenLessonDatePanel();
+        CloseOpenLessonTimePanel();
+        var newPanel = CreateLessonDatePanel(button, lesson);
+        AddPickerPanel(newPanel);
+        button.Tag = newPanel;
+        button.Unloaded -= OnLessonDateButtonUnloaded;
+        button.Unloaded += OnLessonDateButtonUnloaded;
+        openLessonDatePanel = newPanel;
+        openLessonDateTarget = button;
+        return true;
+    }
+
+    private bool ToggleLessonTimePanel(Button button)
+    {
+        if (!button.IsEnabled || button.DataContext is not LessonDisplayModel lesson)
+        {
+            return false;
+        }
+
+        if (button.Tag is Border panel && ReferenceEquals(openLessonTimePanel, panel))
+        {
+            CloseOpenLessonTimePanel();
+            return true;
+        }
+
+        CloseOpenLessonTimePanel();
+        CloseOpenLessonDatePanel();
+        var newPanel = CreateLessonTimePanel(button, lesson);
+        AddPickerPanel(newPanel);
+        button.Tag = newPanel;
+        button.Unloaded -= OnLessonTimeButtonUnloaded;
+        button.Unloaded += OnLessonTimeButtonUnloaded;
+        openLessonTimePanel = newPanel;
+        openLessonTimeTarget = button;
         return true;
     }
 
@@ -159,7 +227,7 @@ public partial class MainWindow : Window
         }
 
         lesson.StartsOnDate = selectedDate.Date;
-        CloseOpenLessonDatePopup();
+        CloseOpenLessonDatePanel();
         await ViewModel.SaveLessonCommand.ExecuteAsync(lesson);
     }
 
@@ -186,74 +254,234 @@ public partial class MainWindow : Window
         command.Execute(parameter);
     }
 
-    private void CloseOpenLessonDatePopup()
+    private void CloseOpenLessonDatePanel()
     {
-        if (openLessonDatePopup is not null)
+        if (openLessonDatePanel is not null)
         {
-            openLessonDatePopup.IsOpen = false;
-            openLessonDatePopup = null;
+            if (openLessonDatePanel.Child is Calendar calendar)
+            {
+                calendar.SelectedDatesChanged -= OnLessonCalendarSelectedDatesChanged;
+            }
+
+            if (openLessonDatePanel.Parent is Panel parent)
+            {
+                parent.Children.Remove(openLessonDatePanel);
+            }
+
+            openLessonDatePanel = null;
+        }
+
+        if (openLessonDateTarget is not null)
+        {
+            openLessonDateTarget.Unloaded -= OnLessonDateButtonUnloaded;
+            if (openLessonDateTarget.Tag is Border)
+            {
+                openLessonDateTarget.Tag = null;
+            }
+
+            openLessonDateTarget = null;
         }
     }
 
-    private Popup? GetOrCreateLessonDatePopup(Button button)
+    private void CloseOpenLessonDatePanelIfOutside(DependencyObject? source)
     {
-        if (button.Tag is Popup popup)
+        if (openLessonDatePanel is not { } panel)
         {
-            return popup;
+            return;
         }
 
-        if (button.DataContext is not LessonDisplayModel lesson)
+        if (source is not null &&
+            (IsWithin(source, openLessonDateTarget) || IsWithin(source, panel)))
+        {
+            return;
+        }
+
+        CloseOpenLessonDatePanel();
+    }
+
+    private void CloseOpenLessonTimePanel()
+    {
+        if (openLessonTimePanel is not null)
+        {
+            if (openLessonTimePanel.Child is ListBox timeList)
+            {
+                timeList.SelectionChanged -= OnLessonTimeSelectionChanged;
+            }
+
+            if (openLessonTimePanel.Parent is Panel parent)
+            {
+                parent.Children.Remove(openLessonTimePanel);
+            }
+
+            openLessonTimePanel = null;
+        }
+
+        if (openLessonTimeTarget is not null)
+        {
+            openLessonTimeTarget.Unloaded -= OnLessonTimeButtonUnloaded;
+            if (openLessonTimeTarget.Tag is Border)
+            {
+                openLessonTimeTarget.Tag = null;
+            }
+
+            openLessonTimeTarget = null;
+        }
+    }
+
+    private void CloseOpenLessonTimePanelIfOutside(DependencyObject? source)
+    {
+        if (openLessonTimePanel is not { } panel)
+        {
+            return;
+        }
+
+        if (source is not null &&
+            (IsWithin(source, openLessonTimeTarget) || IsWithin(source, panel)))
+        {
+            return;
+        }
+
+        CloseOpenLessonTimePanel();
+    }
+
+    private static bool IsWithin(DependencyObject source, DependencyObject? possibleAncestor)
+    {
+        if (possibleAncestor is null)
+        {
+            return false;
+        }
+
+        for (var current = source; current is not null; current = GetParent(current))
+        {
+            if (ReferenceEquals(current, possibleAncestor))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static DependencyObject? GetParent(DependencyObject child)
+    {
+        if (child is FrameworkElement { Parent: { } frameworkParent })
+        {
+            return frameworkParent;
+        }
+
+        if (child is FrameworkContentElement { Parent: DependencyObject contentParent })
+        {
+            return contentParent;
+        }
+
+        try
+        {
+            return VisualTreeHelper.GetParent(child);
+        }
+        catch (InvalidOperationException)
         {
             return null;
         }
+    }
 
+    private Border CreateLessonDatePanel(Button button, LessonDisplayModel lesson)
+    {
         var calendar = new Calendar
         {
+            BorderThickness = new Thickness(0),
             DataContext = lesson,
             SelectedDate = lesson.StartsOnDate
         };
         calendar.SelectedDatesChanged += OnLessonCalendarSelectedDatesChanged;
 
-        popup = new Popup
-        {
-            AllowsTransparency = true,
-            Child = new Border
-            {
-                Background = Brushes.White,
-                BorderBrush = new SolidColorBrush(Color.FromRgb(0x6A, 0x8F, 0xBF)),
-                BorderThickness = new Thickness(1),
-                Child = calendar
-            },
-            DataContext = lesson,
-            Placement = PlacementMode.Bottom,
-            PlacementTarget = button,
-            StaysOpen = true
-        };
-
-        button.Tag = popup;
-        button.Unloaded += OnLessonDateButtonUnloaded;
-        return popup;
+        return CreatePickerBorder(button, lesson, calendar, width: null, maxPanelHeight: DatePickerMaxHeight);
     }
 
-    private void OnLessonDateButtonUnloaded(object sender, RoutedEventArgs e)
+    private Border CreateLessonTimePanel(Button button, LessonDisplayModel lesson)
     {
-        if (sender is not Button { Tag: Popup popup } button)
+        var width = Math.Max(70, button.ActualWidth);
+        var timeList = new ListBox
+        {
+            DataContext = lesson,
+            ItemsSource = lesson.TimeOptions,
+            MinWidth = width,
+            Width = width,
+            SelectedItem = string.IsNullOrWhiteSpace(lesson.StartsAtTimeText)
+                ? null
+                : lesson.StartsAtTimeText
+        };
+        timeList.SelectionChanged += OnLessonTimeSelectionChanged;
+
+        return CreatePickerBorder(button, lesson, timeList, width, TimePickerMaxHeight);
+    }
+
+    private Border CreatePickerBorder(
+        Button button,
+        LessonDisplayModel lesson,
+        Control child,
+        double? width,
+        double maxPanelHeight)
+    {
+        button.UpdateLayout();
+        RootGrid.UpdateLayout();
+        var anchor = button.TransformToAncestor(RootGrid).Transform(new Point(0, button.ActualHeight));
+        var maxHeight = Math.Max(80, Math.Min(maxPanelHeight, RootGrid.ActualHeight - anchor.Y - 4));
+
+        child.MaxHeight = maxHeight;
+        if (width is { } requestedWidth)
+        {
+            child.MinWidth = requestedWidth;
+            child.Width = requestedWidth;
+        }
+
+        return new Border
+        {
+            Background = Brushes.White,
+            BorderBrush = new SolidColorBrush(PickerBorderColor),
+            BorderThickness = new Thickness(1),
+            Child = child,
+            DataContext = lesson,
+            HorizontalAlignment = HorizontalAlignment.Left,
+            Margin = new Thickness(anchor.X, anchor.Y, 0, 0),
+            SnapsToDevicePixels = true,
+            VerticalAlignment = VerticalAlignment.Top
+        };
+    }
+
+    private void AddPickerPanel(Border panel)
+    {
+        Grid.SetRow(panel, 0);
+        Grid.SetRowSpan(panel, 3);
+        Panel.SetZIndex(panel, 1000);
+        RootGrid.Children.Add(panel);
+    }
+
+    private async void OnLessonTimeSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (sender is not ListBox { DataContext: LessonDisplayModel lesson, SelectedItem: string selectedTime } ||
+            e.AddedItems.Count == 0)
         {
             return;
         }
 
-        popup.IsOpen = false;
-        if (popup.Child is Border { Child: Calendar calendar })
-        {
-            calendar.SelectedDatesChanged -= OnLessonCalendarSelectedDatesChanged;
-        }
+        lesson.StartsAtTimeText = selectedTime;
+        CloseOpenLessonTimePanel();
+        await ViewModel.SaveLessonCommand.ExecuteAsync(lesson);
+    }
 
-        if (ReferenceEquals(openLessonDatePopup, popup))
+    private void OnLessonDateButtonUnloaded(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button button && ReferenceEquals(openLessonDateTarget, button))
         {
-            openLessonDatePopup = null;
+            CloseOpenLessonDatePanel();
         }
+    }
 
-        button.Unloaded -= OnLessonDateButtonUnloaded;
-        button.Tag = null;
+    private void OnLessonTimeButtonUnloaded(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button button && ReferenceEquals(openLessonTimeTarget, button))
+        {
+            CloseOpenLessonTimePanel();
+        }
     }
 }

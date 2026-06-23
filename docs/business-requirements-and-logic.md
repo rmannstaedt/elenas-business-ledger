@@ -142,7 +142,7 @@ The application also opens Google Calendar in a separate browser window on the s
 
 The application will automatically refresh the lesson list from Google Calendar as suitable.
 
-There are Previous / Next buttons for the selected student, which will switch to the previous student and the next student respectively (by date/time of lesson).
+There are Previous / Next buttons for the selected student. These navigate a calendar-based occurrence list, not an alphabetical student-name list. Google Calendar lessons for active students in the displayed month are ordered by lesson date/time and the same Student may therefore appear multiple times before other Students appear. If there are no earlier or later Google Calendar lessons in the displayed month, navigation falls back to active Students' saved standard schedule day/time entries around the known calendar range. If the displayed month has no Google Calendar lessons at all, the occurrence list is built entirely from those saved standard schedules.
 There are also Previous / Next buttons for the month, to switch the display back/forth by a month.
 
 The application contains a Student menu with this entry:

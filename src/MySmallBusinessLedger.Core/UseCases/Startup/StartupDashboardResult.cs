@@ -7,4 +7,5 @@ public sealed record StartupDashboardResult(
     IReadOnlyList<string> StudentShortNames,
     IReadOnlyList<DashboardLesson> Lessons,
     IReadOnlyList<IssuedInvoiceSummary> Invoices,
-    bool CurrentStudentHasSchedule = false);
+    bool CurrentStudentHasSchedule,
+    IReadOnlyList<DashboardStudentNavigationEntry> StudentNavigationEntries);

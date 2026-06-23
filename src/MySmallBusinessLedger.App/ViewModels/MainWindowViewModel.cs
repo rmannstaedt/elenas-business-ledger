@@ -31,6 +31,8 @@ public sealed class MainWindowViewModel : ViewModelBase
     private DateTimeOffset? lastRefreshAt;
     private string? currentStudentShortName;
     private string[] studentShortNames = [];
+    private DashboardStudentNavigationEntry[] studentNavigationEntries = [];
+    private int? selectedStudentNavigationIndex;
     private DateOnly displayMonth;
     private bool currentStudentHasSchedule;
     private bool isBusy;
@@ -246,21 +248,51 @@ public sealed class MainWindowViewModel : ViewModelBase
         await RefreshAsync();
     }
 
+    private int FindCurrentNavigationIndex()
+    {
+        if (selectedStudentNavigationIndex is { } index &&
+            index >= 0 &&
+            index < studentNavigationEntries.Length &&
+            StringComparer.OrdinalIgnoreCase.Equals(
+                studentNavigationEntries[index].StudentShortName,
+                CurrentStudentShortName))
+        {
+            return index;
+        }
+
+        if (SelectedLesson is { } selectedLesson &&
+            selectedLesson.TryGetStartsAt(out var selectedStartsAt))
+        {
+            var selectedLessonIndex = Array.FindIndex(
+                studentNavigationEntries,
+                entry =>
+                    StringComparer.OrdinalIgnoreCase.Equals(entry.StudentShortName, selectedLesson.StudentShortName) &&
+                    entry.StartsAt == selectedStartsAt);
+            if (selectedLessonIndex >= 0)
+            {
+                return selectedLessonIndex;
+            }
+        }
+
+        return Array.FindIndex(
+            studentNavigationEntries,
+            entry => StringComparer.OrdinalIgnoreCase.Equals(entry.StudentShortName, CurrentStudentShortName));
+    }
+
     private async Task SelectAdjacentStudentAsync(int delta)
     {
-        if (studentShortNames.Length == 0)
+        if (studentNavigationEntries.Length == 0)
         {
             return;
         }
 
-        var currentIndex = Array.FindIndex(
-            studentShortNames,
-            student => StringComparer.OrdinalIgnoreCase.Equals(student, CurrentStudentShortName));
+        var currentIndex = FindCurrentNavigationIndex();
         var nextIndex = currentIndex < 0
-            ? 0
-            : (currentIndex + delta + studentShortNames.Length) % studentShortNames.Length;
+            ? delta > 0 ? 0 : studentNavigationEntries.Length - 1
+            : (currentIndex + delta + studentNavigationEntries.Length) % studentNavigationEntries.Length;
 
-        CurrentStudentShortName = studentShortNames[nextIndex];
+        selectedStudentNavigationIndex = nextIndex;
+        CurrentStudentShortName = studentNavigationEntries[nextIndex].StudentShortName;
         await RefreshAsync();
     }
 
@@ -606,34 +638,50 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     private void ApplyDashboard(StartupDashboardResult dashboard)
     {
+        var selectedLesson = SelectedLesson;
+        var selectedLessonId = selectedLesson?.Id;
         CurrentStudentShortName = dashboard.CurrentStudentShortName;
         currentStudentHasSchedule = dashboard.CurrentStudentHasSchedule;
         studentShortNames = dashboard.StudentShortNames
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Order(StringComparer.OrdinalIgnoreCase)
             .ToArray();
+        studentNavigationEntries = dashboard.StudentNavigationEntries.ToArray();
+        selectedStudentNavigationIndex = ResolveNavigationIndex(
+            selectedStudentNavigationIndex,
+            dashboard.CurrentStudentShortName,
+            selectedLesson);
 
-        var selectedLesson = SelectedLesson;
-        var selectedLessonId = selectedLesson?.Id;
         var draftLessons = Lessons
             .Where(lesson => lesson.IsDraft)
             .ToArray();
         ClearLessonRows();
-        foreach (var lesson in dashboard.Lessons.OrderBy(lesson => lesson.StartsAt))
+        foreach (var lesson in dashboard.Lessons
+                     .Where(lesson => IsInDisplayMonth(lesson.StartsAt))
+                     .OrderBy(lesson => lesson.StartsAt))
         {
             AddLessonRow(new LessonDisplayModel(lesson, lessonTimeZone));
         }
 
-        foreach (var draft in draftLessons.Where(lesson => lesson.IsDraft))
+        foreach (var draft in draftLessons.Where(lesson => lesson.IsDraft && IsVisibleDraftForDisplayMonth(lesson)))
         {
             AddLessonRow(draft);
         }
 
         SortLessonsPreservingSelection(selectedLesson);
 
+        var navigationSelectedLesson = FindSelectedNavigationLesson();
         if (selectedLesson is { IsDraft: true } && Lessons.Contains(selectedLesson))
         {
             SelectedLesson = selectedLesson;
+        }
+        else if (navigationSelectedLesson is not null)
+        {
+            SelectedLesson = navigationSelectedLesson;
+        }
+        else if (HasSelectedNavigationEntry())
+        {
+            SelectedLesson = null;
         }
         else
         {
@@ -651,11 +699,100 @@ public sealed class MainWindowViewModel : ViewModelBase
         RaiseCommandAvailabilityChanged();
     }
 
+    private int? ResolveNavigationIndex(
+        int? preferredIndex,
+        string? currentStudent,
+        LessonDisplayModel? selectedLesson)
+    {
+        if (studentNavigationEntries.Length == 0)
+        {
+            return null;
+        }
+
+        if (preferredIndex is { } index &&
+            index >= 0 &&
+            index < studentNavigationEntries.Length &&
+            StringComparer.OrdinalIgnoreCase.Equals(
+                studentNavigationEntries[index].StudentShortName,
+                currentStudent))
+        {
+            return index;
+        }
+
+        if (selectedLesson is not null &&
+            selectedLesson.TryGetStartsAt(out var selectedStartsAt))
+        {
+            var matchingLessonIndex = Array.FindIndex(
+                studentNavigationEntries,
+                entry =>
+                    StringComparer.OrdinalIgnoreCase.Equals(entry.StudentShortName, selectedLesson.StudentShortName) &&
+                    entry.StartsAt == selectedStartsAt);
+            if (matchingLessonIndex >= 0)
+            {
+                return matchingLessonIndex;
+            }
+        }
+
+        var matchingCalendarStudentIndex = Array.FindIndex(
+            studentNavigationEntries,
+            entry =>
+                entry.HasCalendarLesson &&
+                StringComparer.OrdinalIgnoreCase.Equals(entry.StudentShortName, currentStudent));
+        if (matchingCalendarStudentIndex >= 0)
+        {
+            return matchingCalendarStudentIndex;
+        }
+
+        var matchingStudentIndex = Array.FindIndex(
+            studentNavigationEntries,
+            entry => StringComparer.OrdinalIgnoreCase.Equals(entry.StudentShortName, currentStudent));
+        return matchingStudentIndex >= 0 ? matchingStudentIndex : null;
+    }
+
+    private bool HasSelectedNavigationEntry() =>
+        selectedStudentNavigationIndex is { } index &&
+        index >= 0 &&
+        index < studentNavigationEntries.Length;
+
+    private LessonDisplayModel? FindSelectedNavigationLesson()
+    {
+        if (selectedStudentNavigationIndex is not { } index ||
+            index < 0 ||
+            index >= studentNavigationEntries.Length)
+        {
+            return null;
+        }
+
+        var entry = studentNavigationEntries[index];
+        if (!entry.HasCalendarLesson)
+        {
+            return null;
+        }
+
+        return Lessons.FirstOrDefault(lesson => NavigationEntryMatchesLesson(entry, lesson));
+    }
+
+    private static bool NavigationEntryMatchesLesson(
+        DashboardStudentNavigationEntry entry,
+        LessonDisplayModel lesson) =>
+        StringComparer.OrdinalIgnoreCase.Equals(entry.StudentShortName, lesson.StudentShortName) &&
+        lesson.TryGetStartsAt(out var startsAt) &&
+        startsAt == entry.StartsAt;
+
     private void AddLessonRow(LessonDisplayModel lesson)
     {
         lesson.PropertyChanged += OnLessonPropertyChanged;
         Lessons.Add(lesson);
     }
+
+    private bool IsInDisplayMonth(DateTimeOffset startsAt) =>
+        startsAt.Year == DisplayMonth.Year &&
+        startsAt.Month == DisplayMonth.Month;
+
+    private bool IsVisibleDraftForDisplayMonth(LessonDisplayModel lesson) =>
+        lesson.StartsOnDate is null ||
+        (lesson.StartsOnDate.Value.Year == DisplayMonth.Year &&
+         lesson.StartsOnDate.Value.Month == DisplayMonth.Month);
 
     private void RemoveLessonRow(LessonDisplayModel lesson)
     {
@@ -733,7 +870,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     }
 
     private bool CanNavigateStudents() =>
-        !IsBusy && studentShortNames.Length > 1;
+        !IsBusy && studentNavigationEntries.Length > 1;
 
     private bool CanPopulateCalendar() =>
         !IsBusy &&

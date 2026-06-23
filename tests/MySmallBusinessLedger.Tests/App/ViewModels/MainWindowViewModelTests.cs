@@ -13,6 +13,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using WpfButton = System.Windows.Controls.Button;
+using WpfBorder = System.Windows.Controls.Border;
 using WpfCalendar = System.Windows.Controls.Calendar;
 using WpfDataGrid = System.Windows.Controls.DataGrid;
 using WpfDataGridGridLinesVisibility = System.Windows.Controls.DataGridGridLinesVisibility;
@@ -20,8 +21,8 @@ using WpfDataGridLengthUnitType = System.Windows.Controls.DataGridLengthUnitType
 using WpfDataGridTemplateColumn = System.Windows.Controls.DataGridTemplateColumn;
 using WpfDataGridTextColumn = System.Windows.Controls.DataGridTextColumn;
 using WpfGrid = System.Windows.Controls.Grid;
+using WpfListBox = System.Windows.Controls.ListBox;
 using WpfMenuItem = System.Windows.Controls.MenuItem;
-using WpfPopup = System.Windows.Controls.Primitives.Popup;
 using AppMainWindow = MySmallBusinessLedger.App.MainWindow;
 
 namespace MySmallBusinessLedger.Tests.App.ViewModels;
@@ -169,7 +170,7 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
-    public void LessonDateButtonOpensNonCapturingCalendarPopup()
+    public void LessonDateButtonOpensInsideWindowCalendarPanel()
     {
         RunOnStaThread(() =>
         {
@@ -185,13 +186,14 @@ public sealed class MainWindowViewModelTests
                 var dateButton = FindButton(window, "Open lesson date selector");
 
                 RaisePreviewLeftClick(dateButton);
-                PumpUntil(() => dateButton.Tag is WpfPopup { IsOpen: true });
+                PumpUntil(() => dateButton.Tag is WpfBorder);
 
-                var popup = Assert.IsType<WpfPopup>(dateButton.Tag);
-                Assert.True(popup.IsOpen, "The lesson date popup should open on the first preview mouse click.");
-                Assert.True(popup.StaysOpen, "The lesson date popup must not capture outside mouse clicks.");
-                Assert.NotNull(popup.Child);
-                Assert.Single(FindVisualChildren<WpfCalendar>(popup.Child));
+                var panel = Assert.IsType<WpfBorder>(dateButton.Tag);
+                Assert.Contains(panel, FindVisualChildren<WpfBorder>(window));
+                Assert.Equal(new Thickness(1), panel.BorderThickness);
+                Assert.Equal(Color.FromRgb(0xC7, 0xD3, 0xE1), Assert.IsType<SolidColorBrush>(panel.BorderBrush).Color);
+                var calendar = Assert.Single(FindVisualChildren<WpfCalendar>(panel));
+                Assert.Equal(new Thickness(0), calendar.BorderThickness);
             }
             finally
             {
@@ -201,7 +203,7 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
-    public void LessonCalendarSelectionUpdatesDateAndClosesPopup()
+    public void LessonCalendarSelectionUpdatesDateAndClosesPanel()
     {
         RunOnStaThread(() =>
         {
@@ -218,21 +220,336 @@ public sealed class MainWindowViewModelTests
 
                 var dateButton = FindButton(window, "Open lesson date selector");
                 RaisePreviewLeftClick(dateButton);
-                PumpUntil(() => dateButton.Tag is WpfPopup { IsOpen: true });
+                PumpUntil(() => dateButton.Tag is WpfBorder);
 
-                var popup = Assert.IsType<WpfPopup>(dateButton.Tag);
-                Assert.NotNull(popup.Child);
-                var calendar = Assert.Single(FindVisualChildren<WpfCalendar>(popup.Child));
+                var panel = Assert.IsType<WpfBorder>(dateButton.Tag);
+                var calendar = Assert.Single(FindVisualChildren<WpfCalendar>(panel));
 
                 calendar.SelectedDates.Clear();
                 calendar.SelectedDates.Add(new DateTime(2026, 6, 23));
-                PumpUntil(() => !popup.IsOpen);
+                PumpUntil(() => dateButton.Tag is null);
 
-                Assert.False(popup.IsOpen);
                 Assert.True(lessonEditor.EditWasCalled);
                 Assert.Equal(
                     new DateTimeOffset(2026, 6, 23, 15, 0, 0, TimeSpan.FromHours(2)),
                     lessonEditor.LastEditRequest?.StartsAt);
+                Assert.DoesNotContain(panel, FindVisualChildren<WpfBorder>(window));
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
+    [Fact]
+    public void LessonDatePanelClosesWhenClickingOutsideSelector()
+    {
+        RunOnStaThread(() =>
+        {
+            var viewModel = CreateViewModel(
+                dashboard: new FakeDashboardService { LessonState = LessonState.Planned, LessonIsInvoiced = false, LessonPaymentStatus = null });
+
+            var window = new AppMainWindow(viewModel);
+            try
+            {
+                window.Show();
+                PumpUntil(() => !viewModel.IsBusy && viewModel.Lessons.Count == 1);
+
+                var dateButton = FindButton(window, "Open lesson date selector");
+                RaisePreviewLeftClick(dateButton);
+                PumpUntil(() => dateButton.Tag is WpfBorder);
+
+                var panel = Assert.IsType<WpfBorder>(dateButton.Tag);
+                RaisePreviewLeftClick(window);
+                PumpUntil(() => dateButton.Tag is null);
+
+                Assert.DoesNotContain(panel, FindVisualChildren<WpfBorder>(window));
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
+    [Fact]
+    public void LessonTimeSelectorOpensInsideWindowWhenClickedAfterReceivingFocus()
+    {
+        RunOnStaThread(() =>
+        {
+            var viewModel = CreateViewModel(
+                dashboard: new FakeDashboardService { LessonState = LessonState.Planned, LessonIsInvoiced = false, LessonPaymentStatus = null });
+
+            var window = new AppMainWindow(viewModel);
+            try
+            {
+                window.Show();
+                PumpUntil(() => !viewModel.IsBusy && viewModel.Lessons.Count == 1);
+
+                var timeSelector = FindButton(window, "Open lesson time selector");
+
+                timeSelector.Focus();
+                RaisePreviewLeftClick(timeSelector);
+                PumpUntil(() => timeSelector.Tag is WpfBorder);
+
+                var panel = Assert.IsType<WpfBorder>(timeSelector.Tag);
+                Assert.Contains(panel, FindVisualChildren<WpfBorder>(window));
+                Assert.Equal(Color.FromRgb(0xC7, 0xD3, 0xE1), Assert.IsType<SolidColorBrush>(panel.BorderBrush).Color);
+                var timeList = Assert.Single(FindVisualChildren<WpfListBox>(panel));
+                Assert.Equal(420, timeList.MaxHeight);
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
+    [Fact]
+    public void LessonTimeSelectorClosesWhenClickingOutsideSelector()
+    {
+        RunOnStaThread(() =>
+        {
+            var viewModel = CreateViewModel(
+                dashboard: new FakeDashboardService { LessonState = LessonState.Planned, LessonIsInvoiced = false, LessonPaymentStatus = null });
+
+            var window = new AppMainWindow(viewModel);
+            try
+            {
+                window.Show();
+                PumpUntil(() => !viewModel.IsBusy && viewModel.Lessons.Count == 1);
+
+                var timeSelector = FindButton(window, "Open lesson time selector");
+
+                RaisePreviewLeftClick(timeSelector);
+                PumpUntil(() => timeSelector.Tag is WpfBorder);
+
+                var panel = Assert.IsType<WpfBorder>(timeSelector.Tag);
+                RaisePreviewLeftClick(window);
+                PumpUntil(() => timeSelector.Tag is null);
+
+                Assert.DoesNotContain(panel, FindVisualChildren<WpfBorder>(window));
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
+    [Fact]
+    public void LessonTimeSelectionUpdatesTimeAndClosesSelector()
+    {
+        RunOnStaThread(() =>
+        {
+            var lessonEditor = new FakeLessonEditorService();
+            var viewModel = CreateViewModel(
+                dashboard: new FakeDashboardService { LessonState = LessonState.Planned, LessonIsInvoiced = false, LessonPaymentStatus = null },
+                lessonEditorService: lessonEditor);
+
+            var window = new AppMainWindow(viewModel);
+            try
+            {
+                window.Show();
+                PumpUntil(() => !viewModel.IsBusy && viewModel.Lessons.Count == 1);
+
+                var timeSelector = FindButton(window, "Open lesson time selector");
+                RaisePreviewLeftClick(timeSelector);
+                PumpUntil(() => timeSelector.Tag is WpfBorder);
+
+                var panel = Assert.IsType<WpfBorder>(timeSelector.Tag);
+                var timeList = Assert.Single(FindVisualChildren<WpfListBox>(panel));
+                timeList.SelectedItem = "15:30";
+                PumpUntil(() => timeSelector.Tag is null && lessonEditor.EditWasCalled);
+
+                Assert.Equal(
+                    new DateTimeOffset(2026, 6, 16, 15, 30, 0, TimeSpan.FromHours(2)),
+                    lessonEditor.LastEditRequest?.StartsAt);
+                Assert.DoesNotContain(panel, FindVisualChildren<WpfBorder>(window));
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
+    [Fact]
+    public void LessonDatePanelOpensWhenTimeSelectorIsOpen()
+    {
+        RunOnStaThread(() =>
+        {
+            var viewModel = CreateViewModel(
+                dashboard: new FakeDashboardService { LessonState = LessonState.Planned, LessonIsInvoiced = false, LessonPaymentStatus = null });
+
+            var window = new AppMainWindow(viewModel);
+            try
+            {
+                window.Show();
+                PumpUntil(() => !viewModel.IsBusy && viewModel.Lessons.Count == 1);
+
+                var timeSelector = FindButton(window, "Open lesson time selector");
+                var dateButton = FindButton(window, "Open lesson date selector");
+
+                RaisePreviewLeftClick(timeSelector);
+                PumpUntil(() => timeSelector.Tag is WpfBorder);
+
+                var timePanel = Assert.IsType<WpfBorder>(timeSelector.Tag);
+                RaisePreviewLeftClick(dateButton);
+                PumpUntil(() => dateButton.Tag is WpfBorder && timeSelector.Tag is null);
+
+                var datePanel = Assert.IsType<WpfBorder>(dateButton.Tag);
+                Assert.Contains(datePanel, FindVisualChildren<WpfBorder>(window));
+                Assert.DoesNotContain(timePanel, FindVisualChildren<WpfBorder>(window));
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
+    [Fact]
+    public void LessonDatePanelClosesWhenWindowDeactivates()
+    {
+        RunOnStaThread(() =>
+        {
+            var viewModel = CreateViewModel(
+                dashboard: new FakeDashboardService { LessonState = LessonState.Planned, LessonIsInvoiced = false, LessonPaymentStatus = null });
+
+            var window = new AppMainWindow(viewModel);
+            try
+            {
+                window.Show();
+                PumpUntil(() => !viewModel.IsBusy && viewModel.Lessons.Count == 1);
+
+                var dateButton = FindButton(window, "Open lesson date selector");
+
+                RaisePreviewLeftClick(dateButton);
+                PumpUntil(() => dateButton.Tag is WpfBorder);
+                var panel = Assert.IsType<WpfBorder>(dateButton.Tag);
+
+                var deactivatedHandler = typeof(AppMainWindow).GetMethod(
+                    "OnWindowDeactivated",
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                Assert.NotNull(deactivatedHandler);
+
+                deactivatedHandler.Invoke(window, [window, EventArgs.Empty]);
+                PumpUntil(() => dateButton.Tag is null);
+
+                Assert.DoesNotContain(panel, FindVisualChildren<WpfBorder>(window));
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
+    [Fact]
+    public void LessonDatePanelClosesWhenApplicationDeactivates()
+    {
+        RunOnStaThread(() =>
+        {
+            var viewModel = CreateViewModel(
+                dashboard: new FakeDashboardService { LessonState = LessonState.Planned, LessonIsInvoiced = false, LessonPaymentStatus = null });
+
+            var window = new AppMainWindow(viewModel);
+            try
+            {
+                window.Show();
+                PumpUntil(() => !viewModel.IsBusy && viewModel.Lessons.Count == 1);
+
+                var dateButton = FindButton(window, "Open lesson date selector");
+
+                RaisePreviewLeftClick(dateButton);
+                PumpUntil(() => dateButton.Tag is WpfBorder);
+                var panel = Assert.IsType<WpfBorder>(dateButton.Tag);
+
+                var deactivatedHandler = typeof(AppMainWindow).GetMethod(
+                    "OnApplicationDeactivated",
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                Assert.NotNull(deactivatedHandler);
+
+                deactivatedHandler.Invoke(window, [Application.Current, EventArgs.Empty]);
+                PumpUntil(() => dateButton.Tag is null);
+
+                Assert.DoesNotContain(panel, FindVisualChildren<WpfBorder>(window));
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
+    [Fact]
+    public void LessonTimeSelectorClosesWhenWindowDeactivates()
+    {
+        RunOnStaThread(() =>
+        {
+            var viewModel = CreateViewModel(
+                dashboard: new FakeDashboardService { LessonState = LessonState.Planned, LessonIsInvoiced = false, LessonPaymentStatus = null });
+
+            var window = new AppMainWindow(viewModel);
+            try
+            {
+                window.Show();
+                PumpUntil(() => !viewModel.IsBusy && viewModel.Lessons.Count == 1);
+
+                var timeSelector = FindButton(window, "Open lesson time selector");
+
+                RaisePreviewLeftClick(timeSelector);
+                PumpUntil(() => timeSelector.Tag is WpfBorder);
+                var panel = Assert.IsType<WpfBorder>(timeSelector.Tag);
+
+                var deactivatedHandler = typeof(AppMainWindow).GetMethod(
+                    "OnWindowDeactivated",
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                Assert.NotNull(deactivatedHandler);
+
+                deactivatedHandler.Invoke(window, [window, EventArgs.Empty]);
+                PumpUntil(() => timeSelector.Tag is null);
+
+                Assert.DoesNotContain(panel, FindVisualChildren<WpfBorder>(window));
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
+    [Fact]
+    public void LessonTimeSelectorClosesWhenApplicationDeactivates()
+    {
+        RunOnStaThread(() =>
+        {
+            var viewModel = CreateViewModel(
+                dashboard: new FakeDashboardService { LessonState = LessonState.Planned, LessonIsInvoiced = false, LessonPaymentStatus = null });
+
+            var window = new AppMainWindow(viewModel);
+            try
+            {
+                window.Show();
+                PumpUntil(() => !viewModel.IsBusy && viewModel.Lessons.Count == 1);
+
+                var timeSelector = FindButton(window, "Open lesson time selector");
+
+                RaisePreviewLeftClick(timeSelector);
+                PumpUntil(() => timeSelector.Tag is WpfBorder);
+                var panel = Assert.IsType<WpfBorder>(timeSelector.Tag);
+
+                var deactivatedHandler = typeof(AppMainWindow).GetMethod(
+                    "OnApplicationDeactivated",
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+                Assert.NotNull(deactivatedHandler);
+
+                deactivatedHandler.Invoke(window, [Application.Current, EventArgs.Empty]);
+                PumpUntil(() => timeSelector.Tag is null);
+
+                Assert.DoesNotContain(panel, FindVisualChildren<WpfBorder>(window));
             }
             finally
             {
@@ -480,11 +797,81 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
-    public async Task StudentNavigationUsesDashboardStudentList()
+    public async Task MonthNavigationShowsOnlySelectedMonthLessons()
     {
-        var dashboard = new FakeDashboardService { StudentShortNames = ["Anna", "Bo"] };
+        var dashboard = new FakeDashboardService();
         var viewModel = CreateViewModel(dashboard: dashboard);
         await viewModel.LoadAsync();
+
+        dashboard.NextResult = OperationResult<StartupDashboardResult>.Success(
+            new StartupDashboardResult(
+                "Anna",
+                ["Anna"],
+                [
+                    new DashboardLesson(
+                        "june",
+                        "Anna",
+                        new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.FromHours(2)),
+                        LessonState.Planned,
+                        false,
+                        null),
+                    new DashboardLesson(
+                        "july",
+                        "Anna",
+                        new DateTimeOffset(2026, 7, 7, 15, 0, 0, TimeSpan.FromHours(2)),
+                        LessonState.Planned,
+                        false,
+                        null),
+                    new DashboardLesson(
+                        "august",
+                        "Anna",
+                        new DateTimeOffset(2026, 8, 4, 15, 0, 0, TimeSpan.FromHours(2)),
+                        LessonState.Planned,
+                        false,
+                        null)
+                ],
+                [],
+                CurrentStudentHasSchedule: true,
+                StudentNavigationEntries:
+                [
+                    new DashboardStudentNavigationEntry("Anna", new DateTimeOffset(2026, 7, 7, 15, 0, 0, TimeSpan.FromHours(2)))
+                ]));
+
+        await viewModel.NextMonthCommand.ExecuteAsync();
+
+        var lesson = Assert.Single(viewModel.Lessons);
+        Assert.Equal("july", lesson.Id);
+    }
+
+    [Fact]
+    public async Task StudentNavigationUsesDashboardOccurrenceListAndCanRepeatCurrentStudent()
+    {
+        var annaFirst = new DateTimeOffset(2026, 6, 2, 15, 0, 0, TimeSpan.FromHours(2));
+        var annaSecond = new DateTimeOffset(2026, 6, 9, 15, 0, 0, TimeSpan.FromHours(2));
+        var boFirst = new DateTimeOffset(2026, 6, 10, 14, 0, 0, TimeSpan.FromHours(2));
+        var dashboard = new FakeDashboardService
+        {
+            StudentShortNames = ["Anna", "Bo"],
+            StudentNavigationEntries =
+            [
+                new DashboardStudentNavigationEntry("Anna", annaFirst),
+                new DashboardStudentNavigationEntry("Anna", annaSecond),
+                new DashboardStudentNavigationEntry("Bo", boFirst)
+            ],
+            DashboardLessons =
+            [
+                new DashboardLesson("anna-1", "Anna", annaFirst, LessonState.Planned, false, null),
+                new DashboardLesson("anna-2", "Anna", annaSecond, LessonState.Planned, false, null)
+            ]
+        };
+        var viewModel = CreateViewModel(dashboard: dashboard);
+        await viewModel.LoadAsync();
+
+        await viewModel.NextStudentCommand.ExecuteAsync();
+
+        Assert.Equal("Anna", dashboard.LastSelectedStudentShortName);
+        Assert.Equal("Anna", viewModel.CurrentStudentShortName);
+        Assert.Equal("anna-2", viewModel.SelectedLesson?.Id);
 
         await viewModel.NextStudentCommand.ExecuteAsync();
 
@@ -934,7 +1321,7 @@ public sealed class MainWindowViewModelTests
             lessonTimeZone: timeZone);
         await viewModel.LoadAsync();
         await viewModel.AddLessonCommand.ExecuteAsync();
-        var draft = viewModel.Lessons[1];
+        var draft = Assert.Single(viewModel.Lessons, lesson => lesson.IsDraft);
         draft.StartsOnDate = new DateTime(2026, 1, 15);
         draft.StartsAtTimeText = "15:30";
 
@@ -1302,6 +1689,10 @@ public sealed class MainWindowViewModelTests
 
         public IReadOnlyList<string> StudentShortNames { get; init; } = ["Anna"];
 
+        public IReadOnlyList<DashboardStudentNavigationEntry>? StudentNavigationEntries { get; init; }
+
+        public IReadOnlyList<DashboardLesson>? DashboardLessons { get; init; }
+
         public OperationResult<StartupDashboardResult>? NextResult { get; set; }
 
         public LessonState LessonState { get; init; } = LessonState.Completed;
@@ -1339,14 +1730,15 @@ public sealed class MainWindowViewModelTests
                 new StartupDashboardResult(
                     currentStudent,
                     StudentShortNames,
+                    DashboardLessons ??
                     [
-                        new DashboardLesson(
-                            "lesson-1",
-                            currentStudent,
-                            new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.FromHours(2)),
-                            LessonState,
-                            LessonIsInvoiced,
-                            LessonPaymentStatus)
+                            new DashboardLesson(
+                                "lesson-1",
+                                currentStudent,
+                                new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.FromHours(2)),
+                                LessonState,
+                                LessonIsInvoiced,
+                                LessonPaymentStatus)
                     ],
                     [
                         new IssuedInvoiceSummary(
@@ -1356,7 +1748,13 @@ public sealed class MainWindowViewModelTests
                             InvoicePaymentStatus,
                             "C:\\Invoices\\000001.pdf")
                     ],
-                    CurrentStudentHasSchedule));
+                    CurrentStudentHasSchedule,
+                    StudentNavigationEntries ??
+                    StudentShortNames
+                        .Select((shortName, index) => new DashboardStudentNavigationEntry(
+                            shortName,
+                            new DateTimeOffset(2026, 6, 16, 15, index, 0, TimeSpan.FromHours(2))))
+                        .ToArray()));
 
             NextResult = null;
             return result;
