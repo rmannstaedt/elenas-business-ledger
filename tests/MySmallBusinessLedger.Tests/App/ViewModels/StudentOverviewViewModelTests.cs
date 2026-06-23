@@ -591,7 +591,10 @@ public sealed class StudentOverviewViewModelTests
     {
         public InvoiceNumber? LastViewedInvoiceNumber { get; private set; }
 
-        public Task<bool> ShowWriteInvoiceAsync(DateOnly displayMonth, CancellationToken cancellationToken) =>
+        public Task<bool> ShowWriteInvoiceAsync(
+            DateOnly displayMonth,
+            string? initialStudentShortName,
+            CancellationToken cancellationToken) =>
             Task.FromResult(false);
 
         public Task ShowInvoiceViewerAsync(InvoiceNumber invoiceNumber, CancellationToken cancellationToken)

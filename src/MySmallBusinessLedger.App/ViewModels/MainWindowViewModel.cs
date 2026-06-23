@@ -385,7 +385,10 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     private async Task WriteInvoiceAsync()
     {
-        var issued = await invoiceWorkflowLauncher.ShowWriteInvoiceAsync(DisplayMonth, CancellationToken.None);
+        var issued = await invoiceWorkflowLauncher.ShowWriteInvoiceAsync(
+            DisplayMonth,
+            CurrentStudentShortName,
+            CancellationToken.None);
         if (issued)
         {
             await RefreshAsync();

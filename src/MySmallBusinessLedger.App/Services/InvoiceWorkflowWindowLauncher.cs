@@ -8,23 +8,30 @@ namespace MySmallBusinessLedger.App.Services;
 public sealed class InvoiceWorkflowWindowLauncher : IInvoiceWorkflowLauncher
 {
     private readonly IInvoiceWorkflowService invoiceWorkflowService;
-    private readonly IAppSettingsService settingsService;
+    private readonly IInvoicePrinterConfigurationService printerConfigurationService;
     private readonly IUiClock clock;
 
     public InvoiceWorkflowWindowLauncher(
         IInvoiceWorkflowService invoiceWorkflowService,
-        IAppSettingsService settingsService,
+        IInvoicePrinterConfigurationService printerConfigurationService,
         IUiClock clock)
     {
         this.invoiceWorkflowService = invoiceWorkflowService;
-        this.settingsService = settingsService;
+        this.printerConfigurationService = printerConfigurationService;
         this.clock = clock;
     }
 
-    public async Task<bool> ShowWriteInvoiceAsync(DateOnly displayMonth, CancellationToken cancellationToken)
+    public async Task<bool> ShowWriteInvoiceAsync(
+        DateOnly displayMonth,
+        string? initialStudentShortName,
+        CancellationToken cancellationToken)
     {
         var today = DateOnly.FromDateTime(clock.Now.DateTime);
-        var candidateViewModel = new InvoiceCandidateDialogViewModel(invoiceWorkflowService, today, clock.Now);
+        var candidateViewModel = new InvoiceCandidateDialogViewModel(
+            invoiceWorkflowService,
+            today,
+            clock.Now,
+            initialStudentShortName);
         await candidateViewModel.LoadAsync();
 
         var candidateWindow = new InvoiceCandidateDialog(candidateViewModel)
@@ -87,32 +94,14 @@ public sealed class InvoiceWorkflowWindowLauncher : IInvoiceWorkflowLauncher
 
     private async Task<bool> EnsureInvoicePrinterConfiguredAsync(CancellationToken cancellationToken)
     {
-        var snapshot = await settingsService.LoadAsync(cancellationToken);
-        if (!string.IsNullOrWhiteSpace(snapshot.CompanyProfile?.ConfiguredInvoicePrinterName))
+        var result = await printerConfigurationService.EnsureConfiguredAsync(cancellationToken);
+        if (!result.Succeeded)
         {
-            return true;
-        }
-
-        var choice = MessageBox.Show(
-            "No invoice printer is configured. Open Settings to choose one now?",
-            "Invoice printer",
-            MessageBoxButton.YesNo,
-            MessageBoxImage.Warning);
-        if (choice != MessageBoxResult.Yes)
-        {
+            ShowWarning(result.Errors.FirstOrDefault()?.Message ?? "The invoice printer could not be configured.");
             return false;
         }
 
-        var viewModel = new SettingsViewModel(settingsService);
-        await viewModel.LoadAsync();
-        var window = new SettingsView(viewModel)
-        {
-            Owner = Application.Current?.MainWindow
-        };
-        window.ShowDialog();
-
-        snapshot = await settingsService.LoadAsync(cancellationToken);
-        return !string.IsNullOrWhiteSpace(snapshot.CompanyProfile?.ConfiguredInvoicePrinterName);
+        return result.Value;
     }
 
     private static void ShowWarning(string message) =>

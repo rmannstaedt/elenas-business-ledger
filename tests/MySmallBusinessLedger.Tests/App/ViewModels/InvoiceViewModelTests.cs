@@ -38,6 +38,26 @@ public sealed class InvoiceViewModelTests
     }
 
     [Fact]
+    public async Task CandidateDialogPrefersInitialStudentOverTimeBasedPreselection()
+    {
+        var service = new FakeInvoiceWorkflowService
+        {
+            Candidates = OperationResult<InvoiceCandidateSelectionResult>.Success(
+                new InvoiceCandidateSelectionResult(["Karina"], ["Mira", "Karina"], "Karina"))
+        };
+        var viewModel = new InvoiceCandidateDialogViewModel(
+            service,
+            new DateOnly(2026, 6, 23),
+            new DateTimeOffset(2026, 6, 23, 15, 0, 0, TimeSpan.Zero),
+            initialStudentShortName: "Mira");
+
+        await viewModel.LoadAsync();
+
+        Assert.Equal("Mira", viewModel.SelectedStudentShortName);
+        Assert.True(viewModel.ConfirmCommand.CanExecute(null));
+    }
+
+    [Fact]
     public async Task PreviewRequiresReasonWhenPriceAdjustmentIsEntered()
     {
         var service = new FakeInvoiceWorkflowService();

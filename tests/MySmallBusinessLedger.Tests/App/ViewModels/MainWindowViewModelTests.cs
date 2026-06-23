@@ -1039,6 +1039,20 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task WriteInvoicePassesCurrentStudentToWorkflow()
+    {
+        var dashboard = new FakeDashboardService { StudentShortNames = ["Anna", "Mira"] };
+        var invoices = new FakeInvoiceWorkflowLauncher();
+        var viewModel = CreateViewModel(dashboard: dashboard, invoiceWorkflowLauncher: invoices);
+        await viewModel.LoadAsync();
+
+        await viewModel.SelectStudentCommand.ExecuteAsync("Mira");
+        await viewModel.WriteInvoiceCommand.ExecuteAsync();
+
+        Assert.Equal("Mira", invoices.LastWriteInitialStudentShortName);
+    }
+
+    [Fact]
     public async Task SettingsRefreshesDashboardAfterSave()
     {
         var dashboard = new FakeDashboardService();
@@ -2082,11 +2096,17 @@ public sealed class MainWindowViewModelTests
 
         public bool WriteWasShown { get; private set; }
 
+        public string? LastWriteInitialStudentShortName { get; private set; }
+
         public InvoiceNumber? LastViewedInvoiceNumber { get; private set; }
 
-        public Task<bool> ShowWriteInvoiceAsync(DateOnly displayMonth, CancellationToken cancellationToken)
+        public Task<bool> ShowWriteInvoiceAsync(
+            DateOnly displayMonth,
+            string? initialStudentShortName,
+            CancellationToken cancellationToken)
         {
             WriteWasShown = true;
+            LastWriteInitialStudentShortName = initialStudentShortName;
             return Task.FromResult(NextWriteResult);
         }
 

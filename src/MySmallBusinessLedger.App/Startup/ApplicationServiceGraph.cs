@@ -122,9 +122,12 @@ internal sealed class ApplicationServiceGraph
             appPaths,
             googleOAuthClientConfigurationProvider,
             googleCalendarClientFactory);
+        var printerConfigurationService = new InvoicePrinterConfigurationService(
+            settingsService,
+            new WindowsInvoicePrinterSelectionDialog());
         var invoiceWorkflowLauncher = new InvoiceWorkflowWindowLauncher(
             invoiceWorkflowService,
-            settingsService,
+            printerConfigurationService,
             systemClock);
 
         return new ApplicationServiceGraph(

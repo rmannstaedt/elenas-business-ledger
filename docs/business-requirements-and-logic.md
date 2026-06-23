@@ -194,8 +194,9 @@ Invoices are written by the press of a button in the main application window: "W
 
 Before the invoice is written, the system will display a dialogue with student short names.
 The dialogue will list all students with lessons that day, who have not yet had an invoice printed this month.
-The dialogue will preselect the student who has a lesson at the current time/date.
-If no student has a lesson at the current time/date, the dialogue does not preselect.
+When opened from the main window, the dialogue will preselect the currently displayed Student if that Student is still in the all-students list.
+If the currently displayed Student is not available, the dialogue will preselect the Student who has a lesson at the current time/date.
+If neither of those choices is available, the dialogue falls back to the first listed candidate/all-student entry so the visible selection remains explicit before Continue.
 The dialogue will also allow the user to choose from all students in the database.
 
 Once a student has been selected, the application will display the invoice on screen as a pre-filled, partially editable form.
@@ -230,7 +231,7 @@ The "Print Invoice" button does the following:
 Once an Invoice has been *successfully* saved, it can no longer be edited.
 Issued Invoices show payment and print status in the main/student invoice lists. The Invoice Viewer shows the stored PDF path, print status, and last print error when present. Reprinting an issued Invoice uses the stored PDF and existing Invoice number; it must not create a new Invoice number or change the issued Invoice content.
 
-The invoice printer is selected from Application Settings during setup. If no invoice printer has been selected when printing or reprinting is first attempted, the app offers to open Settings so the user can choose one before continuing. The selected printer is remembered for subsequent invoice printing and can later be changed or cleared. When the app records an Invoice as Printed, that means the configured printer existed and Windows accepted the print request launch; the app does not verify physical paper output or Windows spooler completion.
+The invoice printer is selected from Application Settings during setup. If no invoice printer has been selected when printing or reprinting is first attempted, the app opens the printer selection dialog directly, lets the user choose a printer, and remembers that printer before continuing. The selected printer is remembered for subsequent invoice printing and can later be changed or cleared from Application Settings. When the app records an Invoice as Printed, that means the configured printer existed and Windows accepted the print request launch; the app does not verify physical paper output or Windows spooler completion.
 
 ## Limitations
 

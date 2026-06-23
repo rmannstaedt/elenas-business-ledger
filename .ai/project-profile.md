@@ -35,7 +35,7 @@ Issued invoice lines: stored with catalog plan identity for lineage plus issued-
 Invoice PDFs: stored as files, not BLOBs
 Invoice PDF generation: QuestPDF
 Invoice PDF safety: reserve invoice metadata as `Issuing`, write to staging, verify PDF bytes, publish without overwriting, finalize the invoice as `Issued`, then request print
-Invoice printer: configured from `Application > Settings`, stored in SQLite company profile data, selectable from installed Windows printers when enumeration is available, typeable, changeable, and clearable; if missing during first invoice print/reprint, the app offers to open Settings before continuing; `Printed` means the configured printer existed and the Windows print request was launched without exception, not that physical output or spooler completion was verified
+Invoice printer: configured from `Application > Settings`, stored in SQLite company profile data, selectable from installed Windows printers when enumeration is available, typeable, changeable, and clearable; if missing during first invoice print/reprint, the app opens the printer selection dialog directly and remembers the selected printer before continuing; `Printed` means the configured printer existed and the Windows print request was launched without exception, not that physical output or spooler completion was verified
 Google Calendar account tokens: stored locally with Windows user data protection, never in SQLite or plaintext config
 Google Calendar selected calendar/account label: stored in SQLite app settings; the main-window browser launcher uses the configured account email as a Google Calendar account hint
 Runtime app data folder: `%APPDATA%\visualtech.dk\MySmallBusinessLedger`
@@ -56,6 +56,7 @@ Google Calendar event time zones: write payloads must use Google/IANA time zone 
 Google Calendar completed-lesson marker: keep the first line as `$ <student short name>` or `$<student short name>`; Completed is represented by a later `Status: Completed` summary line, and absence of that line means Planned
 Google Calendar population: main-window `Populate Calendar` seeds lessons for the selected student from saved student schedule entries; current month starts at today inclusive, future months seed the whole month, past months cannot be seeded, exact same-student same-date/time duplicates are skipped, and v1 does not detect other conflicts
 Calendar availability: invoice issue must rely on the accepted invoice preview/snapshot rather than requiring a fresh Google Calendar read at the final print/save moment
+Write Invoice selection: when opened from the main window, the candidate dialog must prefer the currently displayed student when available before falling back to today/time-based invoice candidates
 PDF generation: QuestPDF Community license accepted for v1
 
 ## UI policy
