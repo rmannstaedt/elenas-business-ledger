@@ -83,10 +83,37 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <Style x:Key="HeaderDropdownButtonStyle" TargetType="Button" BasedOn="{StaticResource HeaderArrowButtonStyle}">
+            <Setter Property="Width" Value="24" />
+            <Setter Property="Height" Value="28" />
+        </Style>
         <Style x:Key="LessonTableCellStyle" TargetType="{x:Type DataGridCell}">
+            <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
             <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Foreground" Value="#111827" />
             <Setter Property="Padding" Value="0" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=DataGridRow}}"
+                             Value="True">
+                    <Setter Property="Background" Value="#DCEBFA" />
+                    <Setter Property="Foreground" Value="#0F2742" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="LessonTableRowStyle" TargetType="{x:Type DataGridRow}">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="#111827" />
+            <Setter Property="SnapsToDevicePixels" Value="True" />
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#F1F6FC" />
+                </Trigger>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="#DCEBFA" />
+                    <Setter Property="Foreground" Value="#0F2742" />
+                </Trigger>
+            </Style.Triggers>
         </Style>
         <Style x:Key="CenteredColumnHeaderStyle" TargetType="{x:Type DataGridColumnHeader}">
             <Setter Property="HorizontalContentAlignment" Value="Center" />
@@ -182,6 +209,35 @@
                                    Foreground="#15191F"
                                    Margin="4,0"
                                    VerticalAlignment="Center" />
+                        <Button Style="{StaticResource HeaderDropdownButtonStyle}"
+                                Click="OnStudentDropdownButtonClick"
+                                ToolTip="Choose student"
+                                AutomationProperties.Name="Choose student">
+                            <Button.ContextMenu>
+                                <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
+                                             ItemsSource="{Binding SelectableStudentShortNames}">
+                                    <ContextMenu.ItemContainerStyle>
+                                        <Style TargetType="{x:Type MenuItem}">
+                                            <Setter Property="Header" Value="{Binding}" />
+                                            <Setter Property="Command"
+                                                    Value="{Binding DataContext.SelectStudentCommand, RelativeSource={RelativeSource AncestorType={x:Type ContextMenu}}}" />
+                                            <Setter Property="CommandParameter" Value="{Binding}" />
+                                        </Style>
+                                    </ContextMenu.ItemContainerStyle>
+                                </ContextMenu>
+                            </Button.ContextMenu>
+                            <Path Data="M 3,5 L 7,9 L 11,5"
+                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                  StrokeThickness="1.5"
+                                  StrokeStartLineCap="Round"
+                                  StrokeEndLineCap="Round"
+                                  StrokeLineJoin="Round"
+                                  Width="14"
+                                  Height="14"
+                                  Stretch="None"
+                                  HorizontalAlignment="Center"
+                                  VerticalAlignment="Center" />
+                        </Button>
                         <Button Command="{Binding NextStudentCommand}"
                                 Style="{StaticResource HeaderArrowButtonStyle}"
                                 ToolTip="Next student"
@@ -329,6 +385,7 @@
                               BorderBrush="#8EA6C3"
                               BorderThickness="1"
                               CellStyle="{StaticResource LessonTableCellStyle}"
+                              RowStyle="{StaticResource LessonTableRowStyle}"
                               HeadersVisibility="Column"
                               GridLinesVisibility="All"
                               HorizontalGridLinesBrush="#C7D3E1"

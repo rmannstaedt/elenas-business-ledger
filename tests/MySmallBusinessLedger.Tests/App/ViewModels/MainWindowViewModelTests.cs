@@ -880,6 +880,56 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task StudentNavigationMovesToAdjacentMonthAndSelectsTargetLesson()
+    {
+        var annaJune = new DateTimeOffset(2026, 6, 29, 15, 0, 0, TimeSpan.FromHours(2));
+        var boJuly = new DateTimeOffset(2026, 7, 6, 14, 0, 0, TimeSpan.FromHours(2));
+        var dashboard = new FakeDashboardService
+        {
+            StudentShortNames = ["Anna", "Bo"],
+            StudentNavigationEntries =
+            [
+                new DashboardStudentNavigationEntry("Anna", annaJune),
+                new DashboardStudentNavigationEntry("Bo", boJuly)
+            ],
+            DashboardLessons =
+            [
+                new DashboardLesson("anna-june", "Anna", annaJune, LessonState.Planned, false, null),
+                new DashboardLesson("bo-july", "Bo", boJuly, LessonState.Planned, false, null)
+            ]
+        };
+        var viewModel = CreateViewModel(dashboard: dashboard);
+        await viewModel.LoadAsync();
+
+        await viewModel.NextStudentCommand.ExecuteAsync();
+
+        Assert.Equal(new DateOnly(2026, 7, 1), viewModel.DisplayMonth);
+        Assert.Equal(new DateOnly(2026, 7, 1), dashboard.LastMonth);
+        Assert.Equal("Bo", viewModel.CurrentStudentShortName);
+        Assert.Equal("bo-july", viewModel.SelectedLesson?.Id);
+        var lesson = Assert.Single(viewModel.Lessons);
+        Assert.Equal("bo-july", lesson.Id);
+    }
+
+    [Fact]
+    public async Task StudentDropdownSelectionRefreshesDashboardWithoutSelectingLesson()
+    {
+        var dashboard = new FakeDashboardService { StudentShortNames = ["Bo", "Anna"] };
+        var viewModel = CreateViewModel(dashboard: dashboard);
+        await viewModel.LoadAsync();
+
+        Assert.Equal(["Bo"], viewModel.SelectableStudentShortNames);
+
+        await viewModel.SelectStudentCommand.ExecuteAsync("Bo");
+
+        Assert.Equal("Bo", dashboard.LastSelectedStudentShortName);
+        Assert.Equal("Bo", viewModel.CurrentStudentShortName);
+        Assert.Null(viewModel.SelectedLesson);
+        Assert.Equal(["Anna"], viewModel.SelectableStudentShortNames);
+        Assert.Equal(2, dashboard.LoadCount);
+    }
+
+    [Fact]
     public async Task RefreshOnActivationIsDebounced()
     {
         var clock = new FakeUiClock(new DateTimeOffset(2026, 6, 16, 12, 0, 0, TimeSpan.Zero));

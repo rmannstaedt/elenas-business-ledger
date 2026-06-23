@@ -109,31 +109,33 @@ public sealed class UseCaseTests
     }
 
     [Fact]
-    public async Task StartupDashboardNavigationFallsBackToDefaultSchedulesAroundCalendarLessonRange()
+    public async Task StartupDashboardNavigationIncludesAdjacentMonthCalendarLessons()
     {
         var clock = new FakeClock(new DateTimeOffset(2026, 6, 16, 12, 0, 0, TimeSpan.Zero));
         var students = new FakeStudentRepository(
         [
-            CreateStudentRecord("Anna", [new StudentScheduleEntry(DayOfWeek.Tuesday, new TimeOnly(15, 0))]),
-            CreateStudentRecord("Bo", [new StudentScheduleEntry(DayOfWeek.Monday, new TimeOnly(14, 0))])
+            CreateStudentRecord("Anna", []),
+            CreateStudentRecord("Bo", [])
         ]);
         var calendar = new FakeCalendarGateway(
         [
-            new CalendarLesson("bo-1", "Bo", new DateTimeOffset(2026, 6, 8, 14, 0, 0, TimeSpan.Zero))
+            new CalendarLesson("anna-june", "Anna", new DateTimeOffset(2026, 6, 29, 15, 0, 0, TimeSpan.Zero)),
+            new CalendarLesson("bo-july", "Bo", new DateTimeOffset(2026, 7, 6, 14, 0, 0, TimeSpan.Zero))
         ]);
-        var query = new StartupDashboardQuery(students, calendar, new FakeInvoiceRepository(), clock, TimeZoneInfo.Utc);
+        var query = new StartupDashboardQuery(students, calendar, new FakeInvoiceRepository(), clock);
 
-        var result = await query.ExecuteAsync(new DateOnly(2026, 6, 1), "Bo", CancellationToken.None);
+        var result = await query.ExecuteAsync(new DateOnly(2026, 6, 1), "Anna", CancellationToken.None);
 
         Assert.True(result.Succeeded);
-        var entries = result.Value!.StudentNavigationEntries.ToArray();
-        var scheduledIndex = Array.FindIndex(entries, entry => entry.StudentShortName == "Bo" && entry.HasCalendarLesson);
-        Assert.True(scheduledIndex >= 0);
-        Assert.Equal(new DateTimeOffset(2026, 6, 8, 14, 0, 0, TimeSpan.Zero), entries[scheduledIndex].StartsAt);
-        Assert.False(entries[scheduledIndex - 1].HasCalendarLesson);
-        Assert.Equal(new DateTimeOffset(2026, 6, 2, 15, 0, 0, TimeSpan.Zero), entries[scheduledIndex - 1].StartsAt);
-        Assert.False(entries[scheduledIndex + 1].HasCalendarLesson);
-        Assert.Equal(new DateTimeOffset(2026, 6, 9, 15, 0, 0, TimeSpan.Zero), entries[scheduledIndex + 1].StartsAt);
+        Assert.Equal(
+            ["Anna", "Bo"],
+            result.Value!.StudentNavigationEntries.Select(entry => entry.StudentShortName).ToArray());
+        Assert.Equal(
+            [
+                new DateTimeOffset(2026, 6, 29, 15, 0, 0, TimeSpan.Zero),
+                new DateTimeOffset(2026, 7, 6, 14, 0, 0, TimeSpan.Zero)
+            ],
+            result.Value.StudentNavigationEntries.Select(entry => entry.StartsAt).ToArray());
     }
 
     [Fact]

@@ -33,6 +33,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private string[] studentShortNames = [];
     private DashboardStudentNavigationEntry[] studentNavigationEntries = [];
     private int? selectedStudentNavigationIndex;
+    private bool suppressNavigationSelectionOnce;
     private DateOnly displayMonth;
     private bool currentStudentHasSchedule;
     private bool isBusy;
@@ -75,6 +76,12 @@ public sealed class MainWindowViewModel : ViewModelBase
         NextMonthCommand = new AsyncRelayCommand(() => ChangeMonthAsync(1), () => !IsBusy);
         PreviousStudentCommand = new AsyncRelayCommand(() => SelectAdjacentStudentAsync(-1), CanNavigateStudents);
         NextStudentCommand = new AsyncRelayCommand(() => SelectAdjacentStudentAsync(1), CanNavigateStudents);
+        SelectStudentCommand = new AsyncRelayCommand(
+            parameter => SelectStudentFromDropdownAsync((string)parameter!),
+            parameter =>
+                parameter is string shortName &&
+                !IsBusy &&
+                !StringComparer.OrdinalIgnoreCase.Equals(shortName, CurrentStudentShortName));
         ToggleInvoicePaymentStatusCommand = new AsyncRelayCommand(
             parameter => ToggleInvoicePaymentStatusAsync((InvoiceDisplayModel)parameter!),
             parameter => parameter is InvoiceDisplayModel && !IsBusy);
@@ -109,6 +116,8 @@ public sealed class MainWindowViewModel : ViewModelBase
     public ObservableCollection<LessonDisplayModel> Lessons { get; } = [];
 
     public ObservableCollection<InvoiceDisplayModel> Invoices { get; } = [];
+
+    public ObservableCollection<string> SelectableStudentShortNames { get; } = [];
 
     public LessonDisplayModel? SelectedLesson
     {
@@ -171,6 +180,8 @@ public sealed class MainWindowViewModel : ViewModelBase
     public AsyncRelayCommand PreviousStudentCommand { get; }
 
     public AsyncRelayCommand NextStudentCommand { get; }
+
+    public AsyncRelayCommand SelectStudentCommand { get; }
 
     public AsyncRelayCommand ToggleInvoicePaymentStatusCommand { get; }
 
@@ -291,9 +302,21 @@ public sealed class MainWindowViewModel : ViewModelBase
             ? delta > 0 ? 0 : studentNavigationEntries.Length - 1
             : (currentIndex + delta + studentNavigationEntries.Length) % studentNavigationEntries.Length;
 
+        var nextEntry = studentNavigationEntries[nextIndex];
         selectedStudentNavigationIndex = nextIndex;
-        CurrentStudentShortName = studentNavigationEntries[nextIndex].StudentShortName;
+        CurrentStudentShortName = nextEntry.StudentShortName;
+        DisplayMonth = new DateOnly(nextEntry.StartsAt.Year, nextEntry.StartsAt.Month, 1);
         await RefreshAsync();
+    }
+
+    private async Task SelectStudentFromDropdownAsync(string studentShortName)
+    {
+        selectedStudentNavigationIndex = null;
+        suppressNavigationSelectionOnce = true;
+        CurrentStudentShortName = studentShortName;
+        SelectedLesson = null;
+        await RefreshAsync();
+        suppressNavigationSelectionOnce = false;
     }
 
     private async Task ToggleInvoicePaymentStatusAsync(InvoiceDisplayModel invoice)
@@ -646,11 +669,16 @@ public sealed class MainWindowViewModel : ViewModelBase
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Order(StringComparer.OrdinalIgnoreCase)
             .ToArray();
+        RefreshSelectableStudentShortNames();
         studentNavigationEntries = dashboard.StudentNavigationEntries.ToArray();
-        selectedStudentNavigationIndex = ResolveNavigationIndex(
-            selectedStudentNavigationIndex,
-            dashboard.CurrentStudentShortName,
-            selectedLesson);
+        var suppressNavigationSelection = suppressNavigationSelectionOnce;
+        suppressNavigationSelectionOnce = false;
+        selectedStudentNavigationIndex = suppressNavigationSelection
+            ? null
+            : ResolveNavigationIndex(
+                selectedStudentNavigationIndex,
+                dashboard.CurrentStudentShortName,
+                selectedLesson);
 
         var draftLessons = Lessons
             .Where(lesson => lesson.IsDraft)
@@ -670,7 +698,9 @@ public sealed class MainWindowViewModel : ViewModelBase
 
         SortLessonsPreservingSelection(selectedLesson);
 
-        var navigationSelectedLesson = FindSelectedNavigationLesson();
+        var navigationSelectedLesson = suppressNavigationSelection
+            ? null
+            : FindSelectedNavigationLesson();
         if (selectedLesson is { IsDraft: true } && Lessons.Contains(selectedLesson))
         {
             SelectedLesson = selectedLesson;
@@ -679,7 +709,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         {
             SelectedLesson = navigationSelectedLesson;
         }
-        else if (HasSelectedNavigationEntry())
+        else if (!suppressNavigationSelection && HasSelectedNavigationEntry())
         {
             SelectedLesson = null;
         }
@@ -697,6 +727,16 @@ public sealed class MainWindowViewModel : ViewModelBase
         }
 
         RaiseCommandAvailabilityChanged();
+    }
+
+    private void RefreshSelectableStudentShortNames()
+    {
+        SelectableStudentShortNames.Clear();
+        foreach (var shortName in studentShortNames.Where(
+                     shortName => !StringComparer.OrdinalIgnoreCase.Equals(shortName, CurrentStudentShortName)))
+        {
+            SelectableStudentShortNames.Add(shortName);
+        }
     }
 
     private int? ResolveNavigationIndex(
@@ -891,6 +931,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         NextMonthCommand.RaiseCanExecuteChanged();
         PreviousStudentCommand.RaiseCanExecuteChanged();
         NextStudentCommand.RaiseCanExecuteChanged();
+        SelectStudentCommand.RaiseCanExecuteChanged();
         ToggleInvoicePaymentStatusCommand.RaiseCanExecuteChanged();
         OpenCalendarCommand.RaiseCanExecuteChanged();
         WriteInvoiceCommand.RaiseCanExecuteChanged();

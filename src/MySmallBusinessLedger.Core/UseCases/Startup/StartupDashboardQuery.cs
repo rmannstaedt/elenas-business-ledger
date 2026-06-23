@@ -101,41 +101,34 @@ public sealed class StartupDashboardQuery
         IReadOnlyList<CalendarLesson> calendarLessons,
         IReadOnlyList<StudentRecord> students)
     {
-        var from = selectedMonth.WithDay(1);
-        var to = from.AddMonths(1).AddDays(-1);
+        var fallbackFrom = selectedMonth.WithDay(1);
+        var fallbackTo = fallbackFrom.AddMonths(1).AddDays(-1);
+        var navigationFrom = selectedMonth.AddMonths(-1).WithDay(1);
+        var navigationTo = selectedMonth.AddMonths(2).WithDay(1).AddDays(-1);
         var activeStudentShortNames = students
             .Select(student => student.Student.ShortName)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         var scheduledEntries = calendarLessons
             .Where(lesson => activeStudentShortNames.Contains(lesson.StudentShortName))
-            .Where(lesson => IsInDateWindow(lesson.StartsAt, from, to))
+            .Where(lesson => IsInDateWindow(lesson.StartsAt, navigationFrom, navigationTo))
             .Select(lesson => new DashboardStudentNavigationEntry(lesson.StudentShortName, lesson.StartsAt))
             .OrderBy(entry => entry.StartsAt)
             .ThenBy(entry => entry.StudentShortName, StringComparer.OrdinalIgnoreCase)
             .ToArray();
+        if (scheduledEntries.Length > 0)
+        {
+            return scheduledEntries;
+        }
 
         var defaultEntries = students
-            .SelectMany(student => CreateScheduledStarts(student.Schedule, from, to)
+            .SelectMany(student => CreateScheduledStarts(student.Schedule, fallbackFrom, fallbackTo)
                 .Select(startsAt => new DashboardStudentNavigationEntry(
                     student.Student.ShortName,
                     startsAt,
                     HasCalendarLesson: false)))
             .ToArray();
-        if (scheduledEntries.Length == 0)
-        {
-            return OrderNavigationEntries(defaultEntries);
-        }
 
-        var firstScheduledStart = scheduledEntries[0].StartsAt;
-        var lastScheduledStart = scheduledEntries[^1].StartsAt;
-        var scheduledKeys = scheduledEntries
-            .Select(entry => (entry.StudentShortName, entry.StartsAt))
-            .ToHashSet();
-        var fallbackEntries = defaultEntries
-            .Where(entry => entry.StartsAt < firstScheduledStart || entry.StartsAt > lastScheduledStart)
-            .Where(entry => !scheduledKeys.Contains((entry.StudentShortName, entry.StartsAt)));
-
-        return OrderNavigationEntries(scheduledEntries.Concat(fallbackEntries));
+        return OrderNavigationEntries(defaultEntries);
     }
 
     private static IReadOnlyList<DashboardStudentNavigationEntry> OrderNavigationEntries(

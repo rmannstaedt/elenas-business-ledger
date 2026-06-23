@@ -91,6 +91,20 @@ public partial class MainWindow : Window
         CloseOpenLessonTimePanel();
     }
 
+    private void OnStudentDropdownButtonClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { ContextMenu: { } menu } button)
+        {
+            return;
+        }
+
+        CloseOpenLessonDatePanel();
+        CloseOpenLessonTimePanel();
+        menu.PlacementTarget = button;
+        menu.IsOpen = true;
+        e.Handled = true;
+    }
+
     private void OnApplicationDeactivated(object? sender, EventArgs e)
     {
         CloseOpenLessonDatePanel();
