@@ -1,6 +1,7 @@
 using MySmallBusinessLedger.Core.Common;
 using MySmallBusinessLedger.Core.Invoices;
 using MySmallBusinessLedger.Core.Ports;
+using MySmallBusinessLedger.Core.Time;
 
 namespace MySmallBusinessLedger.Core.UseCases.Invoices;
 
@@ -11,19 +12,22 @@ public sealed class IssueInvoiceUseCase
     private readonly IInvoiceFileStore fileStore;
     private readonly IInvoicePdfWriter pdfWriter;
     private readonly IInvoicePrinter printer;
+    private readonly IClock clock;
 
     public IssueInvoiceUseCase(
         ICompanyProfileRepository companyProfileRepository,
         IInvoiceRepository invoiceRepository,
         IInvoiceFileStore fileStore,
         IInvoicePdfWriter pdfWriter,
-        IInvoicePrinter printer)
+        IInvoicePrinter printer,
+        IClock clock)
     {
         this.companyProfileRepository = companyProfileRepository;
         this.invoiceRepository = invoiceRepository;
         this.fileStore = fileStore;
         this.pdfWriter = pdfWriter;
         this.printer = printer;
+        this.clock = clock;
     }
 
     public async Task<OperationResult<IssueInvoiceResult>> ExecuteAsync(
@@ -31,8 +35,14 @@ public sealed class IssueInvoiceUseCase
         CancellationToken cancellationToken)
     {
         var company = await companyProfileRepository.GetAsync(cancellationToken);
-        var invoiceNumber = await invoiceRepository.GetNextInvoiceNumberAsync(cancellationToken);
         var totals = draft.CalculateTotals(company);
+        var reserve = await invoiceRepository.ReserveInvoiceAsync(draft, totals, cancellationToken);
+        if (!reserve.Succeeded)
+        {
+            return OperationResult<IssueInvoiceResult>.Failure(reserve.Errors.ToArray());
+        }
+
+        var invoiceNumber = reserve.Value!.InvoiceNumber;
 
         var stagingPath = await fileStore.CreateStagingPathAsync(draft, invoiceNumber, cancellationToken);
         if (!stagingPath.Succeeded)
@@ -58,16 +68,34 @@ public sealed class IssueInvoiceUseCase
             return OperationResult<IssueInvoiceResult>.Failure(publish.Errors.ToArray());
         }
 
-        var issuedInvoice = draft.Issue(invoiceNumber, totals, publish.Value!);
-        var save = await invoiceRepository.SaveIssuedInvoiceAsync(issuedInvoice, cancellationToken);
-        if (!save.Succeeded)
+        var finalize = await invoiceRepository.FinalizeIssuedInvoiceAsync(
+            invoiceNumber,
+            publish.Value!,
+            cancellationToken);
+        if (!finalize.Succeeded)
         {
-            return OperationResult<IssueInvoiceResult>.Failure(save.Errors.ToArray());
+            return OperationResult<IssueInvoiceResult>.Failure(finalize.Errors.ToArray());
         }
 
-        var print = await printer.PrintAsync(publish.Value!, cancellationToken);
+        var print = await printer.PrintAsync(
+            publish.Value!,
+            company.ConfiguredInvoicePrinterName,
+            cancellationToken);
+        var printStatus = print.Succeeded ? InvoicePrintStatus.Printed : InvoicePrintStatus.PrintFailed;
+        var printStatusUpdate = await invoiceRepository.UpdatePrintStatusAsync(
+            invoiceNumber,
+            printStatus,
+            print.Succeeded ? clock.Now : null,
+            print.Succeeded ? null : print.Errors.FirstOrDefault()?.Message,
+            cancellationToken);
+
+        if (!printStatusUpdate.Succeeded)
+        {
+            return OperationResult<IssueInvoiceResult>.Failure(printStatusUpdate.Errors.ToArray());
+        }
+
         return OperationResult<IssueInvoiceResult>.Success(new IssueInvoiceResult(
-            issuedInvoice,
+            printStatusUpdate.Value!,
             print.Succeeded,
             print.Errors));
     }

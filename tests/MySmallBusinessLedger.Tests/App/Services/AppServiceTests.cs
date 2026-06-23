@@ -103,7 +103,39 @@ public sealed class AppServiceTests
         public Task<OperationResult<IssuedInvoice>> SaveIssuedInvoiceAsync(IssuedInvoice invoice, CancellationToken cancellationToken) =>
             Task.FromResult(OperationResult<IssuedInvoice>.Success(invoice));
 
+        public Task<OperationResult<IssuedInvoice>> ReserveInvoiceAsync(
+            InvoiceDraft draft,
+            InvoiceTotals totals,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(OperationResult<IssuedInvoice>.Success(draft.Issue(
+                new InvoiceNumber(1),
+                totals,
+                pdfFilePath: null,
+                InvoiceIssueStatus.Issuing,
+                InvoicePrintStatus.NotPrinted,
+                printedAt: null,
+                lastPrintError: null)));
+
+        public Task<OperationResult<IssuedInvoice>> FinalizeIssuedInvoiceAsync(
+            InvoiceNumber invoiceNumber,
+            string pdfFilePath,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(OperationResult<IssuedInvoice>.Failure(
+                new ValidationError("Invoice.NotConfigured", "Invoice finalization is not configured.")));
+
+        public Task<OperationResult<IssuedInvoice>> UpdatePrintStatusAsync(
+            InvoiceNumber invoiceNumber,
+            InvoicePrintStatus printStatus,
+            DateTimeOffset? printedAt,
+            string? lastPrintError,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(OperationResult<IssuedInvoice>.Failure(
+                new ValidationError("Invoice.NotConfigured", "Invoice print status is not configured.")));
+
         public Task<IssuedInvoice?> GetIssuedInvoiceAsync(InvoiceNumber invoiceNumber, CancellationToken cancellationToken) =>
+            Task.FromResult<IssuedInvoice?>(null);
+
+        public Task<IssuedInvoice?> GetIssuingInvoiceAsync(InvoiceNumber invoiceNumber, CancellationToken cancellationToken) =>
             Task.FromResult<IssuedInvoice?>(null);
 
         public Task<PaymentStatus> GetPaymentStatusAsync(InvoiceNumber invoiceNumber, CancellationToken cancellationToken) =>

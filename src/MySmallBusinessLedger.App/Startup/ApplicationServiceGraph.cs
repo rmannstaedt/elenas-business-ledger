@@ -113,14 +113,18 @@ internal sealed class ApplicationServiceGraph
             companyProfileRepository,
             invoiceRepository,
             new QuestPdfInvoicePdfWriter(),
-            new SavedPdfPrinter(new ShellPrintProcessLauncher()));
-        var invoiceWorkflowLauncher = new InvoiceWorkflowWindowLauncher(invoiceWorkflowService, systemClock);
+            new SavedPdfPrinter(new ShellPrintProcessLauncher(), new WindowsPrinterCatalog()),
+            systemClock);
         var settingsService = new CoreAppSettingsService(
             companyProfileRepository,
             calendarSettingsRepository,
             appPaths,
             googleOAuthClientConfigurationProvider,
             googleCalendarClientFactory);
+        var invoiceWorkflowLauncher = new InvoiceWorkflowWindowLauncher(
+            invoiceWorkflowService,
+            settingsService,
+            systemClock);
 
         return new ApplicationServiceGraph(
             appPaths,

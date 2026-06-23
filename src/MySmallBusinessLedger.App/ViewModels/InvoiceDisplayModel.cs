@@ -6,6 +6,7 @@ namespace MySmallBusinessLedger.App.ViewModels;
 public sealed class InvoiceDisplayModel : ViewModelBase
 {
     private PaymentStatus paymentStatus;
+    private InvoicePrintStatus printStatus;
 
     public InvoiceDisplayModel(IssuedInvoiceSummary invoice)
     {
@@ -13,7 +14,8 @@ public sealed class InvoiceDisplayModel : ViewModelBase
         StudentShortName = invoice.StudentShortName;
         InvoiceDate = invoice.InvoiceDate;
         paymentStatus = invoice.PaymentStatus;
-        PdfFilePath = invoice.PdfFilePath;
+        printStatus = invoice.PrintStatus;
+        PdfFilePath = invoice.PdfFilePath ?? string.Empty;
     }
 
     public InvoiceNumber InvoiceNumber { get; }
@@ -41,4 +43,11 @@ public sealed class InvoiceDisplayModel : ViewModelBase
     public string InvoiceDateText => InvoiceDate.ToString("dd-MM-yyyy", CultureInfo.InvariantCulture);
 
     public string PaymentStatusText => PaymentStatus == PaymentStatus.Paid ? "Paid" : "Outstanding";
+
+    public string PrintStatusText => printStatus switch
+    {
+        InvoicePrintStatus.Printed => "Printed",
+        InvoicePrintStatus.PrintFailed => "Print failed",
+        _ => "Not printed"
+    };
 }

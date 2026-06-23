@@ -10,7 +10,7 @@ Date: 2026-06-23
 - Runtime composition uses SQLite under `%APPDATA%\visualtech.dk\MySmallBusinessLedger`, Google Calendar through the official API client, QuestPDF invoice generation, staged PDF storage, invoice metadata persistence, and OS print request after PDF save.
 - SQLite schema evolution now uses EF Core migrations. The WPF startup bootstrapper applies pending migrations before repositories are used; the old manual `SqliteSchemaInitializer` has been removed.
 - `App.xaml.cs` now handles WPF lifecycle/error display and delegates database migration, service graph creation, startup jobs, and main-window construction to App-layer startup/bootstrapper classes.
-- `Application > Settings` configures company profile, address plus an unlabeled second address/city line, invoice folder with manual entry or Browse picker, Google calendar/account label, publisher Google sign-in app status, local Google authorization status, and Connect Google Calendar / Forget Google sign-in actions; it also shows read-only app data/database paths. The Google calendar field defaults to `primary`, meaning the signed-in account's main calendar, and its tooltip explains where to find a separate calendar ID.
+- `Application > Settings` configures company profile, address plus an unlabeled second address/city line, invoice folder with manual entry or Browse picker, remembered invoice printer with selector/typed value/Clear action, Google calendar/account label, publisher Google sign-in app status, local Google authorization status, and Connect Google Calendar / Forget Google sign-in actions; it also shows read-only app data/database paths. If no printer is configured when printing/reprinting is attempted, the invoice UI offers to open Settings before continuing. The Google calendar field defaults to `primary`, meaning the signed-in account's main calendar, and its tooltip explains where to find a separate calendar ID.
 - Student editor also uses two stacked address fields; the ViewModel combines them into one multiline student address for existing Core/SQLite/invoice behavior.
 - `Student > Manage Students` is the only Student menu action. It opens a comprehensive overview listing active and inactive students. The selected student pane embeds the Student editor behavior for student fields, Active flag, active-plan assignment, copied plan snapshot, plan start/end dates, and schedule. Edits use explicit Save/Cancel; Add Student creates an in-pane draft. Invoice double-click opens the existing invoice viewer. Selection changes in Manage Students immediately refresh the main window around the selected student, and closing Manage Students applies the final selection again. The old standalone Add/Edit Student window and main-menu entries have been removed. The window and student/invoice grid columns are remembered under the existing app-data placement/width stores.
 - `Plan > Manage Plans` now manages a durable SQLite plan catalog with Draft, Active, and Retired states. Draft plans can be incomplete, edited, deleted, and published; publishing requires all fields except `Retire on`. New Drafts default to blank name/price, one lesson per week, 60 minutes, one student, move/cancel flexibility, `Paid monthly in advance`, first day of the current month, and blank `Retire on`. Active plans are immutable except for name-only rename, `Retire on` scheduling, and retirement; Retired plans are immutable except for name-only rename and can be reactivated. `Add Plan` saves changed Draft fields before creating the next Draft and prompts before discarding/saving an unsaved Active `Retire on` change.
@@ -20,12 +20,14 @@ Date: 2026-06-23
 - The app now uses publisher-owned Google Desktop OAuth configuration from `Configuration\google-oauth-client.json` in the app output. The local source file is `src\MySmallBusinessLedger.App\Configuration\google-oauth-client.json`, ignored by Git; the template is committed beside it.
 - Window placement is stored under `%APPDATA%\visualtech.dk\MySmallBusinessLedger\window-placement.json`; Manage Plans column widths are stored under `%APPDATA%\visualtech.dk\MySmallBusinessLedger\grid-column-widths.json`.
 - Completed/Planned lesson state is manual. Google Calendar keeps the first-line `$` student marker and uses a later `Status: Completed` summary line for completed lessons.
-- Write Invoice opens candidate selection, invoice preview, optional price adjustment, staged issue/save/print, dashboard refresh, and read-only invoice viewer.
+- Write Invoice opens candidate selection, invoice preview, optional price adjustment, invoice reservation, staged PDF verification/publish, issue finalization, print request, dashboard refresh, and read-only invoice viewer. Issued invoices carry `IssueStatus` plus `PrintStatus`; normal invoice lists/view/payment paths show only `Issued` invoices. The invoice viewer can reprint an issued invoice from its stored PDF without creating a new invoice number or changing invoice content.
+- Invoice `Printed` means the configured printer existed and Windows accepted the print request launch without exception. The app does not monitor physical paper output or Windows spooler completion.
 - Documentation refresh on 2026-06-23 corrected the business requirements to describe issued invoice lines as the durable local lesson-invoice record; references to a separate local Lessons table should be treated as stale if found only in historical plan logs.
 
 ## Safety Invariants To Preserve
 
 - Do not mark an invoice issued unless final PDF storage and invoice metadata save succeed.
+- Do not imply physical printing was verified; `Printed` is a successful configured-printer print request launch boundary.
 - Do not silently overwrite an issued invoice PDF.
 - Do not silently edit issued invoices.
 - Invoiced lessons are not editable.
@@ -46,6 +48,8 @@ Date: 2026-06-23
 - Full test suite passed on 2026-06-22 after EF migration and startup bootstrapper extraction: `dotnet test MySmallBusinessLedger.sln -nodeReuse:false` with 181/181 tests passing.
 - Latest focused invoice test run passed: 42 invoice-related tests.
 - Focused OAuth/Settings test run passed: 24 tests.
+- Full build passed on 2026-06-23 after invoice issue/print state implementation: `dotnet build MySmallBusinessLedger.sln -nodeReuse:false` with 0 warnings and 0 errors.
+- Full test suite passed on 2026-06-23 after invoice issue/print state implementation: `dotnet test MySmallBusinessLedger.sln -nodeReuse:false` with 203/203 tests passing.
 - Full build passed on 2026-06-17 after Google calendar settings follow-up: `dotnet build MySmallBusinessLedger.sln -nodeReuse:false` with 0 warnings and 0 errors.
 - Full test suite passed on 2026-06-18 after Plan catalog draft-default/payment-term dropdown follow-up: `dotnet test MySmallBusinessLedger.sln -nodeReuse:false` with 161/161 tests passing.
 - Focused Student overview tests passed on 2026-06-20: `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~StudentOverview|FullyQualifiedName~StudentsCanBeListedIncludingInactiveStudents|FullyQualifiedName~ManageStudentsCommand" -nodeReuse:false` with 7/7 tests passing.
@@ -72,7 +76,8 @@ Date: 2026-06-23
 
 1. Place the real publisher OAuth Desktop JSON at `src\MySmallBusinessLedger.App\Configuration\google-oauth-client.json`.
 2. Complete maintainer pilot setup through `Application > Settings`, then use Connect Google Calendar.
-3. Run the Student overview final user test from `.ai/implementation-plans/active/2026-06-20-student-overview-management.md`.
-4. Run the remaining OAuth/calendar pilot test against a safe Google Calendar/test invoice folder.
-5. Visually review the invoice PDF layout and WPF dialogs; PDF layout polish is intentionally deferred.
-6. Create follow-up plans for broader administration views, multi-period student plan history editing, backup/export, VAT reporting, and invoice layout touch-ups.
+3. Run the invoice finalization manual printer test from `.ai/implementation-plans/active/2026-06-22-invoice-issue-finalization-and-print-status.md` against a safe test invoice folder/printer.
+4. Run the Student overview final user test from `.ai/implementation-plans/active/2026-06-20-student-overview-management.md`.
+5. Run the remaining OAuth/calendar pilot test against a safe Google Calendar/test invoice folder.
+6. Visually review the invoice PDF layout and WPF dialogs; PDF layout polish is intentionally deferred.
+7. Create follow-up plans for broader administration views, multi-period student plan history editing, backup/export, VAT reporting, and invoice layout touch-ups.

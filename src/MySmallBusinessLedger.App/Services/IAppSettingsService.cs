@@ -11,7 +11,8 @@ public sealed record AppSettingsSnapshot(
     string AppDataFolderPath = "",
     string DatabasePath = "",
     string GoogleTokenFolderPath = "",
-    bool HasGoogleAuthorizationTokens = false);
+    bool HasGoogleAuthorizationTokens = false,
+    IReadOnlyList<string>? AvailablePrinterNames = null);
 
 public interface IAppSettingsService
 {

@@ -26,6 +26,10 @@ public interface IInvoiceWorkflowService
         InvoiceDraft draft,
         CancellationToken cancellationToken);
 
+    Task<OperationResult<ReprintInvoiceResult>> ReprintAsync(
+        InvoiceNumber invoiceNumber,
+        CancellationToken cancellationToken);
+
     Task<IssuedInvoice?> GetIssuedInvoiceAsync(
         InvoiceNumber invoiceNumber,
         CancellationToken cancellationToken);

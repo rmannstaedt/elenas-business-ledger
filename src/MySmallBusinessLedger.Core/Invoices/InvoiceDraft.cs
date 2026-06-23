@@ -80,7 +80,14 @@ public sealed class InvoiceDraft
         return new InvoiceTotals(totalWithoutVat, vat, totalWithoutVat + vat);
     }
 
-    public IssuedInvoice Issue(InvoiceNumber invoiceNumber, InvoiceTotals totals, string pdfFilePath)
+    public IssuedInvoice Issue(
+        InvoiceNumber invoiceNumber,
+        InvoiceTotals totals,
+        string? pdfFilePath,
+        InvoiceIssueStatus issueStatus = InvoiceIssueStatus.Issued,
+        InvoicePrintStatus printStatus = InvoicePrintStatus.NotPrinted,
+        DateTimeOffset? printedAt = null,
+        string? lastPrintError = null)
     {
         var issuedLines = Lines
             .Select(line => new IssuedInvoiceLine(
@@ -97,6 +104,10 @@ public sealed class InvoiceDraft
             Student,
             new ReadOnlyCollection<IssuedInvoiceLine>(issuedLines),
             totals,
-            pdfFilePath);
+            pdfFilePath,
+            issueStatus,
+            printStatus,
+            printedAt,
+            lastPrintError);
     }
 }

@@ -2,6 +2,7 @@ using System.IO;
 using MySmallBusinessLedger.Core.Common;
 using MySmallBusinessLedger.Core.Company;
 using MySmallBusinessLedger.Core.Ports;
+using MySmallBusinessLedger.Infrastructure.Invoices.Printing;
 using MySmallBusinessLedger.Infrastructure.Persistence;
 
 namespace MySmallBusinessLedger.App.Services;
@@ -13,6 +14,7 @@ public sealed class CoreAppSettingsService : IAppSettingsService
     private readonly AppPaths appPaths;
     private readonly GoogleOAuthClientConfigurationProvider googleOAuthClientConfigurationProvider;
     private readonly GoogleCalendarClientFactory? googleCalendarClientFactory;
+    private readonly IPrinterCatalog printerCatalog;
 
     public CoreAppSettingsService(
         ICompanyProfileRepository companyProfileRepository,
@@ -23,7 +25,8 @@ public sealed class CoreAppSettingsService : IAppSettingsService
             calendarSettingsRepository,
             AppPaths.FromAppDataFolder(appDataPath),
             new GoogleOAuthClientConfigurationProvider(GoogleOAuthClientConfigurationProvider.CreateDefaultConfigurationPath()),
-            googleCalendarClientFactory: null)
+            googleCalendarClientFactory: null,
+            printerCatalog: new WindowsPrinterCatalog())
     {
     }
 
@@ -32,13 +35,15 @@ public sealed class CoreAppSettingsService : IAppSettingsService
         SqliteCalendarSettingsRepository calendarSettingsRepository,
         AppPaths appPaths,
         GoogleOAuthClientConfigurationProvider googleOAuthClientConfigurationProvider,
-        GoogleCalendarClientFactory? googleCalendarClientFactory = null)
+        GoogleCalendarClientFactory? googleCalendarClientFactory = null,
+        IPrinterCatalog? printerCatalog = null)
     {
         this.companyProfileRepository = companyProfileRepository;
         this.calendarSettingsRepository = calendarSettingsRepository;
         this.appPaths = appPaths;
         this.googleOAuthClientConfigurationProvider = googleOAuthClientConfigurationProvider;
         this.googleCalendarClientFactory = googleCalendarClientFactory;
+        this.printerCatalog = printerCatalog ?? new WindowsPrinterCatalog();
     }
 
     public async Task<AppSettingsSnapshot> LoadAsync(CancellationToken cancellationToken)
@@ -54,7 +59,8 @@ public sealed class CoreAppSettingsService : IAppSettingsService
         }
 
         var calendarSettings = await calendarSettingsRepository.GetAsync(cancellationToken);
-        return CreateSnapshot(companyProfile, calendarSettings);
+        var printerNames = await LoadPrinterNamesAsync(cancellationToken);
+        return CreateSnapshot(companyProfile, calendarSettings, printerNames);
     }
 
     public async Task<OperationResult<AppSettingsSnapshot>> SaveAsync(
@@ -144,7 +150,8 @@ public sealed class CoreAppSettingsService : IAppSettingsService
 
     private AppSettingsSnapshot CreateSnapshot(
         CompanyProfile? companyProfile,
-        CalendarSettings? calendarSettings) =>
+        CalendarSettings? calendarSettings,
+        IReadOnlyList<string>? availablePrinterNames = null) =>
         new(
             companyProfile,
             calendarSettings,
@@ -152,7 +159,20 @@ public sealed class CoreAppSettingsService : IAppSettingsService
             appPaths.AppDataFolderPath,
             appPaths.DatabasePath,
             appPaths.GoogleTokenFolderPath,
-            HasGoogleAuthorizationTokens());
+            HasGoogleAuthorizationTokens(),
+            availablePrinterNames ?? []);
+
+    private async Task<IReadOnlyList<string>> LoadPrinterNamesAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await printerCatalog.ListPrinterNamesAsync(cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return [];
+        }
+    }
 
     private bool HasGoogleAuthorizationTokens()
     {

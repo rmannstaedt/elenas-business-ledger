@@ -34,7 +34,8 @@ Student plan periods: stored with a required catalog plan identity plus copied c
 Issued invoice lines: stored with catalog plan identity for lineage plus issued-time plan name and price snapshots for durable invoice display/PDF output; old invoice display must use the stored invoice snapshot, not current catalog names or derived rename history
 Invoice PDFs: stored as files, not BLOBs
 Invoice PDF generation: QuestPDF
-Invoice PDF safety: write to staging, verify PDF bytes, publish without overwriting, then persist invoice metadata and request print
+Invoice PDF safety: reserve invoice metadata as `Issuing`, write to staging, verify PDF bytes, publish without overwriting, finalize the invoice as `Issued`, then request print
+Invoice printer: configured from `Application > Settings`, stored in SQLite company profile data, selectable from installed Windows printers when enumeration is available, typeable, changeable, and clearable; if missing during first invoice print/reprint, the app offers to open Settings before continuing; `Printed` means the configured printer existed and the Windows print request was launched without exception, not that physical output or spooler completion was verified
 Google Calendar account tokens: stored locally with Windows user data protection, never in SQLite or plaintext config
 Google Calendar selected calendar/account label: stored in SQLite app settings; the main-window browser launcher uses the configured account email as a Google Calendar account hint
 Runtime app data folder: `%APPDATA%\visualtech.dk\MySmallBusinessLedger`
@@ -61,7 +62,7 @@ WPF + MVVM
 No business logic in code-behind
 Danish user-facing invoice text
 My-facing UI must stay simple
-Company profile, two-line company address entry, invoice folder with typed or folder-picker selection, Google calendar/account label, Google sign-in app status, local Google authorization status, connect/reconnect controls, and read-only app data/database paths are configured or shown from `Application > Settings`; the Google calendar defaults to `primary`
+Company profile, two-line company address entry, invoice folder with typed or folder-picker selection, invoice printer with remembered selector/typed value/clear action, Google calendar/account label, Google sign-in app status, local Google authorization status, connect/reconnect controls, and read-only app data/database paths are configured or shown from `Application > Settings`; the Google calendar defaults to `primary`
 Student editor uses two stacked address fields and stores them as one multiline student address value.
 Student management is available from `Student > Manage Students`; it lists active and inactive students, embeds the Student editor for selected-student fields/current assigned plan/plan assignment/schedule, keeps explicit Save/Cancel, opens invoices on double-click through the existing viewer, mirrors student selection into the main window immediately and on close, and persists `Student.IsActive` changes only when the embedded editor is saved.
 Plans are managed from `Plan > Manage Plans`; new Draft plans start with blank name/price, default lesson/duration/student/flexibility values, payment terms selected from `Paid monthly in advance` or `Paid per lesson`, and an effective date set to the first day of the current month. `Add Plan` saves changed Draft data before creating the next Draft, and changed Active `Retire on` values are prompted before adding. Active and Retired plan names may be renamed through a name-only save action; the rename is stored in plan-name history and does not unlock commercial fields. The student editor offers only publish-complete Active catalog plans, stores the selected plan identity, and copies the selected plan's commercial terms into the student's plan period. The Manage Plans window remembers its size/position and list column widths.
@@ -84,6 +85,7 @@ Use fake Google Calendar client for calendar integration tests
 ## Hard requirements
 
 - Do not mark invoice issued unless PDF storage succeeds.
+- Do not mark invoice printed unless the configured printer exists and the Windows print request launches without exception; do not imply physical output or spooler completion has been verified.
 - Do not silently overwrite an existing issued invoice PDF.
 - Do not silently edit issued invoices.
 - Do not derive old invoice display text from current plan catalog names or rename history; issued invoice snapshots are authoritative for invoice text.

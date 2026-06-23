@@ -166,13 +166,14 @@ The following must remain unchanged unless this plan explicitly says otherwise:
   - Alternatives: keep shell-based printing and mark success only when launch succeeds; use a third-party PDF/printing package; skip completion monitoring and use `PrintFailed` only for preflight/launch failures.
   - Why it matters: this controls how honest `PrintStatus.Printed` can be.
   - Exact answer needed: implementation discovery should identify the API and document the exact success boundary before coding the printer adapter.
+  - Implementation discovery: Stage 3 currently uses Windows spooler enumeration through `winspool.drv` to list and validate installed printers, then uses shell `printto` to send the PDF to the configured printer. The current success boundary is "configured printer exists and the print request was launched without an exception"; it does not yet monitor the Windows spooler job to completion.
 
 ## Staged Implementation Plan
 
 ### Stage 1: Core Invoice State Contract
 
 Type: implementation/test
-Status: Not started
+Status: Complete
 
 Goal:
 
@@ -241,7 +242,7 @@ Runner may continue automatically after this stage: yes.
 ### Stage 2: SQLite Persistence And Recovery
 
 Type: implementation/test
-Status: Not started
+Status: Complete
 
 Goal:
 
@@ -316,7 +317,7 @@ Runner may continue automatically after this stage: yes.
 ### Stage 3: Printer Configuration And Infrastructure Adapter
 
 Type: implementation/test
-Status: Not started
+Status: Complete
 
 Goal:
 
@@ -388,7 +389,7 @@ Runner may continue automatically after this stage: no. Blocking action required
 ### Stage 4: UI Workflow And Reprint
 
 Type: implementation/test
-Status: Not started
+Status: Complete
 
 Goal:
 
@@ -463,7 +464,7 @@ Runner may continue automatically after this stage: yes.
 ### Stage 5: Recovery Scenario Verification And Documentation Refresh
 
 Type: verification/documentation/review
-Status: Not started
+Status: Implemented; awaiting user manual printer/invoice test
 
 Goal:
 
@@ -609,3 +610,48 @@ Cleanup/reset instructions:
   - Results: Ready for implementation after user approval.
   - Deviations: None.
   - Risks/open questions: Printer completion semantics must be confirmed during implementation discovery before final UI wording.
+- 2026-06-23:
+  - Stage: Stage 1 - Core invoice state contract
+  - Files changed: `src/MySmallBusinessLedger.Core/Invoices/InvoiceIssueStatus.cs`, `src/MySmallBusinessLedger.Core/Invoices/InvoicePrintStatus.cs`, `src/MySmallBusinessLedger.Core/Invoices/IssuedInvoice.cs`, `src/MySmallBusinessLedger.Core/Invoices/IssuedInvoiceSummary.cs`, `src/MySmallBusinessLedger.Core/Invoices/InvoiceDraft.cs`, `src/MySmallBusinessLedger.Core/Ports/IInvoiceRepository.cs`, `src/MySmallBusinessLedger.Core/UseCases/Invoices/IssueInvoiceUseCase.cs`, `src/MySmallBusinessLedger.App/Services/CoreInvoiceWorkflowService.cs`, `src/MySmallBusinessLedger.App/Startup/ApplicationServiceGraph.cs`, `src/MySmallBusinessLedger.App/ViewModels/InvoiceDisplayModel.cs`, `src/MySmallBusinessLedger.App/ViewModels/InvoiceViewerViewModel.cs`, `src/MySmallBusinessLedger.Infrastructure/Persistence/SqliteInvoiceRepository.cs`, `tests/MySmallBusinessLedger.Tests/Core/UseCases/UseCaseTests.cs`, and `tests/MySmallBusinessLedger.Tests/App/Services/AppServiceTests.cs`
+  - Summary: Added typed invoice issue and print states, extended invoice models/summaries with compact print fields, changed `IssueInvoiceUseCase` to reserve before PDF work, finalize only after publish, then update print status after print/reprint outcome. Transitional SQLite methods compile against the existing schema until Stage 2 adds durable columns.
+  - Tests/verification run: `dotnet test MySmallBusinessLedger.sln --filter IssueInvoice -nodeReuse:false`.
+  - Results: Passed 3/3 focused tests.
+  - Deviations: Kept legacy `GetNextInvoiceNumberAsync` and `SaveIssuedInvoiceAsync` methods temporarily for existing tests/callers; Stage 2 will migrate persistence tests and can remove or de-emphasize legacy paths after durable reservation/finalization is implemented.
+  - Risks/open questions: Printer completion semantics remain the Stage 3 decision gate.
+  - Next recommended stage: Stage 2 - SQLite Persistence And Recovery.
+- 2026-06-23:
+  - Stage: Stage 2 - SQLite persistence and recovery
+  - Files changed: `src/MySmallBusinessLedger.Core/Company/CompanyProfile.cs`, `src/MySmallBusinessLedger.Core/Ports/IInvoiceRepository.cs`, `src/MySmallBusinessLedger.Infrastructure/Persistence/Entities.cs`, `src/MySmallBusinessLedger.Infrastructure/Persistence/LedgerDbContext.cs`, `src/MySmallBusinessLedger.Infrastructure/Persistence/SqliteCompanyProfileRepository.cs`, `src/MySmallBusinessLedger.Infrastructure/Persistence/SqliteInvoiceRepository.cs`, `src/MySmallBusinessLedger.Infrastructure/Persistence/Migrations/20260623085927_AddInvoiceIssuePrintState.cs`, `src/MySmallBusinessLedger.Infrastructure/Persistence/Migrations/20260623085927_AddInvoiceIssuePrintState.Designer.cs`, `src/MySmallBusinessLedger.Infrastructure/Persistence/Migrations/LedgerDbContextModelSnapshot.cs`, `tests/MySmallBusinessLedger.Tests/Infrastructure/Persistence/SqlitePersistenceTests.cs`, `tests/MySmallBusinessLedger.Tests/Core/UseCases/UseCaseTests.cs`, and `tests/MySmallBusinessLedger.Tests/App/Services/AppServiceTests.cs`
+  - Summary: Added durable SQLite fields for invoice issue status, print status, printed timestamp, last print error, and configured invoice printer name. Normal invoice list/view/payment queries now filter to `Issued`; `GetIssuingInvoiceAsync` provides a deliberate recovery path for reserved rows. Existing baseline invoice rows migrate to `Issued` and `NotPrinted`.
+  - Tests/verification run: `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter SqlitePersistence -nodeReuse:false`.
+  - Results: Passed 17/17 focused SQLite persistence tests.
+  - Deviations: Updated the previous baseline compatibility test to migrate from the prior baseline migration rather than `EnsureCreated` with the current model, because the latter creates the new columns before migrations run and is not the real old-to-new compatibility path.
+  - Risks/open questions: Printer completion semantics remain unresolved and block Stage 3 implementation.
+  - Next recommended stage: Stage 3 - Printer Configuration And Infrastructure Adapter after the Windows printer API/status boundary is confirmed.
+- 2026-06-23:
+  - Stage: Stage 3 - Printer configuration and infrastructure adapter
+  - Files changed: `src/MySmallBusinessLedger.Core/Ports/IInvoicePrinter.cs`, `src/MySmallBusinessLedger.Core/UseCases/Invoices/IssueInvoiceUseCase.cs`, `src/MySmallBusinessLedger.Infrastructure/Invoices/Printing/IPrintProcessLauncher.cs`, `src/MySmallBusinessLedger.Infrastructure/Invoices/Printing/IPrinterCatalog.cs`, `src/MySmallBusinessLedger.Infrastructure/Invoices/Printing/SavedPdfPrinter.cs`, `src/MySmallBusinessLedger.Infrastructure/Invoices/Printing/ShellPrintProcessLauncher.cs`, `src/MySmallBusinessLedger.Infrastructure/Invoices/Printing/WindowsPrinterCatalog.cs`, `src/MySmallBusinessLedger.App/Services/IAppSettingsService.cs`, `src/MySmallBusinessLedger.App/Services/CoreAppSettingsService.cs`, `src/MySmallBusinessLedger.App/Startup/ApplicationServiceGraph.cs`, `src/MySmallBusinessLedger.App/ViewModels/SettingsViewModel.cs`, `src/MySmallBusinessLedger.App/Views/SettingsView.xaml`, `tests/MySmallBusinessLedger.Tests/Infrastructure/Invoices/InvoiceInfrastructureTests.cs`, `tests/MySmallBusinessLedger.Tests/Core/UseCases/UseCaseTests.cs`, and `tests/MySmallBusinessLedger.Tests/App/ViewModels/SettingsViewModelTests.cs`
+  - Summary: Added configured-printer flow through company settings, Settings ViewModel/UI support for selecting, typing, remembering, and clearing the invoice printer, Windows installed-printer enumeration via `winspool.drv`, and `printto` launch against the configured printer. Invoice issuing now passes the remembered printer name to the printer port.
+  - Tests/verification run: `dotnet test MySmallBusinessLedger.sln --filter "Printer|SettingsViewModel|IssueInvoice" -nodeReuse:false`.
+  - Results: Passed 24/24 focused tests.
+  - Deviations: The current printer adapter validates that the configured printer exists and that the print request launches, but it does not yet monitor the Windows spooler job through completion. This is weaker than the original "Windows reported the job completed" wording.
+  - Risks/open questions: Resolved by user decision on 2026-06-23: option 1 is sufficient. `Printed` means the configured printer existed and Windows accepted the launch request without exception; the app does not monitor physical output or spooler completion.
+  - Next recommended stage: Stage 4 - UI Workflow And Reprint.
+- 2026-06-23:
+  - Stage: Stage 4 - UI workflow and reprint
+  - Files changed: `src/MySmallBusinessLedger.Core/UseCases/Invoices/ReprintIssuedInvoiceUseCase.cs`, `src/MySmallBusinessLedger.Core/UseCases/Invoices/ReprintInvoiceResult.cs`, `src/MySmallBusinessLedger.App/Services/IInvoiceWorkflowService.cs`, `src/MySmallBusinessLedger.App/Services/CoreInvoiceWorkflowService.cs`, `src/MySmallBusinessLedger.App/Services/InvoiceWorkflowWindowLauncher.cs`, `src/MySmallBusinessLedger.App/ViewModels/InvoiceViewerViewModel.cs`, `src/MySmallBusinessLedger.App/ViewModels/InvoiceDisplayModel.cs`, `src/MySmallBusinessLedger.App/Views/InvoiceViewerView.xaml`, `src/MySmallBusinessLedger.App/MainWindow.xaml`, `src/MySmallBusinessLedger.App/Views/StudentOverviewView.xaml`, `tests/MySmallBusinessLedger.Tests/Core/UseCases/UseCaseTests.cs`, and `tests/MySmallBusinessLedger.Tests/App/ViewModels/InvoiceViewModelTests.cs`
+  - Summary: Added a reprint use case that loads an already issued invoice, prints only its stored PDF path through the remembered printer, and updates only print status/error fields. The invoice viewer now shows print status and last print error, offers a reprint command for invoices with published PDFs, and refreshes print state after reprint. Main and Manage Students invoice lists now show compact print status.
+  - Tests/verification run: `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter ReprintIssuedInvoice -nodeReuse:false`; `dotnet test MySmallBusinessLedger.sln --filter InvoiceViewModel -nodeReuse:false`; `dotnet test MySmallBusinessLedger.sln --filter MainWindowViewModel -nodeReuse:false`; `dotnet test MySmallBusinessLedger.sln --filter StudentOverviewViewModel -nodeReuse:false`.
+  - Results: Reprint focused tests passed 2/2; InvoiceViewModel passed 9/9; MainWindowViewModel passed 26/26; StudentOverviewViewModel passed 13/13.
+  - Deviations: Reprint command availability is based on an existing published PDF and active workflow service; configured printer availability is validated by the printer adapter when the command runs so the UI reports current printer errors truthfully.
+  - Risks/open questions: UI wording intentionally says "Print request sent" in the invoice viewer to avoid implying verified physical output.
+  - Next recommended stage: Stage 5 - Recovery Scenario Verification And Documentation Refresh.
+- 2026-06-23:
+  - Stage: Stage 5 - Recovery scenario verification and documentation refresh
+  - Files changed: `README.md`, `.ai/project-profile.md`, `docs/business-requirements-and-logic.md`, `.ai/context/HANDOFF.md`, `.ai/implementation-plans/active/2026-06-22-invoice-issue-finalization-and-print-status.md`, `src/MySmallBusinessLedger.App/ViewModels/InvoicePreviewViewModel.cs`, `src/MySmallBusinessLedger.App/ViewModels/InvoiceViewerViewModel.cs`, `src/MySmallBusinessLedger.App/Services/InvoiceWorkflowWindowLauncher.cs`, `src/MySmallBusinessLedger.App/Startup/ApplicationServiceGraph.cs`, `src/MySmallBusinessLedger.Infrastructure/Invoices/Printing/ShellPrintProcessLauncher.cs`, and `tests/MySmallBusinessLedger.Tests/App/ViewModels/InvoiceViewModelTests.cs`
+  - Summary: Refreshed durable docs/context for invoice issue reservation/finalization, remembered printer selection, first-print Settings prompt, reprint behavior, and the launch-success meaning of `Printed`. Focused code/UI review found and fixed two gaps: first print now offers Settings when no printer is configured, and shell print launch now treats `Process.Start` returning `null` as failure.
+  - Tests/verification run: `dotnet test MySmallBusinessLedger.sln --filter InvoiceViewModel -nodeReuse:false`; `dotnet build MySmallBusinessLedger.sln -nodeReuse:false`; `dotnet test MySmallBusinessLedger.sln -nodeReuse:false`.
+  - Results: InvoiceViewModel passed 11/11; full build passed with 0 warnings and 0 errors; full test suite passed 203/203.
+  - Deviations: Recovery is verified at repository/query level for reserved `Issuing` rows and normal issued-only list/view/payment paths; no separate automated reconciliation worker/UI exists yet for final-PDF/database disagreement beyond the planned `GetIssuingInvoiceAsync` recovery seam.
+  - Risks/open questions: Manual WPF printer/invoice smoke test is still required before moving this plan to completed.
+  - Next recommended stage: User manual printer/invoice test, then move this plan to completed if the smoke test passes.

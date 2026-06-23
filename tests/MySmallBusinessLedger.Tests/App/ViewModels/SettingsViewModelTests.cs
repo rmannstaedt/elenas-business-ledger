@@ -73,6 +73,34 @@ public sealed class SettingsViewModelTests
     }
 
     [Fact]
+    public async Task LoadsRememberedInvoicePrinterAndAvailablePrinterNames()
+    {
+        var service = new FakeAppSettingsService
+        {
+            Snapshot = new AppSettingsSnapshot(
+                CompanyProfile.Create(
+                    "Maple Key Studio",
+                    "Musikvej 1",
+                    "12345678",
+                    "elena@example.test",
+                    null,
+                    null,
+                    VatStatus.NotRegistered,
+                    @"C:\Invoices",
+                    configuredInvoicePrinterName: "Office Printer"),
+                null,
+                GoogleOAuthClientConfigurationStatus.Ready,
+                AvailablePrinterNames: ["Office Printer", "PDF Writer"])
+        };
+        var viewModel = new SettingsViewModel(service);
+
+        await viewModel.LoadAsync();
+
+        Assert.Equal("Office Printer", viewModel.ConfiguredInvoicePrinterName);
+        Assert.Equal(["Office Printer", "PDF Writer"], viewModel.AvailableInvoicePrinters);
+    }
+
+    [Fact]
     public async Task LoadSplitsSavedMultilineCompanyAddressAcrossAddressFields()
     {
         var service = new FakeAppSettingsService
@@ -185,6 +213,41 @@ public sealed class SettingsViewModelTests
         Assert.Equal(new DateOnly(2026, 7, 1), service.SavedProfile.VatRegistrationDate);
         Assert.Equal(new CalendarSettings("primary", "studio@example.test"), service.SavedCalendarSettings);
         Assert.True(viewModel.WasSaved);
+    }
+
+    [Fact]
+    public async Task SavePersistsConfiguredInvoicePrinter()
+    {
+        var service = new FakeAppSettingsService();
+        var viewModel = new SettingsViewModel(service)
+        {
+            CompanyName = "Maple Key Studio",
+            CompanyAddress = "Musikvej 1",
+            CompanyPhone = "12345678",
+            CompanyEmail = "elena@example.test",
+            InvoiceFolderPath = @"C:\Invoices",
+            ConfiguredInvoicePrinterName = "Office Printer",
+            CalendarId = "primary",
+            GoogleAccountEmail = "studio@example.test"
+        };
+
+        await viewModel.SaveCommand.ExecuteAsync();
+
+        Assert.NotNull(service.SavedProfile);
+        Assert.Equal("Office Printer", service.SavedProfile.ConfiguredInvoicePrinterName);
+    }
+
+    [Fact]
+    public async Task ClearInvoicePrinterCommandClearsRememberedPrinter()
+    {
+        var viewModel = new SettingsViewModel(new FakeAppSettingsService())
+        {
+            ConfiguredInvoicePrinterName = "Office Printer"
+        };
+
+        await viewModel.ClearInvoicePrinterCommand.ExecuteAsync();
+
+        Assert.Equal(string.Empty, viewModel.ConfiguredInvoicePrinterName);
     }
 
     [Fact]

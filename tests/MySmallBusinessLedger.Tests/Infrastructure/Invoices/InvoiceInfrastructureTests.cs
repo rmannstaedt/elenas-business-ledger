@@ -97,9 +97,9 @@ public sealed class InvoiceInfrastructureTests
     public async Task PrinterDoesNotPrintMissingPdf()
     {
         var launcher = new FakePrintProcessLauncher();
-        var printer = new SavedPdfPrinter(launcher);
+        var printer = new SavedPdfPrinter(launcher, new FakePrinterCatalog(["Office Printer"]));
 
-        var result = await printer.PrintAsync("C:\\missing\\invoice.pdf", CancellationToken.None);
+        var result = await printer.PrintAsync("C:\\missing\\invoice.pdf", "Office Printer", CancellationToken.None);
 
         Assert.False(result.Succeeded);
         Assert.Contains(result.Errors, error => error.Code == "InvoicePrinter.PdfMissing");
@@ -113,12 +113,45 @@ public sealed class InvoiceInfrastructureTests
         var path = Path.Combine(folder.Path, "invoice.pdf");
         await File.WriteAllBytesAsync(path, "%PDF-1.7\ncontent"u8.ToArray(), TestContext.Current.CancellationToken);
         var launcher = new FakePrintProcessLauncher();
-        var printer = new SavedPdfPrinter(launcher);
+        var printer = new SavedPdfPrinter(launcher, new FakePrinterCatalog(["Office Printer"]));
 
-        var result = await printer.PrintAsync(path, CancellationToken.None);
+        var result = await printer.PrintAsync(path, "Office Printer", CancellationToken.None);
 
         Assert.True(result.Succeeded);
         Assert.Equal(path, launcher.PrintedPath);
+        Assert.Equal("Office Printer", launcher.PrinterName);
+    }
+
+    [Fact]
+    public async Task PrinterFailsWhenNoPrinterIsConfigured()
+    {
+        using var folder = TestInvoiceFolder.Create();
+        var path = Path.Combine(folder.Path, "invoice.pdf");
+        await File.WriteAllBytesAsync(path, "%PDF-1.7\ncontent"u8.ToArray(), TestContext.Current.CancellationToken);
+        var launcher = new FakePrintProcessLauncher();
+        var printer = new SavedPdfPrinter(launcher, new FakePrinterCatalog(["Office Printer"]));
+
+        var result = await printer.PrintAsync(path, "", CancellationToken.None);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Errors, error => error.Code == "InvoicePrinter.NotConfigured");
+        Assert.False(launcher.WasCalled);
+    }
+
+    [Fact]
+    public async Task PrinterFailsWhenConfiguredPrinterIsUnavailable()
+    {
+        using var folder = TestInvoiceFolder.Create();
+        var path = Path.Combine(folder.Path, "invoice.pdf");
+        await File.WriteAllBytesAsync(path, "%PDF-1.7\ncontent"u8.ToArray(), TestContext.Current.CancellationToken);
+        var launcher = new FakePrintProcessLauncher();
+        var printer = new SavedPdfPrinter(launcher, new FakePrinterCatalog(["Office Printer"]));
+
+        var result = await printer.PrintAsync(path, "New Printer", CancellationToken.None);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Errors, error => error.Code == "InvoicePrinter.Unavailable");
+        Assert.False(launcher.WasCalled);
     }
 
     private static InvoiceDraft CreateDraft(
@@ -144,12 +177,21 @@ public sealed class InvoiceInfrastructureTests
 
         public string? PrintedPath { get; private set; }
 
-        public Task PrintAsync(string pdfFilePath, CancellationToken cancellationToken)
+        public string? PrinterName { get; private set; }
+
+        public Task PrintAsync(string pdfFilePath, string printerName, CancellationToken cancellationToken)
         {
             WasCalled = true;
             PrintedPath = pdfFilePath;
+            PrinterName = printerName;
             return Task.CompletedTask;
         }
+    }
+
+    private sealed class FakePrinterCatalog(IReadOnlyList<string> printerNames) : IPrinterCatalog
+    {
+        public Task<IReadOnlyList<string>> ListPrinterNamesAsync(CancellationToken cancellationToken) =>
+            Task.FromResult(printerNames);
     }
 
     private sealed class TestInvoiceFolder : IDisposable

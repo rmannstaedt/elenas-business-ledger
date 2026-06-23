@@ -9,7 +9,11 @@ public sealed class IssuedInvoice
         StudentSnapshot student,
         IReadOnlyList<IssuedInvoiceLine> lines,
         InvoiceTotals totals,
-        string pdfFilePath)
+        string? pdfFilePath,
+        InvoiceIssueStatus issueStatus = InvoiceIssueStatus.Issued,
+        InvoicePrintStatus printStatus = InvoicePrintStatus.NotPrinted,
+        DateTimeOffset? printedAt = null,
+        string? lastPrintError = null)
     {
         InvoiceNumber = invoiceNumber;
         InvoiceDate = invoiceDate;
@@ -18,6 +22,10 @@ public sealed class IssuedInvoice
         Lines = lines;
         Totals = totals;
         PdfFilePath = pdfFilePath;
+        IssueStatus = issueStatus;
+        PrintStatus = printStatus;
+        PrintedAt = printedAt;
+        LastPrintError = lastPrintError;
     }
 
     public InvoiceNumber InvoiceNumber { get; }
@@ -32,5 +40,13 @@ public sealed class IssuedInvoice
 
     public InvoiceTotals Totals { get; }
 
-    public string PdfFilePath { get; }
+    public string? PdfFilePath { get; }
+
+    public InvoiceIssueStatus IssueStatus { get; }
+
+    public InvoicePrintStatus PrintStatus { get; }
+
+    public DateTimeOffset? PrintedAt { get; }
+
+    public string? LastPrintError { get; }
 }

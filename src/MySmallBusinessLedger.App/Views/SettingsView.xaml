@@ -89,6 +89,23 @@
                                 MinWidth="78"
                                 Height="24" />
                     </Grid>
+                    <TextBlock Text="Invoice printer" />
+                    <Grid Margin="0,3,0,8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="8" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <ComboBox Grid.Column="0"
+                                  IsEditable="True"
+                                  ItemsSource="{Binding AvailableInvoicePrinters}"
+                                  Text="{Binding ConfiguredInvoicePrinterName, UpdateSourceTrigger=PropertyChanged}" />
+                        <Button Grid.Column="2"
+                                Content="Clear"
+                                Command="{Binding ClearInvoicePrinterCommand}"
+                                MinWidth="64"
+                                Height="24" />
+                    </Grid>
                 </StackPanel>
 
                 <StackPanel Grid.Column="2">

@@ -11,6 +11,7 @@ namespace MySmallBusinessLedger.App.ViewModels;
 public sealed class InvoicePreviewViewModel : ViewModelBase
 {
     private readonly IInvoiceWorkflowService invoiceWorkflowService;
+    private readonly Func<CancellationToken, Task<bool>>? ensureInvoicePrinterConfiguredAsync;
     private readonly InvoicePreviewResult preview;
     private string priceAdjustmentAmountText = string.Empty;
     private string priceAdjustmentReason = string.Empty;
@@ -18,9 +19,13 @@ public sealed class InvoicePreviewViewModel : ViewModelBase
     private string? errorMessage;
     private bool isBusy;
 
-    public InvoicePreviewViewModel(IInvoiceWorkflowService invoiceWorkflowService, InvoicePreviewResult preview)
+    public InvoicePreviewViewModel(
+        IInvoiceWorkflowService invoiceWorkflowService,
+        InvoicePreviewResult preview,
+        Func<CancellationToken, Task<bool>>? ensureInvoicePrinterConfiguredAsync = null)
     {
         this.invoiceWorkflowService = invoiceWorkflowService;
+        this.ensureInvoicePrinterConfiguredAsync = ensureInvoicePrinterConfiguredAsync;
         this.preview = preview;
         totals = preview.Totals;
 
@@ -136,6 +141,13 @@ public sealed class InvoicePreviewViewModel : ViewModelBase
             var draft = BuildDraft(showErrors: true);
             if (draft is null)
             {
+                return;
+            }
+
+            if (ensureInvoicePrinterConfiguredAsync is not null &&
+                !await ensureInvoicePrinterConfiguredAsync(CancellationToken.None))
+            {
+                ErrorMessage = "Choose an invoice printer before printing the invoice.";
                 return;
             }
 

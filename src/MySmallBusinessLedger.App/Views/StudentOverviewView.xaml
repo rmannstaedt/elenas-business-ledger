@@ -319,6 +319,9 @@
                         <DataGridTextColumn Header="Date"
                                             Binding="{Binding InvoiceDateText}"
                                             Width="95" />
+                        <DataGridTextColumn Header="Print"
+                                            Binding="{Binding PrintStatusText}"
+                                            Width="90" />
                         <DataGridTextColumn Header="Status"
                                             Binding="{Binding PaymentStatusText}"
                                             Width="*" />

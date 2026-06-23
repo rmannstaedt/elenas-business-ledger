@@ -298,6 +298,9 @@
                             <DataGridTextColumn Header="Date"
                                                 Binding="{Binding InvoiceDateText}"
                                                 Width="100" />
+                            <DataGridTextColumn Header="Print"
+                                                Binding="{Binding PrintStatusText}"
+                                                Width="92" />
                             <DataGridTemplateColumn Header="Status" Width="*">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>

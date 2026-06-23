@@ -7,11 +7,20 @@
         MinHeight="500"
         MinWidth="640"
         WindowStartupLocation="CenterOwner">
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
+    </Window.Resources>
     <DockPanel Margin="16">
         <StackPanel DockPanel.Dock="Bottom"
                     Orientation="Horizontal"
                     HorizontalAlignment="Right"
                     Margin="0,14,0,0">
+            <Button Content="Reprint"
+                    Command="{Binding ReprintInvoiceCommand}"
+                    MinWidth="84"
+                    Height="32"
+                    Margin="0,0,8,0"
+                    AutomationProperties.Name="Reprint invoice" />
             <Button Content="Close"
                     Click="OnClose"
                     MinWidth="84"
@@ -31,6 +40,24 @@
                            FontSize="22"
                            FontWeight="SemiBold" />
                 <TextBlock Text="{Binding InvoiceDateText}" />
+                <TextBlock Text="{Binding PrintStatusText}"
+                           Margin="0,4,0,0"
+                           Foreground="#5B6472" />
+                <TextBlock Text="{Binding LastPrintError}"
+                           Margin="0,2,0,0"
+                           Foreground="#8A1F1F"
+                           TextWrapping="Wrap"
+                           Visibility="{Binding HasLastPrintError, Converter={StaticResource BooleanToVisibilityConverter}}" />
+                <Border Background="#FFF4E5"
+                        BorderBrush="#D58512"
+                        BorderThickness="1"
+                        Padding="8"
+                        Margin="0,8,0,0"
+                        Visibility="{Binding HasError, Converter={StaticResource BooleanToVisibilityConverter}}">
+                    <TextBlock Text="{Binding ErrorMessage}"
+                               Foreground="#5F370E"
+                               TextWrapping="Wrap" />
+                </Border>
             </StackPanel>
 
             <Grid Grid.Row="1"

@@ -209,14 +209,20 @@ If the user Cancels, the invoice is not saved and no data are updated in the sys
 
 Once the invoice has been edited, the user may press the "Print Invoice" button on the Invoice form.
 The "Print Invoice" button does the following:
-  - Saves a PDF copy of the invoice in the company invoice folder path.
-    -- note: if save fails, the following actions are *not* performed, and the user is notified of the failure.
-  - Saves the Invoice data to the Invoice table.
-  - Prints a hard copy of the Invoice (only if the printer is available)
-  - Closes the Invoice form and return to the main view.
-  - When saving an Invoice and returning to the main view, the displayed data in the main view are updated with any changes.
+  - Reserves the Invoice in the local database as an in-progress issue operation.
+  - Saves a PDF copy of the invoice in the company invoice folder path through a staging, verification, and publish flow.
+    -- note: if PDF save/publish fails, the Invoice is not shown as issued, later actions are *not* performed, and the user is notified of the failure.
+  - Finalizes the Invoice data in the Invoice table as issued.
+  - Sends a print request to the configured invoice printer, if one is configured and available.
+    -- note: a print failure does not undo the issued Invoice or delete the PDF; the Invoice remains issued and can be reprinted from the Invoice Viewer.
+  - Closes the Invoice form and returns to the main view only when the Invoice was issued and the print request was launched successfully.
+  - Keeps the Invoice form open with an error message if the Invoice was issued but the print request failed.
+  - When an Invoice is issued and returning to the main view, the displayed data in the main view are updated with any changes.
   
 Once an Invoice has been *successfully* saved, it can no longer be edited.
+Issued Invoices show payment and print status in the main/student invoice lists. The Invoice Viewer shows the stored PDF path, print status, and last print error when present. Reprinting an issued Invoice uses the stored PDF and existing Invoice number; it must not create a new Invoice number or change the issued Invoice content.
+
+The invoice printer is selected from Application Settings during setup. If no invoice printer has been selected when printing or reprinting is first attempted, the app offers to open Settings so the user can choose one before continuing. The selected printer is remembered for subsequent invoice printing and can later be changed or cleared. When the app records an Invoice as Printed, that means the configured printer existed and Windows accepted the print request launch; the app does not verify physical paper output or Windows spooler completion.
 
 ## Limitations
 

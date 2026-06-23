@@ -27,9 +27,11 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
         var toKeyExclusive = ToDateRangeKey(to.AddDays(1));
         var lines = await context.IssuedInvoiceLines
             .FromSqlInterpolated($"""
-                SELECT *
+                SELECT IssuedInvoiceLines.*
                 FROM IssuedInvoiceLines
-                WHERE LessonDateTime >= {fromKey}
+                INNER JOIN IssuedInvoices ON IssuedInvoices.Id = IssuedInvoiceLines.IssuedInvoiceEntityId
+                WHERE IssuedInvoices.IssueStatus = 'Issued'
+                  AND LessonDateTime >= {fromKey}
                   AND LessonDateTime < {toKeyExclusive}
                 """)
             .AsNoTracking()
@@ -52,13 +54,18 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
         return await context.IssuedInvoices
             .AsNoTracking()
             .Where(invoice => invoice.StudentShortName == studentShortName)
+            .Where(invoice => invoice.IssueStatus == InvoiceIssueStatus.Issued)
             .OrderBy(invoice => invoice.InvoiceNumber)
             .Select(invoice => new IssuedInvoiceSummary(
                 new InvoiceNumber(invoice.InvoiceNumber),
                 invoice.StudentShortName,
                 invoice.InvoiceDate,
                 invoice.PaymentStatus,
-                invoice.PdfFilePath))
+                invoice.PdfFilePath,
+                invoice.IssueStatus,
+                invoice.PrintStatus,
+                invoice.PrintedAt,
+                invoice.LastPrintError))
             .ToArrayAsync(cancellationToken);
     }
 
@@ -74,6 +81,7 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
             .AsNoTracking()
             .AnyAsync(
                 invoice =>
+                    invoice.IssueStatus == InvoiceIssueStatus.Issued &&
                     invoice.StudentShortName == studentShortName &&
                     invoice.InvoiceDate >= firstDay &&
                     invoice.InvoiceDate < nextMonth,
@@ -112,12 +120,107 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
         return OperationResult<IssuedInvoice>.Success(invoice);
     }
 
+    public async Task<OperationResult<IssuedInvoice>> ReserveInvoiceAsync(
+        InvoiceDraft draft,
+        InvoiceTotals totals,
+        CancellationToken cancellationToken)
+    {
+        await using var context = createContext();
+        var highest = await context.IssuedInvoices
+            .AsNoTracking()
+            .Select(invoice => (int?)invoice.InvoiceNumber)
+            .MaxAsync(cancellationToken);
+        var invoiceNumber = new InvoiceNumber((highest ?? 0) + 1);
+        var reservedInvoice = draft.Issue(
+            invoiceNumber,
+            totals,
+            pdfFilePath: null,
+            InvoiceIssueStatus.Issuing,
+            InvoicePrintStatus.NotPrinted,
+            printedAt: null,
+            lastPrintError: null);
+
+        var exists = await context.IssuedInvoices.AnyAsync(
+            storedInvoice => storedInvoice.InvoiceNumber == invoiceNumber.Value,
+            cancellationToken);
+
+        if (exists)
+        {
+            return OperationResult<IssuedInvoice>.Failure(
+                reservedInvoice,
+                new ValidationError("Invoice.NumberAlreadyExists", "An issued invoice with this number already exists."));
+        }
+
+        context.IssuedInvoices.Add(ToEntity(reservedInvoice));
+        await context.SaveChangesAsync(cancellationToken);
+        return OperationResult<IssuedInvoice>.Success(reservedInvoice);
+    }
+
+    public async Task<OperationResult<IssuedInvoice>> FinalizeIssuedInvoiceAsync(
+        InvoiceNumber invoiceNumber,
+        string pdfFilePath,
+        CancellationToken cancellationToken)
+    {
+        await using var context = createContext();
+        var invoice = await context.IssuedInvoices
+            .Include(storedInvoice => storedInvoice.Lines)
+            .SingleOrDefaultAsync(
+                storedInvoice =>
+                    storedInvoice.InvoiceNumber == invoiceNumber.Value &&
+                    storedInvoice.IssueStatus == InvoiceIssueStatus.Issuing,
+                cancellationToken);
+
+        if (invoice is null)
+        {
+            return OperationResult<IssuedInvoice>.Failure(
+                new ValidationError("Invoice.NotFound", "The reserved invoice could not be found."));
+        }
+
+        invoice.PdfFilePath = pdfFilePath;
+        invoice.IssueStatus = InvoiceIssueStatus.Issued;
+        await context.SaveChangesAsync(cancellationToken);
+
+        return OperationResult<IssuedInvoice>.Success(ToDomain(invoice));
+    }
+
+    public async Task<OperationResult<IssuedInvoice>> UpdatePrintStatusAsync(
+        InvoiceNumber invoiceNumber,
+        InvoicePrintStatus printStatus,
+        DateTimeOffset? printedAt,
+        string? lastPrintError,
+        CancellationToken cancellationToken)
+    {
+        await using var context = createContext();
+        var invoice = await context.IssuedInvoices
+            .Include(storedInvoice => storedInvoice.Lines)
+            .SingleOrDefaultAsync(
+                storedInvoice =>
+                    storedInvoice.InvoiceNumber == invoiceNumber.Value &&
+                    storedInvoice.IssueStatus == InvoiceIssueStatus.Issued,
+                cancellationToken);
+
+        if (invoice is null)
+        {
+            return OperationResult<IssuedInvoice>.Failure(
+                new ValidationError("Invoice.NotFound", "The issued invoice could not be found."));
+        }
+
+        invoice.PrintStatus = printStatus;
+        invoice.PrintedAt = printedAt;
+        invoice.LastPrintError = lastPrintError;
+        await context.SaveChangesAsync(cancellationToken);
+
+        return OperationResult<IssuedInvoice>.Success(ToDomain(invoice));
+    }
+
     public async Task<PaymentStatus> GetPaymentStatusAsync(InvoiceNumber invoiceNumber, CancellationToken cancellationToken)
     {
         await using var context = createContext();
         return await context.IssuedInvoices
             .AsNoTracking()
-            .Where(invoice => invoice.InvoiceNumber == invoiceNumber.Value)
+            .Where(invoice =>
+                invoice.InvoiceNumber == invoiceNumber.Value &&
+                invoice.IssueStatus == InvoiceIssueStatus.Issued)
             .Select(invoice => invoice.PaymentStatus)
             .SingleAsync(cancellationToken);
     }
@@ -129,7 +232,9 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
     {
         await using var context = createContext();
         var invoice = await context.IssuedInvoices.SingleAsync(
-            storedInvoice => storedInvoice.InvoiceNumber == invoiceNumber.Value,
+            storedInvoice =>
+                storedInvoice.InvoiceNumber == invoiceNumber.Value &&
+                storedInvoice.IssueStatus == InvoiceIssueStatus.Issued,
             cancellationToken);
 
         invoice.PaymentStatus = paymentStatus;
@@ -144,7 +249,28 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
         var invoice = await context.IssuedInvoices
             .AsNoTracking()
             .Include(storedInvoice => storedInvoice.Lines)
-            .SingleOrDefaultAsync(storedInvoice => storedInvoice.InvoiceNumber == invoiceNumber.Value, cancellationToken);
+            .SingleOrDefaultAsync(
+                storedInvoice =>
+                    storedInvoice.InvoiceNumber == invoiceNumber.Value &&
+                    storedInvoice.IssueStatus == InvoiceIssueStatus.Issued,
+                cancellationToken);
+
+        return invoice is null ? null : ToDomain(invoice);
+    }
+
+    public async Task<IssuedInvoice?> GetIssuingInvoiceAsync(
+        InvoiceNumber invoiceNumber,
+        CancellationToken cancellationToken)
+    {
+        await using var context = createContext();
+        var invoice = await context.IssuedInvoices
+            .AsNoTracking()
+            .Include(storedInvoice => storedInvoice.Lines)
+            .SingleOrDefaultAsync(
+                storedInvoice =>
+                    storedInvoice.InvoiceNumber == invoiceNumber.Value &&
+                    storedInvoice.IssueStatus == InvoiceIssueStatus.Issuing,
+                cancellationToken);
 
         return invoice is null ? null : ToDomain(invoice);
     }
@@ -165,8 +291,12 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
             VatAmount = invoice.Totals.VatAmount.Amount,
             TotalAmount = invoice.Totals.Total.Amount,
             Currency = invoice.Totals.Total.Currency,
-            PdfFilePath = invoice.PdfFilePath,
-            PaymentStatus = PaymentStatus.Outstanding
+            PdfFilePath = invoice.PdfFilePath ?? string.Empty,
+            PaymentStatus = PaymentStatus.Outstanding,
+            IssueStatus = invoice.IssueStatus,
+            PrintStatus = invoice.PrintStatus,
+            PrintedAt = invoice.PrintedAt,
+            LastPrintError = invoice.LastPrintError
         };
 
         foreach (var line in invoice.Lines)
@@ -196,6 +326,11 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
                 line.PlanCatalogId))
             .ToArray();
 
+        var pdfFilePath = entity.IssueStatus == InvoiceIssueStatus.Issuing &&
+            string.IsNullOrWhiteSpace(entity.PdfFilePath)
+                ? null
+                : entity.PdfFilePath;
+
         return new IssuedInvoice(
             new InvoiceNumber(entity.InvoiceNumber),
             entity.InvoiceDate,
@@ -206,7 +341,11 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
                 new MoneyAmount(entity.TotalWithoutVatAmount, currency),
                 new MoneyAmount(entity.VatAmount, currency),
                 new MoneyAmount(entity.TotalAmount, currency)),
-            entity.PdfFilePath);
+            pdfFilePath,
+            entity.IssueStatus,
+            entity.PrintStatus,
+            entity.PrintedAt,
+            entity.LastPrintError);
     }
 
     private static string FormatLessonDateTime(DateTimeOffset lessonDateTime) =>

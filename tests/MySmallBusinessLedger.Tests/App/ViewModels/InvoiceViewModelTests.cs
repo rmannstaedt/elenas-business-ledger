@@ -117,6 +117,102 @@ public sealed class InvoiceViewModelTests
         Assert.Equal("The invoice PDF was saved, but the print request failed.", viewModel.ErrorMessage);
     }
 
+    [Fact]
+    public async Task PreviewDoesNotIssueWhenPrinterSetupIsDeclined()
+    {
+        var service = new FakeInvoiceWorkflowService
+        {
+            IssueResult = OperationResult<IssueInvoiceResult>.Success(
+                new IssueInvoiceResult(CreateIssuedInvoice(), PrintSucceeded: true, []))
+        };
+        var viewModel = new InvoicePreviewViewModel(
+            service,
+            CreatePreview(),
+            _ => Task.FromResult(false));
+
+        await viewModel.PrintInvoiceCommand.ExecuteAsync();
+
+        Assert.False(service.IssueCalled);
+        Assert.Equal("Choose an invoice printer before printing the invoice.", viewModel.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task ViewerReprintUsesExistingInvoiceNumberAndRefreshesPrintStatus()
+    {
+        var updatedInvoice = CreateIssuedInvoice(
+            printStatus: InvoicePrintStatus.Printed,
+            printedAt: new DateTimeOffset(2026, 6, 16, 18, 0, 0, TimeSpan.Zero),
+            lastPrintError: null);
+        var service = new FakeInvoiceWorkflowService
+        {
+            ReprintResult = OperationResult<ReprintInvoiceResult>.Success(
+                new ReprintInvoiceResult(updatedInvoice, PrintSucceeded: true, []))
+        };
+        var viewModel = new InvoiceViewerViewModel(
+            CreateIssuedInvoice(printStatus: InvoicePrintStatus.PrintFailed, lastPrintError: "Paper jam."),
+            service);
+
+        await viewModel.ReprintInvoiceCommand.ExecuteAsync();
+
+        Assert.Equal(new InvoiceNumber(1), service.ReprintInvoiceNumber);
+        Assert.Equal("Print request sent 16-06-2026 18:00", viewModel.PrintStatusText);
+        Assert.Null(viewModel.LastPrintError);
+        Assert.False(viewModel.HasLastPrintError);
+        Assert.Null(viewModel.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task ViewerFailedReprintKeepsInvoiceOpenAndShowsPrinterError()
+    {
+        var failedInvoice = CreateIssuedInvoice(
+            printStatus: InvoicePrintStatus.PrintFailed,
+            printedAt: null,
+            lastPrintError: "The configured invoice printer is not available.");
+        var service = new FakeInvoiceWorkflowService
+        {
+            ReprintResult = OperationResult<ReprintInvoiceResult>.Success(
+                new ReprintInvoiceResult(
+                    failedInvoice,
+                    PrintSucceeded: false,
+                    [new ValidationError("InvoicePrinter.Unavailable", "The configured invoice printer is not available.")]))
+        };
+        var viewModel = new InvoiceViewerViewModel(CreateIssuedInvoice(), service);
+
+        await viewModel.ReprintInvoiceCommand.ExecuteAsync();
+
+        Assert.Equal("Print failed", viewModel.PrintStatusText);
+        Assert.Equal("The configured invoice printer is not available.", viewModel.LastPrintError);
+        Assert.Equal("The configured invoice printer is not available.", viewModel.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task ViewerDoesNotReprintWhenPrinterSetupIsDeclined()
+    {
+        var service = new FakeInvoiceWorkflowService
+        {
+            ReprintResult = OperationResult<ReprintInvoiceResult>.Success(
+                new ReprintInvoiceResult(CreateIssuedInvoice(InvoicePrintStatus.Printed), PrintSucceeded: true, []))
+        };
+        var viewModel = new InvoiceViewerViewModel(
+            CreateIssuedInvoice(),
+            service,
+            _ => Task.FromResult(false));
+
+        await viewModel.ReprintInvoiceCommand.ExecuteAsync();
+
+        Assert.Null(service.ReprintInvoiceNumber);
+        Assert.Equal("Choose an invoice printer before reprinting the invoice.", viewModel.ErrorMessage);
+    }
+
+    [Fact]
+    public void ViewerDoesNotOfferReprintWhenNoPublishedPdfExists()
+    {
+        var viewModel = new InvoiceViewerViewModel(CreateIssuedInvoice(pdfFilePath: null), new FakeInvoiceWorkflowService());
+
+        Assert.False(viewModel.ReprintInvoiceCommand.CanExecute(null));
+        Assert.Equal("Not printed", viewModel.PrintStatusText);
+    }
+
     private static InvoicePreviewResult CreatePreview(params decimal[] lineAmounts)
     {
         if (lineAmounts.Length == 0)
@@ -152,10 +248,29 @@ public sealed class InvoiceViewModelTests
             vatStatus: VatStatus.NotRegistered,
             invoiceFolderPath: @"C:\Invoices");
 
-    private static IssuedInvoice CreateIssuedInvoice()
+    private static IssuedInvoice CreateIssuedInvoice(
+        InvoicePrintStatus printStatus) =>
+        CreateIssuedInvoice(
+            pdfFilePath: @"C:\Invoices\000001-Anna.pdf",
+            printStatus,
+            printedAt: null,
+            lastPrintError: null);
+
+    private static IssuedInvoice CreateIssuedInvoice(
+        string? pdfFilePath = @"C:\Invoices\000001-Anna.pdf",
+        InvoicePrintStatus printStatus = InvoicePrintStatus.NotPrinted,
+        DateTimeOffset? printedAt = null,
+        string? lastPrintError = null)
     {
         var preview = CreatePreview();
-        return preview.Draft.Issue(new InvoiceNumber(1), preview.Totals, @"C:\Invoices\000001-Anna.pdf");
+        return preview.Draft.Issue(
+            new InvoiceNumber(1),
+            preview.Totals,
+            pdfFilePath,
+            InvoiceIssueStatus.Issued,
+            printStatus,
+            printedAt,
+            lastPrintError);
     }
 
     private sealed class FakeInvoiceWorkflowService : IInvoiceWorkflowService
@@ -166,7 +281,12 @@ public sealed class InvoiceViewModelTests
         public OperationResult<IssueInvoiceResult> IssueResult { get; init; } =
             OperationResult<IssueInvoiceResult>.Failure(new ValidationError("Test.NotConfigured", "Issue not configured."));
 
+        public OperationResult<ReprintInvoiceResult> ReprintResult { get; init; } =
+            OperationResult<ReprintInvoiceResult>.Failure(new ValidationError("Test.NotConfigured", "Reprint not configured."));
+
         public bool IssueCalled { get; private set; }
+
+        public InvoiceNumber? ReprintInvoiceNumber { get; private set; }
 
         public Task<OperationResult<InvoiceCandidateSelectionResult>> LoadCandidatesAsync(DateOnly date, DateTimeOffset now, CancellationToken cancellationToken) =>
             Task.FromResult(Candidates);
@@ -181,6 +301,12 @@ public sealed class InvoiceViewModelTests
         {
             IssueCalled = true;
             return Task.FromResult(IssueResult);
+        }
+
+        public Task<OperationResult<ReprintInvoiceResult>> ReprintAsync(InvoiceNumber invoiceNumber, CancellationToken cancellationToken)
+        {
+            ReprintInvoiceNumber = invoiceNumber;
+            return Task.FromResult(ReprintResult);
         }
 
         public Task<IssuedInvoice?> GetIssuedInvoiceAsync(InvoiceNumber invoiceNumber, CancellationToken cancellationToken) =>

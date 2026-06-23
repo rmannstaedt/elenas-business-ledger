@@ -24,6 +24,8 @@ public sealed class CompanyProfileEntity
     public VatStatus VatStatus { get; set; }
 
     public string InvoiceFolderPath { get; set; } = string.Empty;
+
+    public string ConfiguredInvoicePrinterName { get; set; } = string.Empty;
 }
 
 public sealed class CalendarSettingsEntity
@@ -177,6 +179,14 @@ public sealed class IssuedInvoiceEntity
     public string PdfFilePath { get; set; } = string.Empty;
 
     public PaymentStatus PaymentStatus { get; set; }
+
+    public InvoiceIssueStatus IssueStatus { get; set; } = InvoiceIssueStatus.Issued;
+
+    public InvoicePrintStatus PrintStatus { get; set; } = InvoicePrintStatus.NotPrinted;
+
+    public DateTimeOffset? PrintedAt { get; set; }
+
+    public string? LastPrintError { get; set; }
 
     public List<IssuedInvoiceLineEntity> Lines { get; } = [];
 }

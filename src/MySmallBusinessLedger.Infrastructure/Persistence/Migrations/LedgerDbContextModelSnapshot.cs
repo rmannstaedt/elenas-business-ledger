@@ -49,6 +49,11 @@ namespace MySmallBusinessLedger.Infrastructure.Persistence.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("ConfiguredInvoicePrinterName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Cvr")
                         .HasMaxLength(50)
                         .HasColumnType("TEXT");
@@ -117,6 +122,15 @@ namespace MySmallBusinessLedger.Infrastructure.Persistence.Migrations
                     b.Property<int>("InvoiceNumber")
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("IssueStatus")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("LastPrintError")
+                        .HasMaxLength(1000)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("PaymentStatus")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -125,6 +139,14 @@ namespace MySmallBusinessLedger.Infrastructure.Persistence.Migrations
                     b.Property<string>("PdfFilePath")
                         .IsRequired()
                         .HasMaxLength(1000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PrintStatus")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset?>("PrintedAt")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("StudentAddress")

@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using MySmallBusinessLedger.App.Commands;
 using MySmallBusinessLedger.App.Services;
 using MySmallBusinessLedger.Core.Company;
@@ -18,6 +19,7 @@ public sealed class SettingsViewModel : ViewModelBase
     private bool isVatRegistered;
     private DateTime? vatRegistrationDate;
     private string invoiceFolderPath = string.Empty;
+    private string configuredInvoicePrinterName = string.Empty;
     private string calendarId = DefaultCalendarId;
     private string googleAccountEmail = string.Empty;
     private GoogleOAuthClientConfigurationStatus googleOAuthAppConfigurationStatus = GoogleOAuthClientConfigurationStatus.Missing;
@@ -30,6 +32,7 @@ public sealed class SettingsViewModel : ViewModelBase
     {
         this.settingsService = settingsService;
         SaveCommand = new AsyncRelayCommand(SaveAsync);
+        ClearInvoicePrinterCommand = new AsyncRelayCommand(ClearInvoicePrinterAsync);
         ConnectGoogleCalendarCommand = new AsyncRelayCommand(ConnectGoogleCalendarAsync);
         ForgetGoogleAuthorizationCommand = new AsyncRelayCommand(ForgetGoogleAuthorizationAsync);
     }
@@ -51,6 +54,14 @@ public sealed class SettingsViewModel : ViewModelBase
     public DateTime? VatRegistrationDate { get => vatRegistrationDate; set => SetProperty(ref vatRegistrationDate, value); }
 
     public string InvoiceFolderPath { get => invoiceFolderPath; set => SetProperty(ref invoiceFolderPath, value); }
+
+    public string ConfiguredInvoicePrinterName
+    {
+        get => configuredInvoicePrinterName;
+        set => SetProperty(ref configuredInvoicePrinterName, value);
+    }
+
+    public ObservableCollection<string> AvailableInvoicePrinters { get; } = [];
 
     public string CalendarId { get => calendarId; set => SetProperty(ref calendarId, value); }
 
@@ -107,6 +118,8 @@ public sealed class SettingsViewModel : ViewModelBase
 
     public AsyncRelayCommand SaveCommand { get; }
 
+    public AsyncRelayCommand ClearInvoicePrinterCommand { get; }
+
     public AsyncRelayCommand ConnectGoogleCalendarCommand { get; }
 
     public AsyncRelayCommand ForgetGoogleAuthorizationCommand { get; }
@@ -128,6 +141,13 @@ public sealed class SettingsViewModel : ViewModelBase
             IsVatRegistered = company.VatStatus == VatStatus.Registered;
             VatRegistrationDate = company.VatRegistrationDate?.ToDateTime(TimeOnly.MinValue);
             InvoiceFolderPath = company.InvoiceFolderPath;
+            ConfiguredInvoicePrinterName = company.ConfiguredInvoicePrinterName;
+        }
+
+        AvailableInvoicePrinters.Clear();
+        foreach (var printerName in snapshot.AvailablePrinterNames ?? [])
+        {
+            AvailableInvoicePrinters.Add(printerName);
         }
 
         if (snapshot.CalendarSettings is { } calendar)
@@ -159,7 +179,8 @@ public sealed class SettingsViewModel : ViewModelBase
             string.IsNullOrWhiteSpace(CompanyCvr) ? null : CompanyCvr.Trim(),
             IsVatRegistered && VatRegistrationDate is not null ? DateOnly.FromDateTime(VatRegistrationDate.Value) : null,
             IsVatRegistered ? VatStatus.Registered : VatStatus.NotRegistered,
-            InvoiceFolderPath.Trim());
+            InvoiceFolderPath.Trim(),
+            ConfiguredInvoicePrinterName.Trim());
         CalendarId = NormalizeCalendarId(CalendarId);
         var calendarSettings = new CalendarSettings(CalendarId, GoogleAccountEmail.Trim());
 
@@ -177,6 +198,12 @@ public sealed class SettingsViewModel : ViewModelBase
         WasSaved = true;
         ErrorMessage = null;
         CloseRequested?.Invoke(this, true);
+    }
+
+    private Task ClearInvoicePrinterAsync()
+    {
+        ConfiguredInvoicePrinterName = string.Empty;
+        return Task.CompletedTask;
     }
 
     private async Task ConnectGoogleCalendarAsync()
