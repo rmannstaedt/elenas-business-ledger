@@ -11,6 +11,12 @@ public interface ILessonEditorService
         DateOnly refreshMonth,
         CancellationToken cancellationToken);
 
+    Task<OperationResult<PopulateCalendarResult>> PopulateCalendarAsync(
+        string studentShortName,
+        DateOnly displayMonth,
+        DateOnly today,
+        CancellationToken cancellationToken);
+
     Task<OperationResult<IReadOnlyList<CalendarLesson>>> EditAsync(
         LessonEditRequest request,
         DateOnly refreshMonth,

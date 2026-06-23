@@ -63,8 +63,22 @@ public sealed class StartupDashboardQuery
             .ToArray();
 
         return OperationResult<StartupDashboardResult>.Success(
-            new StartupDashboardResult(currentStudent, studentShortNames, lessons, invoices));
+            new StartupDashboardResult(
+                currentStudent,
+                studentShortNames,
+                lessons,
+                invoices,
+                CurrentStudentHasSchedule(students, currentStudent)));
     }
+
+    private static bool CurrentStudentHasSchedule(IReadOnlyList<StudentRecord> students, string? currentStudent) =>
+        currentStudent is not null &&
+        students
+            .FirstOrDefault(student => string.Equals(
+                student.Student.ShortName,
+                currentStudent,
+                StringComparison.OrdinalIgnoreCase))
+            ?.Schedule.Count > 0;
 
     private string? PickCurrentStudent(IReadOnlyList<CalendarLesson> calendarLessons, IReadOnlyList<StudentRecord> students)
     {

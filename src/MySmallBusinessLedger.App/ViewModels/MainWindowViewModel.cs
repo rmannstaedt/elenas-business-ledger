@@ -30,6 +30,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private string? currentStudentShortName;
     private string[] studentShortNames = [];
     private DateOnly displayMonth;
+    private bool currentStudentHasSchedule;
     private bool isBusy;
     private int activationRefreshSuspendCount;
     private string? errorMessage;
@@ -83,6 +84,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         OpenSettingsCommand = new AsyncRelayCommand(OpenSettingsAsync, () => !IsBusy);
         OpenManagePlansCommand = new AsyncRelayCommand(OpenManagePlansAsync, () => !IsBusy);
         AddLessonCommand = new AsyncRelayCommand(AddLessonAsync, () => !IsBusy && CurrentStudentShortName is not null);
+        PopulateCalendarCommand = new AsyncRelayCommand(PopulateCalendarAsync, CanPopulateCalendar);
         SaveLessonCommand = new AsyncRelayCommand(
             parameter => SaveLessonAsync((LessonDisplayModel)parameter!),
             parameter => parameter is LessonDisplayModel && !IsBusy);
@@ -174,6 +176,8 @@ public sealed class MainWindowViewModel : ViewModelBase
     public AsyncRelayCommand OpenManagePlansCommand { get; }
 
     public AsyncRelayCommand AddLessonCommand { get; }
+
+    public AsyncRelayCommand PopulateCalendarCommand { get; }
 
     public AsyncRelayCommand SaveLessonCommand { get; }
 
@@ -330,6 +334,36 @@ public sealed class MainWindowViewModel : ViewModelBase
         Lessons.Add(LessonDisplayModel.CreateDraft(CurrentStudentShortName, lessonTimeZone));
         RaiseCommandAvailabilityChanged();
         return Task.CompletedTask;
+    }
+
+    private async Task PopulateCalendarAsync()
+    {
+        if (CurrentStudentShortName is null)
+        {
+            return;
+        }
+
+        if (!CanPopulateCalendar())
+        {
+            ErrorMessage = DisplayMonth < CurrentMonth()
+                ? "Past months cannot be populated."
+                : "The selected student has no saved schedule to populate.";
+            return;
+        }
+
+        var result = await lessonEditorService.PopulateCalendarAsync(
+            CurrentStudentShortName,
+            DisplayMonth,
+            DateOnly.FromDateTime(clock.Now.DateTime),
+            CancellationToken.None);
+        if (!result.Succeeded)
+        {
+            ErrorMessage = result.Errors.FirstOrDefault()?.Message ?? "Google Calendar could not be populated.";
+            return;
+        }
+
+        ErrorMessage = null;
+        await RefreshAsync();
     }
 
     public void ClearError()
@@ -509,6 +543,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private void ApplyDashboard(StartupDashboardResult dashboard)
     {
         CurrentStudentShortName = dashboard.CurrentStudentShortName;
+        currentStudentHasSchedule = dashboard.CurrentStudentHasSchedule;
         studentShortNames = dashboard.StudentShortNames
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Order(StringComparer.OrdinalIgnoreCase)
@@ -532,6 +567,18 @@ public sealed class MainWindowViewModel : ViewModelBase
     private bool CanNavigateStudents() =>
         !IsBusy && studentShortNames.Length > 1;
 
+    private bool CanPopulateCalendar() =>
+        !IsBusy &&
+        CurrentStudentShortName is not null &&
+        currentStudentHasSchedule &&
+        DisplayMonth >= CurrentMonth();
+
+    private DateOnly CurrentMonth()
+    {
+        var now = clock.Now;
+        return new DateOnly(now.Year, now.Month, 1);
+    }
+
     private void RaiseCommandAvailabilityChanged()
     {
         RefreshCommand.RaiseCanExecuteChanged();
@@ -546,6 +593,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         OpenSettingsCommand.RaiseCanExecuteChanged();
         OpenManagePlansCommand.RaiseCanExecuteChanged();
         AddLessonCommand.RaiseCanExecuteChanged();
+        PopulateCalendarCommand.RaiseCanExecuteChanged();
         SaveLessonCommand.RaiseCanExecuteChanged();
         DeleteLessonCommand.RaiseCanExecuteChanged();
         ToggleLessonStateCommand.RaiseCanExecuteChanged();

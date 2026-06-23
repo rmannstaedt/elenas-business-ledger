@@ -77,6 +77,41 @@ public sealed class GoogleCalendarGatewayTests
     }
 
     [Fact]
+    public async Task PopulateLessonsCreatesMarkedEventsWithConfiguredDurationThenRefreshesMonth()
+    {
+        var client = new FakeGoogleCalendarEventClient
+        {
+            Events =
+            [
+                new GoogleCalendarEvent("created-1", "$ Anna", new DateTimeOffset(2026, 6, 23, 15, 0, 0, TimeSpan.FromHours(2))),
+                new GoogleCalendarEvent("created-2", "$ Anna", new DateTimeOffset(2026, 6, 30, 15, 0, 0, TimeSpan.FromHours(2)))
+            ]
+        };
+
+        var gateway = new GoogleCalendarGateway(client, CreateOptions(defaultLessonDuration: TimeSpan.FromMinutes(45)));
+        var result = await gateway.PopulateLessonsAsync(
+            [
+                new LessonAddRequest("Anna", new DateTimeOffset(2026, 6, 23, 15, 0, 0, TimeSpan.FromHours(2))),
+                new LessonAddRequest("Anna", new DateTimeOffset(2026, 6, 30, 15, 0, 0, TimeSpan.FromHours(2)))
+            ],
+            new DateOnly(2026, 6, 1),
+            CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(["$ Anna", "$ Anna"], client.CreatedEvents.Select(created => created.Summary));
+        Assert.Equal(
+            [
+                new DateTimeOffset(2026, 6, 23, 15, 0, 0, TimeSpan.FromHours(2)),
+                new DateTimeOffset(2026, 6, 30, 15, 0, 0, TimeSpan.FromHours(2))
+            ],
+            client.CreatedEvents.Select(created => created.StartsAt));
+        Assert.All(client.CreatedEvents, created => Assert.Equal(TimeSpan.FromMinutes(45), created.Duration));
+        Assert.Equal(new DateTimeOffset(2026, 6, 1, 0, 0, 0, TimeSpan.FromHours(2)), client.LastListFromInclusive);
+        Assert.Equal(new DateTimeOffset(2026, 7, 1, 0, 0, 0, TimeSpan.FromHours(2)), client.LastListToExclusive);
+        Assert.Equal(["created-1", "created-2"], result.Value!.Select(lesson => lesson.Id));
+    }
+
+    [Fact]
     public async Task UpdateLessonMovesEventThenRefreshesMonth()
     {
         var client = new FakeGoogleCalendarEventClient
@@ -313,6 +348,8 @@ public sealed class GoogleCalendarGatewayTests
 
         public TimeSpan? CreatedDuration { get; private set; }
 
+        public List<CreatedCalendarEvent> CreatedEvents { get; } = [];
+
         public string? MovedEventId { get; private set; }
 
         public DateTimeOffset? MovedStartsAt { get; private set; }
@@ -355,6 +392,7 @@ public sealed class GoogleCalendarGatewayTests
             CreatedSummary = summary;
             CreatedStartsAt = startsAt;
             CreatedDuration = duration;
+            CreatedEvents.Add(new CreatedCalendarEvent(summary, startsAt, duration));
             return Task.FromResult("created");
         }
 
@@ -401,4 +439,9 @@ public sealed class GoogleCalendarGatewayTests
             return Task.CompletedTask;
         }
     }
+
+    private sealed record CreatedCalendarEvent(
+        string Summary,
+        DateTimeOffset StartsAt,
+        TimeSpan Duration);
 }

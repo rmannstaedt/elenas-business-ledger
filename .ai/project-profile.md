@@ -53,6 +53,7 @@ Google Calendar API: official Google Calendar .NET client
 Google authentication: external browser OAuth
 Google OAuth app identity: publisher-owned Desktop OAuth client; users authorize their own Google account at runtime
 Google Calendar completed-lesson marker: keep the first line as `$ <student short name>` or `$<student short name>`; Completed is represented by a later `Status: Completed` summary line, and absence of that line means Planned
+Google Calendar population: main-window `Populate Calendar` seeds lessons for the selected student from saved student schedule entries; current month starts at today inclusive, future months seed the whole month, past months cannot be seeded, exact same-student same-date/time duplicates are skipped, and v1 does not detect other conflicts
 Calendar availability: invoice issue must rely on the accepted invoice preview/snapshot rather than requiring a fresh Google Calendar read at the final print/save moment
 PDF generation: QuestPDF Community license accepted for v1
 
@@ -94,6 +95,8 @@ Use fake Google Calendar client for calendar integration tests
 - Ignore Google Calendar entries that do not use the documented first-line `$` student marker.
 - Preserve the first-line Google Calendar marker when adding/removing app-owned lesson status lines.
 - Notify the user immediately when a Google Calendar lesson update fails.
+- Do not silently create duplicate Google Calendar lessons for the same student at the same date/time when using Populate Calendar.
+- Do not imply Populate Calendar detects all conflicts; v1 skips exact duplicates only.
 - Do not make Google Calendar sync failure corrupt local data.
 - Do not persist OAuth access or refresh tokens in plaintext.
 - Do not allow Draft or Retired catalog plans to be assigned to students.

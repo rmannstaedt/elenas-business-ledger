@@ -403,6 +403,13 @@ public sealed class EditorViewModelTests
             CancellationToken cancellationToken) =>
             Task.FromResult(OperationResult<IReadOnlyList<CalendarLesson>>.Success([]));
 
+        public Task<OperationResult<PopulateCalendarResult>> PopulateCalendarAsync(
+            string studentShortName,
+            DateOnly displayMonth,
+            DateOnly today,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(OperationResult<PopulateCalendarResult>.Success(new PopulateCalendarResult(0, 0, [])));
+
         public Task<OperationResult<IReadOnlyList<CalendarLesson>>> EditAsync(
             LessonEditRequest request,
             DateOnly refreshMonth,

@@ -60,6 +60,8 @@ Plans are managed from `Plan > Manage Plans`. New plans start as incomplete Draf
 
 Students are managed from `Student > Manage Students`. The overview lists active and inactive students, embeds the student editor for the selected student, shows issued invoices with payment and print status, and keeps explicit Save/Cancel for edits. Add Student creates an in-pane draft. Selecting an Active catalog plan copies that plan into the student's plan period; changing the Active checkbox only persists when Save is pressed. Plan periods, schedules, and issued invoices remain intact unless the user explicitly saves edited student data. Double-clicking an invoice opens the invoice viewer, where an issued invoice can be reprinted from its stored PDF without creating a new invoice number or changing invoice content. Selecting a student in Manage Students immediately refreshes the main window around that student, and closing Manage Students applies the final selection again.
 
+The main window can populate Google Calendar from the selected student's saved standard schedule. `Populate Calendar` seeds the current month from today through month end, or a future month for the whole month. Past months cannot be seeded. Exact duplicate lessons for the same student at the same date/time are skipped; version 1 does not detect other calendar conflicts.
+
 ## Current key assumptions
 
 - Under-30 teaching support remains in the data model because future students may require it (but out of scope for version 1.0).
@@ -73,6 +75,7 @@ Students are managed from `Student > Manage Students`. The overview lists active
 - Company and Google Calendar account setup, connection, and authorization reset are available from `Application > Settings`.
 - Plan catalog management is available from `Plan > Manage Plans`; only Active catalog plans are assignable to students.
 - Student overview management is available from `Student > Manage Students`; it lists all students, supports in-pane student/plan/schedule editing with explicit Save/Cancel, mirrors student selection into the main window immediately and on close, and preserves copied plan commercial-term snapshots and issued invoices unless edited student data is saved.
+- The main window `Populate Calendar` action writes scheduled lessons directly to Google Calendar for the selected student/month, skipping exact duplicate same-student same-date/time lessons only.
 - The app stores issued invoice PDFs in a configurable invoices folder.
 - Invoice PDFs are generated with QuestPDF, staged and verified before final storage, and never silently overwritten. Invoice printing uses the remembered Settings printer and can be retried from the invoice viewer using the stored issued PDF.
 - The initial UI recommendation is WPF + .NET 10.

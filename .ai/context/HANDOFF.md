@@ -20,6 +20,7 @@ Date: 2026-06-23
 - The app now uses publisher-owned Google Desktop OAuth configuration from `Configuration\google-oauth-client.json` in the app output. The local source file is `src\MySmallBusinessLedger.App\Configuration\google-oauth-client.json`, ignored by Git; the template is committed beside it.
 - Window placement is stored under `%APPDATA%\visualtech.dk\MySmallBusinessLedger\window-placement.json`; Manage Plans column widths are stored under `%APPDATA%\visualtech.dk\MySmallBusinessLedger\grid-column-widths.json`.
 - Completed/Planned lesson state is manual. Google Calendar keeps the first-line `$` student marker and uses a later `Status: Completed` summary line for completed lessons.
+- The main window has `Populate Calendar` for the selected student/month. It creates Google Calendar lessons from the student's saved schedule, using today-through-month-end for the current month and the full month for future months. Past months are blocked. Exact same-student same-date/time duplicates are skipped; other conflicts are not detected in v1.
 - Write Invoice opens candidate selection, invoice preview, optional price adjustment, invoice reservation, staged PDF verification/publish, issue finalization, print request, dashboard refresh, and read-only invoice viewer. Issued invoices carry `IssueStatus` plus `PrintStatus`; normal invoice lists/view/payment paths show only `Issued` invoices. The invoice viewer can reprint an issued invoice from its stored PDF without creating a new invoice number or changing invoice content.
 - Invoice `Printed` means the configured printer existed and Windows accepted the print request launch without exception. The app does not monitor physical paper output or Windows spooler completion.
 - Documentation refresh on 2026-06-23 corrected the business requirements to describe issued invoice lines as the durable local lesson-invoice record; references to a separate local Lessons table should be treated as stale if found only in historical plan logs.
@@ -33,6 +34,7 @@ Date: 2026-06-23
 - Invoiced lessons are not editable.
 - Completed lessons can only be toggled back to Planned after confirmation; while Completed, no date/time edit or delete is allowed.
 - Google Calendar write failures must be visible immediately and must not pretend local state changed.
+- Populate Calendar must not seed past months and must not create exact duplicate same-student same-date/time lessons.
 - OAuth tokens must remain Windows-protected and must not be stored in SQLite or plaintext config.
 - Do not restore the old user-selected Google OAuth JSON setup flow unless Ruben explicitly asks for a migration fallback.
 - Do not allow Draft or Retired catalog plans to be assigned to students.
@@ -50,6 +52,8 @@ Date: 2026-06-23
 - Focused OAuth/Settings test run passed: 24 tests.
 - Full build passed on 2026-06-23 after invoice issue/print state implementation: `dotnet build MySmallBusinessLedger.sln -nodeReuse:false` with 0 warnings and 0 errors.
 - Full test suite passed on 2026-06-23 after invoice issue/print state implementation: `dotnet test MySmallBusinessLedger.sln -nodeReuse:false` with 203/203 tests passing.
+- Full build passed on 2026-06-23 after Populate Calendar implementation: `dotnet build MySmallBusinessLedger.sln -nodeReuse:false` with 0 warnings and 0 errors.
+- Full test suite passed on 2026-06-23 after Populate Calendar implementation: `dotnet test MySmallBusinessLedger.sln -nodeReuse:false` with 213/213 tests passing.
 - Full build passed on 2026-06-17 after Google calendar settings follow-up: `dotnet build MySmallBusinessLedger.sln -nodeReuse:false` with 0 warnings and 0 errors.
 - Full test suite passed on 2026-06-18 after Plan catalog draft-default/payment-term dropdown follow-up: `dotnet test MySmallBusinessLedger.sln -nodeReuse:false` with 161/161 tests passing.
 - Focused Student overview tests passed on 2026-06-20: `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~StudentOverview|FullyQualifiedName~StudentsCanBeListedIncludingInactiveStudents|FullyQualifiedName~ManageStudentsCommand" -nodeReuse:false` with 7/7 tests passing.
@@ -76,8 +80,9 @@ Date: 2026-06-23
 
 1. Place the real publisher OAuth Desktop JSON at `src\MySmallBusinessLedger.App\Configuration\google-oauth-client.json`.
 2. Complete maintainer pilot setup through `Application > Settings`, then use Connect Google Calendar.
-3. Run the invoice finalization manual printer test from `.ai/implementation-plans/active/2026-06-22-invoice-issue-finalization-and-print-status.md` against a safe test invoice folder/printer.
-4. Run the Student overview final user test from `.ai/implementation-plans/active/2026-06-20-student-overview-management.md`.
-5. Run the remaining OAuth/calendar pilot test against a safe Google Calendar/test invoice folder.
-6. Visually review the invoice PDF layout and WPF dialogs; PDF layout polish is intentionally deferred.
-7. Create follow-up plans for broader administration views, multi-period student plan history editing, backup/export, VAT reporting, and invoice layout touch-ups.
+3. Run the Populate Calendar manual Google Calendar smoke test from `.ai/implementation-plans/active/2026-06-23-populate-calendar-from-student-schedule.md` against a safe student/month.
+4. Run the invoice finalization manual printer test from `.ai/implementation-plans/active/2026-06-22-invoice-issue-finalization-and-print-status.md` against a safe test invoice folder/printer.
+5. Run the Student overview final user test from `.ai/implementation-plans/active/2026-06-20-student-overview-management.md`.
+6. Run the remaining OAuth/calendar pilot test against a safe Google Calendar/test invoice folder.
+7. Visually review the invoice PDF layout and WPF dialogs; PDF layout polish is intentionally deferred.
+8. Create follow-up plans for broader administration views, multi-period student plan history editing, backup/export, VAT reporting, and invoice layout touch-ups.

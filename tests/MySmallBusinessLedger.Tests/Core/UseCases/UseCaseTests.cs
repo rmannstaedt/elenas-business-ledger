@@ -129,6 +129,113 @@ public sealed class UseCaseTests
     }
 
     [Fact]
+    public async Task PopulateCalendarCurrentMonthStartsTodayAndSkipsExactDuplicates()
+    {
+        var timeZone = TimeZoneInfo.FindSystemTimeZoneById("Romance Standard Time");
+        var existingDuplicate = new CalendarLesson(
+            "existing",
+            "Anna",
+            new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.FromHours(2)));
+        var students = new FakeStudentRepository([CreateStudentRecord("Anna")]);
+        var calendar = new FakeCalendarGateway([existingDuplicate]);
+        var useCase = new PopulateCalendarUseCase(students, calendar, timeZone);
+
+        var result = await useCase.ExecuteAsync(
+            new PopulateCalendarRequest("Anna", new DateOnly(2026, 6, 1), new DateOnly(2026, 6, 16)),
+            CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(2, result.Value!.CreatedCount);
+        Assert.Equal(1, result.Value.SkippedDuplicateCount);
+        Assert.Equal(
+            [
+                new DateTimeOffset(2026, 6, 23, 15, 0, 0, TimeSpan.FromHours(2)),
+                new DateTimeOffset(2026, 6, 30, 15, 0, 0, TimeSpan.FromHours(2))
+            ],
+            calendar.PopulatedRequests.Select(request => request.StartsAt).ToArray());
+    }
+
+    [Fact]
+    public async Task PopulateCalendarFutureMonthSeedsWholeMonth()
+    {
+        var timeZone = TimeZoneInfo.FindSystemTimeZoneById("Romance Standard Time");
+        var students = new FakeStudentRepository([CreateStudentRecord("Anna")]);
+        var calendar = new FakeCalendarGateway([]);
+        var useCase = new PopulateCalendarUseCase(students, calendar, timeZone);
+
+        var result = await useCase.ExecuteAsync(
+            new PopulateCalendarRequest("Anna", new DateOnly(2026, 7, 1), new DateOnly(2026, 6, 16)),
+            CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(4, result.Value!.CreatedCount);
+        Assert.Equal(
+            [
+                new DateTimeOffset(2026, 7, 7, 15, 0, 0, TimeSpan.FromHours(2)),
+                new DateTimeOffset(2026, 7, 14, 15, 0, 0, TimeSpan.FromHours(2)),
+                new DateTimeOffset(2026, 7, 21, 15, 0, 0, TimeSpan.FromHours(2)),
+                new DateTimeOffset(2026, 7, 28, 15, 0, 0, TimeSpan.FromHours(2))
+            ],
+            calendar.PopulatedRequests.Select(request => request.StartsAt).ToArray());
+    }
+
+    [Fact]
+    public async Task PopulateCalendarRejectsPastMonthWithoutWriting()
+    {
+        var timeZone = TimeZoneInfo.FindSystemTimeZoneById("Romance Standard Time");
+        var students = new FakeStudentRepository([CreateStudentRecord("Anna")]);
+        var calendar = new FakeCalendarGateway([]);
+        var useCase = new PopulateCalendarUseCase(students, calendar, timeZone);
+
+        var result = await useCase.ExecuteAsync(
+            new PopulateCalendarRequest("Anna", new DateOnly(2026, 5, 1), new DateOnly(2026, 6, 16)),
+            CancellationToken.None);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Errors, error => error.Code == "CalendarPopulate.PastMonth");
+        Assert.Empty(calendar.PopulatedRequests);
+    }
+
+    [Fact]
+    public async Task PopulateCalendarRequiresSavedStudentSchedule()
+    {
+        var timeZone = TimeZoneInfo.FindSystemTimeZoneById("Romance Standard Time");
+        var studentWithoutSchedule = CreateStudentRecord("Anna") with { Schedule = [] };
+        var students = new FakeStudentRepository([studentWithoutSchedule]);
+        var calendar = new FakeCalendarGateway([]);
+        var useCase = new PopulateCalendarUseCase(students, calendar, timeZone);
+
+        var result = await useCase.ExecuteAsync(
+            new PopulateCalendarRequest("Anna", new DateOnly(2026, 6, 1), new DateOnly(2026, 6, 16)),
+            CancellationToken.None);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Errors, error => error.Code == "CalendarPopulate.NoSchedule");
+        Assert.Empty(calendar.PopulatedRequests);
+    }
+
+    [Fact]
+    public async Task PopulateCalendarReportsGoogleCalendarWriteFailure()
+    {
+        var timeZone = TimeZoneInfo.FindSystemTimeZoneById("Romance Standard Time");
+        var students = new FakeStudentRepository([CreateStudentRecord("Anna")]);
+        var calendar = new FakeCalendarGateway([])
+        {
+            UpdateResult = OperationResult<IReadOnlyList<CalendarLesson>>.Failure(
+                new ValidationError("Calendar.UpdateFailed", "Google Calendar could not be updated."))
+        };
+        var useCase = new PopulateCalendarUseCase(students, calendar, timeZone);
+
+        var result = await useCase.ExecuteAsync(
+            new PopulateCalendarRequest("Anna", new DateOnly(2026, 6, 1), new DateOnly(2026, 6, 16)),
+            CancellationToken.None);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Errors, error => error.Code == "Calendar.UpdateFailed");
+        Assert.NotEmpty(calendar.PopulatedRequests);
+    }
+
+    [Fact]
     public async Task DeletingUninvoicedLessonRefreshesFromCalendarAfterCalendarDeleteSucceeds()
     {
         var remainingLesson = new CalendarLesson("lesson-2", "Anna", new DateTimeOffset(2026, 6, 24, 15, 0, 0, TimeSpan.Zero));
@@ -601,6 +708,8 @@ public sealed class UseCaseTests
 
         public List<LessonState> SavedLessonStates { get; } = [];
 
+        public List<LessonAddRequest> PopulatedRequests { get; } = [];
+
         public Task<IReadOnlyList<CalendarLesson>> ListLessonsAsync(DateOnly from, DateOnly to, CancellationToken cancellationToken)
         {
             var matchingLessons = lessons
@@ -613,6 +722,15 @@ public sealed class UseCaseTests
 
         public Task<OperationResult<IReadOnlyList<CalendarLesson>>> AddLessonAsync(LessonAddRequest request, DateOnly refreshMonth, CancellationToken cancellationToken) =>
             Task.FromResult(UpdateResult);
+
+        public Task<OperationResult<IReadOnlyList<CalendarLesson>>> PopulateLessonsAsync(
+            IReadOnlyList<LessonAddRequest> requests,
+            DateOnly refreshMonth,
+            CancellationToken cancellationToken)
+        {
+            PopulatedRequests.AddRange(requests);
+            return Task.FromResult(UpdateResult);
+        }
 
         public Task<OperationResult<IReadOnlyList<CalendarLesson>>> UpdateLessonAsync(LessonEditRequest request, DateOnly refreshMonth, CancellationToken cancellationToken)
         {

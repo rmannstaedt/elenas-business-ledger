@@ -45,6 +45,42 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <Style x:Key="HeaderArrowButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="30" />
+            <Setter Property="Height" Value="28" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Foreground" Value="#5B6472" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="3">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#EEF3F8" />
+                                <Setter Property="BorderBrush" Value="#A9B7C7" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter Property="BorderBrush" Value="#7AA7D9" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Foreground" Value="#B5BAC2" />
+                                <Setter Property="Cursor" Value="Arrow" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
     <DockPanel Background="#F6F7F9">
@@ -76,15 +112,73 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <StackPanel>
-                    <TextBlock Text="{Binding CurrentStudentShortName, TargetNullValue=No student selected}"
-                               FontSize="30"
-                               FontWeight="SemiBold"
-                               Foreground="#15191F" />
-                    <TextBlock Text="{Binding DisplayMonthText}"
-                               FontSize="15"
-                               Foreground="#5B6472"
-                               Margin="0,4,0,0" />
+                <StackPanel VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal"
+                                VerticalAlignment="Center">
+                        <Button Command="{Binding PreviousStudentCommand}"
+                                Style="{StaticResource HeaderArrowButtonStyle}"
+                                ToolTip="Previous student"
+                                AutomationProperties.Name="Previous student">
+                            <Path Data="M 8,2 L 2,8 L 8,14"
+                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                  StrokeThickness="2"
+                                  StrokeStartLineCap="Round"
+                                  StrokeEndLineCap="Round"
+                                  StrokeLineJoin="Round" />
+                        </Button>
+                        <TextBlock Text="{Binding CurrentStudentShortName, TargetNullValue=No student selected}"
+                                   FontSize="30"
+                                   FontWeight="SemiBold"
+                                   Foreground="#15191F"
+                                   Margin="4,0"
+                                   VerticalAlignment="Center" />
+                        <Button Command="{Binding NextStudentCommand}"
+                                Style="{StaticResource HeaderArrowButtonStyle}"
+                                ToolTip="Next student"
+                                AutomationProperties.Name="Next student">
+                            <Path Data="M 2,2 L 8,8 L 2,14"
+                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                  StrokeThickness="2"
+                                  StrokeStartLineCap="Round"
+                                  StrokeEndLineCap="Round"
+                                  StrokeLineJoin="Round" />
+                        </Button>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal"
+                                VerticalAlignment="Center"
+                                Margin="0,4,0,0">
+                        <Button Command="{Binding PreviousMonthCommand}"
+                                Style="{StaticResource HeaderArrowButtonStyle}"
+                                Width="30"
+                                Height="20"
+                                ToolTip="Previous month"
+                                AutomationProperties.Name="Previous month">
+                            <Path Data="M 6,3 L 2,7 L 6,11"
+                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                  StrokeThickness="1.5"
+                                  StrokeStartLineCap="Round"
+                                  StrokeEndLineCap="Round"
+                                  StrokeLineJoin="Round" />
+                        </Button>
+                        <TextBlock Text="{Binding DisplayMonthText}"
+                                   FontSize="15"
+                                   Foreground="#5B6472"
+                                   Margin="4,0"
+                                   VerticalAlignment="Center" />
+                        <Button Command="{Binding NextMonthCommand}"
+                                Style="{StaticResource HeaderArrowButtonStyle}"
+                                Width="30"
+                                Height="20"
+                                ToolTip="Next month"
+                                AutomationProperties.Name="Next month">
+                            <Path Data="M 2,3 L 6,7 L 2,11"
+                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                  StrokeThickness="1.5"
+                                  StrokeStartLineCap="Round"
+                                  StrokeEndLineCap="Round"
+                                  StrokeLineJoin="Round" />
+                        </Button>
+                    </StackPanel>
                 </StackPanel>
 
                 <StackPanel Grid.Column="1"
@@ -151,42 +245,23 @@
 
                     <Grid Margin="0,0,0,10">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="Auto" />
-                            <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
 
-                        <Button Grid.Column="0"
-                                Content="Previous Student"
-                                Command="{Binding PreviousStudentCommand}"
-                                MinWidth="126"
-                                Height="32"
-                                Margin="0,0,8,0" />
-                        <Button Grid.Column="1"
-                                Content="Next Student"
-                                Command="{Binding NextStudentCommand}"
-                                MinWidth="108"
-                                Height="32" />
-                        <Button Grid.Column="2"
-                                Content="Add Lesson"
-                                Command="{Binding AddLessonCommand}"
-                                MinWidth="96"
-                                Height="32"
-                                HorizontalAlignment="Left"
-                                Margin="12,0,0,0" />
-                        <Button Grid.Column="3"
-                                Content="Previous Month"
-                                Command="{Binding PreviousMonthCommand}"
-                                MinWidth="118"
-                                Height="32"
-                                Margin="0,0,8,0" />
-                        <Button Grid.Column="4"
-                                Content="Next Month"
-                                Command="{Binding NextMonthCommand}"
-                                MinWidth="100"
-                                Height="32" />
+                        <StackPanel Grid.Column="0"
+                                    Orientation="Horizontal"
+                                    HorizontalAlignment="Left">
+                            <Button Content="Add Lesson"
+                                    Command="{Binding AddLessonCommand}"
+                                    MinWidth="96"
+                                    Height="32" />
+                            <Button Content="Populate Calendar"
+                                    Command="{Binding PopulateCalendarCommand}"
+                                    MinWidth="128"
+                                    Height="32"
+                                    Margin="8,0,0,0"
+                                    AutomationProperties.Name="Populate calendar from student schedule" />
+                        </StackPanel>
                     </Grid>
 
                     <DataGrid Grid.Row="1"

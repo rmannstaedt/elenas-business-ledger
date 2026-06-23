@@ -164,6 +164,14 @@ Double-clicking on an Invoice opens it in the Invoice Viewer.
 The application also contains a button:
   * Write Invoice
 
+The lesson toolbar contains a `Populate Calendar` action for the selected Student and displayed month. This action seeds Google Calendar immediately from the selected Student's saved standard schedule:
+  * If the displayed month is the current month, the action creates scheduled lesson entries from today (inclusive) through the end of the month.
+  * If the displayed month is a future month, the action creates scheduled lesson entries for the full month.
+  * Past months cannot be seeded.
+  * The action writes the resulting lesson entries to Google Calendar immediately; there is no separate save operation.
+  * Exact duplicate lessons for the same Student at the same date/time are skipped.
+  * Version 1 does not detect or handle other calendar conflicts. Conflicts must be resolved manually by the user in Google Calendar.
+
 Lessons that are completed or invoiced:yes CAN NOT be edited or deleted in the main lesson list.
 
 The only allowed operation on a Completed lesson is to mark it back to Planned. This requires an explicit confirmation prompt. Once a Completed lesson has been marked back to Planned, and provided it is still invoiced:no, it can again be edited as a planned lesson.
@@ -235,3 +243,4 @@ The invoice printer is selected from Application Settings during setup. If no in
   * No integration with MobilePay/Bank for payment registration.
   * No tax reserve estimate.
   * No automated backup.
+  * No calendar conflict detection for `Populate Calendar` beyond exact duplicate same-student same-date/time skipping.

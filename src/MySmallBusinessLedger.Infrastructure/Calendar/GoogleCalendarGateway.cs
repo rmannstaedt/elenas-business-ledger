@@ -47,14 +47,25 @@ public sealed class GoogleCalendarGateway : IGoogleCalendarGateway
         DateOnly refreshMonth,
         CancellationToken cancellationToken)
     {
+        return await PopulateLessonsAsync([request], refreshMonth, cancellationToken);
+    }
+
+    public async Task<OperationResult<IReadOnlyList<CalendarLesson>>> PopulateLessonsAsync(
+        IReadOnlyList<LessonAddRequest> requests,
+        DateOnly refreshMonth,
+        CancellationToken cancellationToken)
+    {
         try
         {
-            await eventClient.CreateLessonEventAsync(
-                options.CalendarId,
-                $"$ {request.StudentShortName}",
-                request.StartsAt,
-                options.DefaultLessonDuration,
-                cancellationToken);
+            foreach (var request in requests)
+            {
+                await eventClient.CreateLessonEventAsync(
+                    options.CalendarId,
+                    $"$ {request.StudentShortName}",
+                    request.StartsAt,
+                    options.DefaultLessonDuration,
+                    cancellationToken);
+            }
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

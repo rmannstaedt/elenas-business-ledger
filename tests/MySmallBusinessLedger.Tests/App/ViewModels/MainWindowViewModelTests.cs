@@ -3,6 +3,7 @@ using MySmallBusinessLedger.App.ViewModels;
 using MySmallBusinessLedger.Core.Common;
 using MySmallBusinessLedger.Core.Invoices;
 using MySmallBusinessLedger.Core.Lessons;
+using MySmallBusinessLedger.Core.UseCases.Lessons;
 using MySmallBusinessLedger.Core.UseCases.Startup;
 using System.Windows;
 using WpfMenuItem = System.Windows.Controls.MenuItem;
@@ -326,6 +327,90 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task PopulateCalendarCommandPopulatesSelectedStudentMonthAndRefreshesDashboard()
+    {
+        var dashboard = new FakeDashboardService
+        {
+            LessonState = LessonState.Planned,
+            LessonIsInvoiced = false,
+            LessonPaymentStatus = null
+        };
+        var lessonEditor = new FakeLessonEditorService();
+        var viewModel = CreateViewModel(
+            dashboard: dashboard,
+            lessonEditorService: lessonEditor,
+            clock: new FakeUiClock(new DateTimeOffset(2026, 6, 16, 12, 0, 0, TimeSpan.FromHours(2))));
+        await viewModel.LoadAsync();
+
+        await viewModel.PopulateCalendarCommand.ExecuteAsync();
+
+        Assert.Equal("Anna", lessonEditor.LastPopulateStudentShortName);
+        Assert.Equal(new DateOnly(2026, 6, 1), lessonEditor.LastPopulateDisplayMonth);
+        Assert.Equal(new DateOnly(2026, 6, 16), lessonEditor.LastPopulateToday);
+        Assert.Equal(2, dashboard.LoadCount);
+        Assert.False(viewModel.HasError);
+    }
+
+    [Fact]
+    public async Task PopulateCalendarCommandIsUnavailableForPastMonths()
+    {
+        var viewModel = CreateViewModel(
+            dashboard: new FakeDashboardService
+            {
+                LessonState = LessonState.Planned,
+                LessonIsInvoiced = false,
+                LessonPaymentStatus = null
+            },
+            clock: new FakeUiClock(new DateTimeOffset(2026, 6, 16, 12, 0, 0, TimeSpan.FromHours(2))));
+        await viewModel.LoadAsync();
+
+        await viewModel.PreviousMonthCommand.ExecuteAsync();
+
+        Assert.False(viewModel.PopulateCalendarCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task PopulateCalendarCommandIsUnavailableWhenSelectedStudentHasNoSchedule()
+    {
+        var viewModel = CreateViewModel(
+            dashboard: new FakeDashboardService
+            {
+                CurrentStudentHasSchedule = false,
+                LessonState = LessonState.Planned,
+                LessonIsInvoiced = false,
+                LessonPaymentStatus = null
+            });
+        await viewModel.LoadAsync();
+
+        Assert.False(viewModel.PopulateCalendarCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task PopulateCalendarFailureShowsErrorWithoutClearingRows()
+    {
+        var lessonEditor = new FakeLessonEditorService
+        {
+            PopulateResult = OperationResult<PopulateCalendarResult>.Failure(
+                new ValidationError("Calendar.UpdateFailed", "Google Calendar could not be updated."))
+        };
+        var viewModel = CreateViewModel(
+            dashboard: new FakeDashboardService
+            {
+                LessonState = LessonState.Planned,
+                LessonIsInvoiced = false,
+                LessonPaymentStatus = null
+            },
+            lessonEditorService: lessonEditor);
+        await viewModel.LoadAsync();
+
+        await viewModel.PopulateCalendarCommand.ExecuteAsync();
+
+        Assert.True(viewModel.HasError);
+        Assert.Equal("Google Calendar could not be updated.", viewModel.ErrorMessage);
+        Assert.Single(viewModel.Lessons);
+    }
+
+    [Fact]
     public async Task SavingDraftLessonUsesEditedDateOffsetForLocalTimeZone()
     {
         var timeZone = TimeZoneInfo.FindSystemTimeZoneById("Romance Standard Time");
@@ -575,6 +660,8 @@ public sealed class MainWindowViewModelTests
 
         public PaymentStatus? LessonPaymentStatus { get; init; } = PaymentStatus.Outstanding;
 
+        public bool CurrentStudentHasSchedule { get; init; } = true;
+
         public Func<string?, Task>? BeforeReturnAsync { get; init; }
 
         public Task<OperationResult<StartupDashboardResult>> LoadAsync(
@@ -616,7 +703,8 @@ public sealed class MainWindowViewModelTests
                             new DateOnly(2026, 6, 16),
                             PaymentStatus.Outstanding,
                             "C:\\Invoices\\000001.pdf")
-                    ]));
+                    ],
+                    CurrentStudentHasSchedule));
 
             NextResult = null;
             return result;
@@ -778,6 +866,15 @@ public sealed class MainWindowViewModelTests
 
         public MySmallBusinessLedger.Core.UseCases.Lessons.LessonAddRequest? LastAddRequest { get; private set; }
 
+        public string? LastPopulateStudentShortName { get; private set; }
+
+        public DateOnly? LastPopulateDisplayMonth { get; private set; }
+
+        public DateOnly? LastPopulateToday { get; private set; }
+
+        public OperationResult<PopulateCalendarResult> PopulateResult { get; init; } =
+            OperationResult<PopulateCalendarResult>.Success(new PopulateCalendarResult(2, 0, []));
+
         public Task<OperationResult<IReadOnlyList<MySmallBusinessLedger.Core.Calendar.CalendarLesson>>> AddAsync(
             MySmallBusinessLedger.Core.UseCases.Lessons.LessonAddRequest request,
             DateOnly refreshMonth,
@@ -787,6 +884,18 @@ public sealed class MainWindowViewModelTests
             LastAddRequest = request;
             return Task.FromResult(OperationResult<IReadOnlyList<MySmallBusinessLedger.Core.Calendar.CalendarLesson>>.Success(
                 [new MySmallBusinessLedger.Core.Calendar.CalendarLesson("new-lesson", request.StudentShortName, request.StartsAt)]));
+        }
+
+        public Task<OperationResult<PopulateCalendarResult>> PopulateCalendarAsync(
+            string studentShortName,
+            DateOnly displayMonth,
+            DateOnly today,
+            CancellationToken cancellationToken)
+        {
+            LastPopulateStudentShortName = studentShortName;
+            LastPopulateDisplayMonth = displayMonth;
+            LastPopulateToday = today;
+            return Task.FromResult(PopulateResult);
         }
 
         public Task<OperationResult<IReadOnlyList<MySmallBusinessLedger.Core.Calendar.CalendarLesson>>> EditAsync(
