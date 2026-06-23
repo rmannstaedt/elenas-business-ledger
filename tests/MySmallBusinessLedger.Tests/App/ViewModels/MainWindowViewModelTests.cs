@@ -14,6 +14,12 @@ using System.Windows.Media;
 using System.Windows.Threading;
 using WpfButton = System.Windows.Controls.Button;
 using WpfCalendar = System.Windows.Controls.Calendar;
+using WpfDataGrid = System.Windows.Controls.DataGrid;
+using WpfDataGridGridLinesVisibility = System.Windows.Controls.DataGridGridLinesVisibility;
+using WpfDataGridLengthUnitType = System.Windows.Controls.DataGridLengthUnitType;
+using WpfDataGridTemplateColumn = System.Windows.Controls.DataGridTemplateColumn;
+using WpfDataGridTextColumn = System.Windows.Controls.DataGridTextColumn;
+using WpfGrid = System.Windows.Controls.Grid;
 using WpfMenuItem = System.Windows.Controls.MenuItem;
 using WpfPopup = System.Windows.Controls.Primitives.Popup;
 using AppMainWindow = MySmallBusinessLedger.App.MainWindow;
@@ -227,6 +233,76 @@ public sealed class MainWindowViewModelTests
                 Assert.Equal(
                     new DateTimeOffset(2026, 6, 23, 15, 0, 0, TimeSpan.FromHours(2)),
                     lessonEditor.LastEditRequest?.StartsAt);
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
+    [Fact]
+    public void LessonGridUsesBorderedTableColumns()
+    {
+        RunOnStaThread(() =>
+        {
+            var viewModel = CreateViewModel(
+                dashboard: new FakeDashboardService { LessonState = LessonState.Planned, LessonIsInvoiced = false, LessonPaymentStatus = null });
+
+            var window = new AppMainWindow(viewModel);
+            try
+            {
+                window.Show();
+                PumpUntil(() => !viewModel.IsBusy && viewModel.Lessons.Count == 1);
+
+                var lessonGrid = Assert.Single(
+                    FindVisualChildren<WpfDataGrid>(window),
+                    grid => AutomationProperties.GetName(grid) == "Lesson list");
+                var headers = lessonGrid.Columns
+                    .Select(column => column.Header?.ToString() ?? string.Empty)
+                    .ToArray();
+
+                Assert.Equal(["Date", "Time", "State", "Invoiced", "Paid", string.Empty], headers);
+                Assert.Equal(WpfDataGridGridLinesVisibility.All, lessonGrid.GridLinesVisibility);
+                Assert.True(lessonGrid.CanUserResizeColumns);
+                Assert.False(lessonGrid.CanUserReorderColumns);
+
+                var dateButton = Assert.Single(
+                    FindVisualChildren<WpfButton>(lessonGrid),
+                    button => AutomationProperties.GetName(button) == "Open lesson date selector");
+                Assert.Equal(6, dateButton.Padding.Left);
+
+                var centeredHeaderStyle = Assert.IsType<Style>(window.FindResource("CenteredColumnHeaderStyle"));
+                var centeredTextCellStyle = Assert.IsType<Style>(window.FindResource("CenteredTextCellStyle"));
+
+                var stateColumn = Assert.IsType<WpfDataGridTemplateColumn>(
+                    lessonGrid.Columns.Single(column => column.Header?.ToString() == "State"));
+                Assert.Same(centeredHeaderStyle, stateColumn.HeaderStyle);
+
+                var invoicedColumn = Assert.IsType<WpfDataGridTextColumn>(
+                    lessonGrid.Columns.Single(column => column.Header?.ToString() == "Invoiced"));
+                Assert.Same(centeredHeaderStyle, invoicedColumn.HeaderStyle);
+                Assert.Same(centeredTextCellStyle, invoicedColumn.ElementStyle);
+
+                var paidColumn = Assert.IsType<WpfDataGridTextColumn>(
+                    lessonGrid.Columns.Single(column => column.Header?.ToString() == "Paid"));
+                Assert.Same(centeredHeaderStyle, paidColumn.HeaderStyle);
+                Assert.Same(centeredTextCellStyle, paidColumn.ElementStyle);
+                Assert.False(paidColumn.CanUserResize);
+
+                var deleteColumn = Assert.IsType<WpfDataGridTemplateColumn>(
+                    lessonGrid.Columns.Single(column => string.IsNullOrEmpty(column.Header?.ToString())));
+                Assert.False(deleteColumn.CanUserResize);
+
+                var lessonsPane = Assert.Single(
+                    FindVisualChildren<WpfGrid>(window),
+                    grid => AutomationProperties.GetName(grid) == "Lessons pane");
+                Assert.Equal(480, lessonsPane.Width);
+
+                var invoiceGrid = Assert.Single(
+                    FindVisualChildren<WpfDataGrid>(window),
+                    grid => AutomationProperties.GetName(grid) == "Student invoices");
+                Assert.All(invoiceGrid.Columns, column => Assert.Equal(WpfDataGridLengthUnitType.Star, column.Width.UnitType));
             }
             finally
             {
