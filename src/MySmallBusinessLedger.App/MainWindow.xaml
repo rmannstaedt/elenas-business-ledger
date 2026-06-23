@@ -350,6 +350,7 @@
                                         <Button Content="×"
                                                 Command="{Binding DataContext.DeleteLessonCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
                                                 CommandParameter="{Binding}"
+                                                PreviewMouseLeftButtonDown="OnDeleteLessonPreviewMouseLeftButtonDown"
                                                 Visibility="{Binding CanEdit, Converter={StaticResource BooleanToVisibilityConverter}}"
                                                 Style="{StaticResource QuietIconButtonStyle}"
                                                 ToolTip="Delete lesson"

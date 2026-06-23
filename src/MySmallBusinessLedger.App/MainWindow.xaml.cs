@@ -90,4 +90,16 @@ public partial class MainWindow : Window
             new Action(() => comboBox.IsDropDownOpen = true),
             DispatcherPriority.Input);
     }
+
+    private async void OnDeleteLessonPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not FrameworkElement { DataContext: LessonDisplayModel lesson } ||
+            !ViewModel.DeleteLessonCommand.CanExecute(lesson))
+        {
+            return;
+        }
+
+        e.Handled = true;
+        await ViewModel.DeleteLessonCommand.ExecuteAsync(lesson);
+    }
 }

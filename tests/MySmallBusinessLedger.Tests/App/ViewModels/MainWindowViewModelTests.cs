@@ -6,6 +6,11 @@ using MySmallBusinessLedger.Core.Lessons;
 using MySmallBusinessLedger.Core.UseCases.Lessons;
 using MySmallBusinessLedger.Core.UseCases.Startup;
 using System.Windows;
+using System.Windows.Automation;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Threading;
+using WpfButton = System.Windows.Controls.Button;
 using WpfMenuItem = System.Windows.Controls.MenuItem;
 using AppMainWindow = MySmallBusinessLedger.App.MainWindow;
 
@@ -48,6 +53,49 @@ public sealed class MainWindowViewModelTests
             Assert.Equal(["_Manage Students"], studentActions);
 
             window.Close();
+        });
+    }
+
+    [Fact]
+    public void LessonDeleteButtonPreviewClickInvokesDeleteWorkflow()
+    {
+        RunOnStaThread(() =>
+        {
+            var lessonEditor = new FakeLessonEditorService();
+            var viewModel = CreateViewModel(
+                dashboard: new FakeDashboardService { LessonState = LessonState.Planned, LessonIsInvoiced = false, LessonPaymentStatus = null },
+                confirmation: new FakeConfirmationService { NextAnswer = true },
+                lessonEditorService: lessonEditor);
+
+            var window = new AppMainWindow(viewModel);
+            try
+            {
+                window.Show();
+                PumpUntil(() => !viewModel.IsBusy && viewModel.Lessons.Count == 1);
+
+                var deleteButton =
+                    FindVisualChildren<WpfButton>(window)
+                        .FirstOrDefault(button =>
+                            button.Content?.ToString() == "×" &&
+                            AutomationProperties.GetName(button) == "Delete lesson");
+                Assert.NotNull(deleteButton);
+                deleteButton.RaiseEvent(new MouseButtonEventArgs(
+                    Mouse.PrimaryDevice,
+                    Environment.TickCount,
+                    MouseButton.Left)
+                {
+                    RoutedEvent = UIElement.PreviewMouseLeftButtonDownEvent,
+                    Source = deleteButton
+                });
+                PumpUntil(() => lessonEditor.DeleteWasCalled);
+
+                Assert.True(lessonEditor.DeleteWasCalled);
+                Assert.Empty(viewModel.Lessons);
+            }
+            finally
+            {
+                window.Close();
+            }
         });
     }
 
@@ -716,6 +764,40 @@ public sealed class MainWindowViewModelTests
         }
 
         return matches;
+    }
+
+    private static IReadOnlyList<T> FindVisualChildren<T>(DependencyObject root)
+        where T : DependencyObject
+    {
+        var matches = new List<T>();
+        var count = VisualTreeHelper.GetChildrenCount(root);
+        for (var index = 0; index < count; index++)
+        {
+            var child = VisualTreeHelper.GetChild(root, index);
+            if (child is T match)
+            {
+                matches.Add(match);
+            }
+
+            matches.AddRange(FindVisualChildren<T>(child));
+        }
+
+        return matches;
+    }
+
+    private static void PumpUntil(Func<bool> condition)
+    {
+        var deadline = DateTimeOffset.UtcNow.AddSeconds(5);
+        while (!condition() && DateTimeOffset.UtcNow < deadline)
+        {
+            var frame = new DispatcherFrame();
+            Dispatcher.CurrentDispatcher.BeginInvoke(
+                DispatcherPriority.Background,
+                new Action(() => frame.Continue = false));
+            Dispatcher.PushFrame(frame);
+        }
+
+        Assert.True(condition());
     }
 
     private sealed class FakeDashboardService : IStartupDashboardService
