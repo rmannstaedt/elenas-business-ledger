@@ -84,9 +84,17 @@
                       HeadersVisibility="Column"
                       GridLinesVisibility="Horizontal">
                 <DataGrid.Columns>
-                    <DataGridCheckBoxColumn Header="Include"
-                                            Binding="{Binding IsIncluded, UpdateSourceTrigger=PropertyChanged}"
-                                            Width="70" />
+                    <DataGridTemplateColumn Header="Include"
+                                            Width="70">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <CheckBox IsChecked="{Binding IsIncluded, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"
+                                          PreviewMouseLeftButtonDown="OnIncludeLinePreviewMouseLeftButtonDown" />
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
                     <DataGridTextColumn Header="Lesson"
                                         Binding="{Binding LessonDateTimeText}"
                                         IsReadOnly="True"

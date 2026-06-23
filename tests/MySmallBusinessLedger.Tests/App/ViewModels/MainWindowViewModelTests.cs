@@ -7,11 +7,15 @@ using MySmallBusinessLedger.Core.UseCases.Lessons;
 using MySmallBusinessLedger.Core.UseCases.Startup;
 using System.Windows;
 using System.Windows.Automation;
+using System.Windows.Automation.Peers;
+using System.Windows.Automation.Provider;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using WpfButton = System.Windows.Controls.Button;
+using WpfCalendar = System.Windows.Controls.Calendar;
 using WpfMenuItem = System.Windows.Controls.MenuItem;
+using WpfPopup = System.Windows.Controls.Primitives.Popup;
 using AppMainWindow = MySmallBusinessLedger.App.MainWindow;
 
 namespace MySmallBusinessLedger.Tests.App.ViewModels;
@@ -79,14 +83,7 @@ public sealed class MainWindowViewModelTests
                             button.Content?.ToString() == "×" &&
                             AutomationProperties.GetName(button) == "Delete lesson");
                 Assert.NotNull(deleteButton);
-                deleteButton.RaiseEvent(new MouseButtonEventArgs(
-                    Mouse.PrimaryDevice,
-                    Environment.TickCount,
-                    MouseButton.Left)
-                {
-                    RoutedEvent = UIElement.PreviewMouseLeftButtonDownEvent,
-                    Source = deleteButton
-                });
+                RaisePreviewLeftClick(deleteButton);
                 PumpUntil(() => lessonEditor.DeleteWasCalled);
 
                 Assert.True(lessonEditor.DeleteWasCalled);
@@ -94,6 +91,277 @@ public sealed class MainWindowViewModelTests
             }
             finally
             {
+                window.Close();
+            }
+        });
+    }
+
+    [Fact]
+    public void LessonStateButtonPreviewClickInvokesToggleWorkflow()
+    {
+        RunOnStaThread(() =>
+        {
+            var lessonStates = new FakeLessonStateService();
+            var viewModel = CreateViewModel(
+                dashboard: new FakeDashboardService { LessonState = LessonState.Planned, LessonIsInvoiced = false, LessonPaymentStatus = null },
+                lessonStates: lessonStates);
+
+            var window = new AppMainWindow(viewModel);
+            try
+            {
+                window.Show();
+                PumpUntil(() => !viewModel.IsBusy && viewModel.Lessons.Count == 1);
+
+                var stateButton =
+                    FindVisualChildren<WpfButton>(window)
+                        .FirstOrDefault(button => AutomationProperties.GetName(button) == "Mark lesson as completed");
+                Assert.NotNull(stateButton);
+
+                RaisePreviewLeftClick(stateButton);
+                PumpUntil(() => lessonStates.LastLessonId is not null);
+
+                Assert.Equal("lesson-1", lessonStates.LastLessonId);
+                Assert.Equal("Completed", viewModel.Lessons[0].StateText);
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
+    [Fact]
+    public void InvoiceStatusButtonPreviewClickInvokesPaymentWorkflow()
+    {
+        RunOnStaThread(() =>
+        {
+            var payments = new FakePaymentService();
+            var viewModel = CreateViewModel(payments: payments);
+
+            var window = new AppMainWindow(viewModel);
+            try
+            {
+                window.Show();
+                PumpUntil(() => !viewModel.IsBusy && viewModel.Invoices.Count == 1);
+
+                var paymentButton =
+                    FindVisualChildren<WpfButton>(window)
+                        .FirstOrDefault(button => AutomationProperties.GetName(button) == "Outstanding");
+                Assert.NotNull(paymentButton);
+
+                RaisePreviewLeftClick(paymentButton);
+                PumpUntil(() => payments.LastInvoiceNumber.Value == 1);
+
+                Assert.Equal(new InvoiceNumber(1), payments.LastInvoiceNumber);
+                Assert.Equal("Paid", viewModel.Invoices[0].PaymentStatusText);
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
+    [Fact]
+    public void LessonDateButtonOpensNonCapturingCalendarPopup()
+    {
+        RunOnStaThread(() =>
+        {
+            var viewModel = CreateViewModel(
+                dashboard: new FakeDashboardService { LessonState = LessonState.Planned, LessonIsInvoiced = false, LessonPaymentStatus = null });
+
+            var window = new AppMainWindow(viewModel);
+            try
+            {
+                window.Show();
+                PumpUntil(() => !viewModel.IsBusy && viewModel.Lessons.Count == 1);
+
+                var dateButton = FindButton(window, "Open lesson date selector");
+
+                RaisePreviewLeftClick(dateButton);
+                PumpUntil(() => dateButton.Tag is WpfPopup { IsOpen: true });
+
+                var popup = Assert.IsType<WpfPopup>(dateButton.Tag);
+                Assert.True(popup.IsOpen, "The lesson date popup should open on the first preview mouse click.");
+                Assert.True(popup.StaysOpen, "The lesson date popup must not capture outside mouse clicks.");
+                Assert.NotNull(popup.Child);
+                Assert.Single(FindVisualChildren<WpfCalendar>(popup.Child));
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
+    [Fact]
+    public void LessonCalendarSelectionUpdatesDateAndClosesPopup()
+    {
+        RunOnStaThread(() =>
+        {
+            var lessonEditor = new FakeLessonEditorService();
+            var viewModel = CreateViewModel(
+                dashboard: new FakeDashboardService { LessonState = LessonState.Planned, LessonIsInvoiced = false, LessonPaymentStatus = null },
+                lessonEditorService: lessonEditor);
+
+            var window = new AppMainWindow(viewModel);
+            try
+            {
+                window.Show();
+                PumpUntil(() => !viewModel.IsBusy && viewModel.Lessons.Count == 1);
+
+                var dateButton = FindButton(window, "Open lesson date selector");
+                RaisePreviewLeftClick(dateButton);
+                PumpUntil(() => dateButton.Tag is WpfPopup { IsOpen: true });
+
+                var popup = Assert.IsType<WpfPopup>(dateButton.Tag);
+                Assert.NotNull(popup.Child);
+                var calendar = Assert.Single(FindVisualChildren<WpfCalendar>(popup.Child));
+
+                calendar.SelectedDates.Clear();
+                calendar.SelectedDates.Add(new DateTime(2026, 6, 23));
+                PumpUntil(() => !popup.IsOpen);
+
+                Assert.False(popup.IsOpen);
+                Assert.True(lessonEditor.EditWasCalled);
+                Assert.Equal(
+                    new DateTimeOffset(2026, 6, 23, 15, 0, 0, TimeSpan.FromHours(2)),
+                    lessonEditor.LastEditRequest?.StartsAt);
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
+    [Fact]
+    public void AddLessonButtonWorksAfterStudentNavigation()
+    {
+        RunOnStaThread(() =>
+        {
+            var dashboard = new FakeDashboardService
+            {
+                StudentShortNames = ["Anna", "Bo"],
+                LessonState = LessonState.Planned,
+                LessonIsInvoiced = false,
+                LessonPaymentStatus = null
+            };
+            var viewModel = CreateViewModel(dashboard: dashboard);
+
+            var window = new AppMainWindow(viewModel);
+            try
+            {
+                window.Show();
+                PumpUntil(() => !viewModel.IsBusy && viewModel.CurrentStudentShortName == "Anna");
+
+                var nextStudentButton = FindButton(window, "Next student");
+                InvokeButton(nextStudentButton);
+                PumpUntil(() => !viewModel.IsBusy && viewModel.CurrentStudentShortName == "Bo");
+
+                var previousStudentButton = FindButton(window, "Previous student");
+                InvokeButton(previousStudentButton);
+                PumpUntil(() => !viewModel.IsBusy && viewModel.CurrentStudentShortName == "Anna");
+
+                var addLessonButton = FindButton(window, "Add Lesson");
+                Assert.True(addLessonButton.Command?.CanExecute(addLessonButton.CommandParameter));
+                InvokeButton(addLessonButton);
+                PumpUntil(() => viewModel.Lessons.Count == 2);
+
+                Assert.True(viewModel.SelectedLesson?.IsDraft);
+                Assert.Equal("Anna", viewModel.SelectedLesson?.StudentShortName);
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
+    [Fact]
+    public void AddLessonButtonPreviewClickWorksAfterStudentNavigation()
+    {
+        RunOnStaThread(() =>
+        {
+            var dashboard = new FakeDashboardService
+            {
+                StudentShortNames = ["Anna", "Bo"],
+                LessonState = LessonState.Planned,
+                LessonIsInvoiced = false,
+                LessonPaymentStatus = null
+            };
+            var viewModel = CreateViewModel(dashboard: dashboard);
+
+            var window = new AppMainWindow(viewModel);
+            try
+            {
+                window.Show();
+                PumpUntil(() => !viewModel.IsBusy && viewModel.CurrentStudentShortName == "Anna");
+
+                InvokeButton(FindButton(window, "Next student"));
+                PumpUntil(() => !viewModel.IsBusy && viewModel.CurrentStudentShortName == "Bo");
+
+                InvokeButton(FindButton(window, "Previous student"));
+                PumpUntil(() => !viewModel.IsBusy && viewModel.CurrentStudentShortName == "Anna");
+
+                RaisePreviewLeftClick(FindButton(window, "Add Lesson"));
+                PumpUntil(() => viewModel.Lessons.Count == 2);
+
+                Assert.True(viewModel.SelectedLesson?.IsDraft);
+                Assert.Equal("Anna", viewModel.SelectedLesson?.StudentShortName);
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
+    [Fact]
+    public void AddLessonButtonPreviewClickWorksWhileActivationRefreshIsPending()
+    {
+        RunOnStaThread(() =>
+        {
+            var activationRefreshStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var allowActivationRefreshToFinish = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var loadCount = 0;
+            var clock = new FakeUiClock(new DateTimeOffset(2026, 6, 16, 12, 0, 0, TimeSpan.Zero));
+            var dashboard = new FakeDashboardService
+            {
+                BeforeReturnAsync = _ =>
+                {
+                    loadCount++;
+                    if (loadCount != 2)
+                    {
+                        return Task.CompletedTask;
+                    }
+
+                    activationRefreshStarted.SetResult();
+                    return allowActivationRefreshToFinish.Task;
+                }
+            };
+            var viewModel = CreateViewModel(dashboard: dashboard, clock: clock);
+
+            var window = new AppMainWindow(viewModel);
+            try
+            {
+                window.Show();
+                PumpUntil(() => !viewModel.IsBusy && viewModel.Lessons.Count == 1);
+                clock.Now = clock.Now.AddSeconds(11);
+
+                InvokeActivated(window);
+                RaisePreviewLeftClick(FindButton(window, "Add Lesson"));
+
+                Assert.True(viewModel.SelectedLesson?.IsDraft);
+                Assert.Equal(2, viewModel.Lessons.Count);
+
+                PumpUntil(() => activationRefreshStarted.Task.IsCompleted);
+                allowActivationRefreshToFinish.SetResult();
+                PumpUntil(() => !viewModel.IsBusy);
+            }
+            finally
+            {
+                allowActivationRefreshToFinish.TrySetResult();
                 window.Close();
             }
         });
@@ -208,6 +476,27 @@ public sealed class MainWindowViewModelTests
 
         Assert.True(confirmation.WasAsked);
         Assert.True(payments.LastConfirmMarkOutstanding);
+        Assert.Equal("Outstanding", viewModel.Invoices[0].PaymentStatusText);
+    }
+
+    [Fact]
+    public async Task PaidInvoiceReturnToOutstandingIsNotLostWhenActivationRefreshRunsDuringPaymentUpdate()
+    {
+        var clock = new FakeUiClock(new DateTimeOffset(2026, 6, 16, 12, 0, 0, TimeSpan.Zero));
+        var payments = new FakePaymentService();
+        var confirmation = new FakeConfirmationService { NextAnswer = true };
+        var viewModel = CreateViewModel(
+            dashboard: new FakeDashboardService { InvoicePaymentStatus = PaymentStatus.Paid },
+            payments: payments,
+            confirmation: confirmation,
+            clock: clock);
+        payments.BeforeReturnAsync = () => viewModel.RefreshAfterActivationAsync();
+        await viewModel.LoadAsync();
+        clock.Now = clock.Now.AddSeconds(11);
+
+        await viewModel.ToggleInvoicePaymentStatusCommand.ExecuteAsync(viewModel.Invoices[0]);
+
+        Assert.True(confirmation.WasAsked);
         Assert.Equal("Outstanding", viewModel.Invoices[0].PaymentStatusText);
     }
 
@@ -428,6 +717,29 @@ public sealed class MainWindowViewModelTests
         Assert.Equal(new DateTimeOffset(2026, 6, 15, 14, 0, 0, TimeSpan.FromHours(2)), lessonEditor.LastAddRequest?.StartsAt);
         Assert.False(draft.IsDraft);
         Assert.Same(draft, viewModel.SelectedLesson);
+    }
+
+    [Fact]
+    public async Task AutosavedDraftRaisesLessonStateCommandAvailability()
+    {
+        var lessonEditor = new FakeLessonEditorService();
+        var viewModel = CreateViewModel(
+            dashboard: new FakeDashboardService { LessonState = LessonState.Planned, LessonIsInvoiced = false, LessonPaymentStatus = null },
+            lessonEditorService: lessonEditor,
+            lessonTimeZone: TimeZoneInfo.FindSystemTimeZoneById("Romance Standard Time"));
+        await viewModel.LoadAsync();
+        await viewModel.AddLessonCommand.ExecuteAsync();
+        var draft = viewModel.SelectedLesson!;
+        var availabilityChanged = false;
+        viewModel.ToggleLessonStateCommand.CanExecuteChanged += (_, _) => availabilityChanged = true;
+
+        draft.StartsOnDate = new DateTime(2026, 6, 15);
+        draft.StartsAtTimeText = "14:00";
+
+        await EventuallyAsync(() => !draft.IsDraft);
+        Assert.True(draft.CanToggleState);
+        Assert.True(viewModel.ToggleLessonStateCommand.CanExecute(draft));
+        Assert.True(availabilityChanged);
     }
 
     [Fact]
@@ -661,6 +973,28 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task CompletedLessonReturnToPlannedIsNotLostWhenActivationRefreshRunsDuringStateUpdate()
+    {
+        var clock = new FakeUiClock(new DateTimeOffset(2026, 6, 16, 12, 0, 0, TimeSpan.Zero));
+        var confirmation = new FakeConfirmationService { NextAnswer = true };
+        var lessonStates = new FakeLessonStateService();
+        var viewModel = CreateViewModel(
+            dashboard: new FakeDashboardService { LessonState = LessonState.Completed, LessonIsInvoiced = false, LessonPaymentStatus = null },
+            confirmation: confirmation,
+            lessonStates: lessonStates,
+            clock: clock);
+        lessonStates.BeforeReturnAsync = () => viewModel.RefreshAfterActivationAsync();
+        await viewModel.LoadAsync();
+        clock.Now = clock.Now.AddSeconds(11);
+
+        await viewModel.ToggleLessonStateCommand.ExecuteAsync(viewModel.Lessons[0]);
+
+        Assert.True(confirmation.MarkLessonPlannedWasAsked);
+        Assert.Equal("Planned", viewModel.Lessons[0].StateText);
+        Assert.True(viewModel.Lessons[0].CanEdit);
+    }
+
+    [Fact]
     public async Task CompletedLessonEditIsBlocked()
     {
         var lessonEditor = new FakeLessonEditorService();
@@ -688,6 +1022,26 @@ public sealed class MainWindowViewModelTests
         await viewModel.DeleteLessonCommand.ExecuteAsync(viewModel.Lessons[0]);
 
         Assert.True(lessonEditor.DeleteWasCalled);
+        Assert.Empty(viewModel.Lessons);
+        Assert.False(viewModel.HasError);
+    }
+
+    [Fact]
+    public async Task ConfirmedLessonDeleteIsNotLostWhenActivationRefreshRunsDuringDelete()
+    {
+        var clock = new FakeUiClock(new DateTimeOffset(2026, 6, 16, 12, 0, 0, TimeSpan.Zero));
+        var lessonEditor = new FakeLessonEditorService();
+        var viewModel = CreateViewModel(
+            dashboard: new FakeDashboardService { LessonState = LessonState.Planned, LessonIsInvoiced = false, LessonPaymentStatus = null },
+            confirmation: new FakeConfirmationService { NextAnswer = true },
+            lessonEditorService: lessonEditor,
+            clock: clock);
+        lessonEditor.BeforeDeleteReturnAsync = () => viewModel.RefreshAfterActivationAsync();
+        await viewModel.LoadAsync();
+        clock.Now = clock.Now.AddSeconds(11);
+
+        await viewModel.DeleteLessonCommand.ExecuteAsync(viewModel.Lessons[0]);
+
         Assert.Empty(viewModel.Lessons);
         Assert.False(viewModel.HasError);
     }
@@ -785,6 +1139,68 @@ public sealed class MainWindowViewModelTests
         return matches;
     }
 
+    private static void RaisePreviewLeftClick(UIElement element)
+    {
+        element.RaiseEvent(new MouseButtonEventArgs(
+            Mouse.PrimaryDevice,
+            Environment.TickCount,
+            MouseButton.Left)
+        {
+            RoutedEvent = UIElement.PreviewMouseLeftButtonDownEvent,
+            Source = element
+        });
+    }
+
+    private static void RaiseHandledPreviewLeftClick(UIElement element)
+    {
+        element.RaiseEvent(new MouseButtonEventArgs(
+            Mouse.PrimaryDevice,
+            Environment.TickCount,
+            MouseButton.Left)
+        {
+            RoutedEvent = UIElement.PreviewMouseLeftButtonDownEvent,
+            Source = element,
+            Handled = true
+        });
+    }
+
+    private static WpfButton FindButton(DependencyObject root, string nameOrContent)
+    {
+        var button = FindVisualChildren<WpfButton>(root)
+            .FirstOrDefault(button =>
+                string.Equals(AutomationProperties.GetName(button), nameOrContent, StringComparison.Ordinal) ||
+                string.Equals(button.Content?.ToString(), nameOrContent, StringComparison.Ordinal));
+        Assert.NotNull(button);
+        return button;
+    }
+
+    private static void InvokeButton(WpfButton button)
+    {
+        var peer = new ButtonAutomationPeer(button);
+        ((IInvokeProvider)peer.GetPattern(PatternInterface.Invoke)).Invoke();
+    }
+
+    private static void InvokeActivated(AppMainWindow window)
+    {
+        var method = typeof(AppMainWindow).GetMethod(
+            "OnActivated",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic,
+            binder: null,
+            [typeof(object), typeof(EventArgs)],
+            modifiers: null);
+        Assert.NotNull(method);
+        method.Invoke(window, [window, EventArgs.Empty]);
+    }
+
+    private static void PumpDispatcher(DispatcherPriority priority)
+    {
+        var frame = new DispatcherFrame();
+        Dispatcher.CurrentDispatcher.BeginInvoke(
+            priority,
+            new Action(() => frame.Continue = false));
+        Dispatcher.PushFrame(frame);
+    }
+
     private static void PumpUntil(Func<bool> condition)
     {
         var deadline = DateTimeOffset.UtcNow.AddSeconds(5);
@@ -817,6 +1233,8 @@ public sealed class MainWindowViewModelTests
         public bool LessonIsInvoiced { get; init; } = true;
 
         public PaymentStatus? LessonPaymentStatus { get; init; } = PaymentStatus.Outstanding;
+
+        public PaymentStatus InvoicePaymentStatus { get; init; } = PaymentStatus.Outstanding;
 
         public bool CurrentStudentHasSchedule { get; init; } = true;
 
@@ -859,7 +1277,7 @@ public sealed class MainWindowViewModelTests
                             new InvoiceNumber(1),
                             currentStudent,
                             new DateOnly(2026, 6, 16),
-                            PaymentStatus.Outstanding,
+                            InvoicePaymentStatus,
                             "C:\\Invoices\\000001.pdf")
                     ],
                     CurrentStudentHasSchedule));
@@ -891,15 +1309,22 @@ public sealed class MainWindowViewModelTests
 
         public bool LastConfirmMarkOutstanding { get; private set; }
 
-        public Task<OperationResult<PaymentStatus>> ToggleAsync(
+        public Func<Task>? BeforeReturnAsync { get; set; }
+
+        public async Task<OperationResult<PaymentStatus>> ToggleAsync(
             InvoiceNumber invoiceNumber,
             bool confirmMarkOutstanding,
             CancellationToken cancellationToken)
         {
             LastInvoiceNumber = invoiceNumber;
             LastConfirmMarkOutstanding = confirmMarkOutstanding;
+            if (BeforeReturnAsync is not null)
+            {
+                await BeforeReturnAsync();
+            }
+
             var next = confirmMarkOutstanding ? PaymentStatus.Outstanding : PaymentStatus.Paid;
-            return Task.FromResult(OperationResult<PaymentStatus>.Success(next));
+            return OperationResult<PaymentStatus>.Success(next);
         }
     }
 
@@ -1040,11 +1465,15 @@ public sealed class MainWindowViewModelTests
 
         public MySmallBusinessLedger.Core.UseCases.Lessons.LessonAddRequest? LastAddRequest { get; private set; }
 
+        public MySmallBusinessLedger.Core.UseCases.Lessons.LessonEditRequest? LastEditRequest { get; private set; }
+
         public string? LastPopulateStudentShortName { get; private set; }
 
         public DateOnly? LastPopulateDisplayMonth { get; private set; }
 
         public DateOnly? LastPopulateToday { get; private set; }
+
+        public Func<Task>? BeforeDeleteReturnAsync { get; set; }
 
         public OperationResult<PopulateCalendarResult> PopulateResult { get; init; } =
             OperationResult<PopulateCalendarResult>.Success(new PopulateCalendarResult(2, 0, []));
@@ -1078,16 +1507,22 @@ public sealed class MainWindowViewModelTests
             CancellationToken cancellationToken)
         {
             EditWasCalled = true;
+            LastEditRequest = request;
             return Task.FromResult(OperationResult<IReadOnlyList<MySmallBusinessLedger.Core.Calendar.CalendarLesson>>.Success([]));
         }
 
-        public Task<OperationResult<IReadOnlyList<MySmallBusinessLedger.Core.Calendar.CalendarLesson>>> DeleteAsync(
+        public async Task<OperationResult<IReadOnlyList<MySmallBusinessLedger.Core.Calendar.CalendarLesson>>> DeleteAsync(
             string lessonId,
             DateOnly refreshMonth,
             CancellationToken cancellationToken)
         {
             DeleteWasCalled = true;
-            return Task.FromResult(OperationResult<IReadOnlyList<MySmallBusinessLedger.Core.Calendar.CalendarLesson>>.Success([]));
+            if (BeforeDeleteReturnAsync is not null)
+            {
+                await BeforeDeleteReturnAsync();
+            }
+
+            return OperationResult<IReadOnlyList<MySmallBusinessLedger.Core.Calendar.CalendarLesson>>.Success([]);
         }
     }
 
@@ -1097,7 +1532,9 @@ public sealed class MainWindowViewModelTests
 
         public LessonState? LastCurrentState { get; private set; }
 
-        public Task<OperationResult<LessonState>> ToggleAsync(
+        public Func<Task>? BeforeReturnAsync { get; set; }
+
+        public async Task<OperationResult<LessonState>> ToggleAsync(
             string lessonId,
             LessonState currentState,
             bool confirmReturnToPlanned,
@@ -1105,8 +1542,13 @@ public sealed class MainWindowViewModelTests
         {
             LastLessonId = lessonId;
             LastCurrentState = currentState;
+            if (BeforeReturnAsync is not null)
+            {
+                await BeforeReturnAsync();
+            }
+
             var nextState = currentState == LessonState.Planned ? LessonState.Completed : LessonState.Planned;
-            return Task.FromResult(OperationResult<LessonState>.Success(nextState));
+            return OperationResult<LessonState>.Success(nextState);
         }
     }
 

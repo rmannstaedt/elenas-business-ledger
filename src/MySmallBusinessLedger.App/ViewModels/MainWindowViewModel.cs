@@ -266,17 +266,24 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     private async Task ToggleInvoicePaymentStatusAsync(InvoiceDisplayModel invoice)
     {
-        var confirmMarkOutstanding = false;
         if (invoice.PaymentStatus == PaymentStatus.Paid)
         {
-            confirmMarkOutstanding = await RunWithActivationRefreshSuspendedAsync(
-                () => confirmationService.ConfirmMarkInvoiceOutstandingAsync(invoice, CancellationToken.None));
-            if (!confirmMarkOutstanding)
+            await RunWithActivationRefreshSuspendedAsync(async () =>
             {
-                return;
-            }
+                var confirmed = await confirmationService.ConfirmMarkInvoiceOutstandingAsync(invoice, CancellationToken.None);
+                if (confirmed)
+                {
+                    await ToggleInvoicePaymentStatusCoreAsync(invoice, confirmMarkOutstanding: true);
+                }
+            });
+            return;
         }
 
+        await ToggleInvoicePaymentStatusCoreAsync(invoice, confirmMarkOutstanding: false);
+    }
+
+    private async Task ToggleInvoicePaymentStatusCoreAsync(InvoiceDisplayModel invoice, bool confirmMarkOutstanding)
+    {
         var result = await paymentStatusService.ToggleAsync(invoice.InvoiceNumber, confirmMarkOutstanding, CancellationToken.None);
         if (!result.Succeeded)
         {
@@ -461,6 +468,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         }
 
         ErrorMessage = null;
+        RaiseCommandAvailabilityChanged();
     }
 
     private async Task DeleteLessonAsync(LessonDisplayModel lesson)
@@ -486,13 +494,18 @@ public sealed class MainWindowViewModel : ViewModelBase
             return;
         }
 
-        var confirmed = await RunWithActivationRefreshSuspendedAsync(
-            () => confirmationService.ConfirmDeleteLessonAsync(lesson, CancellationToken.None));
-        if (!confirmed)
+        await RunWithActivationRefreshSuspendedAsync(async () =>
         {
-            return;
-        }
+            var confirmed = await confirmationService.ConfirmDeleteLessonAsync(lesson, CancellationToken.None);
+            if (confirmed)
+            {
+                await DeleteConfirmedLessonAsync(lesson);
+            }
+        });
+    }
 
+    private async Task DeleteConfirmedLessonAsync(LessonDisplayModel lesson)
+    {
         var result = await lessonEditorService.DeleteAsync(lesson.Id, DisplayMonth, CancellationToken.None);
         if (!result.Succeeded)
         {
@@ -518,17 +531,24 @@ public sealed class MainWindowViewModel : ViewModelBase
             return;
         }
 
-        var confirmReturnToPlanned = false;
         if (lesson.State == LessonState.Completed)
         {
-            confirmReturnToPlanned = await RunWithActivationRefreshSuspendedAsync(
-                () => confirmationService.ConfirmMarkLessonPlannedAsync(lesson, CancellationToken.None));
-            if (!confirmReturnToPlanned)
+            await RunWithActivationRefreshSuspendedAsync(async () =>
             {
-                return;
-            }
+                var confirmed = await confirmationService.ConfirmMarkLessonPlannedAsync(lesson, CancellationToken.None);
+                if (confirmed)
+                {
+                    await ToggleLessonStateCoreAsync(lesson, confirmReturnToPlanned: true);
+                }
+            });
+            return;
         }
 
+        await ToggleLessonStateCoreAsync(lesson, confirmReturnToPlanned: false);
+    }
+
+    private async Task ToggleLessonStateCoreAsync(LessonDisplayModel lesson, bool confirmReturnToPlanned)
+    {
         var result = await lessonStateService.ToggleAsync(
             lesson.Id,
             lesson.State,
@@ -556,6 +576,19 @@ public sealed class MainWindowViewModel : ViewModelBase
         }
 
         await SaveLessonAsync(lesson);
+    }
+
+    private async Task RunWithActivationRefreshSuspendedAsync(Func<Task> action)
+    {
+        activationRefreshSuspendCount++;
+        try
+        {
+            await action();
+        }
+        finally
+        {
+            activationRefreshSuspendCount--;
+        }
     }
 
     private async Task<T> RunWithActivationRefreshSuspendedAsync<T>(Func<Task<T>> action)

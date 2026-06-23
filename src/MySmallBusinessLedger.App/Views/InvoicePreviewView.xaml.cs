@@ -1,4 +1,6 @@
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
 using MySmallBusinessLedger.App.Services;
 using MySmallBusinessLedger.App.ViewModels;
 
@@ -24,5 +26,16 @@ public partial class InvoicePreviewView : Window
     {
         DialogResult = false;
         Close();
+    }
+
+    private void OnIncludeLinePreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not CheckBox { IsEnabled: true } checkBox)
+        {
+            return;
+        }
+
+        e.Handled = true;
+        checkBox.IsChecked = checkBox.IsChecked != true;
     }
 }

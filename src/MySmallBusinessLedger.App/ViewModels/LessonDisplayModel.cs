@@ -121,6 +121,7 @@ public sealed class LessonDisplayModel : ViewModelBase
         {
             if (SetProperty(ref isDraft, value))
             {
+                OnPropertyChanged(nameof(CanEdit));
                 OnPropertyChanged(nameof(CanToggleState));
                 OnPropertyChanged(nameof(HasDateTimeChange));
             }

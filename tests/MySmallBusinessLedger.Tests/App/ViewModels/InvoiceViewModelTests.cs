@@ -5,6 +5,12 @@ using MySmallBusinessLedger.Core.Common;
 using MySmallBusinessLedger.Core.Invoices;
 using MySmallBusinessLedger.Core.Money;
 using MySmallBusinessLedger.Core.UseCases.Invoices;
+using MySmallBusinessLedger.App.Views;
+using System.Windows;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Threading;
+using WpfCheckBox = System.Windows.Controls.CheckBox;
 
 namespace MySmallBusinessLedger.Tests.App.ViewModels;
 
@@ -134,6 +140,33 @@ public sealed class InvoiceViewModelTests
 
         Assert.False(service.IssueCalled);
         Assert.Equal("Choose an invoice printer before printing the invoice.", viewModel.ErrorMessage);
+    }
+
+    [Fact]
+    public void PreviewIncludeCheckboxPreviewClickTogglesLine()
+    {
+        RunOnStaThread(() =>
+        {
+            var viewModel = new InvoicePreviewViewModel(new FakeInvoiceWorkflowService(), CreatePreview());
+            var window = new InvoicePreviewView(viewModel);
+            try
+            {
+                window.Show();
+                PumpUntil(() => FindVisualChildren<WpfCheckBox>(window).Count == 1);
+                var includeCheckBox = Assert.Single(FindVisualChildren<WpfCheckBox>(window));
+
+                Assert.True(viewModel.Lines[0].IsIncluded);
+
+                RaisePreviewLeftClick(includeCheckBox);
+                PumpUntil(() => !viewModel.Lines[0].IsIncluded);
+
+                Assert.False(viewModel.Lines[0].IsIncluded);
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
     }
 
     [Fact]
@@ -271,6 +304,77 @@ public sealed class InvoiceViewModelTests
             printStatus,
             printedAt,
             lastPrintError);
+    }
+
+    private static void RunOnStaThread(Action action)
+    {
+        Exception? exception = null;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                action();
+            }
+            catch (Exception ex)
+            {
+                exception = ex;
+            }
+        });
+
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+
+        if (exception is not null)
+        {
+            throw exception;
+        }
+    }
+
+    private static IReadOnlyList<T> FindVisualChildren<T>(DependencyObject root)
+        where T : DependencyObject
+    {
+        var matches = new List<T>();
+        var count = VisualTreeHelper.GetChildrenCount(root);
+        for (var index = 0; index < count; index++)
+        {
+            var child = VisualTreeHelper.GetChild(root, index);
+            if (child is T match)
+            {
+                matches.Add(match);
+            }
+
+            matches.AddRange(FindVisualChildren<T>(child));
+        }
+
+        return matches;
+    }
+
+    private static void RaisePreviewLeftClick(UIElement element)
+    {
+        element.RaiseEvent(new MouseButtonEventArgs(
+            Mouse.PrimaryDevice,
+            Environment.TickCount,
+            MouseButton.Left)
+        {
+            RoutedEvent = UIElement.PreviewMouseLeftButtonDownEvent,
+            Source = element
+        });
+    }
+
+    private static void PumpUntil(Func<bool> condition)
+    {
+        var deadline = DateTimeOffset.UtcNow.AddSeconds(5);
+        while (!condition() && DateTimeOffset.UtcNow < deadline)
+        {
+            var frame = new DispatcherFrame();
+            Dispatcher.CurrentDispatcher.BeginInvoke(
+                DispatcherPriority.Background,
+                new Action(() => frame.Continue = false));
+            Dispatcher.PushFrame(frame);
+        }
+
+        Assert.True(condition());
     }
 
     private sealed class FakeInvoiceWorkflowService : IInvoiceWorkflowService
