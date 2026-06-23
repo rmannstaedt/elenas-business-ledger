@@ -62,6 +62,7 @@ public sealed class MainWindowViewModelTests
         Assert.Equal("Anna", viewModel.CurrentStudentShortName);
         Assert.Single(viewModel.Lessons);
         Assert.Equal("16-06-2026 15:00", viewModel.Lessons[0].StartsAtText);
+        Assert.Equal("Tuesday 16-06", viewModel.Lessons[0].StartsOnDateText);
         Assert.Equal("Completed", viewModel.Lessons[0].StateText);
         Assert.Equal("Yes", viewModel.Lessons[0].InvoicedText);
         Assert.Equal("Outstanding", viewModel.Lessons[0].PaymentStatusText);
@@ -324,6 +325,81 @@ public sealed class MainWindowViewModelTests
         Assert.Null(draft.StartsOnDate);
         Assert.Equal(string.Empty, draft.StartsAtTimeText);
         Assert.True(draft.CanEdit);
+    }
+
+    [Fact]
+    public async Task LessonRowsOfferTeachingDayTimeOptions()
+    {
+        var viewModel = CreateViewModel(
+            dashboard: new FakeDashboardService { LessonState = LessonState.Planned, LessonIsInvoiced = false, LessonPaymentStatus = null });
+        await viewModel.LoadAsync();
+
+        var options = viewModel.Lessons[0].TimeOptions;
+
+        Assert.Equal("08:00", options.First());
+        Assert.Equal("20:00", options.Last());
+        Assert.DoesNotContain("07:45", options);
+        Assert.DoesNotContain("20:15", options);
+    }
+
+    [Fact]
+    public async Task DatedDraftLessonSortsIntoLessonListAndRemainsSelected()
+    {
+        var viewModel = CreateViewModel(
+            dashboard: new FakeDashboardService { LessonState = LessonState.Planned, LessonIsInvoiced = false, LessonPaymentStatus = null },
+            lessonTimeZone: TimeZoneInfo.FindSystemTimeZoneById("Romance Standard Time"));
+        await viewModel.LoadAsync();
+        await viewModel.AddLessonCommand.ExecuteAsync();
+        var draft = viewModel.SelectedLesson!;
+
+        draft.StartsAtTimeText = "14:00";
+        draft.StartsOnDate = new DateTime(2026, 6, 15);
+
+        Assert.Same(draft, viewModel.Lessons[0]);
+        Assert.Same(draft, viewModel.SelectedLesson);
+        Assert.Equal("Monday 15-06", draft.StartsOnDateText);
+    }
+
+    [Fact]
+    public async Task CompleteDraftLessonAutosavesWhenDateAndTimeAreSet()
+    {
+        var lessonEditor = new FakeLessonEditorService();
+        var viewModel = CreateViewModel(
+            dashboard: new FakeDashboardService { LessonState = LessonState.Planned, LessonIsInvoiced = false, LessonPaymentStatus = null },
+            lessonEditorService: lessonEditor,
+            lessonTimeZone: TimeZoneInfo.FindSystemTimeZoneById("Romance Standard Time"));
+        await viewModel.LoadAsync();
+        await viewModel.AddLessonCommand.ExecuteAsync();
+        var draft = viewModel.SelectedLesson!;
+
+        draft.StartsOnDate = new DateTime(2026, 6, 15);
+        draft.StartsAtTimeText = "14:00";
+
+        await EventuallyAsync(() => lessonEditor.AddWasCalled);
+        Assert.Equal("Anna", lessonEditor.LastAddRequest?.StudentShortName);
+        Assert.Equal(new DateTimeOffset(2026, 6, 15, 14, 0, 0, TimeSpan.FromHours(2)), lessonEditor.LastAddRequest?.StartsAt);
+        Assert.False(draft.IsDraft);
+        Assert.Same(draft, viewModel.SelectedLesson);
+    }
+
+    [Fact]
+    public async Task ActivationRefreshKeepsIncompleteDraftLessonSelected()
+    {
+        var clock = new FakeUiClock(new DateTimeOffset(2026, 6, 16, 12, 0, 0, TimeSpan.FromHours(2)));
+        var viewModel = CreateViewModel(
+            dashboard: new FakeDashboardService { LessonState = LessonState.Planned, LessonIsInvoiced = false, LessonPaymentStatus = null },
+            clock: clock);
+        await viewModel.LoadAsync();
+        await viewModel.AddLessonCommand.ExecuteAsync();
+        var draft = viewModel.SelectedLesson!;
+        draft.StartsOnDate = new DateTime(2026, 6, 1);
+        clock.Now = clock.Now.AddSeconds(11);
+
+        await viewModel.RefreshAfterActivationAsync();
+
+        Assert.Contains(draft, viewModel.Lessons);
+        Assert.Same(draft, viewModel.SelectedLesson);
+        Assert.True(draft.IsDraft);
     }
 
     [Fact]
@@ -709,6 +785,22 @@ public sealed class MainWindowViewModelTests
             NextResult = null;
             return result;
         }
+    }
+
+    private static async Task EventuallyAsync(Func<bool> condition)
+    {
+        var deadline = DateTimeOffset.UtcNow.AddSeconds(5);
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            if (condition())
+            {
+                return;
+            }
+
+            await Task.Delay(20);
+        }
+
+        Assert.True(condition());
     }
 
     private sealed class FakePaymentService : IInvoicePaymentStatusService

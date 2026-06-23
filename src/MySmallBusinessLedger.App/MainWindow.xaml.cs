@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Threading;
 using MySmallBusinessLedger.App.Services;
 using MySmallBusinessLedger.App.ViewModels;
 
@@ -85,6 +86,8 @@ public partial class MainWindow : Window
 
         e.Handled = true;
         comboBox.Focus();
-        comboBox.IsDropDownOpen = true;
+        comboBox.Dispatcher.BeginInvoke(
+            new Action(() => comboBox.IsDropDownOpen = true),
+            DispatcherPriority.Input);
     }
 }

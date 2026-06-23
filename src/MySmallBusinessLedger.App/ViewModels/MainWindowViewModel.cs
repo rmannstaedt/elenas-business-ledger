@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Globalization;
 using MySmallBusinessLedger.App.Commands;
 using MySmallBusinessLedger.App.Services;
@@ -25,6 +26,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private readonly IPlanCatalogLauncher planCatalogLauncher;
     private readonly IUiClock clock;
     private readonly TimeZoneInfo lessonTimeZone;
+    private readonly HashSet<LessonDisplayModel> autoSavingDraftLessons = [];
     private long studentOverviewSelectionVersion;
     private DateTimeOffset? lastRefreshAt;
     private string? currentStudentShortName;
@@ -33,6 +35,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private bool currentStudentHasSchedule;
     private bool isBusy;
     private int activationRefreshSuspendCount;
+    private LessonDisplayModel? selectedLesson;
     private string? errorMessage;
 
     public MainWindowViewModel(
@@ -104,6 +107,12 @@ public sealed class MainWindowViewModel : ViewModelBase
     public ObservableCollection<LessonDisplayModel> Lessons { get; } = [];
 
     public ObservableCollection<InvoiceDisplayModel> Invoices { get; } = [];
+
+    public LessonDisplayModel? SelectedLesson
+    {
+        get => selectedLesson;
+        set => SetProperty(ref selectedLesson, value);
+    }
 
     public string? CurrentStudentShortName
     {
@@ -331,7 +340,9 @@ public sealed class MainWindowViewModel : ViewModelBase
             return Task.CompletedTask;
         }
 
-        Lessons.Add(LessonDisplayModel.CreateDraft(CurrentStudentShortName, lessonTimeZone));
+        var draft = LessonDisplayModel.CreateDraft(CurrentStudentShortName, lessonTimeZone);
+        AddLessonRow(draft);
+        SelectedLesson = draft;
         RaiseCommandAvailabilityChanged();
         return Task.CompletedTask;
     }
@@ -373,11 +384,21 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     private async Task SaveLessonAsync(LessonDisplayModel lesson)
     {
+        await SaveLessonAsync(lesson, initiatedByAutoSave: false);
+    }
+
+    private async Task SaveLessonAsync(LessonDisplayModel lesson, bool initiatedByAutoSave)
+    {
         if (!lesson.CanEdit)
         {
             ErrorMessage = lesson.State == LessonState.Completed
                 ? "Completed lessons cannot be edited."
                 : "Invoiced lessons cannot be edited.";
+            return;
+        }
+
+        if (!initiatedByAutoSave && lesson.IsDraft && autoSavingDraftLessons.Contains(lesson))
+        {
             return;
         }
 
@@ -454,7 +475,12 @@ public sealed class MainWindowViewModel : ViewModelBase
 
         if (lesson.IsDraft)
         {
-            Lessons.Remove(lesson);
+            RemoveLessonRow(lesson);
+            if (ReferenceEquals(SelectedLesson, lesson))
+            {
+                SelectedLesson = null;
+            }
+
             ErrorMessage = null;
             RaiseCommandAvailabilityChanged();
             return;
@@ -475,7 +501,12 @@ public sealed class MainWindowViewModel : ViewModelBase
         }
 
         ErrorMessage = null;
-        Lessons.Remove(lesson);
+        RemoveLessonRow(lesson);
+        if (ReferenceEquals(SelectedLesson, lesson))
+        {
+            SelectedLesson = null;
+        }
+
         RaiseCommandAvailabilityChanged();
     }
 
@@ -549,10 +580,33 @@ public sealed class MainWindowViewModel : ViewModelBase
             .Order(StringComparer.OrdinalIgnoreCase)
             .ToArray();
 
-        Lessons.Clear();
+        var selectedLesson = SelectedLesson;
+        var selectedLessonId = selectedLesson?.Id;
+        var draftLessons = Lessons
+            .Where(lesson => lesson.IsDraft)
+            .ToArray();
+        ClearLessonRows();
         foreach (var lesson in dashboard.Lessons.OrderBy(lesson => lesson.StartsAt))
         {
-            Lessons.Add(new LessonDisplayModel(lesson, lessonTimeZone));
+            AddLessonRow(new LessonDisplayModel(lesson, lessonTimeZone));
+        }
+
+        foreach (var draft in draftLessons.Where(lesson => lesson.IsDraft))
+        {
+            AddLessonRow(draft);
+        }
+
+        SortLessonsPreservingSelection(selectedLesson);
+
+        if (selectedLesson is { IsDraft: true } && Lessons.Contains(selectedLesson))
+        {
+            SelectedLesson = selectedLesson;
+        }
+        else
+        {
+            SelectedLesson = selectedLessonId is null
+                ? null
+                : Lessons.FirstOrDefault(lesson => string.Equals(lesson.Id, selectedLessonId, StringComparison.OrdinalIgnoreCase));
         }
 
         Invoices.Clear();
@@ -562,6 +616,87 @@ public sealed class MainWindowViewModel : ViewModelBase
         }
 
         RaiseCommandAvailabilityChanged();
+    }
+
+    private void AddLessonRow(LessonDisplayModel lesson)
+    {
+        lesson.PropertyChanged += OnLessonPropertyChanged;
+        Lessons.Add(lesson);
+    }
+
+    private void RemoveLessonRow(LessonDisplayModel lesson)
+    {
+        lesson.PropertyChanged -= OnLessonPropertyChanged;
+        Lessons.Remove(lesson);
+    }
+
+    private void ClearLessonRows()
+    {
+        foreach (var lesson in Lessons)
+        {
+            lesson.PropertyChanged -= OnLessonPropertyChanged;
+        }
+
+        Lessons.Clear();
+    }
+
+    private void OnLessonPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (sender is not LessonDisplayModel lesson ||
+            e.PropertyName is not (nameof(LessonDisplayModel.StartsAt) or nameof(LessonDisplayModel.StartsAtTimeText)))
+        {
+            return;
+        }
+
+        SortLessonsPreservingSelection(lesson);
+        TryAutoSaveCompleteDraftLesson(lesson);
+    }
+
+    private void SortLessonsPreservingSelection(LessonDisplayModel? lessonToKeepSelected)
+    {
+        var selected = SelectedLesson ?? lessonToKeepSelected;
+        var orderedLessons = Lessons
+            .OrderBy(lesson => lesson.TryGetStartsAt(out var startsAt) ? startsAt : DateTimeOffset.MaxValue)
+            .ThenBy(lesson => lesson.Id, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+
+        for (var targetIndex = 0; targetIndex < orderedLessons.Length; targetIndex++)
+        {
+            var currentIndex = Lessons.IndexOf(orderedLessons[targetIndex]);
+            if (currentIndex >= 0 && currentIndex != targetIndex)
+            {
+                Lessons.Move(currentIndex, targetIndex);
+            }
+        }
+
+        SelectedLesson = selected is not null && Lessons.Contains(selected)
+            ? selected
+            : null;
+    }
+
+    private void TryAutoSaveCompleteDraftLesson(LessonDisplayModel lesson)
+    {
+        if (!lesson.IsDraft ||
+            autoSavingDraftLessons.Contains(lesson) ||
+            !lesson.TryGetStartsAt(out _))
+        {
+            return;
+        }
+
+        autoSavingDraftLessons.Add(lesson);
+        _ = AutoSaveCompleteDraftLessonAsync(lesson);
+    }
+
+    private async Task AutoSaveCompleteDraftLessonAsync(LessonDisplayModel lesson)
+    {
+        try
+        {
+            await SaveLessonAsync(lesson, initiatedByAutoSave: true);
+        }
+        finally
+        {
+            autoSavingDraftLessons.Remove(lesson);
+        }
     }
 
     private bool CanNavigateStudents() =>

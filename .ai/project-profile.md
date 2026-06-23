@@ -52,6 +52,7 @@ Backup: no automated backup in version 1.0; keep persistence design compatible w
 Google Calendar API: official Google Calendar .NET client
 Google authentication: external browser OAuth
 Google OAuth app identity: publisher-owned Desktop OAuth client; users authorize their own Google account at runtime
+Google Calendar event time zones: write payloads must use Google/IANA time zone IDs; convert Windows local time zone IDs such as `Romance Standard Time` before creating or moving events
 Google Calendar completed-lesson marker: keep the first line as `$ <student short name>` or `$<student short name>`; Completed is represented by a later `Status: Completed` summary line, and absence of that line means Planned
 Google Calendar population: main-window `Populate Calendar` seeds lessons for the selected student from saved student schedule entries; current month starts at today inclusive, future months seed the whole month, past months cannot be seeded, exact same-student same-date/time duplicates are skipped, and v1 does not detect other conflicts
 Calendar availability: invoice issue must rely on the accepted invoice preview/snapshot rather than requiring a fresh Google Calendar read at the final print/save moment
@@ -66,6 +67,7 @@ My-facing UI must stay simple
 Company profile, two-line company address entry, invoice folder with typed or folder-picker selection, invoice printer with remembered selector/typed value/clear action, Google calendar/account label, Google sign-in app status, local Google authorization status, connect/reconnect controls, and read-only app data/database paths are configured or shown from `Application > Settings`; the Google calendar defaults to `primary`
 Student editor uses two stacked address fields and stores them as one multiline student address value.
 Student management is available from `Student > Manage Students`; it lists active and inactive students, embeds the Student editor for selected-student fields/current assigned plan/plan assignment/schedule, keeps explicit Save/Cancel, opens invoices on double-click through the existing viewer, mirrors student selection into the main window immediately and on close, and persists `Student.IsActive` changes only when the embedded editor is saved.
+Main-window `Add Lesson` creates an editable draft row; when both date and time are valid the draft autosaves to Google Calendar, and incomplete draft rows must survive automatic refreshes. Main lesson row time selectors offer 08:00 through 20:00 in 15-minute increments while still allowing typed time input.
 Plans are managed from `Plan > Manage Plans`; new Draft plans start with blank name/price, default lesson/duration/student/flexibility values, payment terms selected from `Paid monthly in advance` or `Paid per lesson`, and an effective date set to the first day of the current month. `Add Plan` saves changed Draft data before creating the next Draft, and changed Active `Retire on` values are prompted before adding. Active and Retired plan names may be renamed through a name-only save action; the rename is stored in plan-name history and does not unlock commercial fields. The student editor offers only publish-complete Active catalog plans, stores the selected plan identity, and copies the selected plan's commercial terms into the student's plan period. The Manage Plans window remembers its size/position and list column widths.
 Desktop windows must remember size and position, including subwindows, and restore inside the current visible screen area
 
@@ -94,7 +96,9 @@ Use fake Google Calendar client for calendar integration tests
 - Do not store CPR numbers.
 - Ignore Google Calendar entries that do not use the documented first-line `$` student marker.
 - Preserve the first-line Google Calendar marker when adding/removing app-owned lesson status lines.
+- Convert Windows time zone IDs to Google/IANA time zone IDs before writing Google Calendar event start/end payloads.
 - Notify the user immediately when a Google Calendar lesson update fails.
+- Automatic refresh must not discard incomplete main-window lesson drafts.
 - Do not silently create duplicate Google Calendar lessons for the same student at the same date/time when using Populate Calendar.
 - Do not imply Populate Calendar detects all conflicts; v1 skips exact duplicates only.
 - Do not make Google Calendar sync failure corrupt local data.

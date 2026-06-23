@@ -18,8 +18,10 @@ Date: 2026-06-23
 - Plan name changes are recorded in SQLite `PlanNameChanges` with old name, new name, and change date/time. Student plan displays follow the current catalog display name through `PlanCatalogId`; issued invoice lines store `PlanCatalogId` for lineage and keep the plan name stored when the invoice was issued for invoice display/PDF output.
 - The main-window Open Calendar action opens Google Calendar in the browser with the configured Google account email as an `authuser` hint, avoiding the old hardcoded `/u/0/` first-browser-account behavior when possible.
 - The app now uses publisher-owned Google Desktop OAuth configuration from `Configuration\google-oauth-client.json` in the app output. The local source file is `src\MySmallBusinessLedger.App\Configuration\google-oauth-client.json`, ignored by Git; the template is committed beside it.
+- Google Calendar event writes convert Windows local time zone IDs such as `Romance Standard Time` into Google/IANA IDs such as `Europe/Copenhagen` before creating/moving events. This preserves the Windows-local runtime model while satisfying Google Calendar's event payload contract.
 - Window placement is stored under `%APPDATA%\visualtech.dk\MySmallBusinessLedger\window-placement.json`; Manage Plans column widths are stored under `%APPDATA%\visualtech.dk\MySmallBusinessLedger\grid-column-widths.json`.
 - Completed/Planned lesson state is manual. Google Calendar keeps the first-line `$` student marker and uses a later `Status: Completed` summary line for completed lessons.
+- Main-window `Add Lesson` creates an editable draft row. Complete drafts autosave to Google Calendar as soon as both date and time are valid; incomplete drafts are preserved across automatic refreshes/activation reloads instead of being replaced by the calendar snapshot. Main lesson row time selectors offer 08:00 through 20:00 in 15-minute increments while still allowing typed time input.
 - The main window has `Populate Calendar` for the selected student/month. It creates Google Calendar lessons from the student's saved schedule, using today-through-month-end for the current month and the full month for future months. Past months are blocked. Exact same-student same-date/time duplicates are skipped; other conflicts are not detected in v1.
 - Write Invoice opens candidate selection, invoice preview, optional price adjustment, invoice reservation, staged PDF verification/publish, issue finalization, print request, dashboard refresh, and read-only invoice viewer. Issued invoices carry `IssueStatus` plus `PrintStatus`; normal invoice lists/view/payment paths show only `Issued` invoices. The invoice viewer can reprint an issued invoice from its stored PDF without creating a new invoice number or changing invoice content.
 - Invoice `Printed` means the configured printer existed and Windows accepted the print request launch without exception. The app does not monitor physical paper output or Windows spooler completion.
@@ -34,6 +36,8 @@ Date: 2026-06-23
 - Invoiced lessons are not editable.
 - Completed lessons can only be toggled back to Planned after confirmation; while Completed, no date/time edit or delete is allowed.
 - Google Calendar write failures must be visible immediately and must not pretend local state changed.
+- Google Calendar write payloads must use IANA time zone IDs, not raw Windows time zone IDs.
+- Automatic refresh must preserve incomplete lesson draft rows.
 - Populate Calendar must not seed past months and must not create exact duplicate same-student same-date/time lessons.
 - OAuth tokens must remain Windows-protected and must not be stored in SQLite or plaintext config.
 - Do not restore the old user-selected Google OAuth JSON setup flow unless Ruben explicitly asks for a migration fallback.

@@ -183,7 +183,7 @@ The planned and invoiced:no entries in the lesson list may be edited directly in
 
 Adding a lesson creates a new empty planned row for the current student in the main lesson list. The user fills in the date/time directly in that row.
 
-Lesson date editing uses a date selector. Lesson time editing provides a time selector while still allowing typed time input. Lesson cancellation uses an explicit delete action with a confirmation prompt.
+Lesson date editing uses a date selector. Lesson time editing provides a time selector from 08:00 through 20:00 in 15-minute increments while still allowing typed time input. Lesson cancellation uses an explicit delete action with a confirmation prompt.
 
 Schedule changes to the lessons in the lesson list are saved directly in Google Calendar.
 If the update of Google Calendar fails, the user is notified immediately so they can take corrective action.

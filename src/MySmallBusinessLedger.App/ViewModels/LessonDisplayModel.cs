@@ -8,9 +8,15 @@ namespace MySmallBusinessLedger.App.ViewModels;
 
 public sealed class LessonDisplayModel : ViewModelBase
 {
+    private const int FirstTimeOptionHour = 8;
+    private const int LastTimeOptionHour = 20;
+    private const int TimeOptionIntervalMinutes = 15;
+
     private static readonly IReadOnlyList<string> TimeOptionValues = Enumerable
-        .Range(0, 24 * 4)
-        .Select(index => TimeOnly.MinValue.AddMinutes(index * 15).ToString("HH\\:mm", CultureInfo.InvariantCulture))
+        .Range(0, (((LastTimeOptionHour - FirstTimeOptionHour) * 60) / TimeOptionIntervalMinutes) + 1)
+        .Select(index => new TimeOnly(FirstTimeOptionHour, 0)
+            .AddMinutes(index * TimeOptionIntervalMinutes)
+            .ToString("HH\\:mm", CultureInfo.InvariantCulture))
         .ToArray();
 
     private TimeZoneInfo lessonTimeZone;
@@ -73,6 +79,7 @@ public sealed class LessonDisplayModel : ViewModelBase
             {
                 OnPropertyChanged(nameof(StartsAt));
                 OnPropertyChanged(nameof(StartsAtText));
+                OnPropertyChanged(nameof(StartsOnDateText));
             }
         }
     }
@@ -134,6 +141,10 @@ public sealed class LessonDisplayModel : ViewModelBase
         ? startsAt.ToString("dd-MM-yyyy HH:mm", CultureInfo.InvariantCulture)
         : string.Empty;
 
+    public string StartsOnDateText => StartsOnDate is { } date
+        ? date.ToString("dddd dd-MM", CultureInfo.InvariantCulture)
+        : string.Empty;
+
     public string StateText => State == LessonState.Completed ? "Completed" : "Planned";
 
     public string StateToggleToolTip => State == LessonState.Completed
@@ -164,6 +175,7 @@ public sealed class LessonDisplayModel : ViewModelBase
         OnPropertyChanged(nameof(Id));
         OnPropertyChanged(nameof(StartsAt));
         OnPropertyChanged(nameof(StartsAtText));
+        OnPropertyChanged(nameof(StartsOnDateText));
         OnPropertyChanged(nameof(StartsOnDate));
         OnPropertyChanged(nameof(StartsAtTimeText));
     }

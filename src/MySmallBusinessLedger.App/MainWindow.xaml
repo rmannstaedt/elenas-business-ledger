@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:primitives="clr-namespace:System.Windows.Controls.Primitives;assembly=PresentationFramework"
         mc:Ignorable="d"
         Title="My Small Business Ledger"
         Height="720"
@@ -266,6 +267,7 @@
 
                     <DataGrid Grid.Row="1"
                               ItemsSource="{Binding Lessons}"
+                              SelectedItem="{Binding SelectedLesson, Mode=TwoWay}"
                               AutoGenerateColumns="False"
                               CanUserAddRows="False"
                               CanUserDeleteRows="False"
@@ -284,7 +286,23 @@
                                                         IsEnabled="{Binding CanEdit}"
                                                         CalendarClosed="OnLessonCalendarClosed"
                                                         LostFocus="OnLessonEditCommitted"
-                                                        Width="125" />
+                                                        Width="125">
+                                                <DatePicker.Resources>
+                                                    <Style TargetType="{x:Type primitives:DatePickerTextBox}">
+                                                        <Setter Property="Template">
+                                                            <Setter.Value>
+                                                                <ControlTemplate TargetType="{x:Type primitives:DatePickerTextBox}">
+                                                                    <Grid>
+                                                                        <TextBlock Text="{Binding StartsOnDateText}"
+                                                                                   Padding="4,0,0,0"
+                                                                                   VerticalAlignment="Center" />
+                                                                    </Grid>
+                                                                </ControlTemplate>
+                                                            </Setter.Value>
+                                                        </Setter>
+                                                    </Style>
+                                                </DatePicker.Resources>
+                                            </DatePicker>
                                             <ComboBox Text="{Binding StartsAtTimeText, UpdateSourceTrigger=PropertyChanged}"
                                                       ItemsSource="{Binding TimeOptions}"
                                                       IsEnabled="{Binding CanEdit}"

@@ -258,6 +258,31 @@ public sealed class GoogleCalendarGatewayTests
     }
 
     [Fact]
+    public async Task GoogleCalendarServiceEventClientCreatesEventsWithIanaTimeZone()
+    {
+        Event? createdEvent = null;
+        var client = new GoogleCalendarServiceEventClient(
+            "Romance Standard Time",
+            "DK",
+            (calendarId, calendarEvent, cancellationToken) =>
+            {
+                createdEvent = calendarEvent;
+                return Task.FromResult(new Event { Id = "created" });
+            });
+
+        var createdId = await client.CreateLessonEventAsync(
+            "primary",
+            "$ Anna",
+            new DateTimeOffset(2026, 6, 23, 15, 0, 0, TimeSpan.FromHours(2)),
+            TimeSpan.FromMinutes(45),
+            CancellationToken.None);
+
+        Assert.Equal("created", createdId);
+        Assert.Equal("Europe/Copenhagen", createdEvent?.Start?.TimeZone);
+        Assert.Equal("Europe/Copenhagen", createdEvent?.End?.TimeZone);
+    }
+
+    [Fact]
     public async Task WindowsProtectedFileDataStoreDoesNotPersistPlaintextTokens()
     {
         if (!OperatingSystem.IsWindows())
