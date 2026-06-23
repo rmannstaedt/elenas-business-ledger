@@ -553,19 +553,19 @@ public sealed class UseCaseTests
         Assert.Equal(
             [
                 "reserve",
-                "stage:000001",
-                "write:C:\\Invoices\\.staging\\000001.pdf",
-                "verify:C:\\Invoices\\.staging\\000001.pdf",
-                "publish:C:\\Invoices\\.staging\\000001.pdf",
-                "finalize:C:\\Invoices\\000001.pdf",
-                "print:C:\\Invoices\\000001.pdf:Office Printer",
+                "stage:001",
+                "write:C:\\Invoices\\.staging\\001.pdf",
+                "verify:C:\\Invoices\\.staging\\001.pdf",
+                "publish:C:\\Invoices\\.staging\\001.pdf",
+                "finalize:C:\\Invoices\\001.pdf",
+                "print:C:\\Invoices\\001.pdf:Office Printer",
                 "print-status:Printed:2026-06-16T17:30:00.0000000+00:00:"
             ],
             calls);
         Assert.Equal(InvoiceIssueStatus.Issued, result.Value!.Invoice.IssueStatus);
         Assert.Equal(InvoicePrintStatus.Printed, result.Value.Invoice.PrintStatus);
         Assert.Equal(new DateTimeOffset(2026, 6, 16, 17, 30, 0, TimeSpan.Zero), result.Value.Invoice.PrintedAt);
-        Assert.Equal("C:\\Invoices\\000001.pdf", result.Value!.Invoice.PdfFilePath);
+        Assert.Equal("C:\\Invoices\\001.pdf", result.Value!.Invoice.PdfFilePath);
     }
 
     [Fact]
@@ -608,7 +608,7 @@ public sealed class UseCaseTests
         var invoice = CreateInvoiceDraft().Issue(
             new InvoiceNumber(7),
             CreateInvoiceDraft().CalculateTotals(CreateCompanyProfile()),
-            "C:\\Invoices\\000007.pdf",
+            "C:\\Invoices\\007.pdf",
             InvoiceIssueStatus.Issued,
             InvoicePrintStatus.PrintFailed,
             printedAt: null,
@@ -632,12 +632,12 @@ public sealed class UseCaseTests
         Assert.False(invoices.FinalizeCalled);
         Assert.Equal(
             [
-                "print:C:\\Invoices\\000007.pdf:Office Printer",
+                "print:C:\\Invoices\\007.pdf:Office Printer",
                 "print-status:Printed:2026-06-16T18:00:00.0000000+00:00:"
             ],
             calls);
         Assert.Equal(new InvoiceNumber(7), result.Value!.Invoice.InvoiceNumber);
-        Assert.Equal("C:\\Invoices\\000007.pdf", result.Value.Invoice.PdfFilePath);
+        Assert.Equal("C:\\Invoices\\007.pdf", result.Value.Invoice.PdfFilePath);
         Assert.Equal(InvoicePrintStatus.Printed, result.Value.Invoice.PrintStatus);
         Assert.Null(result.Value.Invoice.LastPrintError);
     }
@@ -648,7 +648,7 @@ public sealed class UseCaseTests
         var invoice = CreateInvoiceDraft().Issue(
             new InvoiceNumber(7),
             CreateInvoiceDraft().CalculateTotals(CreateCompanyProfile()),
-            "C:\\Invoices\\000007.pdf",
+            "C:\\Invoices\\007.pdf",
             InvoiceIssueStatus.Issued,
             InvoicePrintStatus.Printed,
             printedAt: new DateTimeOffset(2026, 6, 15, 18, 0, 0, TimeSpan.Zero),
@@ -941,7 +941,7 @@ public sealed class UseCaseTests
                     vatRegistrationDate: null,
                     VatStatus.NotRegistered,
                     "C:\\Invoices")),
-                "C:\\Invoices\\000001.pdf",
+                "C:\\Invoices\\001.pdf",
                 InvoiceIssueStatus.Issued,
                 InvoicePrintStatus.NotPrinted,
                 printedAt: null,
@@ -987,7 +987,7 @@ public sealed class UseCaseTests
         public Task<OperationResult<string>> CreateStagingPathAsync(InvoiceDraft draft, InvoiceNumber invoiceNumber, CancellationToken cancellationToken)
         {
             calls?.Add($"stage:{invoiceNumber}");
-            return Task.FromResult(OperationResult<string>.Success("C:\\Invoices\\.staging\\000001.pdf"));
+            return Task.FromResult(OperationResult<string>.Success("C:\\Invoices\\.staging\\001.pdf"));
         }
 
         public Task<OperationResult<string>> VerifyStagedPdfAsync(string stagingPath, CancellationToken cancellationToken)
@@ -999,14 +999,14 @@ public sealed class UseCaseTests
         public Task<OperationResult<string>> PublishAsync(string stagingPath, InvoiceDraft draft, InvoiceNumber invoiceNumber, CancellationToken cancellationToken)
         {
             calls?.Add($"publish:{stagingPath}");
-            return Task.FromResult(OperationResult<string>.Success("C:\\Invoices\\000001.pdf"));
+            return Task.FromResult(OperationResult<string>.Success("C:\\Invoices\\001.pdf"));
         }
     }
 
     private sealed class FakeInvoicePdfWriter : IInvoicePdfWriter
     {
         public OperationResult<string> WriteResult { get; init; } =
-            OperationResult<string>.Success("C:\\Invoices\\.staging\\000001.pdf");
+            OperationResult<string>.Success("C:\\Invoices\\.staging\\001.pdf");
 
         public List<string>? Calls { get; init; }
 
@@ -1025,7 +1025,7 @@ public sealed class UseCaseTests
     private sealed class FakeInvoicePrinter(List<string>? calls = null) : IInvoicePrinter
     {
         public OperationResult<string> PrintResult { get; init; } =
-            OperationResult<string>.Success("C:\\Invoices\\000001.pdf");
+            OperationResult<string>.Success("C:\\Invoices\\001.pdf");
 
         public bool PrintCalled { get; private set; }
 

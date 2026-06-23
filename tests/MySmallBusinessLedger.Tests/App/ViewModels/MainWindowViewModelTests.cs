@@ -776,7 +776,7 @@ public sealed class MainWindowViewModelTests
         Assert.Equal("Yes", viewModel.Lessons[0].InvoicedText);
         Assert.Equal("Outstanding", viewModel.Lessons[0].PaymentStatusText);
         Assert.Single(viewModel.Invoices);
-        Assert.Equal("000001", viewModel.Invoices[0].InvoiceNumberText);
+        Assert.Equal("001", viewModel.Invoices[0].InvoiceNumberText);
         Assert.False(viewModel.HasError);
     }
 

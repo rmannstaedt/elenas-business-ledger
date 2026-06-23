@@ -117,7 +117,7 @@ public sealed class StudentOverviewViewModelTests
         Assert.Equal("400 kr.", viewModel.SelectedStudentEditor?.PlanPriceWithoutVatText);
         Assert.Equal("Paid monthly in advance", viewModel.SelectedStudentEditor?.PlanPaymentTerms);
         var invoice = Assert.Single(viewModel.Invoices);
-        Assert.Equal("000001", invoice.InvoiceNumberText);
+        Assert.Equal("001", invoice.InvoiceNumberText);
         Assert.False(viewModel.HasError);
     }
 

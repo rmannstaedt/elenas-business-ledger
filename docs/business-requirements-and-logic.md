@@ -38,7 +38,7 @@
     invoice folder path
 
 ### Invoice
-    invoice number (unique, sequential)
+    invoice number (unique, sequential; displayed with at least three digits, e.g. 001)
     date
     company info
     student info
@@ -220,6 +220,7 @@ Once the invoice has been edited, the user may press the "Print Invoice" button 
 The "Print Invoice" button does the following:
   - Reserves the Invoice in the local database as an in-progress issue operation.
   - Saves a PDF copy of the invoice in the company invoice folder path through a staging, verification, and publish flow.
+    -- note: the final PDF file name uses the invoice number and Student full name, e.g. `001-Mira Vale.pdf`.
     -- note: if PDF save/publish fails, the Invoice is not shown as issued, later actions are *not* performed, and the user is notified of the failure.
   - Finalizes the Invoice data in the Invoice table as issued.
   - Sends a print request to the configured invoice printer, if one is configured and available.

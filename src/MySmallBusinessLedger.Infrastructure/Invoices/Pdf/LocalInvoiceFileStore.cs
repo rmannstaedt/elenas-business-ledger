@@ -99,18 +99,21 @@ public sealed class LocalInvoiceFileStore : IInvoiceFileStore
     }
 
     private static string CreateFinalFileName(InvoiceDraft draft, InvoiceNumber invoiceNumber) =>
-        $"{invoiceNumber}-{SanitizeFileNamePart(draft.Student.ShortName)}-{SanitizeFileNamePart(draft.Student.FullName)}.pdf";
+        $"{invoiceNumber}-{SanitizeFileNamePart(draft.Student.FullName)}.pdf";
 
     private static string SanitizeFileNamePart(string value)
     {
         var invalidCharacters = Path.GetInvalidFileNameChars().ToHashSet();
         var builder = new StringBuilder(value.Length);
         var lastWasDash = false;
+        var lastWasSpace = false;
 
         foreach (var character in value.Trim())
         {
-            var replacement = invalidCharacters.Contains(character) || char.IsWhiteSpace(character)
+            var replacement = invalidCharacters.Contains(character)
                 ? '-'
+                : char.IsWhiteSpace(character)
+                    ? ' '
                 : character;
 
             if (replacement == '-')
@@ -121,16 +124,28 @@ public sealed class LocalInvoiceFileStore : IInvoiceFileStore
                 }
 
                 lastWasDash = true;
+                lastWasSpace = false;
+            }
+            else if (replacement == ' ')
+            {
+                if (lastWasSpace)
+                {
+                    continue;
+                }
+
+                lastWasDash = false;
+                lastWasSpace = true;
             }
             else
             {
                 lastWasDash = false;
+                lastWasSpace = false;
             }
 
             builder.Append(replacement);
         }
 
-        var sanitized = builder.ToString().Trim('-');
+        var sanitized = builder.ToString().Trim(' ', '-');
         return sanitized.Length == 0 ? "invoice" : sanitized;
     }
 
