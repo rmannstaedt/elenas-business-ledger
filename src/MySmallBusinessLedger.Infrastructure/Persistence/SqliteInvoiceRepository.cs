@@ -183,6 +183,26 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
         return OperationResult<IssuedInvoice>.Success(ToDomain(invoice));
     }
 
+    public async Task ReleaseInvoiceReservationAsync(InvoiceNumber invoiceNumber, CancellationToken cancellationToken)
+    {
+        await using var context = createContext();
+        var invoice = await context.IssuedInvoices
+            .Include(storedInvoice => storedInvoice.Lines)
+            .SingleOrDefaultAsync(
+                storedInvoice =>
+                    storedInvoice.InvoiceNumber == invoiceNumber.Value &&
+                    storedInvoice.IssueStatus == InvoiceIssueStatus.Issuing,
+                cancellationToken);
+
+        if (invoice is null)
+        {
+            return;
+        }
+
+        context.IssuedInvoices.Remove(invoice);
+        await context.SaveChangesAsync(cancellationToken);
+    }
+
     public async Task<OperationResult<IssuedInvoice>> UpdatePrintStatusAsync(
         InvoiceNumber invoiceNumber,
         InvoicePrintStatus printStatus,
@@ -284,6 +304,7 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
             CompanyName = invoice.Company.Name,
             CompanyAddress = invoice.Company.Address,
             CompanyCvr = invoice.Company.Cvr,
+            CompanyPaymentInstructions = invoice.Company.PaymentInstructions,
             StudentShortName = invoice.Student.ShortName,
             StudentFullName = invoice.Student.FullName,
             StudentAddress = invoice.Student.Address,
@@ -334,7 +355,11 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
         return new IssuedInvoice(
             new InvoiceNumber(entity.InvoiceNumber),
             entity.InvoiceDate,
-            new CompanySnapshot(entity.CompanyName, entity.CompanyAddress, entity.CompanyCvr),
+            new CompanySnapshot(
+                entity.CompanyName,
+                entity.CompanyAddress,
+                entity.CompanyCvr,
+                entity.CompanyPaymentInstructions),
             new StudentSnapshot(entity.StudentShortName, entity.StudentFullName, entity.StudentAddress),
             new ReadOnlyCollection<IssuedInvoiceLine>(lines),
             new InvoiceTotals(

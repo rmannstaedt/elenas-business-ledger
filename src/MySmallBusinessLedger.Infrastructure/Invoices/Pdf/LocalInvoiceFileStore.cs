@@ -9,6 +9,7 @@ public sealed class LocalInvoiceFileStore : IInvoiceFileStore
 {
     private static readonly byte[] PdfHeader = "%PDF"u8.ToArray();
     private readonly string invoiceFolderPath;
+    private readonly string stagingFolderPath;
 
     public LocalInvoiceFileStore(InvoiceFileStoreOptions options)
     {
@@ -18,6 +19,7 @@ public sealed class LocalInvoiceFileStore : IInvoiceFileStore
         }
 
         invoiceFolderPath = Path.GetFullPath(options.InvoiceFolderPath);
+        stagingFolderPath = Path.GetFullPath(Path.Combine(invoiceFolderPath, ".staging"));
     }
 
     public Task<OperationResult<string>> CreateStagingPathAsync(
@@ -28,11 +30,10 @@ public sealed class LocalInvoiceFileStore : IInvoiceFileStore
         try
         {
             Directory.CreateDirectory(invoiceFolderPath);
-            var stagingDirectory = Path.Combine(invoiceFolderPath, ".staging");
-            Directory.CreateDirectory(stagingDirectory);
+            Directory.CreateDirectory(stagingFolderPath);
 
             var stagingPath = Path.Combine(
-                stagingDirectory,
+                stagingFolderPath,
                 $"{invoiceNumber}-{Guid.NewGuid():N}.pdf");
 
             return Task.FromResult(OperationResult<string>.Success(stagingPath));
@@ -98,6 +99,33 @@ public sealed class LocalInvoiceFileStore : IInvoiceFileStore
         }
     }
 
+    public Task<OperationResult<string>> DiscardStagingPathAsync(string stagingPath, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        try
+        {
+            var fullStagingPath = Path.GetFullPath(stagingPath);
+            if (!IsInDirectory(fullStagingPath, stagingFolderPath))
+            {
+                return Task.FromResult(Failure(
+                    "InvoicePdf.StagingPathOutsideStagingDirectory",
+                    "The staged invoice PDF path is outside the invoice staging folder."));
+            }
+
+            if (File.Exists(fullStagingPath))
+            {
+                File.Delete(fullStagingPath);
+            }
+
+            return Task.FromResult(OperationResult<string>.Success(fullStagingPath));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return Task.FromResult(Failure("InvoicePdf.StagingDiscardFailed", "Could not delete the staged invoice PDF."));
+        }
+    }
+
     private static string CreateFinalFileName(InvoiceDraft draft, InvoiceNumber invoiceNumber) =>
         $"{invoiceNumber}-{SanitizeFileNamePart(draft.Student.FullName)}.pdf";
 
@@ -147,6 +175,15 @@ public sealed class LocalInvoiceFileStore : IInvoiceFileStore
 
         var sanitized = builder.ToString().Trim(' ', '-');
         return sanitized.Length == 0 ? "invoice" : sanitized;
+    }
+
+    private static bool IsInDirectory(string filePath, string directoryPath)
+    {
+        var normalizedFilePath = Path.GetFullPath(filePath);
+        var normalizedDirectoryPath = Path.GetFullPath(directoryPath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+            + Path.DirectorySeparatorChar;
+
+        return normalizedFilePath.StartsWith(normalizedDirectoryPath, StringComparison.OrdinalIgnoreCase);
     }
 
     private static OperationResult<string> Failure(string code, string message) =>

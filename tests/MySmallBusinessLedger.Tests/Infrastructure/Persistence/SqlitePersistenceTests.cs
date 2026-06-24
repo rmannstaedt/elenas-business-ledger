@@ -25,13 +25,15 @@ public sealed class SqlitePersistenceTests
             new DateOnly(2026, 7, 1),
             VatStatus.Registered,
             "C:\\Invoices",
-            configuredInvoicePrinterName: "Office Printer");
+            configuredInvoicePrinterName: "Office Printer",
+            paymentInstructions: "Bank 1234 / MobilePay 5678");
 
         await repository.SaveAsync(profile, CancellationToken.None);
 
         var loaded = await repository.GetAsync(CancellationToken.None);
         Assert.Equal(profile, loaded);
         Assert.Equal("Office Printer", loaded.ConfiguredInvoicePrinterName);
+        Assert.Equal("Bank 1234 / MobilePay 5678", loaded.PaymentInstructions);
     }
 
     [Fact]
@@ -423,6 +425,24 @@ public sealed class SqlitePersistenceTests
         Assert.Equal(InvoiceIssueStatus.Issued, summary.IssueStatus);
         Assert.Equal(InvoicePrintStatus.PrintFailed, summary.PrintStatus);
         Assert.Equal("Printer unavailable.", summary.LastPrintError);
+    }
+
+    [Fact]
+    public async Task ReleasedInvoiceReservationDoesNotConsumeInvoiceNumber()
+    {
+        using var database = await TestDatabase.CreateAsync();
+        var repository = new SqliteInvoiceRepository(database.CreateContext);
+        var draft = CreateInvoiceDraft("Anna", "Anna Andersen", "Standard");
+        var totals = new InvoiceTotals(Money.Dkk(400m), Money.Dkk(0m), Money.Dkk(400m));
+
+        var reserved = await repository.ReserveInvoiceAsync(draft, totals, CancellationToken.None);
+        await repository.ReleaseInvoiceReservationAsync(reserved.Value!.InvoiceNumber, CancellationToken.None);
+        var retry = await repository.ReserveInvoiceAsync(draft, totals, CancellationToken.None);
+
+        Assert.True(retry.Succeeded);
+        Assert.Equal(new InvoiceNumber(1), retry.Value!.InvoiceNumber);
+        Assert.Null(await repository.GetIssuedInvoiceAsync(new InvoiceNumber(1), CancellationToken.None));
+        Assert.NotNull(await repository.GetIssuingInvoiceAsync(new InvoiceNumber(1), CancellationToken.None));
     }
 
     [Fact]

@@ -52,7 +52,8 @@ public sealed class SettingsViewModelTests
                     "12345678",
                 new DateOnly(2026, 7, 1),
                 VatStatus.Registered,
-                @"C:\Invoices"),
+                @"C:\Invoices",
+                paymentInstructions: "Bank 1234 / MobilePay 5678"),
                 new CalendarSettings("primary", "studio@example.test"),
                 GoogleOAuthAppConfigurationStatus: GoogleOAuthClientConfigurationStatus.Ready,
                 AppDataFolderPath: @"C:\Users\ExampleUser\AppData\Roaming\visualtech.dk\MySmallBusinessLedger",
@@ -63,6 +64,7 @@ public sealed class SettingsViewModelTests
         await viewModel.LoadAsync();
 
         Assert.Equal("Maple Key Studio", viewModel.CompanyName);
+        Assert.Equal("Bank 1234 / MobilePay 5678", viewModel.PaymentInstructions);
         Assert.Equal("primary", viewModel.CalendarId);
         Assert.True(viewModel.IsVatRegistered);
         Assert.True(viewModel.HasGoogleOAuthAppConfiguration);
@@ -203,7 +205,8 @@ public sealed class SettingsViewModelTests
             VatRegistrationDate = new DateTime(2026, 7, 1),
             InvoiceFolderPath = @"C:\Invoices",
             CalendarId = "primary",
-            GoogleAccountEmail = "studio@example.test"
+            GoogleAccountEmail = "studio@example.test",
+            PaymentInstructions = "Bank 1234 / MobilePay 5678"
         };
 
         await viewModel.SaveCommand.ExecuteAsync();
@@ -211,6 +214,7 @@ public sealed class SettingsViewModelTests
         Assert.NotNull(service.SavedProfile);
         Assert.Equal(VatStatus.Registered, service.SavedProfile.VatStatus);
         Assert.Equal(new DateOnly(2026, 7, 1), service.SavedProfile.VatRegistrationDate);
+        Assert.Equal("Bank 1234 / MobilePay 5678", service.SavedProfile.PaymentInstructions);
         Assert.Equal(new CalendarSettings("primary", "studio@example.test"), service.SavedCalendarSettings);
         Assert.True(viewModel.WasSaved);
     }

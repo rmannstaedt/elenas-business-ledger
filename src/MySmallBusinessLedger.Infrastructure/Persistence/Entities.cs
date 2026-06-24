@@ -26,6 +26,8 @@ public sealed class CompanyProfileEntity
     public string InvoiceFolderPath { get; set; } = string.Empty;
 
     public string ConfiguredInvoicePrinterName { get; set; } = string.Empty;
+
+    public string PaymentInstructions { get; set; } = string.Empty;
 }
 
 public sealed class CalendarSettingsEntity
@@ -161,6 +163,8 @@ public sealed class IssuedInvoiceEntity
     public string CompanyAddress { get; set; } = string.Empty;
 
     public string? CompanyCvr { get; set; }
+
+    public string CompanyPaymentInstructions { get; set; } = string.Empty;
 
     public string StudentShortName { get; set; } = string.Empty;
 

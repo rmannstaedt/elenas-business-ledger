@@ -49,6 +49,7 @@ public sealed class SqliteCompanyProfileRepository : ICompanyProfileRepository
         entity.VatStatus = profile.VatStatus;
         entity.InvoiceFolderPath = profile.InvoiceFolderPath;
         entity.ConfiguredInvoicePrinterName = profile.ConfiguredInvoicePrinterName;
+        entity.PaymentInstructions = profile.PaymentInstructions;
 
         await context.SaveChangesAsync(cancellationToken);
     }
@@ -63,5 +64,6 @@ public sealed class SqliteCompanyProfileRepository : ICompanyProfileRepository
             entity.VatRegistrationDate,
             entity.VatStatus,
             entity.InvoiceFolderPath,
-            entity.ConfiguredInvoicePrinterName);
+            entity.ConfiguredInvoicePrinterName,
+            entity.PaymentInstructions);
 }

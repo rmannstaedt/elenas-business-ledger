@@ -9,12 +9,14 @@ public sealed class InvoiceDraft
 {
     private InvoiceDraft(
         DateOnly invoiceDate,
+        InvoicePeriod period,
         CompanySnapshot companySnapshot,
         StudentSnapshot studentSnapshot,
         IReadOnlyList<InvoiceLineDraft> lines,
         PriceAdjustment? priceAdjustment)
     {
         InvoiceDate = invoiceDate;
+        Period = period;
         Company = companySnapshot;
         Student = studentSnapshot;
         Lines = lines;
@@ -22,6 +24,8 @@ public sealed class InvoiceDraft
     }
 
     public DateOnly InvoiceDate { get; }
+
+    public InvoicePeriod Period { get; }
 
     public CompanySnapshot Company { get; }
 
@@ -36,9 +40,10 @@ public sealed class InvoiceDraft
         CompanySnapshot companySnapshot,
         StudentSnapshot studentSnapshot,
         IReadOnlyList<InvoiceLineDraft> lines,
-        PriceAdjustment? priceAdjustment)
+        PriceAdjustment? priceAdjustment,
+        InvoicePeriod? period = null)
     {
-        var result = TryCreate(invoiceDate, companySnapshot, studentSnapshot, lines, priceAdjustment);
+        var result = TryCreate(invoiceDate, companySnapshot, studentSnapshot, lines, priceAdjustment, period);
         return result.Value ?? throw new InvalidOperationException(string.Join("; ", result.Errors.Select(error => error.Message)));
     }
 
@@ -47,7 +52,8 @@ public sealed class InvoiceDraft
         CompanySnapshot companySnapshot,
         StudentSnapshot studentSnapshot,
         IReadOnlyList<InvoiceLineDraft> lines,
-        PriceAdjustment? priceAdjustment)
+        PriceAdjustment? priceAdjustment,
+        InvoicePeriod? period = null)
     {
         if (lines.Count == 0)
         {
@@ -63,8 +69,17 @@ public sealed class InvoiceDraft
                 "A price adjustment requires a reason."));
         }
 
+        var invoicePeriod = period ?? InvoicePeriod.FromLines(lines);
+        if (invoicePeriod.From > invoicePeriod.To)
+        {
+            return ValidationResult<InvoiceDraft>.Failure(new ValidationError(
+                "Invoice.InvalidPeriod",
+                "The invoice period start date must be on or before the end date."));
+        }
+
         return ValidationResult<InvoiceDraft>.Success(new InvoiceDraft(
             invoiceDate,
+            invoicePeriod,
             companySnapshot,
             studentSnapshot,
             lines.ToArray(),

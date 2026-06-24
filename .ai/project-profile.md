@@ -31,11 +31,11 @@ Database access: EF Core SQLite
 Database schema evolution: EF Core migrations, applied by the WPF startup bootstrapper before repositories are used
 Plan catalog: stored in SQLite with Draft, Active, and Retired lifecycle state; Draft plans are editable/deletable and may be incomplete, publishing requires all fields except Retire on, Active plans are immutable/assignable except for name-only rename, Retire on scheduling, and immediate retirement, and Retired plans are immutable/reactivatable except for name-only rename but not assignable
 Student plan periods: stored with a required catalog plan identity plus copied commercial-term snapshots including price, cadence, duration, flexibility, student count, effective date, payment terms, and start/end dates; catalog lifecycle changes and name-only renames must not rewrite copied commercial terms or issued invoice data
-Issued invoice lines: stored with catalog plan identity for lineage plus issued-time plan name and price snapshots for durable invoice display/PDF output; old invoice display must use the stored invoice snapshot, not current catalog names or derived rename history
+Issued invoice lines: stored with catalog plan identity for lineage plus issued-time plan name and price snapshots for durable invoice display/PDF output; issued invoice company snapshots include the payment instructions used at issue time; old invoice display must use the stored invoice snapshot, not current catalog names or derived rename history
 Invoice PDFs: stored as files, not BLOBs
 Invoice number and PDF filename display: invoice numbers are formatted with at least three digits, and final PDF filenames use `<invoice number>-<student full name>.pdf`, for example `001-Mira Vale.pdf`
-Invoice PDF generation: QuestPDF
-Invoice PDF safety: reserve invoice metadata as `Issuing`, write to staging, verify PDF bytes, publish without overwriting, finalize the invoice as `Issued`, then request print
+Invoice PDF generation: QuestPDF; Danish invoice PDFs use a toner-light header with `studio.example.test`, show the invoice period/month, group lesson services by issued plan and price, list all included lessons in one clear list, use `CVR` for the CVR label, include configured payment instructions when present, and add a plan cut-over note when a single invoice covers a mid-month plan change
+Invoice PDF safety: reserve invoice metadata as `Issuing`, write to staging, verify PDF bytes, publish without overwriting, finalize the invoice as `Issued`, then request print; staging/write/verify/publish failures before final PDF publication must discard any staged PDF and release the reserved number so retries do not skip invoice numbers
 Invoice printer: configured from `Application > Settings`, stored in SQLite company profile data, selectable from installed Windows printers when enumeration is available, typeable, changeable, and clearable; if missing during first invoice print/reprint, the app opens the printer selection dialog directly and remembers the selected printer before continuing; `Printed` means the configured printer existed and the Windows print request was launched without exception, not that physical output or spooler completion was verified
 Google Calendar account tokens: stored locally with Windows user data protection, never in SQLite or plaintext config
 Google Calendar selected calendar/account label: stored in SQLite app settings; the main-window browser launcher uses the configured account email as a Google Calendar account hint
@@ -66,7 +66,7 @@ WPF + MVVM
 No business logic in code-behind
 Danish user-facing invoice text
 My-facing UI must stay simple
-Company profile, two-line company address entry, invoice folder with typed or folder-picker selection, invoice printer with remembered selector/typed value/clear action, Google calendar/account label, Google sign-in app status, local Google authorization status, connect/reconnect controls, and read-only app data/database paths are configured or shown from `Application > Settings`; the Google calendar defaults to `primary`
+Company profile, two-line company address entry, invoice folder with typed or folder-picker selection, invoice printer with remembered selector/typed value/clear action, invoice payment instructions, Google calendar/account label, Google sign-in app status, local Google authorization status, connect/reconnect controls, and read-only app data/database paths are configured or shown from `Application > Settings`; the Google calendar defaults to `primary`
 Student editor uses two stacked address fields and stores them as one multiline student address value.
 Student management is available from `Student > Manage Students`; it lists active and inactive students, embeds the Student editor for selected-student fields/current assigned plan/plan assignment/schedule, keeps explicit Save/Cancel, opens invoices on double-click through the existing viewer, mirrors student selection into the main window immediately and on close, and persists `Student.IsActive` changes only when the embedded editor is saved.
 Main-window `Add Lesson` creates an editable draft row; when both date and time are valid the draft autosaves to Google Calendar, and incomplete draft rows must survive automatic refreshes. Main lesson row time selectors offer 08:00 through 20:00 in 15-minute increments while still allowing typed time input.
@@ -93,6 +93,7 @@ Use fake Google Calendar client for calendar integration tests
 - Do not mark invoice issued unless PDF storage succeeds.
 - Do not mark invoice printed unless the configured printer exists and the Windows print request launches without exception; do not imply physical output or spooler completion has been verified.
 - Do not silently overwrite an existing issued invoice PDF.
+- Do not consume or skip an invoice number, or leave a staged PDF behind, when invoice staging, PDF writing, verification, or final PDF publish fails before the final PDF is published.
 - Do not silently edit issued invoices.
 - Do not derive old invoice display text from current plan catalog names or rename history; issued invoice snapshots are authoritative for invoice text.
 - Do not charge VAT when business profile says NotRegistered.

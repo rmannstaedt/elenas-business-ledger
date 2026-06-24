@@ -47,25 +47,37 @@ public sealed class IssueInvoiceUseCase
         var stagingPath = await fileStore.CreateStagingPathAsync(draft, invoiceNumber, cancellationToken);
         if (!stagingPath.Succeeded)
         {
-            return OperationResult<IssueInvoiceResult>.Failure(stagingPath.Errors.ToArray());
+            return await ReleaseReservationAndFailAsync(invoiceNumber, stagingPath.Errors.ToArray(), cancellationToken);
         }
 
         var write = await pdfWriter.WriteAsync(draft, totals, invoiceNumber, stagingPath.Value!, cancellationToken);
         if (!write.Succeeded)
         {
-            return OperationResult<IssueInvoiceResult>.Failure(write.Errors.ToArray());
+            return await DiscardStagingReleaseReservationAndFailAsync(
+                invoiceNumber,
+                stagingPath.Value!,
+                write.Errors.ToArray(),
+                cancellationToken);
         }
 
         var verify = await fileStore.VerifyStagedPdfAsync(stagingPath.Value!, cancellationToken);
         if (!verify.Succeeded)
         {
-            return OperationResult<IssueInvoiceResult>.Failure(verify.Errors.ToArray());
+            return await DiscardStagingReleaseReservationAndFailAsync(
+                invoiceNumber,
+                stagingPath.Value!,
+                verify.Errors.ToArray(),
+                cancellationToken);
         }
 
         var publish = await fileStore.PublishAsync(stagingPath.Value!, draft, invoiceNumber, cancellationToken);
         if (!publish.Succeeded)
         {
-            return OperationResult<IssueInvoiceResult>.Failure(publish.Errors.ToArray());
+            return await DiscardStagingReleaseReservationAndFailAsync(
+                invoiceNumber,
+                stagingPath.Value!,
+                publish.Errors.ToArray(),
+                cancellationToken);
         }
 
         var finalize = await invoiceRepository.FinalizeIssuedInvoiceAsync(
@@ -98,5 +110,31 @@ public sealed class IssueInvoiceUseCase
             printStatusUpdate.Value!,
             print.Succeeded,
             print.Errors));
+    }
+
+    private async Task<OperationResult<IssueInvoiceResult>> ReleaseReservationAndFailAsync(
+        InvoiceNumber invoiceNumber,
+        IReadOnlyList<ValidationError> errors,
+        CancellationToken cancellationToken)
+    {
+        await invoiceRepository.ReleaseInvoiceReservationAsync(invoiceNumber, cancellationToken);
+        return OperationResult<IssueInvoiceResult>.Failure(errors.ToArray());
+    }
+
+    private async Task<OperationResult<IssueInvoiceResult>> DiscardStagingReleaseReservationAndFailAsync(
+        InvoiceNumber invoiceNumber,
+        string stagingPath,
+        IReadOnlyList<ValidationError> errors,
+        CancellationToken cancellationToken)
+    {
+        var discard = await fileStore.DiscardStagingPathAsync(stagingPath, cancellationToken);
+        await invoiceRepository.ReleaseInvoiceReservationAsync(invoiceNumber, cancellationToken);
+
+        if (discard.Succeeded)
+        {
+            return OperationResult<IssueInvoiceResult>.Failure(errors.ToArray());
+        }
+
+        return OperationResult<IssueInvoiceResult>.Failure(errors.Concat(discard.Errors).ToArray());
     }
 }

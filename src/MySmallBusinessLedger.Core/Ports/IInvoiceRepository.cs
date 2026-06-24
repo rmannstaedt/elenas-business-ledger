@@ -25,6 +25,8 @@ public interface IInvoiceRepository
         string pdfFilePath,
         CancellationToken cancellationToken);
 
+    Task ReleaseInvoiceReservationAsync(InvoiceNumber invoiceNumber, CancellationToken cancellationToken);
+
     Task<OperationResult<IssuedInvoice>> UpdatePrintStatusAsync(
         InvoiceNumber invoiceNumber,
         InvoicePrintStatus printStatus,

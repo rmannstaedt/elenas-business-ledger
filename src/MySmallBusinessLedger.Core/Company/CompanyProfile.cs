@@ -9,7 +9,8 @@ public sealed record CompanyProfile(
     DateOnly? VatRegistrationDate,
     VatStatus VatStatus,
     string InvoiceFolderPath,
-    string ConfiguredInvoicePrinterName = "")
+    string ConfiguredInvoicePrinterName = "",
+    string PaymentInstructions = "")
 {
     public static CompanyProfile Create(
         string name,
@@ -20,8 +21,19 @@ public sealed record CompanyProfile(
         DateOnly? vatRegistrationDate,
         VatStatus vatStatus,
         string invoiceFolderPath,
-        string configuredInvoicePrinterName = "") =>
-        new(name, address, phone, email, cvr, vatRegistrationDate, vatStatus, invoiceFolderPath, configuredInvoicePrinterName);
+        string configuredInvoicePrinterName = "",
+        string paymentInstructions = "") =>
+        new(
+            name,
+            address,
+            phone,
+            email,
+            cvr,
+            vatRegistrationDate,
+            vatStatus,
+            invoiceFolderPath,
+            configuredInvoicePrinterName,
+            paymentInstructions);
 
     public bool ChargesVatOn(DateOnly invoiceDate) =>
         VatStatus == VatStatus.Registered &&

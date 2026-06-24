@@ -20,6 +20,7 @@ public sealed class SettingsViewModel : ViewModelBase
     private DateTime? vatRegistrationDate;
     private string invoiceFolderPath = string.Empty;
     private string configuredInvoicePrinterName = string.Empty;
+    private string paymentInstructions = string.Empty;
     private string calendarId = DefaultCalendarId;
     private string googleAccountEmail = string.Empty;
     private GoogleOAuthClientConfigurationStatus googleOAuthAppConfigurationStatus = GoogleOAuthClientConfigurationStatus.Missing;
@@ -60,6 +61,8 @@ public sealed class SettingsViewModel : ViewModelBase
         get => configuredInvoicePrinterName;
         set => SetProperty(ref configuredInvoicePrinterName, value);
     }
+
+    public string PaymentInstructions { get => paymentInstructions; set => SetProperty(ref paymentInstructions, value); }
 
     public ObservableCollection<string> AvailableInvoicePrinters { get; } = [];
 
@@ -142,6 +145,7 @@ public sealed class SettingsViewModel : ViewModelBase
             VatRegistrationDate = company.VatRegistrationDate?.ToDateTime(TimeOnly.MinValue);
             InvoiceFolderPath = company.InvoiceFolderPath;
             ConfiguredInvoicePrinterName = company.ConfiguredInvoicePrinterName;
+            PaymentInstructions = company.PaymentInstructions;
         }
 
         AvailableInvoicePrinters.Clear();
@@ -180,7 +184,8 @@ public sealed class SettingsViewModel : ViewModelBase
             IsVatRegistered && VatRegistrationDate is not null ? DateOnly.FromDateTime(VatRegistrationDate.Value) : null,
             IsVatRegistered ? VatStatus.Registered : VatStatus.NotRegistered,
             InvoiceFolderPath.Trim(),
-            ConfiguredInvoicePrinterName.Trim());
+            ConfiguredInvoicePrinterName.Trim(),
+            PaymentInstructions.Trim());
         CalendarId = NormalizeCalendarId(CalendarId);
         var calendarSettings = new CalendarSettings(CalendarId, GoogleAccountEmail.Trim());
 

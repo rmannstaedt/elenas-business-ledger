@@ -69,12 +69,37 @@ public sealed class InvoiceInfrastructureTests
     }
 
     [Fact]
+    public async Task FileStoreDiscardsOnlyFilesInsideInvoiceStagingFolder()
+    {
+        using var folder = TestInvoiceFolder.Create();
+        var fileStore = new LocalInvoiceFileStore(new InvoiceFileStoreOptions(folder.Path));
+        var draft = CreateDraft();
+        var invoiceNumber = new InvoiceNumber(7);
+        var stagingPath = await fileStore.CreateStagingPathAsync(draft, invoiceNumber, CancellationToken.None);
+        Assert.True(stagingPath.Succeeded);
+        await File.WriteAllBytesAsync(stagingPath.Value!, "%PDF-1.7\nnew"u8.ToArray(), TestContext.Current.CancellationToken);
+        var outsidePath = Path.Combine(folder.Path, "outside.pdf");
+        await File.WriteAllTextAsync(outsidePath, "outside", TestContext.Current.CancellationToken);
+
+        var discard = await fileStore.DiscardStagingPathAsync(stagingPath.Value!, CancellationToken.None);
+        var outsideDiscard = await fileStore.DiscardStagingPathAsync(outsidePath, CancellationToken.None);
+        var missingDiscard = await fileStore.DiscardStagingPathAsync(stagingPath.Value!, CancellationToken.None);
+
+        Assert.True(discard.Succeeded);
+        Assert.False(File.Exists(stagingPath.Value));
+        Assert.False(outsideDiscard.Succeeded);
+        Assert.Contains(outsideDiscard.Errors, error => error.Code == "InvoicePdf.StagingPathOutsideStagingDirectory");
+        Assert.True(File.Exists(outsidePath));
+        Assert.True(missingDiscard.Succeeded);
+    }
+
+    [Fact]
     public async Task QuestPdfInvoiceWriterCreatesNonEmptyPdfWithInvoiceContent()
     {
         using var folder = TestInvoiceFolder.Create();
         var writer = new QuestPdfInvoicePdfWriter();
-        var draft = CreateDraft();
-        var totals = new InvoiceTotals(Money.Dkk(400m), Money.Dkk(100m), Money.Dkk(500m));
+        var draft = CreateEightLessonDraft();
+        var totals = new InvoiceTotals(Money.Dkk(2800m), Money.Dkk(0m), Money.Dkk(2800m));
         var outputPath = Path.Combine(folder.Path, "invoice.pdf");
 
         var result = await writer.WriteAsync(draft, totals, new InvoiceNumber(12), outputPath, CancellationToken.None);
@@ -169,6 +194,32 @@ public sealed class InvoiceInfrastructureTests
                     Money.Dkk(400m))
             ],
             priceAdjustment: null);
+    }
+
+    private static InvoiceDraft CreateEightLessonDraft()
+    {
+        var dates = new[]
+        {
+            new DateTimeOffset(2026, 6, 1, 14, 0, 0, TimeSpan.FromHours(2)),
+            new DateTimeOffset(2026, 6, 4, 14, 0, 0, TimeSpan.FromHours(2)),
+            new DateTimeOffset(2026, 6, 8, 14, 0, 0, TimeSpan.FromHours(2)),
+            new DateTimeOffset(2026, 6, 11, 14, 0, 0, TimeSpan.FromHours(2)),
+            new DateTimeOffset(2026, 6, 15, 14, 0, 0, TimeSpan.FromHours(2)),
+            new DateTimeOffset(2026, 6, 18, 14, 0, 0, TimeSpan.FromHours(2)),
+            new DateTimeOffset(2026, 6, 25, 14, 0, 0, TimeSpan.FromHours(2)),
+            new DateTimeOffset(2026, 6, 29, 14, 0, 0, TimeSpan.FromHours(2))
+        };
+
+        return InvoiceDraft.Create(
+            new DateOnly(2026, 6, 23),
+            new CompanySnapshot("Maple Key Studio", "18 Example Lane, 0000 Example City", null),
+            new StudentSnapshot("Mira", "Mira Vale", "42 Sample Lane" + Environment.NewLine + "0000 Example City"),
+            dates.Select(date => new InvoiceLineDraft(
+                date,
+                "Tilbud 2 - 2026: 2 lektioner/uge",
+                Money.Dkk(350m))).ToArray(),
+            priceAdjustment: null,
+            period: new InvoicePeriod(new DateOnly(2026, 6, 1), new DateOnly(2026, 6, 30)));
     }
 
     private sealed class FakePrintProcessLauncher : IPrintProcessLauncher

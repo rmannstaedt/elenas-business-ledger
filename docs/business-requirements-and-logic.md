@@ -36,13 +36,17 @@
     VAT register date: date/time / blank
     VAT status: not registered / registered
     invoice folder path
+    invoice payment instructions (bank/MobilePay/free text)
 
 ### Invoice
     invoice number (unique, sequential; displayed with at least three digits, e.g. 001)
     date
+    period: the month/date range the invoice is being written for
     company info
     student info
     (list) lesson date/time + lesson plan identity + issued lesson plan name + lesson price (without VAT)
+    grouped service lines by lesson plan and price
+    payment instructions
   
   AND (optional, left out if not specified)
     price adjustment
@@ -204,9 +208,14 @@ The form will contain the proposed final invoice layout and information.
 
 The Invoice will contain the Company information.
 The Invoice will contain the Student information.
-The Invoice will contain a list of lessons matching the information for that Student in Google Calendar.
+The Invoice will contain the period/month it is written for.
+The Invoice will contain grouped service lines summarizing lessons by issued lesson plan and price.
+The Invoice will contain a single clear list of lessons matching the information for that Student in Google Calendar.
+If the invoice covers lessons under more than one Plan, the explanatory text lists the plan change with the cut-over date.
 The Invoice will contain VAT information, if currently relevant.
 The Invoice will contain price information.
+The Invoice will contain the configured payment instructions, if any.
+The payment instructions and totals should sit near the bottom of the invoice page, above the footer text.
 The Invoice language is: Danish
 
 The user may edit the list of lessons.
@@ -221,7 +230,7 @@ The "Print Invoice" button does the following:
   - Reserves the Invoice in the local database as an in-progress issue operation.
   - Saves a PDF copy of the invoice in the company invoice folder path through a staging, verification, and publish flow.
     -- note: the final PDF file name uses the invoice number and Student full name, e.g. `001-Mira Vale.pdf`.
-    -- note: if PDF save/publish fails, the Invoice is not shown as issued, later actions are *not* performed, and the user is notified of the failure.
+    -- note: if PDF staging, writing, verification, or publish fails before the final PDF is published, any staged PDF is discarded and the reserved Invoice number is released; the Invoice is not shown as issued, later actions are *not* performed, and the user is notified of the failure. Retrying must reuse that Invoice number rather than skipping to the next one.
   - Finalizes the Invoice data in the Invoice table as issued.
   - Sends a print request to the configured invoice printer, if one is configured and available.
     -- note: a print failure does not undo the issued Invoice or delete the PDF; the Invoice remains issued and can be reprinted from the Invoice Viewer.

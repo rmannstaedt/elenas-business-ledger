@@ -151,7 +151,7 @@ The following must remain unchanged unless this plan explicitly says otherwise:
 - Risk: a final PDF exists but the row remains `Issuing` after a crash/failure.
   - Mitigation: recovery path verifies the final PDF and finalizes the row before retrying or reports a clear reconciliation error.
 - Risk: invoice numbers skip after abandoned `Issuing` reservations.
-  - Mitigation: acceptable only if the app reports the state truthfully; prefer recovery/finalization over deletion. Do not silently reuse a number if an `Issuing` row exists.
+  - Mitigation: a failure before final PDF publication must release the reservation so retrying reuses the same invoice number; only published-final-PDF/database-disagreement cases should remain in explicit recovery/finalization handling.
 - Risk: Windows printer APIs may report spooler success rather than physical output.
   - Mitigation: UI/docs define Printed as "Windows reported the print job completed"; do not claim paper output.
 - Risk: settings UI becomes cluttered.
@@ -584,7 +584,8 @@ Expected successful result:
 Expected failure/safety result, if relevant:
 
 - If printing fails, the invoice remains issued and can be reprinted.
-- If PDF publish/finalization fails, the app reports the issue failure and does not show a false issued invoice.
+- If PDF staging/write/verification/publish fails before final PDF publication, the app reports the issue failure, discards any staged PDF, releases the reservation, and does not skip the invoice number on retry.
+- If PDF finalization fails after final PDF publication, the app reports the issue failure and does not show a false issued invoice.
 - If recovery detects a final PDF for an `Issuing` row, the app finalizes or reports a clear reconciliation error rather than silently creating a second invoice.
 
 Where to inspect artifacts, reports, logs, database state, or UI state:

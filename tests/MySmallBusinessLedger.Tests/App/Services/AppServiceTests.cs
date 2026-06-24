@@ -123,6 +123,9 @@ public sealed class AppServiceTests
             Task.FromResult(OperationResult<IssuedInvoice>.Failure(
                 new ValidationError("Invoice.NotConfigured", "Invoice finalization is not configured.")));
 
+        public Task ReleaseInvoiceReservationAsync(InvoiceNumber invoiceNumber, CancellationToken cancellationToken) =>
+            Task.CompletedTask;
+
         public Task<OperationResult<IssuedInvoice>> UpdatePrintStatusAsync(
             InvoiceNumber invoiceNumber,
             InvoicePrintStatus printStatus,

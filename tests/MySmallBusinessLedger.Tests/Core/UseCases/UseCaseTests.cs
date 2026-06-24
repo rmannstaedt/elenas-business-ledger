@@ -525,6 +525,16 @@ public sealed class UseCaseTests
 
         Assert.False(result.Succeeded);
         Assert.True(invoices.ReserveCalled);
+        Assert.Equal(
+            [
+                "reserve",
+                "stage:001",
+                "write:C:\\Invoices\\.staging\\001.pdf",
+                "discard:C:\\Invoices\\.staging\\001.pdf",
+                "release:001"
+            ],
+            calls);
+        Assert.True(invoices.ReleaseReservationCalled);
         Assert.False(invoices.FinalizeCalled);
         Assert.False(invoices.UpdatePrintStatusCalled);
         Assert.False(printer.PrintCalled);
@@ -599,6 +609,48 @@ public sealed class UseCaseTests
         Assert.Equal("The invoice could not be printed.", result.Value.Invoice.LastPrintError);
         Assert.False(result.Value.PrintSucceeded);
         Assert.Contains(result.Value.PrintErrors, error => error.Code == "InvoicePrint.Failed");
+    }
+
+    [Fact]
+    public async Task IssueInvoiceReleasesReservedInvoiceNumberWhenPdfPublishFails()
+    {
+        var calls = new List<string>();
+        var company = new FakeCompanyProfileRepository();
+        var invoices = new FakeInvoiceRepository(calls);
+        var fileStore = new FakeInvoiceFileStore(calls)
+        {
+            PublishResult = OperationResult<string>.Failure(new ValidationError(
+                "InvoicePdf.FinalFileAlreadyExists",
+                "An invoice PDF already exists for this invoice number."))
+        };
+        var pdfWriter = new FakeInvoicePdfWriter { Calls = calls };
+        var printer = new FakeInvoicePrinter(calls);
+        var useCase = new IssueInvoiceUseCase(
+            company,
+            invoices,
+            fileStore,
+            pdfWriter,
+            printer,
+            new FakeClock(new DateTimeOffset(2026, 6, 16, 17, 30, 0, TimeSpan.Zero)));
+
+        var result = await useCase.ExecuteAsync(CreateInvoiceDraft(), CancellationToken.None);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Errors, error => error.Code == "InvoicePdf.FinalFileAlreadyExists");
+        Assert.Equal(
+            [
+                "reserve",
+                "stage:001",
+                "write:C:\\Invoices\\.staging\\001.pdf",
+                "verify:C:\\Invoices\\.staging\\001.pdf",
+                "publish:C:\\Invoices\\.staging\\001.pdf",
+                "discard:C:\\Invoices\\.staging\\001.pdf",
+                "release:001"
+            ],
+            calls);
+        Assert.True(invoices.ReleaseReservationCalled);
+        Assert.False(invoices.FinalizeCalled);
+        Assert.False(printer.PrintCalled);
     }
 
     [Fact]
@@ -860,6 +912,8 @@ public sealed class UseCaseTests
 
         public bool UpdatePrintStatusCalled { get; private set; }
 
+        public bool ReleaseReservationCalled { get; private set; }
+
         public bool SavePaymentStatusCalledBeforeConfirmation { get; private set; }
 
         public PaymentStatus? SavedPaymentStatus { get; private set; }
@@ -919,6 +973,13 @@ public sealed class UseCaseTests
                 InvoicePrintStatus.NotPrinted,
                 printedAt: null,
                 lastPrintError: null)));
+        }
+
+        public Task ReleaseInvoiceReservationAsync(InvoiceNumber invoiceNumber, CancellationToken cancellationToken)
+        {
+            ReleaseReservationCalled = true;
+            calls?.Add($"release:{invoiceNumber}");
+            return Task.CompletedTask;
         }
 
         public Task<OperationResult<IssuedInvoice>> UpdatePrintStatusAsync(
@@ -984,6 +1045,9 @@ public sealed class UseCaseTests
 
     private sealed class FakeInvoiceFileStore(List<string>? calls = null) : IInvoiceFileStore
     {
+        public OperationResult<string> PublishResult { get; init; } =
+            OperationResult<string>.Success("C:\\Invoices\\001.pdf");
+
         public Task<OperationResult<string>> CreateStagingPathAsync(InvoiceDraft draft, InvoiceNumber invoiceNumber, CancellationToken cancellationToken)
         {
             calls?.Add($"stage:{invoiceNumber}");
@@ -999,7 +1063,13 @@ public sealed class UseCaseTests
         public Task<OperationResult<string>> PublishAsync(string stagingPath, InvoiceDraft draft, InvoiceNumber invoiceNumber, CancellationToken cancellationToken)
         {
             calls?.Add($"publish:{stagingPath}");
-            return Task.FromResult(OperationResult<string>.Success("C:\\Invoices\\001.pdf"));
+            return Task.FromResult(PublishResult);
+        }
+
+        public Task<OperationResult<string>> DiscardStagingPathAsync(string stagingPath, CancellationToken cancellationToken)
+        {
+            calls?.Add($"discard:{stagingPath}");
+            return Task.FromResult(OperationResult<string>.Success(stagingPath));
         }
     }
 

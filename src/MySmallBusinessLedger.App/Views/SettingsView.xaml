@@ -106,6 +106,12 @@
                                 MinWidth="64"
                                 Height="24" />
                     </Grid>
+                    <TextBlock Text="Payment instructions" />
+                    <TextBox Text="{Binding PaymentInstructions, UpdateSourceTrigger=PropertyChanged}"
+                             AcceptsReturn="True"
+                             TextWrapping="Wrap"
+                             MinHeight="64"
+                             Margin="0,3,0,8" />
                 </StackPanel>
 
                 <StackPanel Grid.Column="2">
