@@ -53,6 +53,7 @@ Backup: no automated backup in version 1.0; keep persistence design compatible w
 Google Calendar API: official Google Calendar .NET client
 Google authentication: external browser OAuth
 Google OAuth app identity: publisher-owned Desktop OAuth client; users authorize their own Google account at runtime
+Google OAuth Calendar scope: request `https://www.googleapis.com/auth/calendar.events.owned`, not broader all-calendar event scopes; the configured calendar should be owned by the signed-in Google account, and app-level lesson matching still ignores events whose first summary line does not match the `$` student marker
 Google Calendar event time zones: write payloads must use Google/IANA time zone IDs; convert Windows local time zone IDs such as `Romance Standard Time` before creating or moving events
 Google Calendar completed-lesson marker: keep the first line as `$ <student short name>` or `$<student short name>`; Completed is represented by a later `Status: Completed` summary line, and absence of that line means Planned
 Google Calendar population: main-window `Populate Calendar` seeds lessons for the selected student from saved student schedule entries; current month starts at today inclusive, future months seed the whole month, past months cannot be seeded, exact same-student same-date/time duplicates are skipped, and v1 does not detect other conflicts

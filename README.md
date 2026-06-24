@@ -67,7 +67,7 @@ The main window can populate Google Calendar from the selected student's saved s
 - Under-30 teaching support remains in the data model because future students may require it (but out of scope for version 1.0).
 - Lønsumsafgift is out of scope for version 1.0.
 - Google Calendar is the operational lesson schedule, with two-way sync.
-- Google Calendar integration uses the official Google Calendar API client, external browser OAuth, and Windows-protected local token storage.
+- Google Calendar integration uses the official Google Calendar API client, external browser OAuth, and Windows-protected local token storage. The app requests the narrower `https://www.googleapis.com/auth/calendar.events.owned` OAuth scope so it can read, create, move, complete, and delete lesson events on calendars owned by the signed-in Google account; entries still must match the documented `$` student marker before the app treats them as lessons.
 - The Google OAuth app identity is publisher-owned and supplied from `Configuration\google-oauth-client.json`, not selected by each user in Settings.
 - The main window Open Calendar action opens Google Calendar in the browser with the configured Google account email as the account hint.
 - Runtime data is stored under `%APPDATA%\visualtech.dk\MySmallBusinessLedger`.

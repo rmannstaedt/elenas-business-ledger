@@ -105,6 +105,8 @@ Google Calendar is the repository of truth for all future lessons.
 Google Calendar is also the repository of truth for past lessons *until* an invoice is issued for them.
 Once an invoice is issued, issued invoice lines are the durable local repository of truth for the invoiced lesson snapshots.
 
+Google authorization requests the `https://www.googleapis.com/auth/calendar.events.owned` OAuth scope. This lets the app read, create, move, complete, and delete events on Google calendars owned by the signed-in account, including lesson appointments the user creates manually in Google Calendar. The configured calendar should therefore be owned by that account; the app does not request broader all-calendar event access merely to inspect shared calendars.
+
 Relevant Google Calendar entries are identified by their first line, which may be one of these:
   $ <student short name>
   $<student short name>

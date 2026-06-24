@@ -18,6 +18,7 @@ Date: 2026-06-23
 - Plan name changes are recorded in SQLite `PlanNameChanges` with old name, new name, and change date/time. Student plan displays follow the current catalog display name through `PlanCatalogId`; issued invoice lines store `PlanCatalogId` for lineage and keep the plan name stored when the invoice was issued for invoice display/PDF output.
 - The main-window Open Calendar action opens Google Calendar in the browser with the configured Google account email as an `authuser` hint, avoiding the old hardcoded `/u/0/` first-browser-account behavior when possible.
 - The app now uses publisher-owned Google Desktop OAuth configuration from `Configuration\google-oauth-client.json` in the app output. The local source file is `src\MySmallBusinessLedger.App\Configuration\google-oauth-client.json`, ignored by Git; the template is committed beside it.
+- Google OAuth now requests `https://www.googleapis.com/auth/calendar.events.owned` instead of broader all-calendar event access. The configured Google Calendar should be owned by the signed-in Google account; manually created `$` lesson events on that owned calendar still sync normally.
 - Google Calendar event writes convert Windows local time zone IDs such as `Romance Standard Time` into Google/IANA IDs such as `Europe/Copenhagen` before creating/moving events. This preserves the Windows-local runtime model while satisfying Google Calendar's event payload contract.
 - Window placement is stored under `%APPDATA%\visualtech.dk\MySmallBusinessLedger\window-placement.json`; Manage Plans column widths are stored under `%APPDATA%\visualtech.dk\MySmallBusinessLedger\grid-column-widths.json`.
 - Completed/Planned lesson state is manual. Google Calendar keeps the first-line `$` student marker and uses a later `Status: Completed` summary line for completed lessons.
@@ -57,6 +58,7 @@ Date: 2026-06-23
 - Full test suite passed on 2026-06-22 after EF migration and startup bootstrapper extraction: `dotnet test MySmallBusinessLedger.sln -nodeReuse:false` with 181/181 tests passing.
 - Latest focused invoice sample PDF writer test passed on 2026-06-23: `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter QuestPdfInvoiceWriterCreatesNonEmptyPdfWithInvoiceContent -nodeReuse:false` with 1/1 tests passing and sample PDF rendered to `tmp\pdfs\invoice-template-sample-page1.png`.
 - Full test suite passed on 2026-06-24 after staged invoice PDF cleanup: `dotnet test MySmallBusinessLedger.sln -nodeReuse:false` with 258/258 tests passing.
+- Full test suite passed on 2026-06-24 after narrowing Google Calendar OAuth scope: `dotnet test MySmallBusinessLedger.sln -nodeReuse:false` with 259/259 tests passing.
 - Focused OAuth/Settings test run passed: 24 tests.
 - Full build passed on 2026-06-23 after invoice layout/payment instruction implementation: `dotnet build MySmallBusinessLedger.sln -nodeReuse:false` with 0 warnings and 0 errors.
 - Full test suite passed on 2026-06-23 after invoice layout/payment instruction implementation: `dotnet test MySmallBusinessLedger.sln -nodeReuse:false` with 255/255 tests passing.

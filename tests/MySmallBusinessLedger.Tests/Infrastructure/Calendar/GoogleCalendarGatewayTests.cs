@@ -2,6 +2,7 @@ using MySmallBusinessLedger.Core.Common;
 using MySmallBusinessLedger.Core.Lessons;
 using MySmallBusinessLedger.Core.UseCases.Lessons;
 using MySmallBusinessLedger.Infrastructure.Calendar;
+using Google.Apis.Calendar.v3;
 using Google.Apis.Calendar.v3.Data;
 using Google.Apis.Util.Store;
 
@@ -9,6 +10,14 @@ namespace MySmallBusinessLedger.Tests.Infrastructure.Calendar;
 
 public sealed class GoogleCalendarGatewayTests
 {
+    [Fact]
+    public void CredentialFactoryRequestsOwnedCalendarEventScopeOnly()
+    {
+        Assert.Equal(
+            [CalendarService.Scope.CalendarEventsOwned],
+            GoogleCalendarCredentialFactory.RequestedScopes);
+    }
+
     [Fact]
     public async Task ListLessonsReturnsOnlyEventsMarkedOnTheFirstSummaryLine()
     {
