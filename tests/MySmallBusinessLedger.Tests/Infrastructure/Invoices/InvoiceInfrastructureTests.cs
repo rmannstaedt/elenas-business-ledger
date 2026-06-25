@@ -24,7 +24,7 @@ public sealed class InvoiceInfrastructureTests
 
         Assert.True(verify.Succeeded);
         Assert.True(publish.Succeeded);
-        Assert.Equal(Path.Combine(folder.Path, "042-Anna Maria Andersen.pdf"), publish.Value);
+        Assert.Equal(Path.Combine(folder.Path, "Invoice 042 Juni 2026 - Anna Maria Andersen.pdf"), publish.Value);
         Assert.True(File.Exists(publish.Value));
         Assert.False(File.Exists(stagingPath.Value));
     }
@@ -36,7 +36,7 @@ public sealed class InvoiceInfrastructureTests
         var fileStore = new LocalInvoiceFileStore(new InvoiceFileStoreOptions(folder.Path));
         var draft = CreateDraft();
         var invoiceNumber = new InvoiceNumber(7);
-        var existingFinalPath = Path.Combine(folder.Path, "007-Anna Andersen.pdf");
+        var existingFinalPath = Path.Combine(folder.Path, "Invoice 007 Juni 2026 - Anna Andersen.pdf");
         await File.WriteAllTextAsync(existingFinalPath, "existing", TestContext.Current.CancellationToken);
 
         var stagingPath = await fileStore.CreateStagingPathAsync(draft, invoiceNumber, CancellationToken.None);

@@ -52,7 +52,7 @@
     price adjustment
     price adjustment reason (mandatory if price was adjusted)
 
-  AND (ONLY if the company is VAT registered AND we are past the VAT register date):
+  AND (ONLY if the company is VAT registered AND the invoice period starts on or after the VAT register date):
     total price without VAT
     VAT percentage
     VAT amount
@@ -215,6 +215,7 @@ The Invoice will contain grouped service lines summarizing lessons by issued les
 The Invoice will contain a single clear list of lessons matching the information for that Student in Google Calendar.
 If the invoice covers lessons under more than one Plan, the explanatory text lists the plan change with the cut-over date.
 The Invoice will contain VAT information, if currently relevant.
+VAT applicability is based on the invoice period start date, not the invoice issue/print date.
 The Invoice will contain price information.
 The Invoice will contain the configured bank registration/account number lines, MobilePay account line, and payment instructions, if any.
 The Invoice must fit on one PDF page. If the included lesson list is long, the lesson list should use multiple columns in the middle lesson area rather than pushing payment instructions, totals, or footer text to a second page.
@@ -239,7 +240,7 @@ Once the invoice has been edited, the user may press the "Print Invoice" button 
 The "Print Invoice" button does the following:
   - Reserves the Invoice in the local database as an in-progress issue operation.
   - Saves a PDF copy of the invoice in the company invoice folder path through a staging, verification, and publish flow.
-    -- note: the final PDF file name uses the invoice number and Student full name, e.g. `001-Mira Vale.pdf`.
+    -- note: the final PDF file name uses the invoice number, invoice period, and Student full name, e.g. `Invoice 001 Juni 2026 - Mira Vale.pdf`.
     -- note: if PDF staging, writing, verification, or publish fails before the final PDF is published, any staged PDF is discarded and the reserved Invoice number is released; the Invoice is not shown as issued, later actions are *not* performed, and the user is notified of the failure. Retrying must reuse that Invoice number rather than skipping to the next one.
   - Finalizes the Invoice data in the Invoice table as issued.
   - Sends a print request to the configured invoice printer, if one is configured and available.

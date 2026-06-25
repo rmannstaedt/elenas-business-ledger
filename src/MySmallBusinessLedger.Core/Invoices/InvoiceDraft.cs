@@ -90,7 +90,7 @@ public sealed class InvoiceDraft
     {
         var subtotal = Lines.Aggregate(MoneyAmount.Dkk(0m), (total, line) => total + line.PriceWithoutVat);
         var totalWithoutVat = PriceAdjustment is null ? subtotal : subtotal + PriceAdjustment.Amount;
-        var vat = company.ChargesVatOn(InvoiceDate) ? totalWithoutVat * 0.25m : MoneyAmount.Dkk(0m);
+        var vat = company.ChargesVatOn(Period.From) ? totalWithoutVat * 0.25m : MoneyAmount.Dkk(0m);
 
         return new InvoiceTotals(totalWithoutVat, vat, totalWithoutVat + vat);
     }

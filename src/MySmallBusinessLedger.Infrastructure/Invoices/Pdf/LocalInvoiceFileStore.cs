@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using MySmallBusinessLedger.Core.Common;
 using MySmallBusinessLedger.Core.Invoices;
@@ -8,6 +9,7 @@ namespace MySmallBusinessLedger.Infrastructure.Invoices.Pdf;
 public sealed class LocalInvoiceFileStore : IInvoiceFileStore
 {
     private static readonly byte[] PdfHeader = "%PDF"u8.ToArray();
+    private static readonly CultureInfo DanishCulture = CultureInfo.GetCultureInfo("da-DK");
     private readonly string invoiceFolderPath;
     private readonly string stagingFolderPath;
 
@@ -126,8 +128,25 @@ public sealed class LocalInvoiceFileStore : IInvoiceFileStore
         }
     }
 
-    private static string CreateFinalFileName(InvoiceDraft draft, InvoiceNumber invoiceNumber) =>
-        $"{invoiceNumber}-{SanitizeFileNamePart(draft.Student.FullName)}.pdf";
+    private static string CreateFinalFileName(InvoiceDraft draft, InvoiceNumber invoiceNumber)
+    {
+        var period = SanitizeFileNamePart(FormatPeriod(draft.Period));
+        var studentName = SanitizeFileNamePart(draft.Student.FullName);
+        return $"Invoice {invoiceNumber} {period} - {studentName}.pdf";
+    }
+
+    private static string FormatPeriod(InvoicePeriod period)
+    {
+        if (period.From.Year == period.To.Year && period.From.Month == period.To.Month)
+        {
+            var text = period.From.ToString("MMMM yyyy", DanishCulture);
+            return char.ToUpper(text[0], DanishCulture) + text[1..];
+        }
+
+        return period.From.ToString("dd-MM-yyyy", CultureInfo.InvariantCulture)
+            + " - "
+            + period.To.ToString("dd-MM-yyyy", CultureInfo.InvariantCulture);
+    }
 
     private static string SanitizeFileNamePart(string value)
     {
