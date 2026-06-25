@@ -223,7 +223,7 @@ public sealed class SettingsViewModel : ViewModelBase
 
         SetGoogleOAuthAppConfigurationStatus(snapshot.GoogleOAuthAppConfigurationStatus);
         GoogleAuthorizationStatusText = snapshot.HasGoogleAuthorizationTokens
-            ? "Google authorization: Saved locally. Connect again if Google Calendar access fails."
+            ? "Google authorization: Saved locally." + Environment.NewLine + "Connect again if Google Calendar fails."
             : "Google authorization: Not connected";
         AppDataFolderPath = snapshot.AppDataFolderPath;
         DatabasePath = snapshot.DatabasePath;

@@ -37,7 +37,7 @@ public sealed class SettingsViewModelTests
             AssertGroupBoxColumn(window, "VAT", 2);
             var vatGroupBox = FindGroupBoxByHeader(window, "VAT");
             Assert.NotNull(vatGroupBox);
-            Assert.Equal(72, vatGroupBox.Margin.Top);
+            Assert.Equal(56, vatGroupBox.Margin.Top);
             var saveButton = FindButtonByContent(window, "Save");
             Assert.NotNull(saveButton);
             var actionPanel = Assert.IsType<StackPanel>(saveButton.Parent);
@@ -234,7 +234,7 @@ public sealed class SettingsViewModelTests
         await viewModel.LoadAsync();
 
         Assert.Equal(
-            "Google authorization: Saved locally. Connect again if Google Calendar access fails.",
+            "Google authorization: Saved locally." + Environment.NewLine + "Connect again if Google Calendar fails.",
             viewModel.GoogleAuthorizationStatusText);
     }
 

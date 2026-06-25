@@ -201,7 +201,7 @@
                     <GroupBox Header="VAT"
                               Grid.Column="2"
                               Style="{StaticResource SettingsGroupBoxStyle}"
-                              Margin="0,72,0,12">
+                              Margin="0,56,0,12">
                         <StackPanel>
                             <CheckBox Content="VAT registered"
                                       IsChecked="{Binding IsVatRegistered}"
