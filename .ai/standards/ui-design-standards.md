@@ -160,6 +160,7 @@ Data-dense views should support scanning, comparison, and safe action.
 - Choose default columns by user importance, not internal model order.
 - Use stable identifiers and meaningful names so rows remain recognizable across refreshes.
 - Preserve selection, scroll position, sort, filters, expanded groups, and visible columns where practical.
+- For selectable rows, make selection a deliberate contract: bind selected item/state where the platform supports it, keep selection visible, preserve it across refreshes by stable row identity, and verify that row clicks, double-clicks, embedded buttons, focus changes, and command handlers do not accidentally clear or steal selection.
 - Do not let late detail loads overwrite the current selection.
 - Show row-level status, warnings, and failures where the user makes row-level decisions.
 - Keep bulk actions visibly scoped to the selected or filtered set.

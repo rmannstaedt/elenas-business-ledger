@@ -72,9 +72,14 @@ public partial class MainWindow : Window
 
     private async void OnInvoiceDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
     {
+        if (FindAncestor<Button>(e.OriginalSource as DependencyObject) is not null)
+        {
+            return;
+        }
+
         if (sender is DataGrid { SelectedItem: InvoiceDisplayModel invoice })
         {
-            await ViewModel.OpenInvoiceCommand.ExecuteAsync(invoice);
+            await ViewModel.OpenInvoicePdfCommand.ExecuteAsync(invoice);
         }
     }
 
@@ -374,6 +379,20 @@ public partial class MainWindow : Window
         }
 
         return false;
+    }
+
+    private static T? FindAncestor<T>(DependencyObject? source)
+        where T : DependencyObject
+    {
+        for (var current = source; current is not null; current = GetParent(current))
+        {
+            if (current is T match)
+            {
+                return match;
+            }
+        }
+
+        return null;
     }
 
     private static DependencyObject? GetParent(DependencyObject child)

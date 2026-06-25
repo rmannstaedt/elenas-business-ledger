@@ -22,6 +22,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private readonly ILessonEditorService lessonEditorService;
     private readonly ILessonStateService lessonStateService;
     private readonly IInvoiceWorkflowLauncher invoiceWorkflowLauncher;
+    private readonly IInvoicePdfLauncher invoicePdfLauncher;
     private readonly ISettingsLauncher settingsLauncher;
     private readonly IPlanCatalogLauncher planCatalogLauncher;
     private readonly IUiClock clock;
@@ -39,6 +40,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private bool isBusy;
     private int activationRefreshSuspendCount;
     private LessonDisplayModel? selectedLesson;
+    private InvoiceDisplayModel? selectedInvoice;
     private string? errorMessage;
 
     public MainWindowViewModel(
@@ -51,6 +53,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         ILessonEditorService lessonEditorService,
         ILessonStateService lessonStateService,
         IInvoiceWorkflowLauncher invoiceWorkflowLauncher,
+        IInvoicePdfLauncher invoicePdfLauncher,
         ISettingsLauncher settingsLauncher,
         IPlanCatalogLauncher planCatalogLauncher,
         IUiClock clock,
@@ -65,6 +68,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         this.lessonEditorService = lessonEditorService;
         this.lessonStateService = lessonStateService;
         this.invoiceWorkflowLauncher = invoiceWorkflowLauncher;
+        this.invoicePdfLauncher = invoicePdfLauncher;
         this.settingsLauncher = settingsLauncher;
         this.planCatalogLauncher = planCatalogLauncher;
         this.clock = clock;
@@ -91,6 +95,9 @@ public sealed class MainWindowViewModel : ViewModelBase
         WriteInvoiceCommand = new AsyncRelayCommand(WriteInvoiceAsync, () => !IsBusy);
         OpenInvoiceCommand = new AsyncRelayCommand(
             parameter => OpenInvoiceAsync((InvoiceDisplayModel)parameter!),
+            parameter => parameter is InvoiceDisplayModel && !IsBusy);
+        OpenInvoicePdfCommand = new AsyncRelayCommand(
+            parameter => OpenInvoicePdfAsync((InvoiceDisplayModel)parameter!),
             parameter => parameter is InvoiceDisplayModel && !IsBusy);
         OpenManageStudentsCommand = new AsyncRelayCommand(OpenManageStudentsAsync, () => !IsBusy);
         OpenSettingsCommand = new AsyncRelayCommand(OpenSettingsAsync, () => !IsBusy);
@@ -123,6 +130,12 @@ public sealed class MainWindowViewModel : ViewModelBase
     {
         get => selectedLesson;
         set => SetProperty(ref selectedLesson, value);
+    }
+
+    public InvoiceDisplayModel? SelectedInvoice
+    {
+        get => selectedInvoice;
+        set => SetProperty(ref selectedInvoice, value);
     }
 
     public string? CurrentStudentShortName
@@ -190,6 +203,8 @@ public sealed class MainWindowViewModel : ViewModelBase
     public AsyncRelayCommand WriteInvoiceCommand { get; }
 
     public AsyncRelayCommand OpenInvoiceCommand { get; }
+
+    public AsyncRelayCommand OpenInvoicePdfCommand { get; }
 
     public AsyncRelayCommand OpenManageStudentsCommand { get; }
 
@@ -394,6 +409,12 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     private async Task WriteInvoiceAsync()
     {
+        if (ResolveInvoiceForWriteButton() is { } existingInvoice)
+        {
+            await OpenInvoiceAsync(existingInvoice);
+            return;
+        }
+
         var issued = await invoiceWorkflowLauncher.ShowWriteInvoiceAsync(
             DisplayMonth,
             CurrentStudentShortName,
@@ -406,6 +427,26 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     private Task OpenInvoiceAsync(InvoiceDisplayModel invoice) =>
         invoiceWorkflowLauncher.ShowInvoiceViewerAsync(invoice.InvoiceNumber, CancellationToken.None);
+
+    private async Task OpenInvoicePdfAsync(InvoiceDisplayModel invoice)
+    {
+        SelectedInvoice = invoice;
+        if (string.IsNullOrWhiteSpace(invoice.PdfFilePath))
+        {
+            ErrorMessage = "The selected invoice does not have a saved PDF file yet.";
+            return;
+        }
+
+        try
+        {
+            await invoicePdfLauncher.OpenAsync(invoice.PdfFilePath, CancellationToken.None);
+            ErrorMessage = null;
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Could not open invoice PDF. {ex.Message}";
+        }
+    }
 
     private Task AddLessonAsync()
     {
@@ -675,6 +716,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     {
         var selectedLesson = SelectedLesson;
         var selectedLessonId = selectedLesson?.Id;
+        var selectedInvoiceNumber = SelectedInvoice?.InvoiceNumber;
         CurrentStudentShortName = dashboard.CurrentStudentShortName;
         currentStudentHasSchedule = dashboard.CurrentStudentHasSchedule;
         studentShortNames = dashboard.StudentShortNames
@@ -738,7 +780,33 @@ public sealed class MainWindowViewModel : ViewModelBase
             Invoices.Add(new InvoiceDisplayModel(invoice));
         }
 
+        SelectedInvoice = selectedInvoiceNumber is null
+            ? null
+            : Invoices.FirstOrDefault(invoice => invoice.InvoiceNumber == selectedInvoiceNumber.Value);
+
         RaiseCommandAvailabilityChanged();
+    }
+
+    private InvoiceDisplayModel? ResolveInvoiceForWriteButton()
+    {
+        if (Lessons.Any(lesson => !lesson.IsInvoiced))
+        {
+            return null;
+        }
+
+        var lessonInvoiceNumbers = Lessons
+            .Where(lesson => lesson.IsInvoiced && lesson.InvoiceNumber is not null)
+            .Select(lesson => lesson.InvoiceNumber!.Value)
+            .Distinct()
+            .ToArray();
+
+        if (lessonInvoiceNumbers.Length == 1)
+        {
+            var invoiceNumber = lessonInvoiceNumbers[0];
+            return Invoices.FirstOrDefault(invoice => invoice.InvoiceNumber == invoiceNumber);
+        }
+
+        return Lessons.Count == 0 ? SelectedInvoice : null;
     }
 
     private void RefreshSelectableStudentShortNames()
@@ -947,6 +1015,8 @@ public sealed class MainWindowViewModel : ViewModelBase
         ToggleInvoicePaymentStatusCommand.RaiseCanExecuteChanged();
         OpenCalendarCommand.RaiseCanExecuteChanged();
         WriteInvoiceCommand.RaiseCanExecuteChanged();
+        OpenInvoiceCommand.RaiseCanExecuteChanged();
+        OpenInvoicePdfCommand.RaiseCanExecuteChanged();
         OpenManageStudentsCommand.RaiseCanExecuteChanged();
         OpenSettingsCommand.RaiseCanExecuteChanged();
         OpenManagePlansCommand.RaiseCanExecuteChanged();

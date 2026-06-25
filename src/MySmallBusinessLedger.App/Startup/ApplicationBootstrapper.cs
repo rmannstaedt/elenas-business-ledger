@@ -64,6 +64,7 @@ internal sealed class ApplicationBootstrapper
             services.LessonEditorService,
             new CoreLessonStateService(new ToggleLessonStateUseCase(services.CalendarGateway)),
             services.InvoiceWorkflowLauncher,
+            new ShellInvoicePdfLauncher(),
             new SettingsWindowLauncher(services.SettingsService),
             new PlanCatalogWindowLauncher(services.PlanCatalogService),
             services.SystemClock);

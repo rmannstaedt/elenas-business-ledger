@@ -627,9 +627,13 @@ public sealed class MainWindowViewModelTests
                 Assert.Equal([56, 84, 70, 112], invoiceGrid.Columns.Select(column => column.MinWidth).ToArray());
 
                 var invoiceStatusStyle = Assert.IsType<Style>(window.FindResource("InvoiceStatusButtonStyle"));
+                var invoiceCellStyle = Assert.IsType<Style>(window.FindResource("InvoiceTableCellStyle"));
+                var invoiceRowStyle = Assert.IsType<Style>(window.FindResource("InvoiceTableRowStyle"));
                 var invoiceStatusButton = Assert.Single(
                     FindVisualChildren<WpfButton>(invoiceGrid),
                     button => AutomationProperties.GetName(button) == "Outstanding");
+                Assert.Same(invoiceCellStyle, invoiceGrid.CellStyle);
+                Assert.Same(invoiceRowStyle, invoiceGrid.RowStyle);
                 Assert.Same(invoiceStatusStyle, invoiceStatusButton.Style);
                 Assert.Equal(28, invoiceStatusButton.Height);
                 Assert.Equal(VerticalAlignment.Center, invoiceStatusButton.VerticalAlignment);
@@ -1059,7 +1063,12 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public async Task WriteInvoiceLaunchesWorkflowAndRefreshesAfterIssue()
     {
-        var dashboard = new FakeDashboardService();
+        var dashboard = new FakeDashboardService
+        {
+            LessonIsInvoiced = false,
+            LessonPaymentStatus = null,
+            InvoiceSummaries = []
+        };
         var invoices = new FakeInvoiceWorkflowLauncher { NextWriteResult = true };
         var viewModel = CreateViewModel(dashboard: dashboard, invoiceWorkflowLauncher: invoices);
         await viewModel.LoadAsync();
@@ -1073,7 +1082,13 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public async Task WriteInvoicePassesCurrentStudentToWorkflow()
     {
-        var dashboard = new FakeDashboardService { StudentShortNames = ["Anna", "Mira"] };
+        var dashboard = new FakeDashboardService
+        {
+            StudentShortNames = ["Anna", "Mira"],
+            LessonIsInvoiced = false,
+            LessonPaymentStatus = null,
+            InvoiceSummaries = []
+        };
         var invoices = new FakeInvoiceWorkflowLauncher();
         var viewModel = CreateViewModel(dashboard: dashboard, invoiceWorkflowLauncher: invoices);
         await viewModel.LoadAsync();
@@ -1082,6 +1097,62 @@ public sealed class MainWindowViewModelTests
         await viewModel.WriteInvoiceCommand.ExecuteAsync();
 
         Assert.Equal("Mira", invoices.LastWriteInitialStudentShortName);
+    }
+
+    [Fact]
+    public async Task WriteInvoiceOpensExistingInvoiceForVisibleInvoicedLessons()
+    {
+        var invoices = new FakeInvoiceWorkflowLauncher();
+        var viewModel = CreateViewModel(invoiceWorkflowLauncher: invoices);
+        await viewModel.LoadAsync();
+
+        await viewModel.WriteInvoiceCommand.ExecuteAsync();
+
+        Assert.False(invoices.WriteWasShown);
+        Assert.Equal(new InvoiceNumber(1), invoices.LastViewedInvoiceNumber);
+    }
+
+    [Fact]
+    public async Task WriteInvoiceOpensSelectedInvoiceWhenInvoiceRowIsSelected()
+    {
+        var invoices = new FakeInvoiceWorkflowLauncher();
+        var viewModel = CreateViewModel(invoiceWorkflowLauncher: invoices);
+        await viewModel.LoadAsync();
+
+        viewModel.SelectedInvoice = viewModel.Invoices[0];
+        await viewModel.WriteInvoiceCommand.ExecuteAsync();
+
+        Assert.False(invoices.WriteWasShown);
+        Assert.Equal(new InvoiceNumber(1), invoices.LastViewedInvoiceNumber);
+    }
+
+    [Fact]
+    public async Task WriteInvoiceStartsCurrentMonthFlowWhenVisibleLessonsAreUninvoicedEvenIfInvoiceRowIsSelected()
+    {
+        var dashboard = new FakeDashboardService
+        {
+            LessonIsInvoiced = false,
+            LessonPaymentStatus = null,
+            InvoiceSummaries =
+            [
+                new IssuedInvoiceSummary(
+                    new InvoiceNumber(1),
+                    "Anna",
+                    new DateOnly(2026, 6, 25),
+                    PaymentStatus.Outstanding,
+                    "C:\\Invoices\\001-Anna.pdf")
+            ]
+        };
+        var invoices = new FakeInvoiceWorkflowLauncher { NextWriteResult = true };
+        var viewModel = CreateViewModel(dashboard: dashboard, invoiceWorkflowLauncher: invoices);
+        await viewModel.LoadAsync();
+
+        viewModel.SelectedInvoice = viewModel.Invoices[0];
+        await viewModel.WriteInvoiceCommand.ExecuteAsync();
+
+        Assert.True(invoices.WriteWasShown);
+        Assert.Null(invoices.LastViewedInvoiceNumber);
+        Assert.Equal(2, dashboard.LoadCount);
     }
 
     [Fact]
@@ -1200,6 +1271,47 @@ public sealed class MainWindowViewModelTests
         await viewModel.OpenInvoiceCommand.ExecuteAsync(viewModel.Invoices[0]);
 
         Assert.Equal(new InvoiceNumber(1), invoices.LastViewedInvoiceNumber);
+    }
+
+    [Fact]
+    public async Task OpenInvoicePdfLaunchesPublishedPdfAndPreservesSelection()
+    {
+        var pdfLauncher = new FakeInvoicePdfLauncher();
+        var viewModel = CreateViewModel(invoicePdfLauncher: pdfLauncher);
+        await viewModel.LoadAsync();
+        viewModel.SelectedInvoice = viewModel.Invoices[0];
+
+        await viewModel.OpenInvoicePdfCommand.ExecuteAsync(viewModel.Invoices[0]);
+
+        Assert.Equal("C:\\Invoices\\000001.pdf", pdfLauncher.LastOpenedPdfFilePath);
+        Assert.Same(viewModel.Invoices[0], viewModel.SelectedInvoice);
+        Assert.False(viewModel.HasError);
+    }
+
+    [Fact]
+    public async Task OpenInvoicePdfShowsErrorWhenNoPublishedPdfExists()
+    {
+        var pdfLauncher = new FakeInvoicePdfLauncher();
+        var dashboard = new FakeDashboardService
+        {
+            InvoiceSummaries =
+            [
+                new IssuedInvoiceSummary(
+                    new InvoiceNumber(1),
+                    "Anna",
+                    new DateOnly(2026, 6, 16),
+                    PaymentStatus.Outstanding,
+                    string.Empty)
+            ]
+        };
+        var viewModel = CreateViewModel(dashboard: dashboard, invoicePdfLauncher: pdfLauncher);
+        await viewModel.LoadAsync();
+
+        await viewModel.OpenInvoicePdfCommand.ExecuteAsync(viewModel.Invoices[0]);
+
+        Assert.Null(pdfLauncher.LastOpenedPdfFilePath);
+        Assert.True(viewModel.HasError);
+        Assert.Equal("The selected invoice does not have a saved PDF file yet.", viewModel.ErrorMessage);
     }
 
     [Fact]
@@ -1465,6 +1577,7 @@ public sealed class MainWindowViewModelTests
             new FakeLessonEditorService(),
             new FakeLessonStateService(),
             new FakeInvoiceWorkflowLauncher(),
+            new FakeInvoicePdfLauncher(),
             new FakeSettingsLauncher(),
             new FakePlanCatalogLauncher(),
             new FakeUiClock(new DateTimeOffset(2026, 6, 16, 12, 0, 0, TimeSpan.Zero)));
@@ -1615,6 +1728,7 @@ public sealed class MainWindowViewModelTests
         FakeLessonEditorService? lessonEditorService = null,
         FakeLessonStateService? lessonStates = null,
         FakeInvoiceWorkflowLauncher? invoiceWorkflowLauncher = null,
+        FakeInvoicePdfLauncher? invoicePdfLauncher = null,
         FakeSettingsLauncher? settingsLauncher = null,
         FakePlanCatalogLauncher? planCatalogLauncher = null,
         FakeUiClock? clock = null,
@@ -1629,6 +1743,7 @@ public sealed class MainWindowViewModelTests
             lessonEditorService ?? new FakeLessonEditorService(),
             lessonStates ?? new FakeLessonStateService(),
             invoiceWorkflowLauncher ?? new FakeInvoiceWorkflowLauncher(),
+            invoicePdfLauncher ?? new FakeInvoicePdfLauncher(),
             settingsLauncher ?? new FakeSettingsLauncher(),
             planCatalogLauncher ?? new FakePlanCatalogLauncher(),
             clock ?? new FakeUiClock(new DateTimeOffset(2026, 6, 16, 12, 0, 0, TimeSpan.Zero)),
@@ -1801,6 +1916,8 @@ public sealed class MainWindowViewModelTests
 
         public PaymentStatus InvoicePaymentStatus { get; init; } = PaymentStatus.Outstanding;
 
+        public IReadOnlyList<IssuedInvoiceSummary>? InvoiceSummaries { get; init; }
+
         public bool CurrentStudentHasSchedule { get; init; } = true;
 
         public Func<string?, Task>? BeforeReturnAsync { get; init; }
@@ -1839,6 +1956,7 @@ public sealed class MainWindowViewModelTests
                                 LessonPaymentStatus,
                                 LessonIsInvoiced ? LessonInvoiceNumber : null)
                     ],
+                    InvoiceSummaries ??
                     [
                         new IssuedInvoiceSummary(
                             new InvoiceNumber(1),
@@ -2148,6 +2266,17 @@ public sealed class MainWindowViewModelTests
         public Task ShowInvoiceViewerAsync(InvoiceNumber invoiceNumber, CancellationToken cancellationToken)
         {
             LastViewedInvoiceNumber = invoiceNumber;
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class FakeInvoicePdfLauncher : IInvoicePdfLauncher
+    {
+        public string? LastOpenedPdfFilePath { get; private set; }
+
+        public Task OpenAsync(string pdfFilePath, CancellationToken cancellationToken)
+        {
+            LastOpenedPdfFilePath = pdfFilePath;
             return Task.CompletedTask;
         }
     }

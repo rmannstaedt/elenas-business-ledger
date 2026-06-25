@@ -127,6 +127,34 @@
             <Setter Property="Padding" Value="4,0" />
             <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
+        <Style x:Key="InvoiceTableCellStyle" TargetType="{x:Type DataGridCell}">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Foreground" Value="#111827" />
+            <Setter Property="Padding" Value="0" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=DataGridRow}}"
+                             Value="True">
+                    <Setter Property="Background" Value="#DCEBFA" />
+                    <Setter Property="Foreground" Value="#0F2742" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style x:Key="InvoiceTableRowStyle" TargetType="{x:Type DataGridRow}">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="#111827" />
+            <Setter Property="SnapsToDevicePixels" Value="True" />
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#F1F6FC" />
+                </Trigger>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="#DCEBFA" />
+                    <Setter Property="Foreground" Value="#0F2742" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
         <Style x:Key="InvoiceStatusButtonStyle" TargetType="{x:Type Button}">
             <Setter Property="Background" Value="#F8FAFC" />
             <Setter Property="BorderBrush" Value="#64748B" />
@@ -566,13 +594,18 @@
                                Margin="0,0,0,10" />
                     <DataGrid Grid.Row="1"
                               ItemsSource="{Binding Invoices}"
+                              SelectedItem="{Binding SelectedInvoice, Mode=TwoWay}"
                               AutoGenerateColumns="False"
                               CanUserAddRows="False"
                               CanUserDeleteRows="False"
+                              CellStyle="{StaticResource InvoiceTableCellStyle}"
                               IsReadOnly="True"
                               HeadersVisibility="Column"
                               GridLinesVisibility="Horizontal"
                               RowHeight="36"
+                              RowStyle="{StaticResource InvoiceTableRowStyle}"
+                              SelectionMode="Single"
+                              SelectionUnit="FullRow"
                               SelectionChanged="OnGridSelectionChanged"
                               MouseDoubleClick="OnInvoiceDoubleClick"
                               AutomationProperties.Name="Student invoices">
