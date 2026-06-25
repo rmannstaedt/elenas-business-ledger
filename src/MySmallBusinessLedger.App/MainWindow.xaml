@@ -620,6 +620,11 @@
                                                 ElementStyle="{StaticResource InvoiceTableTextCellStyle}"
                                                 MinWidth="84"
                                                 Width="1*" />
+                            <DataGridTextColumn Header="Period"
+                                                Binding="{Binding PeriodText}"
+                                                ElementStyle="{StaticResource InvoiceTableTextCellStyle}"
+                                                MinWidth="88"
+                                                Width="1*" />
                             <DataGridTextColumn Header="Print"
                                                 Binding="{Binding PrintStatusText}"
                                                 ElementStyle="{StaticResource InvoiceTableTextCellStyle}"
@@ -636,6 +641,7 @@
                                                 PreviewMouseLeftButtonDown="OnCommandButtonPreviewMouseLeftButtonDown"
                                                 MinWidth="104"
                                                 Height="28"
+                                                Margin="6,0"
                                                 VerticalAlignment="Center"
                                                 Style="{StaticResource InvoiceStatusButtonStyle}"
                                                 ToolTip="Toggle invoice payment status"

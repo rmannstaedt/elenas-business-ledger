@@ -471,9 +471,7 @@ public sealed class MainWindowViewModel : ViewModelBase
 
         if (!CanPopulateCalendar())
         {
-            ErrorMessage = DisplayMonth < CurrentMonth()
-                ? "Past months cannot be populated."
-                : "The selected student has no saved schedule to populate.";
+            ErrorMessage = "Past months cannot be populated.";
             return;
         }
 
@@ -995,7 +993,6 @@ public sealed class MainWindowViewModel : ViewModelBase
     private bool CanPopulateCalendar() =>
         !IsBusy &&
         CurrentStudentShortName is not null &&
-        currentStudentHasSchedule &&
         DisplayMonth >= CurrentMonth();
 
     private DateOnly CurrentMonth()

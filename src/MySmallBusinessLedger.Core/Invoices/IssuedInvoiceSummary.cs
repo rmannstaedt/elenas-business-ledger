@@ -9,4 +9,5 @@ public sealed record IssuedInvoiceSummary(
     InvoiceIssueStatus IssueStatus = InvoiceIssueStatus.Issued,
     InvoicePrintStatus PrintStatus = InvoicePrintStatus.NotPrinted,
     DateTimeOffset? PrintedAt = null,
-    string? LastPrintError = null);
+    string? LastPrintError = null,
+    InvoicePeriod? Period = null);

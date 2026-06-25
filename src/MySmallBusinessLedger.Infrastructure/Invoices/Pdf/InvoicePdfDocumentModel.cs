@@ -13,6 +13,9 @@ public sealed record InvoicePdfDocumentModel(
     IReadOnlyList<string> CompanyAddressLines,
     string? CompanyCvr,
     string PaymentInstructions,
+    string BankRegistrationNumber,
+    string BankAccountNumber,
+    string MobilePayAccount,
     string StudentFullName,
     IReadOnlyList<string> StudentAddressLines,
     IReadOnlyList<InvoicePdfServiceLine> Services,
@@ -34,8 +37,10 @@ public sealed record InvoicePdfDocumentModel(
             .Select(group =>
             {
                 var orderedGroup = group.OrderBy(line => line.LessonDateTime).ToArray();
+                var serviceText = CreateServiceText(group.Key.PlanName);
                 return new InvoicePdfServiceLine(
-                    $"Klaverundervisning - {group.Key.PlanName}",
+                    serviceText.Description,
+                    serviceText.Detail,
                     orderedGroup.Length,
                     "lektioner",
                     group.Key.PriceWithoutVat,
@@ -53,6 +58,9 @@ public sealed record InvoicePdfDocumentModel(
             SplitLines(draft.Company.Address),
             draft.Company.Cvr,
             draft.Company.PaymentInstructions,
+            draft.Company.BankRegistrationNumber,
+            draft.Company.BankAccountNumber,
+            draft.Company.MobilePayAccount,
             draft.Student.FullName,
             SplitLines(draft.Student.Address),
             services,
@@ -60,6 +68,24 @@ public sealed record InvoicePdfDocumentModel(
             CreatePlanChangeNotes(orderedLines),
             totals,
             draft.PriceAdjustment);
+    }
+
+    private static InvoicePdfServiceText CreateServiceText(string planName)
+    {
+        var match = Regex.Match(
+            planName,
+            @"^(?<title>.+?)\s+-\s+\d{4}\s*:\s*(?<detail>.+)$",
+            RegexOptions.CultureInvariant);
+        if (!match.Success)
+        {
+            return new InvoicePdfServiceText($"Klaverundervisning - {planName}", string.Empty);
+        }
+
+        var detail = match.Groups["detail"].Value
+            .Replace("/uge", " pr. uge", StringComparison.Ordinal);
+        return new InvoicePdfServiceText(
+            $"Klaverundervisning - {match.Groups["title"].Value}",
+            $"Individuel undervisning, {detail}");
     }
 
     private static IReadOnlyList<string> CreatePlanChangeNotes(IReadOnlyList<InvoiceLineDraft> orderedLines)
@@ -120,10 +146,13 @@ public sealed record InvoicePdfDocumentModel(
             .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
     private sealed record ServiceGroupKey(string PlanName, Money PriceWithoutVat);
+
+    private sealed record InvoicePdfServiceText(string Description, string Detail);
 }
 
 public sealed record InvoicePdfServiceLine(
     string Description,
+    string Detail,
     int Quantity,
     string Unit,
     Money UnitPriceWithoutVat,

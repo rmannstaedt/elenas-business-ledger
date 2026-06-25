@@ -115,6 +115,7 @@ public sealed class InvoiceDraft
         return new IssuedInvoice(
             invoiceNumber,
             InvoiceDate,
+            Period,
             Company,
             Student,
             new ReadOnlyCollection<IssuedInvoiceLine>(issuedLines),

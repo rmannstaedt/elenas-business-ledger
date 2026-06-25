@@ -36,7 +36,7 @@
     VAT register date: date/time / blank
     VAT status: not registered / registered
     invoice folder path
-    invoice payment instructions (bank/MobilePay/free text)
+    bank registration number, bank account number, MobilePay account, and invoice payment instructions selected from fixed terms or custom text
 
 ### Invoice
     invoice number (unique, sequential; displayed with at least three digits, e.g. 001)
@@ -46,7 +46,7 @@
     student info
     (list) lesson date/time + lesson plan identity + issued lesson plan name + lesson price (without VAT)
     grouped service lines by lesson plan and price
-    payment instructions
+    bank registration/account number lines, MobilePay account line, and payment instructions
   
   AND (optional, left out if not specified)
     price adjustment
@@ -216,7 +216,14 @@ The Invoice will contain a single clear list of lessons matching the information
 If the invoice covers lessons under more than one Plan, the explanatory text lists the plan change with the cut-over date.
 The Invoice will contain VAT information, if currently relevant.
 The Invoice will contain price information.
-The Invoice will contain the configured payment instructions, if any.
+The Invoice will contain the configured bank registration/account number lines, MobilePay account line, and payment instructions, if any.
+Payment instructions are configured as one of:
+
+- `Betales ved modtagelse`
+- `8 dage fra fakturadato`
+- `30 dage fra fakturadato`
+- custom text
+
 The payment instructions and totals should sit near the bottom of the invoice page, above the footer text.
 The Invoice language is: Danish
 

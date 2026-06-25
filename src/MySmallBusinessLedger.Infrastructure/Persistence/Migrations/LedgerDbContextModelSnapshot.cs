@@ -49,6 +49,16 @@ namespace MySmallBusinessLedger.Infrastructure.Persistence.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("BankAccountNumber")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("BankRegistrationNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("ConfiguredInvoicePrinterName")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -66,6 +76,11 @@ namespace MySmallBusinessLedger.Infrastructure.Persistence.Migrations
                     b.Property<string>("InvoiceFolderPath")
                         .IsRequired()
                         .HasMaxLength(1000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("MobilePayAccount")
+                        .IsRequired()
+                        .HasMaxLength(200)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("Name")
@@ -107,8 +122,23 @@ namespace MySmallBusinessLedger.Infrastructure.Persistence.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("CompanyBankAccountNumber")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CompanyBankRegistrationNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("CompanyCvr")
                         .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CompanyMobilePayAccount")
+                        .IsRequired()
+                        .HasMaxLength(200)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("CompanyName")
@@ -149,6 +179,12 @@ namespace MySmallBusinessLedger.Infrastructure.Persistence.Migrations
                     b.Property<string>("PdfFilePath")
                         .IsRequired()
                         .HasMaxLength(1000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateOnly>("PeriodFrom")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateOnly>("PeriodTo")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("PrintStatus")

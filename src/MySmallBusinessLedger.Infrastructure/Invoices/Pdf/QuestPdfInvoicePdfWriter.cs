@@ -11,6 +11,9 @@ namespace MySmallBusinessLedger.Infrastructure.Invoices.Pdf;
 
 public sealed class QuestPdfInvoicePdfWriter : IInvoicePdfWriter
 {
+    private const string InvoiceFontFamily = "Segoe UI";
+    private const float BaseFontSize = 9.5f;
+    private const float BaseLineHeight = 1.12f;
     private static readonly CultureInfo DanishCulture = CultureInfo.GetCultureInfo("da-DK");
 
     static QuestPdfInvoicePdfWriter()
@@ -38,19 +41,26 @@ public sealed class QuestPdfInvoicePdfWriter : IInvoicePdfWriter
                 {
                     page.Size(PageSizes.A4);
                     page.Margin(34);
-                    page.DefaultTextStyle(text => text.FontSize(9).FontFamily("Arial"));
+                    page.DefaultTextStyle(text => text
+                        .FontSize(BaseFontSize)
+                        .FontFamily(InvoiceFontFamily)
+                        .LineHeight(BaseLineHeight));
 
                     page.Header().Element(container => ComposeHeader(container, model));
                     page.Content().PaddingTop(18).Column(column =>
                     {
                         column.Spacing(16);
                         column.Item().Element(container => ComposeParties(container, model));
-                        column.Item().Element(container => ComposeServices(container, model));
+                        column.Item().PaddingTop(8).Element(container => ComposeServices(container, model));
                         column.Item().Element(container => ComposeLessons(container, model));
-                        column.Item().Height(190);
+                        column.Item().Height(145);
                         column.Item().Element(container => ComposePaymentAndTotals(container, model));
                     });
-                    page.Footer().AlignCenter().Text("Tak for undervisningen.").FontColor(Colors.Grey.Darken1);
+                    page.Footer().Column(footer =>
+                    {
+                        footer.Item().PaddingTop(12).LineHorizontal(1).LineColor(Colors.Grey.Lighten2);
+                        footer.Item().PaddingTop(8).AlignCenter().Text("Tak for undervisningen.").FontColor(Colors.Grey.Darken1);
+                    });
                 });
             }).GeneratePdf(stagingPath);
 
@@ -69,10 +79,10 @@ public sealed class QuestPdfInvoicePdfWriter : IInvoicePdfWriter
         {
             column.Item().Row(row =>
             {
-                row.RelativeItem().Text("FAKTURA").FontSize(28).SemiBold();
+                row.RelativeItem().Text("FAKTURA").FontSize(27.5f);
                 row.RelativeItem().AlignRight().Column(company =>
                 {
-                    company.Item().Text(model.CompanyName).SemiBold().FontSize(13);
+                    company.Item().Text(model.CompanyName).SemiBold().FontSize(10.5f);
                     company.Item().Text("studio.example.test").FontColor(Colors.Grey.Darken1);
                 });
             });
@@ -80,19 +90,19 @@ public sealed class QuestPdfInvoicePdfWriter : IInvoicePdfWriter
             column.Item().PaddingTop(12).Row(row =>
             {
                 row.RelativeItem();
-                row.ConstantItem(230).Element(container => ComposeMetadata(container, model));
+                row.ConstantItem(185).Element(container => ComposeMetadata(container, model));
             });
         });
     }
 
     private static void ComposeMetadata(IContainer container, InvoicePdfDocumentModel model)
     {
-        container.Table(table =>
+        container.PaddingLeft(10).Table(table =>
         {
             table.ColumnsDefinition(columns =>
             {
-                columns.RelativeColumn();
-                columns.RelativeColumn();
+                columns.RelativeColumn(0.8f);
+                columns.RelativeColumn(1.2f);
             });
 
             AddMetadataRow(table, "Fakturanr.", model.InvoiceNumber);
@@ -129,19 +139,34 @@ public sealed class QuestPdfInvoicePdfWriter : IInvoicePdfWriter
         IReadOnlyList<string> addressLines,
         string? extraLine)
     {
-        container.Border(1).BorderColor(Colors.Grey.Lighten2).Background(Colors.Grey.Lighten5).Padding(10).Column(column =>
+        container
+            .Border(1)
+            .BorderColor(Colors.Grey.Lighten2)
+            .CornerRadius(7)
+            .Column(column =>
         {
-            column.Item().Text(title).SemiBold().FontColor(Colors.Blue.Darken3);
-            column.Item().PaddingTop(4).Text(name).SemiBold();
-            foreach (var line in addressLines)
+            column.Item()
+                .Background(Colors.BlueGrey.Lighten5)
+                .PaddingHorizontal(10)
+                .PaddingVertical(7)
+                .Text(title)
+                .SemiBold();
+            column.Item().PaddingHorizontal(10).PaddingTop(10).Column(body =>
             {
-                column.Item().Text(line);
-            }
+                body.Spacing(3);
+                body.Item().Text(name).SemiBold();
+                foreach (var line in addressLines)
+                {
+                    body.Item().Text(line);
+                }
 
-            if (!string.IsNullOrWhiteSpace(extraLine))
-            {
-                column.Item().PaddingTop(3).Text(extraLine);
-            }
+                if (!string.IsNullOrWhiteSpace(extraLine))
+                {
+                    body.Item().Text(extraLine);
+                }
+            });
+
+            column.Item().Height(18);
         });
     }
 
@@ -149,7 +174,11 @@ public sealed class QuestPdfInvoicePdfWriter : IInvoicePdfWriter
     {
         container.Column(column =>
         {
-            column.Item().Text("Ydelser").FontSize(14).SemiBold();
+            column.Item().Text("Ydelser").FontSize(13).SemiBold();
+            column.Item().PaddingTop(3).Text("Klaverundervisning leveret i den angivne periode.")
+                .FontSize(8.5f)
+                .FontColor(Colors.Grey.Darken2);
+            column.Item().Height(5);
             foreach (var note in model.PlanChangeNotes)
             {
                 column.Item().PaddingTop(4).Text(note).FontColor(Colors.Grey.Darken2);
@@ -167,15 +196,15 @@ public sealed class QuestPdfInvoicePdfWriter : IInvoicePdfWriter
                 });
 
                 AddHeader(table, "Beskrivelse");
-                AddHeader(table, "Antal", true);
+                AddHeader(table, "Antal", Alignment.Center);
                 AddHeader(table, "Enhed");
                 AddHeader(table, "Pris", true);
                 AddHeader(table, "Beløb", true);
 
                 foreach (var service in model.Services)
                 {
-                    AddBody(table, service.Description);
-                    AddBody(table, service.Quantity.ToString(CultureInfo.InvariantCulture), true);
+                    AddServiceDescriptionBody(table, service.Description, service.Detail);
+                    AddBody(table, service.Quantity.ToString(CultureInfo.InvariantCulture), Alignment.Center);
                     AddBody(table, service.Unit);
                     AddBody(table, FormatMoney(service.UnitPriceWithoutVat), true);
                     AddBody(table, FormatMoney(service.TotalWithoutVat), true);
@@ -184,7 +213,7 @@ public sealed class QuestPdfInvoicePdfWriter : IInvoicePdfWriter
                 if (model.PriceAdjustment is not null)
                 {
                     AddBody(table, $"Prisjustering: {model.PriceAdjustment.Reason}");
-                    AddBody(table, string.Empty, true);
+                    AddBody(table, string.Empty, Alignment.Center);
                     AddBody(table, string.Empty);
                     AddBody(table, string.Empty, true);
                     AddBody(table, FormatMoney(model.PriceAdjustment.Amount), true);
@@ -197,12 +226,13 @@ public sealed class QuestPdfInvoicePdfWriter : IInvoicePdfWriter
     {
         container.Column(column =>
         {
-            column.Item().Text("Inkluderede lektioner").FontSize(12).SemiBold();
+            column.Item().Text("Inkluderede lektioner").FontSize(10.5f).SemiBold();
             column.Item().PaddingTop(6).Column(list =>
             {
+                list.Spacing(4);
                 foreach (var lesson in model.IncludedLessons)
                 {
-                    list.Item().Text(lesson);
+                    list.Item().Text(lesson).FontSize(8.5f).FontColor(Colors.Grey.Darken2);
                 }
             });
         });
@@ -214,17 +244,38 @@ public sealed class QuestPdfInvoicePdfWriter : IInvoicePdfWriter
         {
             row.RelativeItem().Element(payment => ComposePayment(payment, model));
             row.ConstantItem(22);
-            row.ConstantItem(230).Element(totals => ComposeTotals(totals, model));
+            row.ConstantItem(230).PaddingTop(2).Element(totals => ComposeTotals(totals, model));
         });
     }
 
     private static void ComposePayment(IContainer container, InvoicePdfDocumentModel model)
     {
-        container.Border(1).BorderColor(Colors.Grey.Lighten2).Background(Colors.Grey.Lighten5).Padding(10).Column(column =>
+        container
+            .Border(1)
+            .BorderColor(Colors.Grey.Lighten2)
+            .CornerRadius(7)
+            .Background(Colors.Grey.Lighten5)
+            .Padding(10)
+            .Column(column =>
         {
-            column.Item().Text("Betaling").SemiBold().FontColor(Colors.Blue.Darken3);
-            column.Item().PaddingTop(4).Text("Betales ved modtagelse.");
+            column.Item().Text("Betaling").SemiBold();
+            column.Item().PaddingTop(6).Text("Betales ved modtagelse.").FontColor(Colors.Grey.Darken2);
             column.Item().Text($"Angiv fakturanr. {model.InvoiceNumber} ved betaling.");
+            if (!string.IsNullOrWhiteSpace(model.BankRegistrationNumber))
+            {
+                column.Item().PaddingTop(6).Text($"Reg. nr.: {model.BankRegistrationNumber}");
+            }
+
+            if (!string.IsNullOrWhiteSpace(model.BankAccountNumber))
+            {
+                column.Item().Text($"Konto nr.: {model.BankAccountNumber}");
+            }
+
+            if (!string.IsNullOrWhiteSpace(model.MobilePayAccount))
+            {
+                column.Item().Text($"MobilePay: {model.MobilePayAccount}");
+            }
+
             if (!string.IsNullOrWhiteSpace(model.PaymentInstructions))
             {
                 column.Item().PaddingTop(6).Text(model.PaymentInstructions);
@@ -236,37 +287,35 @@ public sealed class QuestPdfInvoicePdfWriter : IInvoicePdfWriter
     {
         container.Column(column =>
         {
-            column.Item().Border(1).BorderColor(Colors.Grey.Lighten2).Padding(10).Column(totals =>
+            if (model.Totals.VatAmount.Amount != 0)
             {
-                totals.Item().Row(row =>
+                column.Item().Row(row =>
                 {
                     row.RelativeItem().Text("I alt ekskl. moms");
                     row.RelativeItem().AlignRight().Text(FormatMoney(model.Totals.TotalWithoutVat));
                 });
 
-                if (model.Totals.VatAmount.Amount != 0)
+                column.Item().PaddingTop(4).Row(row =>
                 {
-                    totals.Item().PaddingTop(4).Row(row =>
-                    {
-                        row.RelativeItem().Text("Moms 25%");
-                        row.RelativeItem().AlignRight().Text(FormatMoney(model.Totals.VatAmount));
-                    });
-                }
-                else
-                {
-                    totals.Item().PaddingTop(7).Text(
-                        $"{model.CompanyName} er ikke momsregistreret. Der er derfor ikke opkrævet moms på denne faktura.")
-                        .FontSize(8)
-                        .FontColor(Colors.Grey.Darken2);
-                }
-
-                totals.Item().PaddingTop(8).LineHorizontal(1).LineColor(Colors.Grey.Lighten2);
-                totals.Item().PaddingTop(7).Row(row =>
-                {
-                    row.RelativeItem().Text(model.Totals.VatAmount.Amount == 0 ? "I alt" : "I alt inkl. moms").SemiBold();
-                    row.RelativeItem().AlignRight().Text(FormatMoney(model.Totals.Total)).FontSize(12).SemiBold();
+                    row.RelativeItem().Text("Moms 25%");
+                    row.RelativeItem().AlignRight().Text(FormatMoney(model.Totals.VatAmount));
                 });
+            }
+
+            column.Item().LineHorizontal(1).LineColor(Colors.BlueGrey.Darken1);
+            column.Item().PaddingTop(9).Row(row =>
+            {
+                row.RelativeItem().Text("I alt til betaling").FontSize(12.5f).SemiBold();
+                row.RelativeItem().AlignRight().Text(FormatMoney(model.Totals.Total)).FontSize(12.5f).SemiBold();
             });
+
+            if (model.Totals.VatAmount.Amount == 0)
+            {
+                column.Item().PaddingTop(12).Text(
+                    $"{model.CompanyName} er ikke momsregistreret. Der er derfor ikke opkrævet moms på denne faktura.")
+                    .FontSize(8.5f)
+                    .FontColor(Colors.Grey.Darken2);
+            }
         });
     }
 
@@ -276,35 +325,76 @@ public sealed class QuestPdfInvoicePdfWriter : IInvoicePdfWriter
         table.Cell().Element(MetadataValue).Text(value);
     }
 
-    private static void AddHeader(TableDescriptor table, string text, bool alignRight = false)
+    private static void AddHeader(TableDescriptor table, string text, bool alignRight = false) =>
+        AddHeader(table, text, alignRight ? Alignment.Right : Alignment.Left);
+
+    private static void AddHeader(TableDescriptor table, string text, Alignment alignment)
     {
         var cell = table.Cell().Element(HeaderCell);
-        if (alignRight)
+        if (alignment == Alignment.Right)
         {
             cell.AlignRight().Text(text);
+            return;
+        }
+
+        if (alignment == Alignment.Center)
+        {
+            cell.AlignCenter().Text(text);
             return;
         }
 
         cell.Text(text);
     }
 
-    private static void AddBody(TableDescriptor table, string text, bool alignRight = false)
+    private static void AddBody(TableDescriptor table, string text, bool alignRight = false) =>
+        AddBody(table, text, alignRight ? Alignment.Right : Alignment.Left);
+
+    private static void AddBody(TableDescriptor table, string text, Alignment alignment)
     {
-        var cell = table.Cell().Element(BodyCell);
-        if (alignRight)
+        var cell = table.Cell().Element(BodyCell).AlignMiddle();
+        if (alignment == Alignment.Right)
         {
             cell.AlignRight().Text(text);
             return;
         }
 
+        if (alignment == Alignment.Center)
+        {
+            cell.AlignCenter().Text(text);
+            return;
+        }
+
         cell.Text(text);
+    }
+
+    private static void AddServiceDescriptionBody(TableDescriptor table, string description, string detail)
+    {
+        table.Cell().Element(BodyCell).Column(column =>
+        {
+            column.Spacing(2);
+            column.Item().Text(description);
+            if (!string.IsNullOrWhiteSpace(detail))
+            {
+                column.Item().Text(detail).FontColor(Colors.Grey.Darken2);
+            }
+        });
     }
 
     private static IContainer MetadataLabel(IContainer container) =>
-        container.BorderBottom(1).BorderColor(Colors.Grey.Lighten3).PaddingVertical(3).DefaultTextStyle(text => text.SemiBold());
+        container
+            .BorderBottom(1)
+            .BorderColor(Colors.Grey.Lighten3)
+            .PaddingLeft(4)
+            .PaddingVertical(3)
+            .DefaultTextStyle(text => text.FontFamily(InvoiceFontFamily).FontColor(Colors.Grey.Darken1));
 
     private static IContainer MetadataValue(IContainer container) =>
-        container.BorderBottom(1).BorderColor(Colors.Grey.Lighten3).PaddingVertical(3).AlignRight();
+        container
+            .BorderBottom(1)
+            .BorderColor(Colors.Grey.Lighten3)
+            .PaddingVertical(3)
+            .AlignRight()
+            .DefaultTextStyle(text => text.FontFamily(InvoiceFontFamily).SemiBold());
 
     private static IContainer HeaderCell(IContainer container) =>
         container.Background(Colors.Grey.Lighten3)
@@ -312,13 +402,20 @@ public sealed class QuestPdfInvoicePdfWriter : IInvoicePdfWriter
             .BorderColor(Colors.Grey.Lighten2)
             .PaddingHorizontal(5)
             .PaddingVertical(4)
-            .DefaultTextStyle(text => text.SemiBold());
+            .DefaultTextStyle(text => text.FontFamily(InvoiceFontFamily).SemiBold());
 
     private static IContainer BodyCell(IContainer container) =>
         container.BorderBottom(1)
             .BorderColor(Colors.Grey.Lighten3)
             .PaddingHorizontal(5)
-            .PaddingVertical(5);
+            .PaddingVertical(7);
+
+    private enum Alignment
+    {
+        Left,
+        Center,
+        Right
+    }
 
     private static string FormatDate(DateOnly date) =>
         date.ToString("dd-MM-yyyy", CultureInfo.InvariantCulture);

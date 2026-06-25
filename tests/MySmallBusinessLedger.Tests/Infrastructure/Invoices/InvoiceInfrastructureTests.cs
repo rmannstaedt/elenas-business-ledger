@@ -212,7 +212,13 @@ public sealed class InvoiceInfrastructureTests
 
         return InvoiceDraft.Create(
             new DateOnly(2026, 6, 23),
-            new CompanySnapshot("Maple Key Studio", "18 Example Lane, 0000 Example City", null),
+            new CompanySnapshot(
+                "Maple Key Studio",
+                "18 Example Lane, 0000 Example City",
+                null,
+                string.Empty,
+                "Reg.nr. 1234 Kontonr. 5678901234",
+                "MobilePay 123456"),
             new StudentSnapshot("Mira", "Mira Vale", "42 Sample Lane" + Environment.NewLine + "0000 Example City"),
             dates.Select(date => new InvoiceLineDraft(
                 date,

@@ -10,7 +10,10 @@ public sealed record CompanyProfile(
     VatStatus VatStatus,
     string InvoiceFolderPath,
     string ConfiguredInvoicePrinterName = "",
-    string PaymentInstructions = "")
+    string PaymentInstructions = "",
+    string BankRegistrationNumber = "",
+    string BankAccountNumber = "",
+    string MobilePayAccount = "")
 {
     public static CompanyProfile Create(
         string name,
@@ -22,7 +25,10 @@ public sealed record CompanyProfile(
         VatStatus vatStatus,
         string invoiceFolderPath,
         string configuredInvoicePrinterName = "",
-        string paymentInstructions = "") =>
+        string paymentInstructions = "",
+        string bankRegistrationNumber = "",
+        string bankAccountNumber = "",
+        string mobilePayAccount = "") =>
         new(
             name,
             address,
@@ -33,7 +39,10 @@ public sealed record CompanyProfile(
             vatStatus,
             invoiceFolderPath,
             configuredInvoicePrinterName,
-            paymentInstructions);
+            paymentInstructions,
+            bankRegistrationNumber,
+            bankAccountNumber,
+            mobilePayAccount);
 
     public bool ChargesVatOn(DateOnly invoiceDate) =>
         VatStatus == VatStatus.Registered &&

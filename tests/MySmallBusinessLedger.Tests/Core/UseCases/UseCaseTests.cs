@@ -1011,6 +1011,7 @@ public sealed class UseCaseTests
             return Task.FromResult(OperationResult<IssuedInvoice>.Success(new IssuedInvoice(
                 invoiceNumber,
                 source.InvoiceDate,
+                source.Period,
                 source.Company,
                 source.Student,
                 source.Lines,

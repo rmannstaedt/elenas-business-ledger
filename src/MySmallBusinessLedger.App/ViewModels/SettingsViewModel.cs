@@ -20,7 +20,11 @@ public sealed class SettingsViewModel : ViewModelBase
     private DateTime? vatRegistrationDate;
     private string invoiceFolderPath = string.Empty;
     private string configuredInvoicePrinterName = string.Empty;
-    private string paymentInstructions = string.Empty;
+    private PaymentInstructionChoice paymentInstructionChoice = PaymentInstructionChoice.DueOnReceipt;
+    private string customPaymentInstructions = string.Empty;
+    private string bankRegistrationNumber = string.Empty;
+    private string bankAccountNumber = string.Empty;
+    private string mobilePayAccount = string.Empty;
     private string calendarId = DefaultCalendarId;
     private string googleAccountEmail = string.Empty;
     private GoogleOAuthClientConfigurationStatus googleOAuthAppConfigurationStatus = GoogleOAuthClientConfigurationStatus.Missing;
@@ -62,7 +66,61 @@ public sealed class SettingsViewModel : ViewModelBase
         set => SetProperty(ref configuredInvoicePrinterName, value);
     }
 
-    public string PaymentInstructions { get => paymentInstructions; set => SetProperty(ref paymentInstructions, value); }
+    public string PaymentInstructions
+    {
+        get => CreatePaymentInstructions();
+        set => ApplyPaymentInstructions(value);
+    }
+
+    public bool IsPaymentDueOnReceipt
+    {
+        get => paymentInstructionChoice == PaymentInstructionChoice.DueOnReceipt;
+        set => SetPaymentInstructionChoice(PaymentInstructionChoice.DueOnReceipt, value);
+    }
+
+    public bool IsPaymentDueIn8Days
+    {
+        get => paymentInstructionChoice == PaymentInstructionChoice.DueIn8Days;
+        set => SetPaymentInstructionChoice(PaymentInstructionChoice.DueIn8Days, value);
+    }
+
+    public bool IsPaymentDueIn30Days
+    {
+        get => paymentInstructionChoice == PaymentInstructionChoice.DueIn30Days;
+        set => SetPaymentInstructionChoice(PaymentInstructionChoice.DueIn30Days, value);
+    }
+
+    public bool IsCustomPaymentInstructions
+    {
+        get => paymentInstructionChoice == PaymentInstructionChoice.Custom;
+        set => SetPaymentInstructionChoice(PaymentInstructionChoice.Custom, value);
+    }
+
+    public string CustomPaymentInstructions
+    {
+        get => customPaymentInstructions;
+        set
+        {
+            if (SetProperty(ref customPaymentInstructions, value) && IsCustomPaymentInstructions)
+            {
+                OnPropertyChanged(nameof(PaymentInstructions));
+            }
+        }
+    }
+
+    public string BankRegistrationNumber
+    {
+        get => bankRegistrationNumber;
+        set => SetProperty(ref bankRegistrationNumber, value);
+    }
+
+    public string BankAccountNumber
+    {
+        get => bankAccountNumber;
+        set => SetProperty(ref bankAccountNumber, value);
+    }
+
+    public string MobilePayAccount { get => mobilePayAccount; set => SetProperty(ref mobilePayAccount, value); }
 
     public ObservableCollection<string> AvailableInvoicePrinters { get; } = [];
 
@@ -145,7 +203,10 @@ public sealed class SettingsViewModel : ViewModelBase
             VatRegistrationDate = company.VatRegistrationDate?.ToDateTime(TimeOnly.MinValue);
             InvoiceFolderPath = company.InvoiceFolderPath;
             ConfiguredInvoicePrinterName = company.ConfiguredInvoicePrinterName;
-            PaymentInstructions = company.PaymentInstructions;
+            ApplyPaymentInstructions(company.PaymentInstructions);
+            BankRegistrationNumber = company.BankRegistrationNumber;
+            BankAccountNumber = company.BankAccountNumber;
+            MobilePayAccount = company.MobilePayAccount;
         }
 
         AvailableInvoicePrinters.Clear();
@@ -185,7 +246,10 @@ public sealed class SettingsViewModel : ViewModelBase
             IsVatRegistered ? VatStatus.Registered : VatStatus.NotRegistered,
             InvoiceFolderPath.Trim(),
             ConfiguredInvoicePrinterName.Trim(),
-            PaymentInstructions.Trim());
+            PaymentInstructions.Trim(),
+            BankRegistrationNumber.Trim(),
+            BankAccountNumber.Trim(),
+            MobilePayAccount.Trim());
         CalendarId = NormalizeCalendarId(CalendarId);
         var calendarSettings = new CalendarSettings(CalendarId, GoogleAccountEmail.Trim());
 
@@ -284,6 +348,53 @@ public sealed class SettingsViewModel : ViewModelBase
     private static string NormalizeCalendarId(string value) =>
         string.IsNullOrWhiteSpace(value) ? DefaultCalendarId : value.Trim();
 
+    private string CreatePaymentInstructions() =>
+        paymentInstructionChoice switch
+        {
+            PaymentInstructionChoice.DueIn8Days => "8 dage fra fakturadato",
+            PaymentInstructionChoice.DueIn30Days => "30 dage fra fakturadato",
+            PaymentInstructionChoice.Custom => CustomPaymentInstructions.Trim(),
+            _ => "Betales ved modtagelse"
+        };
+
+    private void ApplyPaymentInstructions(string? value)
+    {
+        var normalized = value?.Trim() ?? string.Empty;
+        switch (normalized)
+        {
+            case "":
+            case "Betales ved modtagelse":
+            case "Betales ved modtagelse.":
+                SetPaymentInstructionChoice(PaymentInstructionChoice.DueOnReceipt, true);
+                break;
+            case "8 dage fra fakturadato":
+                SetPaymentInstructionChoice(PaymentInstructionChoice.DueIn8Days, true);
+                break;
+            case "30 dage fra fakturadato":
+                SetPaymentInstructionChoice(PaymentInstructionChoice.DueIn30Days, true);
+                break;
+            default:
+                CustomPaymentInstructions = normalized;
+                SetPaymentInstructionChoice(PaymentInstructionChoice.Custom, true);
+                break;
+        }
+    }
+
+    private void SetPaymentInstructionChoice(PaymentInstructionChoice choice, bool isSelected)
+    {
+        if (!isSelected || paymentInstructionChoice == choice)
+        {
+            return;
+        }
+
+        paymentInstructionChoice = choice;
+        OnPropertyChanged(nameof(IsPaymentDueOnReceipt));
+        OnPropertyChanged(nameof(IsPaymentDueIn8Days));
+        OnPropertyChanged(nameof(IsPaymentDueIn30Days));
+        OnPropertyChanged(nameof(IsCustomPaymentInstructions));
+        OnPropertyChanged(nameof(PaymentInstructions));
+    }
+
     private static (string Line1, string Line2) SplitCompanyAddress(string address)
     {
         var normalized = address.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n');
@@ -305,5 +416,13 @@ public sealed class SettingsViewModel : ViewModelBase
         return string.IsNullOrWhiteSpace(trimmedLine2)
             ? trimmedLine1
             : trimmedLine1 + Environment.NewLine + trimmedLine2;
+    }
+
+    private enum PaymentInstructionChoice
+    {
+        DueOnReceipt,
+        DueIn8Days,
+        DueIn30Days,
+        Custom
     }
 }

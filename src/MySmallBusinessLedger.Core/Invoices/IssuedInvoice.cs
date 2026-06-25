@@ -5,6 +5,7 @@ public sealed class IssuedInvoice
     public IssuedInvoice(
         InvoiceNumber invoiceNumber,
         DateOnly invoiceDate,
+        InvoicePeriod period,
         CompanySnapshot company,
         StudentSnapshot student,
         IReadOnlyList<IssuedInvoiceLine> lines,
@@ -17,6 +18,7 @@ public sealed class IssuedInvoice
     {
         InvoiceNumber = invoiceNumber;
         InvoiceDate = invoiceDate;
+        Period = period;
         Company = company;
         Student = student;
         Lines = lines;
@@ -31,6 +33,8 @@ public sealed class IssuedInvoice
     public InvoiceNumber InvoiceNumber { get; }
 
     public DateOnly InvoiceDate { get; }
+
+    public InvoicePeriod Period { get; }
 
     public CompanySnapshot Company { get; }
 

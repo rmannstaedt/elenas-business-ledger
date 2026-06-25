@@ -28,6 +28,12 @@ public sealed class CompanyProfileEntity
     public string ConfiguredInvoicePrinterName { get; set; } = string.Empty;
 
     public string PaymentInstructions { get; set; } = string.Empty;
+
+    public string BankRegistrationNumber { get; set; } = string.Empty;
+
+    public string BankAccountNumber { get; set; } = string.Empty;
+
+    public string MobilePayAccount { get; set; } = string.Empty;
 }
 
 public sealed class CalendarSettingsEntity
@@ -158,6 +164,10 @@ public sealed class IssuedInvoiceEntity
 
     public DateOnly InvoiceDate { get; set; }
 
+    public DateOnly PeriodFrom { get; set; }
+
+    public DateOnly PeriodTo { get; set; }
+
     public string CompanyName { get; set; } = string.Empty;
 
     public string CompanyAddress { get; set; } = string.Empty;
@@ -165,6 +175,12 @@ public sealed class IssuedInvoiceEntity
     public string? CompanyCvr { get; set; }
 
     public string CompanyPaymentInstructions { get; set; } = string.Empty;
+
+    public string CompanyBankRegistrationNumber { get; set; } = string.Empty;
+
+    public string CompanyBankAccountNumber { get; set; } = string.Empty;
+
+    public string CompanyMobilePayAccount { get; set; } = string.Empty;
 
     public string StudentShortName { get; set; } = string.Empty;
 

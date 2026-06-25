@@ -624,7 +624,7 @@ public sealed class MainWindowViewModelTests
                     grid => AutomationProperties.GetName(grid) == "Student invoices");
                 Assert.All(invoiceGrid.Columns, column => Assert.Equal(WpfDataGridLengthUnitType.Star, column.Width.UnitType));
                 Assert.Equal(36, invoiceGrid.RowHeight);
-                Assert.Equal([56, 84, 70, 112], invoiceGrid.Columns.Select(column => column.MinWidth).ToArray());
+                Assert.Equal([56, 84, 88, 70, 112], invoiceGrid.Columns.Select(column => column.MinWidth).ToArray());
 
                 var invoiceStatusStyle = Assert.IsType<Style>(window.FindResource("InvoiceStatusButtonStyle"));
                 var invoiceCellStyle = Assert.IsType<Style>(window.FindResource("InvoiceTableCellStyle"));
@@ -636,6 +636,7 @@ public sealed class MainWindowViewModelTests
                 Assert.Same(invoiceRowStyle, invoiceGrid.RowStyle);
                 Assert.Same(invoiceStatusStyle, invoiceStatusButton.Style);
                 Assert.Equal(28, invoiceStatusButton.Height);
+                Assert.Equal(new Thickness(6, 0, 6, 0), invoiceStatusButton.Margin);
                 Assert.Equal(VerticalAlignment.Center, invoiceStatusButton.VerticalAlignment);
             }
             finally
@@ -794,6 +795,7 @@ public sealed class MainWindowViewModelTests
         Assert.Equal("Outstanding", viewModel.Lessons[0].PaymentStatusText);
         Assert.Single(viewModel.Invoices);
         Assert.Equal("001", viewModel.Invoices[0].InvoiceNumberText);
+        Assert.Equal("Juni 2026", viewModel.Invoices[0].PeriodText);
         Assert.False(viewModel.HasError);
     }
 
@@ -1477,8 +1479,9 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
-    public async Task PopulateCalendarCommandIsUnavailableWhenSelectedStudentHasNoSchedule()
+    public async Task PopulateCalendarCommandStillCallsUseCaseWhenDashboardScheduleFlagIsStale()
     {
+        var lessonEditor = new FakeLessonEditorService();
         var viewModel = CreateViewModel(
             dashboard: new FakeDashboardService
             {
@@ -1486,10 +1489,14 @@ public sealed class MainWindowViewModelTests
                 LessonState = LessonState.Planned,
                 LessonIsInvoiced = false,
                 LessonPaymentStatus = null
-            });
+            },
+            lessonEditorService: lessonEditor);
         await viewModel.LoadAsync();
 
-        Assert.False(viewModel.PopulateCalendarCommand.CanExecute(null));
+        await viewModel.PopulateCalendarCommand.ExecuteAsync();
+
+        Assert.Equal("Anna", lessonEditor.LastPopulateStudentShortName);
+        Assert.False(viewModel.HasError);
     }
 
     [Fact]
@@ -1963,7 +1970,8 @@ public sealed class MainWindowViewModelTests
                             currentStudent,
                             new DateOnly(2026, 6, 16),
                             InvoicePaymentStatus,
-                            "C:\\Invoices\\000001.pdf")
+                            "C:\\Invoices\\000001.pdf",
+                            Period: new InvoicePeriod(new DateOnly(2026, 6, 1), new DateOnly(2026, 6, 30)))
                     ],
                     CurrentStudentHasSchedule,
                     StudentNavigationEntries ??

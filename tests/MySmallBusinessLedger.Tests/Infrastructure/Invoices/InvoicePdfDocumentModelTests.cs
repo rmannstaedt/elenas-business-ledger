@@ -7,7 +7,7 @@ namespace MySmallBusinessLedger.Tests.Infrastructure.Invoices;
 public sealed class InvoicePdfDocumentModelTests
 {
     [Fact]
-    public void CreateGroupsLessonsByPlanAndDerivesInvoicePeriodFromIncludedLessons()
+    public void CreateGroupsLessonsByPlanAndUsesDraftInvoicePeriod()
     {
         var draft = InvoiceDraft.Create(
             new DateOnly(2026, 6, 23),
@@ -15,7 +15,10 @@ public sealed class InvoicePdfDocumentModelTests
                 "Maple Key Studio",
                 "18 Example Lane, 0000 Example City",
                 "12345678",
-                "Bank 1234 / MobilePay 5678"),
+                "Betales ved modtagelse.",
+                "1234",
+                "5678901234",
+                "MobilePay 5678"),
             new StudentSnapshot("Mira", "Mira Vale", "42 Sample Lane" + Environment.NewLine + "0000 Example City"),
             [
                 CreateLine(2026, 6, 1, "Tilbud 2 - 2026: 2 lektioner/uge"),
@@ -27,17 +30,22 @@ public sealed class InvoicePdfDocumentModelTests
                 CreateLine(2026, 6, 25, "Tilbud 2 - 2026: 2 lektioner/uge"),
                 CreateLine(2026, 6, 29, "Tilbud 2 - 2026: 2 lektioner/uge")
             ],
-            priceAdjustment: null);
+            priceAdjustment: null,
+            period: new InvoicePeriod(new DateOnly(2026, 6, 1), new DateOnly(2026, 6, 30)));
         var totals = new InvoiceTotals(Money.Dkk(2800m), Money.Dkk(0m), Money.Dkk(2800m));
 
         var model = InvoicePdfDocumentModel.Create(draft, totals, new InvoiceNumber(1));
 
         Assert.Equal("001", model.InvoiceNumber);
         Assert.Equal("Juni 2026", model.Period);
-        Assert.Equal("Bank 1234 / MobilePay 5678", model.PaymentInstructions);
+        Assert.Equal("Betales ved modtagelse.", model.PaymentInstructions);
+        Assert.Equal("1234", model.BankRegistrationNumber);
+        Assert.Equal("5678901234", model.BankAccountNumber);
+        Assert.Equal("MobilePay 5678", model.MobilePayAccount);
         Assert.Equal(["18 Example Lane", "0000 Example City"], model.CompanyAddressLines);
         var service = Assert.Single(model.Services);
-        Assert.Equal("Klaverundervisning - Tilbud 2 - 2026: 2 lektioner/uge", service.Description);
+        Assert.Equal("Klaverundervisning - Tilbud 2", service.Description);
+        Assert.Equal("Individuel undervisning, 2 lektioner pr. uge", service.Detail);
         Assert.Equal(8, service.Quantity);
         Assert.Equal("lektioner", service.Unit);
         Assert.Equal(Money.Dkk(350m), service.UnitPriceWithoutVat);

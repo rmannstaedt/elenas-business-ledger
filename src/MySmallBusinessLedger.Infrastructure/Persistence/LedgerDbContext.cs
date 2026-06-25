@@ -41,6 +41,9 @@ public sealed class LedgerDbContext : DbContext
             entity.Property(profile => profile.InvoiceFolderPath).HasMaxLength(1000).IsRequired();
             entity.Property(profile => profile.ConfiguredInvoicePrinterName).HasMaxLength(200).IsRequired();
             entity.Property(profile => profile.PaymentInstructions).HasMaxLength(1000).IsRequired();
+            entity.Property(profile => profile.BankRegistrationNumber).HasMaxLength(50).IsRequired();
+            entity.Property(profile => profile.BankAccountNumber).HasMaxLength(100).IsRequired();
+            entity.Property(profile => profile.MobilePayAccount).HasMaxLength(200).IsRequired();
         });
 
         modelBuilder.Entity<CalendarSettingsEntity>(entity =>
@@ -123,6 +126,9 @@ public sealed class LedgerDbContext : DbContext
             entity.Property(invoice => invoice.CompanyAddress).HasMaxLength(500).IsRequired();
             entity.Property(invoice => invoice.CompanyCvr).HasMaxLength(50);
             entity.Property(invoice => invoice.CompanyPaymentInstructions).HasMaxLength(1000).IsRequired();
+            entity.Property(invoice => invoice.CompanyBankRegistrationNumber).HasMaxLength(50).IsRequired();
+            entity.Property(invoice => invoice.CompanyBankAccountNumber).HasMaxLength(100).IsRequired();
+            entity.Property(invoice => invoice.CompanyMobilePayAccount).HasMaxLength(200).IsRequired();
             entity.Property(invoice => invoice.StudentShortName).HasMaxLength(100).IsRequired();
             entity.Property(invoice => invoice.StudentFullName).HasMaxLength(200).IsRequired();
             entity.Property(invoice => invoice.StudentAddress).HasMaxLength(500).IsRequired();

@@ -66,7 +66,8 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
                 invoice.IssueStatus,
                 invoice.PrintStatus,
                 invoice.PrintedAt,
-                invoice.LastPrintError))
+                invoice.LastPrintError,
+                new InvoicePeriod(invoice.PeriodFrom, invoice.PeriodTo)))
             .ToArrayAsync(cancellationToken);
     }
 
@@ -84,8 +85,8 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
                 invoice =>
                     invoice.IssueStatus == InvoiceIssueStatus.Issued &&
                     invoice.StudentShortName == studentShortName &&
-                    invoice.InvoiceDate >= firstDay &&
-                    invoice.InvoiceDate < nextMonth,
+                    invoice.PeriodFrom < nextMonth &&
+                    invoice.PeriodTo >= firstDay,
                 cancellationToken);
     }
 
@@ -302,10 +303,15 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
         {
             InvoiceNumber = invoice.InvoiceNumber.Value,
             InvoiceDate = invoice.InvoiceDate,
+            PeriodFrom = invoice.Period.From,
+            PeriodTo = invoice.Period.To,
             CompanyName = invoice.Company.Name,
             CompanyAddress = invoice.Company.Address,
             CompanyCvr = invoice.Company.Cvr,
             CompanyPaymentInstructions = invoice.Company.PaymentInstructions,
+            CompanyBankRegistrationNumber = invoice.Company.BankRegistrationNumber,
+            CompanyBankAccountNumber = invoice.Company.BankAccountNumber,
+            CompanyMobilePayAccount = invoice.Company.MobilePayAccount,
             StudentShortName = invoice.Student.ShortName,
             StudentFullName = invoice.Student.FullName,
             StudentAddress = invoice.Student.Address,
@@ -356,11 +362,15 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
         return new IssuedInvoice(
             new InvoiceNumber(entity.InvoiceNumber),
             entity.InvoiceDate,
+            new InvoicePeriod(entity.PeriodFrom, entity.PeriodTo),
             new CompanySnapshot(
                 entity.CompanyName,
                 entity.CompanyAddress,
                 entity.CompanyCvr,
-                entity.CompanyPaymentInstructions),
+                entity.CompanyPaymentInstructions,
+                entity.CompanyBankRegistrationNumber,
+                entity.CompanyBankAccountNumber,
+                entity.CompanyMobilePayAccount),
             new StudentSnapshot(entity.StudentShortName, entity.StudentFullName, entity.StudentAddress),
             new ReadOnlyCollection<IssuedInvoiceLine>(lines),
             new InvoiceTotals(

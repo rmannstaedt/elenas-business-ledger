@@ -23,6 +23,26 @@ public sealed class SettingsViewModelTests
             Assert.Same(viewModel, window.DataContext);
             Assert.NotNull(window.Content);
             Assert.NotNull(FindButtonByContent(window, "Browse..."));
+            Assert.NotNull(FindGroupBoxByHeader(window, "Contact"));
+            Assert.NotNull(FindGroupBoxByHeader(window, "Payment accounts"));
+            Assert.NotNull(FindGroupBoxByHeader(window, "VAT"));
+            Assert.NotNull(FindGroupBoxByHeader(window, "Invoicing"));
+            Assert.NotNull(FindRadioButtonByContent(window, "Betales ved modtagelse"));
+            Assert.NotNull(FindRadioButtonByContent(window, "8 dage fra fakturadato"));
+            Assert.NotNull(FindRadioButtonByContent(window, "30 dage fra fakturadato"));
+            Assert.NotNull(FindRadioButtonByContent(window, "andet:"));
+            AssertGroupBoxColumn(window, "Contact", 0);
+            AssertGroupBoxColumn(window, "Payment accounts", 0);
+            AssertGroupBoxColumn(window, "Invoicing", 0);
+            AssertGroupBoxColumn(window, "VAT", 2);
+            var vatGroupBox = FindGroupBoxByHeader(window, "VAT");
+            Assert.NotNull(vatGroupBox);
+            Assert.Equal(72, vatGroupBox.Margin.Top);
+            var saveButton = FindButtonByContent(window, "Save");
+            Assert.NotNull(saveButton);
+            var actionPanel = Assert.IsType<StackPanel>(saveButton.Parent);
+            Assert.Equal(HorizontalAlignment.Center, actionPanel.HorizontalAlignment);
+            Assert.Equal(40, actionPanel.Margin.Top);
 
             window.Close();
         });
@@ -39,6 +59,18 @@ public sealed class SettingsViewModelTests
     }
 
     [Fact]
+    public void DefaultsPaymentInstructionsToDueOnReceipt()
+    {
+        var viewModel = new SettingsViewModel(new FakeAppSettingsService());
+
+        Assert.True(viewModel.IsPaymentDueOnReceipt);
+        Assert.False(viewModel.IsPaymentDueIn8Days);
+        Assert.False(viewModel.IsPaymentDueIn30Days);
+        Assert.False(viewModel.IsCustomPaymentInstructions);
+        Assert.Equal("Betales ved modtagelse", viewModel.PaymentInstructions);
+    }
+
+    [Fact]
     public async Task LoadsExistingSettings()
     {
         var service = new FakeAppSettingsService
@@ -51,9 +83,11 @@ public sealed class SettingsViewModelTests
                     "elena@example.test",
                     "12345678",
                 new DateOnly(2026, 7, 1),
-                VatStatus.Registered,
-                @"C:\Invoices",
-                paymentInstructions: "Bank 1234 / MobilePay 5678"),
+                    VatStatus.Registered,
+                    @"C:\Invoices",
+                bankRegistrationNumber: "1234",
+                bankAccountNumber: "5678901234",
+                mobilePayAccount: "MobilePay 5678"),
                 new CalendarSettings("primary", "studio@example.test"),
                 GoogleOAuthAppConfigurationStatus: GoogleOAuthClientConfigurationStatus.Ready,
                 AppDataFolderPath: @"C:\Users\ExampleUser\AppData\Roaming\visualtech.dk\MySmallBusinessLedger",
@@ -64,7 +98,11 @@ public sealed class SettingsViewModelTests
         await viewModel.LoadAsync();
 
         Assert.Equal("Maple Key Studio", viewModel.CompanyName);
-        Assert.Equal("Bank 1234 / MobilePay 5678", viewModel.PaymentInstructions);
+        Assert.Equal("1234", viewModel.BankRegistrationNumber);
+        Assert.Equal("5678901234", viewModel.BankAccountNumber);
+        Assert.Equal("MobilePay 5678", viewModel.MobilePayAccount);
+        Assert.True(viewModel.IsPaymentDueOnReceipt);
+        Assert.Equal("Betales ved modtagelse", viewModel.PaymentInstructions);
         Assert.Equal("primary", viewModel.CalendarId);
         Assert.True(viewModel.IsVatRegistered);
         Assert.True(viewModel.HasGoogleOAuthAppConfiguration);
@@ -72,6 +110,34 @@ public sealed class SettingsViewModelTests
         Assert.Equal(@"C:\Users\ExampleUser\AppData\Roaming\visualtech.dk\MySmallBusinessLedger", viewModel.AppDataFolderPath);
         Assert.Equal(@"C:\Users\ExampleUser\AppData\Roaming\visualtech.dk\MySmallBusinessLedger\ledger.db", viewModel.DatabasePath);
         Assert.Equal("Google authorization: Not connected", viewModel.GoogleAuthorizationStatusText);
+    }
+
+    [Fact]
+    public async Task LoadSelectsCustomPaymentInstructionsForUnknownSavedText()
+    {
+        var service = new FakeAppSettingsService
+        {
+            Snapshot = new AppSettingsSnapshot(
+                CompanyProfile.Create(
+                    "Maple Key Studio",
+                    "Musikvej 1",
+                    "12345678",
+                    "elena@example.test",
+                    null,
+                    null,
+                    VatStatus.NotRegistered,
+                    @"C:\Invoices",
+                    paymentInstructions: "Betaling senest efter aftale"),
+                null,
+                GoogleOAuthClientConfigurationStatus.Ready)
+        };
+        var viewModel = new SettingsViewModel(service);
+
+        await viewModel.LoadAsync();
+
+        Assert.True(viewModel.IsCustomPaymentInstructions);
+        Assert.Equal("Betaling senest efter aftale", viewModel.CustomPaymentInstructions);
+        Assert.Equal("Betaling senest efter aftale", viewModel.PaymentInstructions);
     }
 
     [Fact]
@@ -206,7 +272,10 @@ public sealed class SettingsViewModelTests
             InvoiceFolderPath = @"C:\Invoices",
             CalendarId = "primary",
             GoogleAccountEmail = "studio@example.test",
-            PaymentInstructions = "Bank 1234 / MobilePay 5678"
+            BankRegistrationNumber = "1234",
+            BankAccountNumber = "5678901234",
+            MobilePayAccount = "MobilePay 5678",
+            IsPaymentDueIn8Days = true
         };
 
         await viewModel.SaveCommand.ExecuteAsync();
@@ -214,9 +283,35 @@ public sealed class SettingsViewModelTests
         Assert.NotNull(service.SavedProfile);
         Assert.Equal(VatStatus.Registered, service.SavedProfile.VatStatus);
         Assert.Equal(new DateOnly(2026, 7, 1), service.SavedProfile.VatRegistrationDate);
-        Assert.Equal("Bank 1234 / MobilePay 5678", service.SavedProfile.PaymentInstructions);
+        Assert.Equal("1234", service.SavedProfile.BankRegistrationNumber);
+        Assert.Equal("5678901234", service.SavedProfile.BankAccountNumber);
+        Assert.Equal("MobilePay 5678", service.SavedProfile.MobilePayAccount);
+        Assert.Equal("8 dage fra fakturadato", service.SavedProfile.PaymentInstructions);
         Assert.Equal(new CalendarSettings("primary", "studio@example.test"), service.SavedCalendarSettings);
         Assert.True(viewModel.WasSaved);
+    }
+
+    [Fact]
+    public async Task SavePersistsCustomPaymentInstructions()
+    {
+        var service = new FakeAppSettingsService();
+        var viewModel = new SettingsViewModel(service)
+        {
+            CompanyName = "Maple Key Studio",
+            CompanyAddress = "Musikvej 1",
+            CompanyPhone = "12345678",
+            CompanyEmail = "elena@example.test",
+            InvoiceFolderPath = @"C:\Invoices",
+            CalendarId = "primary",
+            GoogleAccountEmail = "studio@example.test",
+            IsCustomPaymentInstructions = true,
+            CustomPaymentInstructions = "Betaling efter aftale"
+        };
+
+        await viewModel.SaveCommand.ExecuteAsync();
+
+        Assert.NotNull(service.SavedProfile);
+        Assert.Equal("Betaling efter aftale", service.SavedProfile.PaymentInstructions);
     }
 
     [Fact]
@@ -446,5 +541,56 @@ public sealed class SettingsViewModelTests
         }
 
         return null;
+    }
+
+    private static GroupBox? FindGroupBoxByHeader(DependencyObject root, string header)
+    {
+        foreach (var child in LogicalTreeHelper.GetChildren(root))
+        {
+            if (child is GroupBox groupBox && string.Equals(groupBox.Header as string, header, StringComparison.Ordinal))
+            {
+                return groupBox;
+            }
+
+            if (child is DependencyObject dependencyObject)
+            {
+                var match = FindGroupBoxByHeader(dependencyObject, header);
+                if (match is not null)
+                {
+                    return match;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static RadioButton? FindRadioButtonByContent(DependencyObject root, string content)
+    {
+        foreach (var child in LogicalTreeHelper.GetChildren(root))
+        {
+            if (child is RadioButton radioButton && string.Equals(radioButton.Content as string, content, StringComparison.Ordinal))
+            {
+                return radioButton;
+            }
+
+            if (child is DependencyObject dependencyObject)
+            {
+                var match = FindRadioButtonByContent(dependencyObject, content);
+                if (match is not null)
+                {
+                    return match;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static void AssertGroupBoxColumn(DependencyObject root, string header, int expectedColumn)
+    {
+        var groupBox = FindGroupBoxByHeader(root, header);
+        Assert.NotNull(groupBox);
+        Assert.Equal(expectedColumn, Grid.GetColumn(groupBox));
     }
 }
