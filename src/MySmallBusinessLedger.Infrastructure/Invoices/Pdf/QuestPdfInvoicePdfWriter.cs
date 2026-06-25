@@ -255,32 +255,65 @@ public sealed class QuestPdfInvoicePdfWriter : IInvoicePdfWriter
             .BorderColor(Colors.Grey.Lighten2)
             .CornerRadius(7)
             .Background(Colors.Grey.Lighten5)
-            .Padding(10)
+            .MinHeight(92)
+            .Padding(12)
             .Column(column =>
         {
             column.Item().Text("Betaling").SemiBold();
-            column.Item().PaddingTop(6).Text("Betales ved modtagelse.").FontColor(Colors.Grey.Darken2);
-            column.Item().Text($"Angiv fakturanr. {model.InvoiceNumber} ved betaling.");
-            if (!string.IsNullOrWhiteSpace(model.BankRegistrationNumber))
+            column.Item()
+                .PaddingTop(7)
+                .DefaultTextStyle(text => text.FontColor(Colors.Grey.Darken2).LineHeight(1.23f))
+                .Column(details =>
             {
-                column.Item().PaddingTop(6).Text($"Reg. nr.: {model.BankRegistrationNumber}");
-            }
-
-            if (!string.IsNullOrWhiteSpace(model.BankAccountNumber))
-            {
-                column.Item().Text($"Konto nr.: {model.BankAccountNumber}");
-            }
-
-            if (!string.IsNullOrWhiteSpace(model.MobilePayAccount))
-            {
-                column.Item().Text($"MobilePay: {model.MobilePayAccount}");
-            }
-
-            if (!string.IsNullOrWhiteSpace(model.PaymentInstructions))
-            {
-                column.Item().PaddingTop(6).Text(model.PaymentInstructions);
-            }
+                details.Spacing(4);
+                foreach (var line in CreatePaymentBoxDetailLines(
+                    model.InvoiceNumber,
+                    model.PaymentInstructions,
+                    model.BankRegistrationNumber,
+                    model.BankAccountNumber,
+                    model.MobilePayAccount))
+                {
+                    details.Item().Text(line);
+                }
+            });
         });
+    }
+
+    internal static IReadOnlyList<string> CreatePaymentBoxDetailLines(
+        string invoiceNumber,
+        string paymentInstructions,
+        string bankRegistrationNumber,
+        string bankAccountNumber,
+        string mobilePayAccount)
+    {
+        var lines = new List<string>
+        {
+            string.IsNullOrWhiteSpace(paymentInstructions) ? "Betales ved modtagelse." : paymentInstructions.Trim(),
+            $"Angiv fakturanr. {invoiceNumber} ved betaling."
+        };
+
+        var bankParts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(bankRegistrationNumber))
+        {
+            bankParts.Add($"Reg. nr.: {bankRegistrationNumber.Trim()}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(bankAccountNumber))
+        {
+            bankParts.Add($"Konto nr.: {bankAccountNumber.Trim()}");
+        }
+
+        if (bankParts.Count > 0)
+        {
+            lines.Add(string.Join("   ", bankParts));
+        }
+
+        if (!string.IsNullOrWhiteSpace(mobilePayAccount))
+        {
+            lines.Add($"MobilePay: {mobilePayAccount.Trim()}");
+        }
+
+        return lines;
     }
 
     private static void ComposeTotals(IContainer container, InvoicePdfDocumentModel model)

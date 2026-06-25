@@ -119,6 +119,26 @@ public sealed class InvoiceInfrastructureTests
     }
 
     [Fact]
+    public void QuestPdfInvoiceWriterFormatsPaymentAccountLinesForInvoicePaymentBox()
+    {
+        var lines = QuestPdfInvoicePdfWriter.CreatePaymentBoxDetailLines(
+            "001",
+            "Betales ved modtagelse.",
+            "0000",
+            "0000 000 000",
+            "0000 0000");
+
+        Assert.Equal(
+            [
+                "Betales ved modtagelse.",
+                "Angiv fakturanr. 001 ved betaling.",
+                "Reg. nr.: 0000   Konto nr.: 0000 000 000",
+                "MobilePay: 0000 0000"
+            ],
+            lines);
+    }
+
+    [Fact]
     public async Task PrinterDoesNotPrintMissingPdf()
     {
         var launcher = new FakePrintProcessLauncher();

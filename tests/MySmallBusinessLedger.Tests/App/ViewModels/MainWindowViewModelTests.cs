@@ -1158,6 +1158,42 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task WriteInvoiceWaitsForActivationRefreshInsteadOfDroppingClick()
+    {
+        var activationRefreshGate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var loadCall = 0;
+        var clock = new FakeUiClock(new DateTimeOffset(2026, 6, 16, 12, 0, 0, TimeSpan.Zero));
+        var dashboard = new FakeDashboardService
+        {
+            LessonIsInvoiced = false,
+            LessonPaymentStatus = null,
+            InvoiceSummaries = [],
+            BeforeReturnAsync = _ =>
+            {
+                loadCall++;
+                return loadCall == 2
+                    ? activationRefreshGate.Task
+                    : Task.CompletedTask;
+            }
+        };
+        var invoices = new FakeInvoiceWorkflowLauncher();
+        var viewModel = CreateViewModel(dashboard: dashboard, invoiceWorkflowLauncher: invoices, clock: clock);
+        await viewModel.LoadAsync();
+        clock.Now = clock.Now.AddSeconds(11);
+
+        var activationRefresh = viewModel.RefreshAfterActivationAsync();
+        await EventuallyAsync(() => viewModel.IsBusy);
+
+        var writeInvoice = viewModel.WriteInvoiceCommand.ExecuteAsync();
+        Assert.False(invoices.WriteWasShown);
+
+        activationRefreshGate.SetResult();
+        await Task.WhenAll(activationRefresh, writeInvoice);
+
+        Assert.True(invoices.WriteWasShown);
+    }
+
+    [Fact]
     public async Task SettingsRefreshesDashboardAfterSave()
     {
         var dashboard = new FakeDashboardService();

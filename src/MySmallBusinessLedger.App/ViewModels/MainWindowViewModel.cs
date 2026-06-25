@@ -37,6 +37,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private bool suppressNavigationSelectionOnce;
     private DateOnly displayMonth;
     private bool currentStudentHasSchedule;
+    private Task? activationRefreshTask;
     private bool isBusy;
     private int activationRefreshSuspendCount;
     private LessonDisplayModel? selectedLesson;
@@ -92,7 +93,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         OpenCalendarCommand = new AsyncRelayCommand(
             () => calendarLauncher.OpenAsync(CancellationToken.None),
             () => !IsBusy);
-        WriteInvoiceCommand = new AsyncRelayCommand(WriteInvoiceAsync, () => !IsBusy);
+        WriteInvoiceCommand = new AsyncRelayCommand(WriteInvoiceAsync, CanStartWriteInvoice);
         OpenInvoiceCommand = new AsyncRelayCommand(
             parameter => OpenInvoiceAsync((InvoiceDisplayModel)parameter!),
             parameter => parameter is InvoiceDisplayModel && !IsBusy);
@@ -238,7 +239,22 @@ public sealed class MainWindowViewModel : ViewModelBase
             return;
         }
 
-        await RefreshAsync();
+        var refreshTask = RefreshAsync();
+        activationRefreshTask = refreshTask;
+        RaiseCommandAvailabilityChanged();
+
+        try
+        {
+            await refreshTask;
+        }
+        finally
+        {
+            if (ReferenceEquals(activationRefreshTask, refreshTask))
+            {
+                activationRefreshTask = null;
+                RaiseCommandAvailabilityChanged();
+            }
+        }
     }
 
     private async Task RefreshAsync(Func<bool>? shouldApply = null)
@@ -409,20 +425,30 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     private async Task WriteInvoiceAsync()
     {
-        if (ResolveInvoiceForWriteButton() is { } existingInvoice)
+        await WaitForActivationRefreshAsync();
+
+        if (IsBusy)
         {
-            await OpenInvoiceAsync(existingInvoice);
             return;
         }
 
-        var issued = await invoiceWorkflowLauncher.ShowWriteInvoiceAsync(
-            DisplayMonth,
-            CurrentStudentShortName,
-            CancellationToken.None);
-        if (issued)
+        await RunWithActivationRefreshSuspendedAsync(async () =>
         {
-            await RefreshAsync();
-        }
+            if (ResolveInvoiceForWriteButton() is { } existingInvoice)
+            {
+                await OpenInvoiceAsync(existingInvoice);
+                return;
+            }
+
+            var issued = await invoiceWorkflowLauncher.ShowWriteInvoiceAsync(
+                DisplayMonth,
+                CurrentStudentShortName,
+                CancellationToken.None);
+            if (issued)
+            {
+                await RefreshAsync();
+            }
+        });
     }
 
     private Task OpenInvoiceAsync(InvoiceDisplayModel invoice) =>
@@ -994,6 +1020,21 @@ public sealed class MainWindowViewModel : ViewModelBase
         !IsBusy &&
         CurrentStudentShortName is not null &&
         DisplayMonth >= CurrentMonth();
+
+    private bool CanStartWriteInvoice() =>
+        !IsBusy || IsActivationRefreshRunning();
+
+    private bool IsActivationRefreshRunning() =>
+        activationRefreshTask is { IsCompleted: false };
+
+    private async Task WaitForActivationRefreshAsync()
+    {
+        var refreshTask = activationRefreshTask;
+        if (refreshTask is { IsCompleted: false })
+        {
+            await refreshTask;
+        }
+    }
 
     private DateOnly CurrentMonth()
     {
