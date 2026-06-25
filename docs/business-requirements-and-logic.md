@@ -217,6 +217,7 @@ If the invoice covers lessons under more than one Plan, the explanatory text lis
 The Invoice will contain VAT information, if currently relevant.
 The Invoice will contain price information.
 The Invoice will contain the configured bank registration/account number lines, MobilePay account line, and payment instructions, if any.
+The Invoice must fit on one PDF page. If the included lesson list is long, the lesson list should use multiple columns in the middle lesson area rather than pushing payment instructions, totals, or footer text to a second page.
 Payment instructions are configured as one of:
 
 - `Betales ved modtagelse`

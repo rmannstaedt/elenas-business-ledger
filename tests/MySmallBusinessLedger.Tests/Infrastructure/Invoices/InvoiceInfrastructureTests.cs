@@ -119,6 +119,29 @@ public sealed class InvoiceInfrastructureTests
     }
 
     [Fact]
+    public async Task QuestPdfInvoiceWriterKeepsNineLessonInvoiceOnOnePage()
+    {
+        using var folder = TestInvoiceFolder.Create();
+        var writer = new QuestPdfInvoicePdfWriter();
+        var draft = CreateNineLessonDraft();
+        var totals = new InvoiceTotals(Money.Dkk(3150m), Money.Dkk(0m), Money.Dkk(3150m));
+        var outputPath = Path.Combine(folder.Path, "invoice.pdf");
+
+        var result = await writer.WriteAsync(draft, totals, new InvoiceNumber(1), outputPath, CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        var bytes = await File.ReadAllBytesAsync(outputPath, TestContext.Current.CancellationToken);
+        Assert.Equal(1, CountPdfPages(bytes));
+
+        var keepSamplePath = Environment.GetEnvironmentVariable("ELENA_LEDGER_KEEP_NINE_LESSON_SAMPLE_PDF");
+        if (!string.IsNullOrWhiteSpace(keepSamplePath))
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(keepSamplePath)!);
+            File.Copy(outputPath, keepSamplePath, overwrite: true);
+        }
+    }
+
+    [Fact]
     public void QuestPdfInvoiceWriterFormatsPaymentAccountLinesForInvoicePaymentBox()
     {
         var lines = QuestPdfInvoicePdfWriter.CreatePaymentBoxDetailLines(
@@ -246,6 +269,49 @@ public sealed class InvoiceInfrastructureTests
                 Money.Dkk(350m))).ToArray(),
             priceAdjustment: null,
             period: new InvoicePeriod(new DateOnly(2026, 6, 1), new DateOnly(2026, 6, 30)));
+    }
+
+    private static InvoiceDraft CreateNineLessonDraft()
+    {
+        var dates = new[]
+        {
+            new DateTimeOffset(2026, 7, 2, 14, 0, 0, TimeSpan.FromHours(2)),
+            new DateTimeOffset(2026, 7, 6, 14, 0, 0, TimeSpan.FromHours(2)),
+            new DateTimeOffset(2026, 7, 9, 14, 0, 0, TimeSpan.FromHours(2)),
+            new DateTimeOffset(2026, 7, 13, 14, 0, 0, TimeSpan.FromHours(2)),
+            new DateTimeOffset(2026, 7, 16, 14, 0, 0, TimeSpan.FromHours(2)),
+            new DateTimeOffset(2026, 7, 20, 14, 0, 0, TimeSpan.FromHours(2)),
+            new DateTimeOffset(2026, 7, 23, 14, 0, 0, TimeSpan.FromHours(2)),
+            new DateTimeOffset(2026, 7, 27, 14, 0, 0, TimeSpan.FromHours(2)),
+            new DateTimeOffset(2026, 7, 30, 14, 0, 0, TimeSpan.FromHours(2))
+        };
+
+        return InvoiceDraft.Create(
+            new DateOnly(2026, 6, 26),
+            new CompanySnapshot(
+                "Maple Key Studio",
+                "18 Example Lane, 0000 Example City",
+                null,
+                string.Empty,
+                "0000",
+                "0000 000 000",
+                "0000 0000"),
+            new StudentSnapshot("Mira", "Mira Vale", "42 Sample Lane" + Environment.NewLine + "0000 Example City"),
+            dates.Select(date => new InvoiceLineDraft(
+                date,
+                "Tilbud 2 - 2026: 2 lektioner/uge",
+                Money.Dkk(350m))).ToArray(),
+            priceAdjustment: null,
+            period: new InvoicePeriod(new DateOnly(2026, 7, 1), new DateOnly(2026, 7, 31)));
+    }
+
+    private static int CountPdfPages(byte[] bytes)
+    {
+        var pdfText = System.Text.Encoding.Latin1.GetString(bytes);
+        return System.Text.RegularExpressions.Regex.Matches(
+            pdfText,
+            @"/Type\s*/Page\b",
+            System.Text.RegularExpressions.RegexOptions.CultureInvariant).Count;
     }
 
     private sealed class FakePrintProcessLauncher : IPrintProcessLauncher

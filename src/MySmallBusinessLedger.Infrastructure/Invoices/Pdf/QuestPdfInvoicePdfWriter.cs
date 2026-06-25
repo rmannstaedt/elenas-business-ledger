@@ -14,6 +14,7 @@ public sealed class QuestPdfInvoicePdfWriter : IInvoicePdfWriter
     private const string InvoiceFontFamily = "Segoe UI";
     private const float BaseFontSize = 9.5f;
     private const float BaseLineHeight = 1.12f;
+    private const float HeaderToBodySpacing = 30f;
     private static readonly CultureInfo DanishCulture = CultureInfo.GetCultureInfo("da-DK");
 
     static QuestPdfInvoicePdfWriter()
@@ -47,18 +48,17 @@ public sealed class QuestPdfInvoicePdfWriter : IInvoicePdfWriter
                         .LineHeight(BaseLineHeight));
 
                     page.Header().Element(container => ComposeHeader(container, model));
-                    page.Content().PaddingTop(18).Column(column =>
+                    page.Content().PaddingTop(HeaderToBodySpacing).Column(column =>
                     {
                         column.Spacing(16);
                         column.Item().Element(container => ComposeParties(container, model));
                         column.Item().PaddingTop(8).Element(container => ComposeServices(container, model));
                         column.Item().Element(container => ComposeLessons(container, model));
-                        column.Item().Height(145);
-                        column.Item().Element(container => ComposePaymentAndTotals(container, model));
                     });
                     page.Footer().Column(footer =>
                     {
-                        footer.Item().PaddingTop(12).LineHorizontal(1).LineColor(Colors.Grey.Lighten2);
+                        footer.Item().Element(container => ComposePaymentAndTotals(container, model));
+                        footer.Item().PaddingTop(18).LineHorizontal(1).LineColor(Colors.Grey.Lighten2);
                         footer.Item().PaddingTop(8).AlignCenter().Text("Tak for undervisningen.").FontColor(Colors.Grey.Darken1);
                     });
                 });
@@ -227,14 +227,36 @@ public sealed class QuestPdfInvoicePdfWriter : IInvoicePdfWriter
         container.Column(column =>
         {
             column.Item().Text("Inkluderede lektioner").FontSize(10.5f).SemiBold();
-            column.Item().PaddingTop(6).Column(list =>
+            column.Item().PaddingTop(6).Element(list => ComposeLessonList(list, model.IncludedLessons));
+        });
+    }
+
+    private static void ComposeLessonList(IContainer container, IReadOnlyList<string> lessons)
+    {
+        if (lessons.Count <= 6)
+        {
+            container.Element(list => ComposeLessonListColumn(list, lessons));
+            return;
+        }
+
+        var leftColumnCount = (int)Math.Ceiling(lessons.Count / 2m);
+        container.Row(row =>
+        {
+            row.RelativeItem().Element(list => ComposeLessonListColumn(list, lessons.Take(leftColumnCount)));
+            row.ConstantItem(28);
+            row.RelativeItem().Element(list => ComposeLessonListColumn(list, lessons.Skip(leftColumnCount)));
+        });
+    }
+
+    private static void ComposeLessonListColumn(IContainer container, IEnumerable<string> lessons)
+    {
+        container.Column(list =>
+        {
+            list.Spacing(4);
+            foreach (var lesson in lessons)
             {
-                list.Spacing(4);
-                foreach (var lesson in model.IncludedLessons)
-                {
-                    list.Item().Text(lesson).FontSize(8.5f).FontColor(Colors.Grey.Darken2);
-                }
-            });
+                list.Item().Text(lesson).FontSize(8.5f).FontColor(Colors.Grey.Darken2);
+            }
         });
     }
 
