@@ -43,16 +43,32 @@ public sealed class StartupDashboardQuery
         var lessonStatuses = await invoiceRepository.ListLessonStatusesAsync(from, to, cancellationToken);
         var statusLookup = lessonStatuses.ToDictionary(
             status => (status.StudentShortName, status.LessonDateTime),
-            status => status.PaymentStatus);
+            status => status);
 
         var lessons = calendarLessons
             .Where(lesson => currentStudent is null || lesson.StudentShortName == currentStudent)
             .OrderBy(lesson => lesson.StartsAt)
             .Select(lesson =>
             {
-                var isInvoiced = statusLookup.TryGetValue((lesson.StudentShortName, lesson.StartsAt), out var paymentStatus);
-                var state = isInvoiced ? LessonState.Completed : lesson.State;
-                return new DashboardLesson(lesson.Id, lesson.StudentShortName, lesson.StartsAt, state, isInvoiced, isInvoiced ? paymentStatus : null);
+                if (!statusLookup.TryGetValue((lesson.StudentShortName, lesson.StartsAt), out var invoiceStatus))
+                {
+                    return new DashboardLesson(
+                        lesson.Id,
+                        lesson.StudentShortName,
+                        lesson.StartsAt,
+                        lesson.State,
+                        IsInvoiced: false,
+                        PaymentStatus: null);
+                }
+
+                return new DashboardLesson(
+                    lesson.Id,
+                    lesson.StudentShortName,
+                    lesson.StartsAt,
+                    LessonState.Completed,
+                    IsInvoiced: true,
+                    invoiceStatus.PaymentStatus,
+                    invoiceStatus.InvoiceNumber);
             })
             .ToArray();
 

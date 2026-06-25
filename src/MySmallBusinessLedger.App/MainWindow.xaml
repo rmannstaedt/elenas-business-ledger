@@ -123,6 +123,49 @@
             <Setter Property="TextAlignment" Value="Center" />
             <Setter Property="VerticalAlignment" Value="Center" />
         </Style>
+        <Style x:Key="InvoiceTableTextCellStyle" TargetType="{x:Type TextBlock}">
+            <Setter Property="Padding" Value="4,0" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style x:Key="InvoiceStatusButtonStyle" TargetType="{x:Type Button}">
+            <Setter Property="Background" Value="#F8FAFC" />
+            <Setter Property="BorderBrush" Value="#64748B" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Foreground" Value="#111827" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="Padding" Value="8,0" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Button}">
+                        <Border x:Name="Chrome"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}">
+                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="#EEF3F8" />
+                                <Setter TargetName="Chrome" Property="BorderBrush" Value="#334155" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Chrome" Property="Background" Value="#DCEBFA" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Chrome" Property="BorderBrush" Value="#2563EB" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Cursor" Value="Arrow" />
+                                <Setter Property="Opacity" Value="0.55" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
         <Style x:Key="LessonCellButtonStyle" TargetType="{x:Type Button}">
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderBrush" Value="Transparent" />
@@ -344,7 +387,7 @@
                 </Grid.ColumnDefinitions>
 
                 <Grid Grid.Column="0"
-                      Width="480"
+                      Width="528"
                       HorizontalAlignment="Left"
                       AutomationProperties.Name="Lessons pane">
                     <Grid.RowDefinitions>
@@ -488,10 +531,10 @@
                                                 ElementStyle="{StaticResource CenteredTextCellStyle}"
                                                 HeaderStyle="{StaticResource CenteredColumnHeaderStyle}"
                                                 IsReadOnly="True"
-                                                Width="*" />
+                                                Width="105" />
                             <DataGridTemplateColumn Header=""
                                                     CanUserResize="False"
-                                                    Width="44">
+                                                    Width="28">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <Button Content="×"
@@ -501,7 +544,7 @@
                                                 Visibility="{Binding CanEdit, Converter={StaticResource BooleanToVisibilityConverter}}"
                                                 Style="{StaticResource QuietIconButtonStyle}"
                                                 ToolTip="Delete lesson"
-                                                Width="28"
+                                                Width="22"
                                                 Height="24"
                                                 AutomationProperties.Name="Delete lesson" />
                                     </DataTemplate>
@@ -529,24 +572,28 @@
                               IsReadOnly="True"
                               HeadersVisibility="Column"
                               GridLinesVisibility="Horizontal"
+                              RowHeight="36"
                               SelectionChanged="OnGridSelectionChanged"
                               MouseDoubleClick="OnInvoiceDoubleClick"
                               AutomationProperties.Name="Student invoices">
                         <DataGrid.Columns>
                             <DataGridTextColumn Header="Invoice"
                                                 Binding="{Binding InvoiceNumberText}"
-                                                MinWidth="90"
+                                                ElementStyle="{StaticResource InvoiceTableTextCellStyle}"
+                                                MinWidth="56"
                                                 Width="1*" />
                             <DataGridTextColumn Header="Date"
                                                 Binding="{Binding InvoiceDateText}"
-                                                MinWidth="100"
+                                                ElementStyle="{StaticResource InvoiceTableTextCellStyle}"
+                                                MinWidth="84"
                                                 Width="1*" />
                             <DataGridTextColumn Header="Print"
                                                 Binding="{Binding PrintStatusText}"
-                                                MinWidth="92"
+                                                ElementStyle="{StaticResource InvoiceTableTextCellStyle}"
+                                                MinWidth="70"
                                                 Width="0.9*" />
                             <DataGridTemplateColumn Header="Status"
-                                                    MinWidth="120"
+                                                    MinWidth="112"
                                                     Width="1.2*">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
@@ -556,6 +603,9 @@
                                                 PreviewMouseLeftButtonDown="OnCommandButtonPreviewMouseLeftButtonDown"
                                                 MinWidth="104"
                                                 Height="28"
+                                                VerticalAlignment="Center"
+                                                Style="{StaticResource InvoiceStatusButtonStyle}"
+                                                ToolTip="Toggle invoice payment status"
                                                 AutomationProperties.Name="{Binding PaymentStatusText}" />
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>

@@ -40,7 +40,8 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
             .Select(line => new InvoiceLessonStatus(
                 line.Invoice.StudentShortName,
                 ParseLessonDateTime(line.LessonDateTime),
-                line.Invoice.PaymentStatus))
+                line.Invoice.PaymentStatus,
+                new InvoiceNumber(line.Invoice.InvoiceNumber)))
             .ToArrayAsync(cancellationToken);
 
         return lines;

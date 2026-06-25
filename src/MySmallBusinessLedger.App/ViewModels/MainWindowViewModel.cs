@@ -347,7 +347,16 @@ public sealed class MainWindowViewModel : ViewModelBase
         }
 
         invoice.PaymentStatus = result.Value;
+        ApplyInvoicePaymentStatusToLessons(invoice);
         ErrorMessage = null;
+    }
+
+    private void ApplyInvoicePaymentStatusToLessons(InvoiceDisplayModel invoice)
+    {
+        foreach (var lesson in Lessons.Where(lesson => lesson.InvoiceNumber == invoice.InvoiceNumber))
+        {
+            lesson.PaymentStatus = invoice.PaymentStatus;
+        }
     }
 
     private async Task OpenManageStudentsAsync()

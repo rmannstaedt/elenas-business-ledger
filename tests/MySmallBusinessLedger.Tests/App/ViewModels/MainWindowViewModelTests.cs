@@ -606,20 +606,33 @@ public sealed class MainWindowViewModelTests
                 Assert.Same(centeredHeaderStyle, paidColumn.HeaderStyle);
                 Assert.Same(centeredTextCellStyle, paidColumn.ElementStyle);
                 Assert.False(paidColumn.CanUserResize);
+                Assert.Equal(WpfDataGridLengthUnitType.Pixel, paidColumn.Width.UnitType);
+                Assert.Equal(105, paidColumn.Width.Value);
 
                 var deleteColumn = Assert.IsType<WpfDataGridTemplateColumn>(
                     lessonGrid.Columns.Single(column => string.IsNullOrEmpty(column.Header?.ToString())));
                 Assert.False(deleteColumn.CanUserResize);
+                Assert.Equal(28, deleteColumn.Width.Value);
 
                 var lessonsPane = Assert.Single(
                     FindVisualChildren<WpfGrid>(window),
                     grid => AutomationProperties.GetName(grid) == "Lessons pane");
-                Assert.Equal(480, lessonsPane.Width);
+                Assert.Equal(528, lessonsPane.Width);
 
                 var invoiceGrid = Assert.Single(
                     FindVisualChildren<WpfDataGrid>(window),
                     grid => AutomationProperties.GetName(grid) == "Student invoices");
                 Assert.All(invoiceGrid.Columns, column => Assert.Equal(WpfDataGridLengthUnitType.Star, column.Width.UnitType));
+                Assert.Equal(36, invoiceGrid.RowHeight);
+                Assert.Equal([56, 84, 70, 112], invoiceGrid.Columns.Select(column => column.MinWidth).ToArray());
+
+                var invoiceStatusStyle = Assert.IsType<Style>(window.FindResource("InvoiceStatusButtonStyle"));
+                var invoiceStatusButton = Assert.Single(
+                    FindVisualChildren<WpfButton>(invoiceGrid),
+                    button => AutomationProperties.GetName(button) == "Outstanding");
+                Assert.Same(invoiceStatusStyle, invoiceStatusButton.Style);
+                Assert.Equal(28, invoiceStatusButton.Height);
+                Assert.Equal(VerticalAlignment.Center, invoiceStatusButton.VerticalAlignment);
             }
             finally
             {
@@ -990,6 +1003,25 @@ public sealed class MainWindowViewModelTests
         Assert.True(confirmation.WasAsked);
         Assert.True(payments.LastConfirmMarkOutstanding);
         Assert.Equal("Outstanding", viewModel.Invoices[0].PaymentStatusText);
+    }
+
+    [Fact]
+    public async Task InvoicePaymentStatusUpdatesVisibleLessonRowsImmediately()
+    {
+        var payments = new FakePaymentService();
+        var confirmation = new FakeConfirmationService { NextAnswer = true };
+        var viewModel = CreateViewModel(payments: payments, confirmation: confirmation);
+        await viewModel.LoadAsync();
+
+        await viewModel.ToggleInvoicePaymentStatusCommand.ExecuteAsync(viewModel.Invoices[0]);
+
+        Assert.Equal("Paid", viewModel.Invoices[0].PaymentStatusText);
+        Assert.Equal("Paid", viewModel.Lessons[0].PaymentStatusText);
+
+        await viewModel.ToggleInvoicePaymentStatusCommand.ExecuteAsync(viewModel.Invoices[0]);
+
+        Assert.Equal("Outstanding", viewModel.Invoices[0].PaymentStatusText);
+        Assert.Equal("Outstanding", viewModel.Lessons[0].PaymentStatusText);
     }
 
     [Fact]
@@ -1763,6 +1795,8 @@ public sealed class MainWindowViewModelTests
 
         public bool LessonIsInvoiced { get; init; } = true;
 
+        public InvoiceNumber? LessonInvoiceNumber { get; init; } = new(1);
+
         public PaymentStatus? LessonPaymentStatus { get; init; } = PaymentStatus.Outstanding;
 
         public PaymentStatus InvoicePaymentStatus { get; init; } = PaymentStatus.Outstanding;
@@ -1802,7 +1836,8 @@ public sealed class MainWindowViewModelTests
                                 new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.FromHours(2)),
                                 LessonState,
                                 LessonIsInvoiced,
-                                LessonPaymentStatus)
+                                LessonPaymentStatus,
+                                LessonIsInvoiced ? LessonInvoiceNumber : null)
                     ],
                     [
                         new IssuedInvoiceSummary(

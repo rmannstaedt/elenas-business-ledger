@@ -25,6 +25,7 @@ public sealed class LessonDisplayModel : ViewModelBase
     private DateTime? startsOnDate;
     private string startsAtTimeText;
     private LessonState state;
+    private PaymentStatus? paymentStatus;
     private bool isDraft;
 
     public LessonDisplayModel(DashboardLesson lesson, TimeZoneInfo? lessonTimeZone = null)
@@ -37,7 +38,8 @@ public sealed class LessonDisplayModel : ViewModelBase
         savedStartsAt = lesson.StartsAt;
         state = lesson.State;
         IsInvoiced = lesson.IsInvoiced;
-        PaymentStatus = lesson.PaymentStatus;
+        InvoiceNumber = lesson.InvoiceNumber;
+        paymentStatus = lesson.PaymentStatus;
     }
 
     private LessonDisplayModel(string studentShortName, TimeZoneInfo lessonTimeZone)
@@ -49,7 +51,8 @@ public sealed class LessonDisplayModel : ViewModelBase
         startsAtTimeText = string.Empty;
         state = LessonState.Planned;
         IsInvoiced = false;
-        PaymentStatus = null;
+        InvoiceNumber = null;
+        paymentStatus = null;
         isDraft = true;
     }
 
@@ -130,13 +133,25 @@ public sealed class LessonDisplayModel : ViewModelBase
 
     public bool IsInvoiced { get; }
 
+    public InvoiceNumber? InvoiceNumber { get; }
+
     public bool CanEdit => (IsDraft || State == LessonState.Planned) && !IsInvoiced;
 
     public bool CanToggleState => !IsDraft && !IsInvoiced;
 
     public bool HasDateTimeChange => TryGetStartsAt(out var startsAt) && startsAt != savedStartsAt;
 
-    public PaymentStatus? PaymentStatus { get; }
+    public PaymentStatus? PaymentStatus
+    {
+        get => paymentStatus;
+        set
+        {
+            if (SetProperty(ref paymentStatus, value))
+            {
+                OnPropertyChanged(nameof(PaymentStatusText));
+            }
+        }
+    }
 
     public string StartsAtText => TryGetStartsAt(out var startsAt)
         ? startsAt.ToString("dd-MM-yyyy HH:mm", CultureInfo.InvariantCulture)
