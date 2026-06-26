@@ -502,12 +502,6 @@ public sealed class MainWindowViewModel : ViewModelBase
             return;
         }
 
-        if (!CanPopulateCalendar())
-        {
-            ErrorMessage = "Past months cannot be populated.";
-            return;
-        }
-
         var result = await lessonEditorService.PopulateCalendarAsync(
             CurrentStudentShortName,
             DisplayMonth,
@@ -1159,8 +1153,7 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     private bool CanPopulateCalendar() =>
         !IsBusy &&
-        CurrentStudentShortName is not null &&
-        DisplayMonth >= CurrentMonth();
+        CurrentStudentShortName is not null;
 
     private bool CanStartWriteInvoice() =>
         !IsBusy || IsActivationRefreshRunning();

@@ -26,13 +26,6 @@ public sealed class PopulateCalendarUseCase
     {
         var firstOfDisplayMonth = new DateOnly(request.DisplayMonth.Year, request.DisplayMonth.Month, 1);
         var firstOfCurrentMonth = new DateOnly(request.Today.Year, request.Today.Month, 1);
-        if (firstOfDisplayMonth < firstOfCurrentMonth)
-        {
-            return OperationResult<PopulateCalendarResult>.Failure(new ValidationError(
-                "CalendarPopulate.PastMonth",
-                "Past months cannot be populated."));
-        }
-
         var student = await studentRepository.GetByShortNameAsync(request.StudentShortName, cancellationToken);
         if (student is null)
         {

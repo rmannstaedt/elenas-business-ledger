@@ -176,8 +176,7 @@ The application also contains a button:
 
 The lesson toolbar contains a `Populate Calendar` action for the selected Student and displayed month. This action seeds Google Calendar immediately from the selected Student's saved standard schedule:
   * If the displayed month is the current month, the action creates scheduled lesson entries from today (inclusive) through the end of the month.
-  * If the displayed month is a future month, the action creates scheduled lesson entries for the full month.
-  * Past months cannot be seeded.
+  * If the displayed month is a past or future month, the action creates scheduled lesson entries for the full month.
   * The action writes the resulting lesson entries to Google Calendar immediately; there is no separate save operation.
   * Exact duplicate lessons for the same Student at the same date/time are skipped.
   * Version 1 does not detect or handle other calendar conflicts. Conflicts must be resolved manually by the user in Google Calendar.

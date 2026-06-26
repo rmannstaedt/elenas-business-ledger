@@ -426,7 +426,7 @@ public sealed class UseCaseTests
     }
 
     [Fact]
-    public async Task PopulateCalendarRejectsPastMonthWithoutWriting()
+    public async Task PopulateCalendarPastMonthSeedsWholeMonth()
     {
         var timeZone = TimeZoneInfo.FindSystemTimeZoneById("Romance Standard Time");
         var students = new FakeStudentRepository([CreateStudentRecord("Anna")]);
@@ -437,9 +437,15 @@ public sealed class UseCaseTests
             new PopulateCalendarRequest("Anna", new DateOnly(2026, 5, 1), new DateOnly(2026, 6, 16)),
             CancellationToken.None);
 
-        Assert.False(result.Succeeded);
-        Assert.Contains(result.Errors, error => error.Code == "CalendarPopulate.PastMonth");
-        Assert.Empty(calendar.PopulatedRequests);
+        Assert.True(result.Succeeded);
+        Assert.Equal(
+            [
+                new DateTimeOffset(2026, 5, 5, 15, 0, 0, TimeSpan.FromHours(2)),
+                new DateTimeOffset(2026, 5, 12, 15, 0, 0, TimeSpan.FromHours(2)),
+                new DateTimeOffset(2026, 5, 19, 15, 0, 0, TimeSpan.FromHours(2)),
+                new DateTimeOffset(2026, 5, 26, 15, 0, 0, TimeSpan.FromHours(2))
+            ],
+            calendar.PopulatedRequests.Select(request => request.StartsAt).ToArray());
     }
 
     [Fact]

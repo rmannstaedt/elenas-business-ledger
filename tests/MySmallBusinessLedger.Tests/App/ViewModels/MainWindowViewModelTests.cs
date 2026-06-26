@@ -22,6 +22,7 @@ using WpfDataGridLengthUnitType = System.Windows.Controls.DataGridLengthUnitType
 using WpfDataGridTemplateColumn = System.Windows.Controls.DataGridTemplateColumn;
 using WpfDataGridTextColumn = System.Windows.Controls.DataGridTextColumn;
 using WpfGrid = System.Windows.Controls.Grid;
+using WpfGridSplitter = System.Windows.Controls.GridSplitter;
 using WpfListBox = System.Windows.Controls.ListBox;
 using WpfMenuItem = System.Windows.Controls.MenuItem;
 using AppMainWindow = MySmallBusinessLedger.App.MainWindow;
@@ -65,6 +66,41 @@ public sealed class MainWindowViewModelTests
             Assert.Equal(["_Manage Students"], studentActions);
 
             window.Close();
+        });
+    }
+
+    [Fact]
+    public void MainWindowAlignsLessonAndInvoiceTablesAndExposesPaneSplitter()
+    {
+        RunOnStaThread(() =>
+        {
+            var viewModel = CreateViewModel();
+            var window = new AppMainWindow(viewModel);
+            try
+            {
+                window.Show();
+                PumpUntil(() => !viewModel.IsBusy && viewModel.Lessons.Count == 1);
+
+                var lessonGrid = Assert.Single(
+                    FindVisualChildren<WpfDataGrid>(window),
+                    grid => AutomationProperties.GetName(grid) == "Lesson list");
+                var invoiceGrid = Assert.Single(
+                    FindVisualChildren<WpfDataGrid>(window),
+                    grid => AutomationProperties.GetName(grid) == "Student invoices");
+                var splitter = Assert.Single(
+                    FindVisualChildren<WpfGridSplitter>(window),
+                    candidate => AutomationProperties.GetName(candidate) == "Resize lessons and invoices");
+
+                var lessonTop = lessonGrid.TranslatePoint(new Point(0, 0), window).Y;
+                var invoiceTop = invoiceGrid.TranslatePoint(new Point(0, 0), window).Y;
+                Assert.InRange(Math.Abs(lessonTop - invoiceTop), 0, 1);
+                Assert.False(splitter.Focusable);
+                Assert.Equal(Cursors.SizeWE, splitter.Cursor);
+            }
+            finally
+            {
+                window.Close();
+            }
         });
     }
 
@@ -622,7 +658,8 @@ public sealed class MainWindowViewModelTests
                 var lessonsPane = Assert.Single(
                     FindVisualChildren<WpfGrid>(window),
                     grid => AutomationProperties.GetName(grid) == "Lessons pane");
-                Assert.Equal(640, lessonsPane.Width);
+                Assert.True(double.IsNaN(lessonsPane.Width));
+                Assert.InRange(lessonsPane.ActualWidth, 630, 650);
 
                 var invoiceGrid = Assert.Single(
                     FindVisualChildren<WpfDataGrid>(window),
@@ -1921,8 +1958,9 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
-    public async Task PopulateCalendarCommandIsUnavailableForPastMonths()
+    public async Task PopulateCalendarCommandCanPopulatePastMonthsForBackfill()
     {
+        var lessonEditor = new FakeLessonEditorService();
         var viewModel = CreateViewModel(
             dashboard: new FakeDashboardService
             {
@@ -1930,12 +1968,19 @@ public sealed class MainWindowViewModelTests
                 LessonIsInvoiced = false,
                 LessonPaymentStatus = null
             },
+            lessonEditorService: lessonEditor,
             clock: new FakeUiClock(new DateTimeOffset(2026, 6, 16, 12, 0, 0, TimeSpan.FromHours(2))));
         await viewModel.LoadAsync();
 
         await viewModel.PreviousMonthCommand.ExecuteAsync();
 
-        Assert.False(viewModel.PopulateCalendarCommand.CanExecute(null));
+        Assert.True(viewModel.PopulateCalendarCommand.CanExecute(null));
+
+        await viewModel.PopulateCalendarCommand.ExecuteAsync();
+
+        Assert.Equal("Anna", lessonEditor.LastPopulateStudentShortName);
+        Assert.Equal(new DateOnly(2026, 5, 1), lessonEditor.LastPopulateDisplayMonth);
+        Assert.Equal(new DateOnly(2026, 6, 16), lessonEditor.LastPopulateToday);
     }
 
     [Fact]
