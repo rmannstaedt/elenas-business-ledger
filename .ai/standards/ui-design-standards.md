@@ -108,6 +108,7 @@ Controls should be sized, placed, and named for the task.
 - Use clear command labels with verbs, such as Run, Pause, Resume, Cancel, Review, View details, Apply changes, or Export report.
 - Disable unavailable commands only when the unavailable state is understandable or explained.
 - Prefer preventing impossible actions over letting users fail late, but do not hide important actions so completely that the user cannot discover how to become eligible.
+- Activation, refresh, and focus recovery must not consume the user's first intentional click. If the application regains focus because the user clicks a button, menu item, row, field, dropdown, picker, or icon, that same click must either perform the visible action or be blocked for a clear user-facing reason. Background or activation refresh work must be deferred, coalesced, cancelled, or made non-disruptive so it cannot disable controls, close popups, rebuild rows, clear selection, or otherwise invalidate that input.
 
 Page structure should be steady. Avoid layout shifts caused by changing text, late-arriving data, progress bars, validation messages, or control visibility. Reserve stable space for progress, summaries, validation, and activity text when those elements are expected during a workflow. Use visual grouping to clarify relationships, not as decoration.
 

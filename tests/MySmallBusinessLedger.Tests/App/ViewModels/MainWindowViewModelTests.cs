@@ -733,7 +733,7 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
-    public void AddLessonButtonPreviewClickWorksWhileActivationRefreshIsPending()
+    public void AddLessonButtonPreviewClickCancelsPendingActivationRefresh()
     {
         RunOnStaThread(() =>
         {
@@ -743,6 +743,9 @@ public sealed class MainWindowViewModelTests
             var clock = new FakeUiClock(new DateTimeOffset(2026, 6, 16, 12, 0, 0, TimeSpan.Zero));
             var dashboard = new FakeDashboardService
             {
+                LessonState = LessonState.Planned,
+                LessonIsInvoiced = false,
+                LessonPaymentStatus = null,
                 BeforeReturnAsync = _ =>
                 {
                     loadCount++;
@@ -755,6 +758,122 @@ public sealed class MainWindowViewModelTests
                     return allowActivationRefreshToFinish.Task;
                 }
             };
+            var viewModel = CreateViewModel(
+                dashboard: dashboard,
+                clock: clock);
+
+            var window = new AppMainWindow(viewModel);
+            try
+            {
+                window.Show();
+                PumpUntil(() => !viewModel.IsBusy && viewModel.Lessons.Count == 1);
+                clock.Now = clock.Now.AddSeconds(11);
+
+                InvokeActivated(window);
+                var addLessonButton = FindButton(window, "Add Lesson");
+                RaisePreviewLeftClick(window);
+                RaisePreviewLeftClick(addLessonButton);
+
+                Assert.True(viewModel.SelectedLesson?.IsDraft);
+                Assert.Equal(2, viewModel.Lessons.Count);
+
+                PumpDispatcher(DispatcherPriority.ApplicationIdle);
+                Assert.False(activationRefreshStarted.Task.IsCompleted);
+            }
+            finally
+            {
+                allowActivationRefreshToFinish.TrySetResult();
+                window.Close();
+            }
+        });
+    }
+
+    [Fact]
+    public void ActivationRefreshDoesNotDisableTheFirstReactivationCommandClick()
+    {
+        RunOnStaThread(() =>
+        {
+            var activationRefreshStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var allowRefreshToFinish = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var loadCount = 0;
+            var clock = new FakeUiClock(new DateTimeOffset(2026, 6, 16, 12, 0, 0, TimeSpan.Zero));
+            MainWindowViewModel? viewModel = null;
+            var dashboard = new FakeDashboardService
+            {
+                LessonState = LessonState.Planned,
+                LessonIsInvoiced = false,
+                LessonPaymentStatus = null,
+                BeforeReturnAsync = _ =>
+                {
+                    loadCount++;
+                    if (loadCount != 2 || viewModel?.DisplayMonth != new DateOnly(2026, 6, 1))
+                    {
+                        return Task.CompletedTask;
+                    }
+
+                    activationRefreshStarted.SetResult();
+                    return allowRefreshToFinish.Task;
+                }
+            };
+            viewModel = CreateViewModel(dashboard: dashboard, clock: clock);
+
+            var window = new AppMainWindow(viewModel);
+            try
+            {
+                window.Show();
+                PumpUntil(() => !viewModel.IsBusy && viewModel.Lessons.Count == 1);
+                clock.Now = clock.Now.AddSeconds(11);
+
+                InvokeActivated(window);
+                var previousMonthButton = FindButton(window, "Previous month");
+                RaisePreviewLeftClick(window);
+                PumpDispatcher(DispatcherPriority.Background);
+
+                Assert.False(activationRefreshStarted.Task.IsCompleted);
+                Assert.True(viewModel.PreviousMonthCommand.CanExecute(null));
+
+                var previousMonthTask = ((MySmallBusinessLedger.App.Commands.AsyncRelayCommand)previousMonthButton.Command)
+                    .ExecuteAsync(previousMonthButton.CommandParameter);
+                PumpUntil(() => previousMonthTask.IsCompleted);
+                previousMonthTask.GetAwaiter().GetResult();
+                PumpDispatcher(DispatcherPriority.ApplicationIdle);
+
+                Assert.Equal(new DateOnly(2026, 5, 1), viewModel.DisplayMonth);
+            }
+            finally
+            {
+                allowRefreshToFinish.TrySetResult();
+                window.Close();
+            }
+        });
+    }
+
+    [Fact]
+    public void ActivationRefreshDoesNotClosePickerOpenedByTheFirstReactivationClick()
+    {
+        RunOnStaThread(() =>
+        {
+            var activationRefreshStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var allowRefreshToFinish = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var loadCount = 0;
+            var clock = new FakeUiClock(new DateTimeOffset(2026, 6, 16, 12, 0, 0, TimeSpan.Zero));
+            var dashboard = new FakeDashboardService
+            {
+                LessonState = LessonState.Planned,
+                LessonIsInvoiced = false,
+                LessonPaymentStatus = null,
+                BeforeReturnAsync = _ =>
+                {
+                    loadCount++;
+                    if (loadCount != 2)
+                    {
+                        return Task.CompletedTask;
+                    }
+
+                    activationRefreshStarted.SetResult();
+                    return allowRefreshToFinish.Task;
+                }
+            };
             var viewModel = CreateViewModel(dashboard: dashboard, clock: clock);
 
             var window = new AppMainWindow(viewModel);
@@ -765,18 +884,17 @@ public sealed class MainWindowViewModelTests
                 clock.Now = clock.Now.AddSeconds(11);
 
                 InvokeActivated(window);
-                RaisePreviewLeftClick(FindButton(window, "Add Lesson"));
+                var dateButton = FindButton(window, "Open lesson date selector");
+                RaisePreviewLeftClick(window);
+                RaisePreviewLeftClick(dateButton);
+                PumpDispatcher(DispatcherPriority.ApplicationIdle);
 
-                Assert.True(viewModel.SelectedLesson?.IsDraft);
-                Assert.Equal(2, viewModel.Lessons.Count);
-
-                PumpUntil(() => activationRefreshStarted.Task.IsCompleted);
-                allowActivationRefreshToFinish.SetResult();
-                PumpUntil(() => !viewModel.IsBusy);
+                Assert.False(activationRefreshStarted.Task.IsCompleted);
+                Assert.IsType<WpfBorder>(dateButton.Tag);
             }
             finally
             {
-                allowActivationRefreshToFinish.TrySetResult();
+                allowRefreshToFinish.TrySetResult();
                 window.Close();
             }
         });
@@ -1934,6 +2052,7 @@ public sealed class MainWindowViewModelTests
         Exception? exception = null;
         var thread = new Thread(() =>
         {
+            SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(Dispatcher.CurrentDispatcher));
             try
             {
                 action();

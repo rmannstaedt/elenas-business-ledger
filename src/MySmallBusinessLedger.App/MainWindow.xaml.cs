@@ -17,6 +17,7 @@ public partial class MainWindow : Window
 
     private bool hasLoaded;
     private bool activationRefreshQueued;
+    private bool activationRefreshCanceledByUserInput;
     private Border? openLessonDatePanel;
     private Button? openLessonDateTarget;
     private Border? openLessonTimePanel;
@@ -55,19 +56,24 @@ public partial class MainWindow : Window
         }
 
         activationRefreshQueued = true;
+        activationRefreshCanceledByUserInput = false;
         Dispatcher.BeginInvoke(
             new Action(async () =>
             {
                 try
                 {
-                    await ViewModel.RefreshAfterActivationAsync();
+                    if (!activationRefreshCanceledByUserInput)
+                    {
+                        await ViewModel.RefreshAfterActivationAsync();
+                    }
                 }
                 finally
                 {
                     activationRefreshQueued = false;
+                    activationRefreshCanceledByUserInput = false;
                 }
             }),
-            DispatcherPriority.Background);
+            DispatcherPriority.ApplicationIdle);
     }
 
     private async void OnInvoiceDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
@@ -85,6 +91,11 @@ public partial class MainWindow : Window
 
     private void OnWindowPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
+        if (activationRefreshQueued)
+        {
+            activationRefreshCanceledByUserInput = true;
+        }
+
         var source = e.OriginalSource as DependencyObject;
         CloseOpenLessonDatePanelIfOutside(source);
         CloseOpenLessonTimePanelIfOutside(source);
