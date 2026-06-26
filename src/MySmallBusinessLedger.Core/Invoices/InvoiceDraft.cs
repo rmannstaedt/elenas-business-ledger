@@ -110,7 +110,8 @@ public sealed class InvoiceDraft
                 line.PlanName,
                 line.PriceWithoutVat,
                 line.PlanCatalogId,
-                line.HasKnownLessonTime))
+                line.HasKnownLessonTime,
+                line.LessonId))
             .ToArray();
 
         return new IssuedInvoice(

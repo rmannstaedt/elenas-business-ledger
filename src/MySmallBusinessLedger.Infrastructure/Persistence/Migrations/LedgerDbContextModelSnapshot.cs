@@ -238,18 +238,21 @@ namespace MySmallBusinessLedger.Infrastructure.Persistence.Migrations
                         .HasMaxLength(3)
                         .HasColumnType("TEXT");
 
-                    b.Property<int>("IssuedInvoiceEntityId")
-                        .HasColumnType("INTEGER");
-
                     b.Property<bool>("HasKnownLessonTime")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER")
                         .HasDefaultValue(true);
 
+                    b.Property<int>("IssuedInvoiceEntityId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<string>("LessonDateTime")
                         .IsRequired()
                         .HasMaxLength(40)
                         .HasColumnType("TEXT");
+
+                    b.Property<int>("LessonId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("PlanCatalogId")
                         .HasColumnType("INTEGER");
@@ -267,6 +270,8 @@ namespace MySmallBusinessLedger.Infrastructure.Persistence.Migrations
                     b.HasIndex("IssuedInvoiceEntityId");
 
                     b.HasIndex("LessonDateTime");
+
+                    b.HasIndex("LessonId");
 
                     b.HasIndex("PlanCatalogId");
 

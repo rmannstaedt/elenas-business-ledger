@@ -155,6 +155,7 @@ public sealed class LedgerDbContext : DbContext
             entity.HasKey(line => line.Id);
             entity.HasIndex(line => line.LessonDateTime);
             entity.HasIndex(line => line.PlanCatalogId);
+            entity.HasIndex(line => line.LessonId);
             entity.Property(line => line.LessonDateTime).HasMaxLength(40).IsRequired();
             entity.Property(line => line.HasKnownLessonTime).HasDefaultValue(true);
             entity.Property(line => line.PlanName).HasMaxLength(200).IsRequired();

@@ -23,28 +23,43 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
         CancellationToken cancellationToken)
     {
         await using var context = createContext();
-        var fromKey = ToDateRangeKey(from);
-        var toKeyExclusive = ToDateRangeKey(to.AddDays(1));
-        var lines = await context.IssuedInvoiceLines
-            .FromSqlInterpolated($"""
-                SELECT IssuedInvoiceLines.*
-                FROM IssuedInvoiceLines
-                INNER JOIN IssuedInvoices ON IssuedInvoices.Id = IssuedInvoiceLines.IssuedInvoiceEntityId
-                WHERE IssuedInvoices.IssueStatus = 'Issued'
-                  AND LessonDateTime >= {fromKey}
-                  AND LessonDateTime < {toKeyExclusive}
-                """)
+        var issuedInvoiceLines = await context.IssuedInvoiceLines
             .AsNoTracking()
             .Include(line => line.Invoice)
-            .OrderBy(line => line.LessonDateTime)
-            .Select(line => new InvoiceLessonStatus(
-                line.Invoice.StudentShortName,
-                ParseLessonDateTime(line.LessonDateTime),
-                line.Invoice.PaymentStatus,
-                new InvoiceNumber(line.Invoice.InvoiceNumber)))
+            .Where(line => line.LessonId > 0)
+            .Where(line => line.Invoice.IssueStatus == InvoiceIssueStatus.Issued)
+            .Select(line => new
+            {
+                line.LessonId,
+                line.Invoice.InvoiceNumber,
+                line.Invoice.PaymentStatus
+            })
+            .ToArrayAsync(cancellationToken);
+        var invoiceLinesByLessonId = issuedInvoiceLines
+            .GroupBy(line => line.LessonId)
+            .ToDictionary(group => group.Key, group => group.First());
+        var invoicedLessonIds = invoiceLinesByLessonId.Keys.ToArray();
+
+        var invoicedLessons = await context.Lessons
+            .AsNoTracking()
+            .Include(lesson => lesson.Student)
+            .Where(lesson => invoicedLessonIds.Contains(lesson.Id))
             .ToArrayAsync(cancellationToken);
 
-        return lines;
+        return invoicedLessons
+            .Where(lesson => IsInDateRange(lesson.StartsAt, from, to))
+            .OrderBy(lesson => lesson.StartsAt)
+            .Select(lesson =>
+            {
+                var invoice = invoiceLinesByLessonId[lesson.Id];
+                return new InvoiceLessonStatus(
+                    lesson.Student.ShortName,
+                    lesson.StartsAt,
+                    invoice.PaymentStatus,
+                    new InvoiceNumber(invoice.InvoiceNumber),
+                    lesson.Id);
+            })
+            .ToArray();
     }
 
     public async Task<IReadOnlyList<IssuedInvoiceSummary>> ListInvoicesForStudentAsync(
@@ -335,6 +350,7 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
                 HasKnownLessonTime = line.HasKnownLessonTime,
                 PlanName = line.PlanName,
                 PlanCatalogId = line.PlanCatalogId,
+                LessonId = line.LessonId,
                 PriceWithoutVatAmount = line.PriceWithoutVat.Amount,
                 Currency = line.PriceWithoutVat.Currency
             });
@@ -353,7 +369,8 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
                 line.PlanName,
                 new MoneyAmount(line.PriceWithoutVatAmount, line.Currency),
                 line.PlanCatalogId,
-                line.HasKnownLessonTime))
+                line.HasKnownLessonTime,
+                line.LessonId))
             .ToArray();
 
         var pdfFilePath = entity.IssueStatus == InvoiceIssueStatus.Issuing &&
@@ -392,6 +409,9 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
     private static DateTimeOffset ParseLessonDateTime(string lessonDateTime) =>
         DateTimeOffset.ParseExact(lessonDateTime, "O", CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
 
-    private static string ToDateRangeKey(DateOnly date) =>
-        date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+    private static bool IsInDateRange(DateTimeOffset startsAt, DateOnly from, DateOnly to)
+    {
+        var date = DateOnly.FromDateTime(startsAt.DateTime);
+        return date >= from && date <= to;
+    }
 }

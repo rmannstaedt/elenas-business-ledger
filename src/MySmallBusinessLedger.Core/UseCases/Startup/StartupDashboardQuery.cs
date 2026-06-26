@@ -57,7 +57,11 @@ public sealed class StartupDashboardQuery
             : PickCurrentStudent(knownCalendarLessons, students);
 
         var lessonStatuses = await invoiceRepository.ListLessonStatusesAsync(from, to, cancellationToken);
-        var statusLookup = lessonStatuses.ToDictionary(
+        var statusByLessonId = lessonStatuses
+            .Where(status => status.LessonId > 0)
+            .GroupBy(status => status.LessonId)
+            .ToDictionary(group => group.Key, group => group.First());
+        var legacyStatusLookup = lessonStatuses.ToDictionary(
             status => (status.StudentShortName, status.LessonDateTime),
             status => status);
         var localLessons = lessonRepository is null
@@ -76,8 +80,12 @@ public sealed class StartupDashboardQuery
                 continue;
             }
 
-            var invoiceStatus = statusLookup.GetValueOrDefault((lesson.StudentShortName, lesson.StartsAt));
             var localLesson = localByCalendarId.GetValueOrDefault(lesson.Id);
+            var invoiceStatus = lessonRepository is null
+                ? legacyStatusLookup.GetValueOrDefault((lesson.StudentShortName, lesson.StartsAt))
+                : localLesson is null
+                    ? null
+                    : statusByLessonId.GetValueOrDefault(localLesson.Id);
             var dashboardLesson = lessonRepository is null
                 ? CreateLegacyDashboardLesson(lesson, invoiceStatus)
                 : await ReconcileCalendarLessonAsync(lesson, localLesson, invoiceStatus, students, cancellationToken);
@@ -95,7 +103,7 @@ public sealed class StartupDashboardQuery
                 .Select(lesson => lesson.Id)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
             var missingUninvoicedLocalLessonIds = localLessons
-                .Where(lesson => lesson.InvoiceNumber is null)
+                .Where(lesson => !statusByLessonId.ContainsKey(lesson.Id))
                 .Where(lesson => !string.IsNullOrWhiteSpace(lesson.GoogleCalendarEventId))
                 .Where(lesson => !currentCalendarLessonIds.Contains(lesson.GoogleCalendarEventId!))
                 .Select(lesson => lesson.Id)
@@ -103,11 +111,11 @@ public sealed class StartupDashboardQuery
             await lessonRepository.DeleteUninvoicedAsync(missingUninvoicedLocalLessonIds, cancellationToken);
 
             foreach (var localLesson in localLessons
-                .Where(lesson => lesson.InvoiceNumber is not null)
+                .Where(lesson => statusByLessonId.ContainsKey(lesson.Id))
                 .Where(lesson => !representedLocalLessonIds.Contains(lesson.Id))
                 .Where(lesson => currentStudent is null || lesson.StudentShortName == currentStudent))
             {
-                var invoiceStatus = statusLookup.GetValueOrDefault((localLesson.StudentShortName, localLesson.StartsAt));
+                var invoiceStatus = statusByLessonId.GetValueOrDefault(localLesson.Id);
                 dashboardLessons.Add(CreateDashboardLesson(localLesson, invoiceStatus));
             }
         }
@@ -174,13 +182,14 @@ public sealed class StartupDashboardQuery
         CancellationToken cancellationToken)
     {
         var record = localLesson is null
-            ? CreateLocalLesson(calendarLesson, invoiceStatus, students)
-            : localLesson.InvoiceNumber is null
+            ? CreateLocalLesson(calendarLesson, students)
+            : invoiceStatus is null
                 ? localLesson with
                 {
                     StartsAt = calendarLesson.StartsAt,
                     HasKnownStartTime = calendarLesson.HasKnownStartTime,
-                    State = calendarLesson.State
+                    State = calendarLesson.State,
+                    InvoiceNumber = null
                 }
                 : localLesson;
 
@@ -191,19 +200,23 @@ public sealed class StartupDashboardQuery
 
     private static DashboardLesson CreateDashboardLesson(
         LessonRecord record,
-        InvoiceLessonStatus? invoiceStatus) =>
-        new(
+        InvoiceLessonStatus? invoiceStatus)
+    {
+        var isInvoiced = invoiceStatus?.InvoiceNumber is not null;
+
+        return new(
             record.GoogleCalendarEventId ?? record.Id.ToString(System.Globalization.CultureInfo.InvariantCulture),
             record.StudentShortName,
             record.StartsAt,
-            record.InvoiceNumber is null ? record.State : LessonState.Completed,
-            IsInvoiced: record.InvoiceNumber is not null,
+            isInvoiced ? LessonState.Completed : record.State,
+            isInvoiced,
             invoiceStatus?.PaymentStatus,
-            record.InvoiceNumber,
+            invoiceStatus?.InvoiceNumber,
             record.PlanCatalogId,
             record.PlanName,
             record.Id,
             record.HasKnownStartTime);
+    }
 
     private async Task<IReadOnlyList<DashboardPlanOption>> CreatePlanOptionsAsync(
         IReadOnlyList<StudentRecord> students,
@@ -229,7 +242,6 @@ public sealed class StartupDashboardQuery
 
     private static LessonRecord CreateLocalLesson(
         CalendarLesson calendarLesson,
-        InvoiceLessonStatus? invoiceStatus,
         IReadOnlyList<StudentRecord> students)
     {
         var student = students.FirstOrDefault(student =>
@@ -249,7 +261,7 @@ public sealed class StartupDashboardQuery
             DurationMinutes: plan?.DurationMinutes ?? 60,
             State: calendarLesson.State,
             GoogleCalendarEventId: calendarLesson.Id,
-            InvoiceNumber: invoiceStatus?.InvoiceNumber,
+            InvoiceNumber: null,
             HasKnownStartTime: calendarLesson.HasKnownStartTime);
     }
 

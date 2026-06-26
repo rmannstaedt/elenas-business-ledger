@@ -152,7 +152,7 @@ public sealed class UseCaseTests
             {
                 LessonStatuses =
                 [
-                    new InvoiceLessonStatus("Anna", startsAt, PaymentStatus.Outstanding, new InvoiceNumber(7))
+                    new InvoiceLessonStatus("Anna", startsAt, PaymentStatus.Outstanding, new InvoiceNumber(7), 1)
                 ]
             },
             clock,
@@ -167,6 +167,95 @@ public sealed class UseCaseTests
         Assert.Equal(LessonState.Completed, dashboardLesson.State);
         Assert.Equal(new InvoiceNumber(7), dashboardLesson.InvoiceNumber);
         Assert.Equal(PaymentStatus.Outstanding, dashboardLesson.PaymentStatus);
+    }
+
+    [Fact]
+    public async Task StartupDashboardDoesNotApplyInvoiceStatusToSeparateLessonOnSameDate()
+    {
+        var startsAt = new DateTimeOffset(2026, 5, 1, 14, 0, 0, TimeSpan.Zero);
+        var clock = new FakeClock(startsAt);
+        var students = new FakeStudentRepository([CreateStudentRecord("Anna")]);
+        var lessons = new FakeLessonRepository();
+        await lessons.SaveAsync(new LessonRecord(
+            Id: 0,
+            StudentId: 1,
+            StudentShortName: "Anna",
+            PlanCatalogId: 1,
+            PlanName: "Prøvetime",
+            StartsAt: startsAt,
+            DurationMinutes: 30,
+            State: LessonState.Completed,
+            GoogleCalendarEventId: "calendar-trial",
+            InvoiceNumber: new InvoiceNumber(1)),
+            CancellationToken.None);
+        var calendar = new FakeCalendarGateway(
+        [
+            new CalendarLesson("calendar-standard", "Anna", startsAt, LessonState.Planned)
+        ]);
+        var invoices = new FakeInvoiceRepository
+        {
+            LessonStatuses =
+            [
+                new InvoiceLessonStatus("Anna", startsAt, PaymentStatus.Paid, new InvoiceNumber(1), 1)
+            ]
+        };
+        var query = new StartupDashboardQuery(
+            students,
+            calendar,
+            invoices,
+            clock,
+            lessonRepository: lessons);
+
+        var result = await query.ExecuteAsync(new DateOnly(2026, 5, 1), "Anna", CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        var newLesson = Assert.Single(result.Value!.Lessons, lesson => lesson.Id == "calendar-standard");
+        Assert.Equal(LessonState.Planned, newLesson.State);
+        Assert.False(newLesson.IsInvoiced);
+        Assert.Null(newLesson.InvoiceNumber);
+        Assert.Null(newLesson.PaymentStatus);
+        Assert.Null(lessons.SavedLessons.Single(lesson => lesson.GoogleCalendarEventId == "calendar-standard").InvoiceNumber);
+    }
+
+    [Fact]
+    public async Task StartupDashboardDoesNotTreatLocalInvoiceNumberAsIssuedWithoutInvoiceLineStatus()
+    {
+        var startsAt = new DateTimeOffset(2026, 5, 1, 14, 0, 0, TimeSpan.Zero);
+        var clock = new FakeClock(startsAt);
+        var students = new FakeStudentRepository([CreateStudentRecord("Anna")]);
+        var lessons = new FakeLessonRepository();
+        await lessons.SaveAsync(new LessonRecord(
+            Id: 0,
+            StudentId: 1,
+            StudentShortName: "Anna",
+            PlanCatalogId: 2,
+            PlanName: "Standard",
+            StartsAt: startsAt,
+            DurationMinutes: 60,
+            State: LessonState.Planned,
+            GoogleCalendarEventId: "calendar-standard",
+            InvoiceNumber: new InvoiceNumber(1)),
+            CancellationToken.None);
+        var calendar = new FakeCalendarGateway(
+        [
+            new CalendarLesson("calendar-standard", "Anna", startsAt, LessonState.Planned)
+        ]);
+        var query = new StartupDashboardQuery(
+            students,
+            calendar,
+            new FakeInvoiceRepository(),
+            clock,
+            lessonRepository: lessons);
+
+        var result = await query.ExecuteAsync(new DateOnly(2026, 5, 1), "Anna", CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        var lesson = Assert.Single(result.Value!.Lessons);
+        Assert.Equal(LessonState.Planned, lesson.State);
+        Assert.False(lesson.IsInvoiced);
+        Assert.Null(lesson.InvoiceNumber);
+        Assert.Null(lesson.PaymentStatus);
+        Assert.Null(Assert.Single(lessons.SavedLessons).InvoiceNumber);
     }
 
     [Fact]
@@ -196,7 +285,13 @@ public sealed class UseCaseTests
         var query = new StartupDashboardQuery(
             students,
             calendar,
-            new FakeInvoiceRepository(),
+            new FakeInvoiceRepository
+            {
+                LessonStatuses =
+                [
+                    new InvoiceLessonStatus("Anna", invoicedStartsAt, PaymentStatus.Outstanding, new InvoiceNumber(7), 1)
+                ]
+            },
             clock,
             lessonRepository: lessons);
 

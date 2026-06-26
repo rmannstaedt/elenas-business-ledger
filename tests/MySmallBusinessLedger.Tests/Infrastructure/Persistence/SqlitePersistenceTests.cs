@@ -413,7 +413,7 @@ public sealed class SqlitePersistenceTests
         using var database = await TestDatabase.CreateAsync();
         var repository = new SqliteInvoiceRepository(database.CreateContext);
         var lessonDateTime = new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.FromHours(2));
-        var invoice = CreateIssuedInvoice("Anna", fullName: "Anna Andersen", planName: "Standard", lessonDateTime);
+        var invoice = CreateIssuedInvoice("Anna", fullName: "Anna Andersen", planName: "Standard", lessonDateTime, lessonId: 123);
 
         await repository.SaveIssuedInvoiceAsync(invoice, CancellationToken.None);
 
@@ -425,6 +425,7 @@ public sealed class SqlitePersistenceTests
         Assert.Equal(lessonDateTime, loaded.Lines[0].LessonDateTime);
         Assert.Equal(7, loaded.Lines[0].PlanCatalogId);
         Assert.Equal("Standard", loaded.Lines[0].PlanName);
+        Assert.Equal(123, loaded.Lines[0].LessonId);
         Assert.Equal(Money.Dkk(400m), loaded.Totals.Total);
     }
 
@@ -548,6 +549,7 @@ public sealed class SqlitePersistenceTests
         var propertyNames = entityType.GetProperties().Select(property => property.Name).ToArray();
 
         Assert.Contains("LessonDateTime", propertyNames);
+        Assert.Contains("LessonId", propertyNames);
         Assert.Contains("PlanCatalogId", propertyNames);
         Assert.DoesNotContain("LessonDateTimeUtcTicks", propertyNames);
     }
@@ -588,8 +590,33 @@ public sealed class SqlitePersistenceTests
     public async Task PaymentStatusCanBeSavedAndQueriedThroughInvoiceRepository()
     {
         using var database = await TestDatabase.CreateAsync();
+        var students = new SqliteStudentRepository(database.CreateContext);
+        var plans = new SqlitePlanCatalogRepository(database.CreateContext);
+        var lessons = new SqliteLessonRepository(database.CreateContext);
         var repository = new SqliteInvoiceRepository(database.CreateContext);
-        await repository.SaveIssuedInvoiceAsync(CreateIssuedInvoice("Anna", "Anna Andersen", "Standard"), CancellationToken.None);
+        var intro = await SaveCatalogPlanAsync(plans, "Intro");
+        var standard = await SaveCatalogPlanAsync(plans, "Standard");
+        var student = await students.SaveAsync(
+            CreateStudentRecord("Anna", introPlanId: intro.Id, currentPlanId: standard.Id),
+            CancellationToken.None);
+        Assert.True(student.Succeeded);
+        var startsAt = new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.Zero);
+        var lesson = await lessons.SaveAsync(
+            new LessonRecord(
+                Id: 0,
+                StudentId: student.Value!.Id,
+                StudentShortName: "Anna",
+                PlanCatalogId: standard.Id,
+                PlanName: "Standard",
+                StartsAt: startsAt,
+                DurationMinutes: 60,
+                State: LessonState.Completed,
+                GoogleCalendarEventId: "calendar-event-1",
+                InvoiceNumber: new InvoiceNumber(1)),
+            CancellationToken.None);
+        await repository.SaveIssuedInvoiceAsync(
+            CreateIssuedInvoice("Anna", "Anna Andersen", "Standard", startsAt, standard.Id, lessonId: lesson.Id),
+            CancellationToken.None);
 
         var initial = await repository.GetPaymentStatusAsync(new InvoiceNumber(1), CancellationToken.None);
         await repository.SavePaymentStatusAsync(new InvoiceNumber(1), PaymentStatus.Paid, CancellationToken.None);
@@ -601,6 +628,7 @@ public sealed class SqlitePersistenceTests
         Assert.Equal(PaymentStatus.Paid, updated);
         Assert.Equal(PaymentStatus.Paid, summaries.Single().PaymentStatus);
         Assert.Equal(PaymentStatus.Paid, lessonStatuses.Single().PaymentStatus);
+        Assert.Equal(lesson.Id, lessonStatuses.Single().LessonId);
     }
 
     [Fact]
@@ -707,9 +735,10 @@ public sealed class SqlitePersistenceTests
         string planName,
         DateTimeOffset? lessonDateTime = null,
         int planCatalogId = 7,
-        InvoicePeriod? period = null)
+        InvoicePeriod? period = null,
+        int lessonId = 0)
     {
-        var draft = CreateInvoiceDraft(studentShortName, fullName, planName, lessonDateTime, planCatalogId, period);
+        var draft = CreateInvoiceDraft(studentShortName, fullName, planName, lessonDateTime, planCatalogId, period, lessonId);
 
         return draft.Issue(
             new InvoiceNumber(1),
@@ -723,7 +752,8 @@ public sealed class SqlitePersistenceTests
         string planName,
         DateTimeOffset? lessonDateTime = null,
         int planCatalogId = 7,
-        InvoicePeriod? period = null) =>
+        InvoicePeriod? period = null,
+        int lessonId = 0) =>
         InvoiceDraft.Create(
             new DateOnly(2026, 6, 16),
             new CompanySnapshot("Maple Key Studio", "Musikvej 1", null),
@@ -733,7 +763,8 @@ public sealed class SqlitePersistenceTests
                     lessonDateTime ?? new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.Zero),
                     planName,
                     Money.Dkk(400m),
-                    planCatalogId)
+                    planCatalogId,
+                    lessonId)
             ],
             priceAdjustment: null,
             period);

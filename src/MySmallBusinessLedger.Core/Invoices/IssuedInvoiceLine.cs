@@ -7,4 +7,5 @@ public sealed record IssuedInvoiceLine(
     string PlanName,
     MoneyAmount PriceWithoutVat,
     int PlanCatalogId = 0,
-    bool HasKnownLessonTime = true);
+    bool HasKnownLessonTime = true,
+    int LessonId = 0);

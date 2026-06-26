@@ -121,7 +121,9 @@ The first line remains the ownership/matching marker. A completed uninvoiced les
 
 If that later status line is absent, the lesson is treated as Planned.
 
-When an Invoice is issued, it is added to the Invoice table with its issued invoice lines, and the included local Lessons are linked to that Invoice number. Those lesson links are the durable local record of which lessons were invoiced.
+When an Invoice is issued, it is added to the Invoice table with its issued invoice lines, and the included local Lessons are linked to that Invoice number. Each issued invoice line also stores the local Lesson ID for the lesson it invoices. Those lesson links are the durable local record of which lessons were invoiced.
+
+Invoice, completion, and payment state must only be applied to a lesson through that lesson's durable local identity and invoice link. The application must never infer that a lesson is invoiced, completed, or paid merely because it has the same student, date, time, or plan as an issued invoice line; a separate lesson on the same date remains separate and uninvoiced until it is explicitly included in an invoice.
 
 Issued Invoice lines store the catalog Plan identity for lineage/reporting and also store the Plan name as it appeared when the Invoice was issued. Invoice viewing and PDF output use the stored issued-time Plan name snapshot, not current catalog names and not a derived lookup through Plan name-change history.
 

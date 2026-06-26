@@ -42,6 +42,7 @@ Date: 2026-06-23
 - Do not allow invoice layout changes to push payment details, totals, or footer text to a second PDF page; longer lesson lists must fit the one-page invoice layout by using the available middle lesson area.
 - Do not silently edit issued invoices.
 - Invoiced lessons are not editable.
+- Do not infer invoiced/completed/paid lesson state from matching student/date/time/plan data. Invoice state belongs only to the durable local lesson identity linked to an issued invoice.
 - Completed lessons can only be toggled back to Planned after confirmation; while Completed, no date/time edit or delete is allowed.
 - Google Calendar write failures must be visible immediately and must not pretend local state changed.
 - Google Calendar write payloads must use IANA time zone IDs, not raw Windows time zone IDs.
