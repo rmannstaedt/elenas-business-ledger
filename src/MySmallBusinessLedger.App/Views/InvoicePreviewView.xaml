@@ -80,6 +80,7 @@
                       AutoGenerateColumns="False"
                       CanUserAddRows="False"
                       CanUserDeleteRows="False"
+                      CanUserResizeRows="False"
                       IsReadOnly="False"
                       HeadersVisibility="Column"
                       GridLinesVisibility="Horizontal">

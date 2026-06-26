@@ -583,6 +583,7 @@ public sealed class MainWindowViewModelTests
                 Assert.Equal(["Date", "Time", "Plan", "State", "Invoiced", "Paid", string.Empty], headers);
                 Assert.Equal(WpfDataGridGridLinesVisibility.All, lessonGrid.GridLinesVisibility);
                 Assert.True(lessonGrid.CanUserResizeColumns);
+                Assert.False(lessonGrid.CanUserResizeRows);
                 Assert.False(lessonGrid.CanUserReorderColumns);
 
                 var dateButton = Assert.Single(
@@ -628,6 +629,7 @@ public sealed class MainWindowViewModelTests
                     grid => AutomationProperties.GetName(grid) == "Student invoices");
                 Assert.All(invoiceGrid.Columns, column => Assert.Equal(WpfDataGridLengthUnitType.Star, column.Width.UnitType));
                 Assert.Equal(36, invoiceGrid.RowHeight);
+                Assert.False(invoiceGrid.CanUserResizeRows);
                 Assert.Equal([56, 84, 88, 70, 112], invoiceGrid.Columns.Select(column => column.MinWidth).ToArray());
 
                 var invoiceStatusStyle = Assert.IsType<Style>(window.FindResource("InvoiceStatusButtonStyle"));
