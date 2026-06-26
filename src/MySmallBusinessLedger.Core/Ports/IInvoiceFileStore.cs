@@ -17,4 +17,6 @@ public interface IInvoiceFileStore
         InvoiceDraft draft,
         InvoiceNumber invoiceNumber,
         CancellationToken cancellationToken);
+
+    Task<OperationResult<string>> DiscardStagingPathAsync(string stagingPath, CancellationToken cancellationToken);
 }

@@ -19,6 +19,7 @@ public sealed record StudentPlanPeriodInput(
 public sealed record StudentScheduleInput(DayOfWeek Weekday, TimeOnly StartsAt);
 
 public sealed record SaveStudentRequest(
+    int StudentId,
     string ShortName,
     string FullName,
     string Address,

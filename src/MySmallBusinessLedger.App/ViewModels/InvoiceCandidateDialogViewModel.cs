@@ -9,17 +9,20 @@ public sealed class InvoiceCandidateDialogViewModel : ViewModelBase
     private readonly IInvoiceWorkflowService invoiceWorkflowService;
     private readonly DateOnly date;
     private readonly DateTimeOffset now;
+    private readonly string? initialStudentShortName;
     private string? selectedStudentShortName;
     private string? errorMessage;
 
     public InvoiceCandidateDialogViewModel(
         IInvoiceWorkflowService invoiceWorkflowService,
         DateOnly date,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        string? initialStudentShortName = null)
     {
         this.invoiceWorkflowService = invoiceWorkflowService;
         this.date = date;
         this.now = now;
+        this.initialStudentShortName = initialStudentShortName;
 
         ConfirmCommand = new AsyncRelayCommand(ConfirmAsync, () => SelectedStudentShortName is not null);
     }
@@ -81,10 +84,22 @@ public sealed class InvoiceCandidateDialogViewModel : ViewModelBase
             AllStudentShortNames.Add(shortName);
         }
 
-        SelectedStudentShortName = result.Value.PreselectedStudentShortName
+        SelectedStudentShortName = PreferredInitialStudent(result.Value.AllStudentShortNames)
+            ?? result.Value.PreselectedStudentShortName
             ?? CandidateStudentShortNames.FirstOrDefault()
             ?? AllStudentShortNames.FirstOrDefault();
         ErrorMessage = null;
+    }
+
+    private string? PreferredInitialStudent(IReadOnlyList<string> allStudentShortNames)
+    {
+        if (string.IsNullOrWhiteSpace(initialStudentShortName))
+        {
+            return null;
+        }
+
+        return allStudentShortNames.FirstOrDefault(
+            shortName => string.Equals(shortName, initialStudentShortName, StringComparison.OrdinalIgnoreCase));
     }
 
     private Task ConfirmAsync()

@@ -9,4 +9,5 @@ public sealed record DashboardLesson(
     DateTimeOffset StartsAt,
     LessonState State,
     bool IsInvoiced,
-    PaymentStatus? PaymentStatus);
+    PaymentStatus? PaymentStatus,
+    InvoiceNumber? InvoiceNumber = null);

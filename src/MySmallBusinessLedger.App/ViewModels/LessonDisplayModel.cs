@@ -8,47 +8,56 @@ namespace MySmallBusinessLedger.App.ViewModels;
 
 public sealed class LessonDisplayModel : ViewModelBase
 {
+    private const int FirstTimeOptionHour = 8;
+    private const int LastTimeOptionHour = 20;
+    private const int TimeOptionIntervalMinutes = 15;
+
     private static readonly IReadOnlyList<string> TimeOptionValues = Enumerable
-        .Range(0, 24 * 4)
-        .Select(index => TimeOnly.MinValue.AddMinutes(index * 15).ToString("HH\\:mm", CultureInfo.InvariantCulture))
+        .Range(0, (((LastTimeOptionHour - FirstTimeOptionHour) * 60) / TimeOptionIntervalMinutes) + 1)
+        .Select(index => new TimeOnly(FirstTimeOptionHour, 0)
+            .AddMinutes(index * TimeOptionIntervalMinutes)
+            .ToString("HH\\:mm", CultureInfo.InvariantCulture))
         .ToArray();
 
-    private TimeSpan offset;
+    private TimeZoneInfo lessonTimeZone;
     private string id;
     private DateTimeOffset? savedStartsAt;
     private DateTime? startsOnDate;
     private string startsAtTimeText;
     private LessonState state;
+    private PaymentStatus? paymentStatus;
     private bool isDraft;
 
-    public LessonDisplayModel(DashboardLesson lesson)
+    public LessonDisplayModel(DashboardLesson lesson, TimeZoneInfo? lessonTimeZone = null)
     {
         id = lesson.Id;
         StudentShortName = lesson.StudentShortName;
-        offset = lesson.StartsAt.Offset;
+        this.lessonTimeZone = lessonTimeZone ?? TimeZoneInfo.Local;
         startsOnDate = lesson.StartsAt.Date;
         startsAtTimeText = lesson.StartsAt.ToString("HH:mm", CultureInfo.InvariantCulture);
         savedStartsAt = lesson.StartsAt;
         state = lesson.State;
         IsInvoiced = lesson.IsInvoiced;
-        PaymentStatus = lesson.PaymentStatus;
+        InvoiceNumber = lesson.InvoiceNumber;
+        paymentStatus = lesson.PaymentStatus;
     }
 
-    private LessonDisplayModel(string studentShortName, TimeSpan offset)
+    private LessonDisplayModel(string studentShortName, TimeZoneInfo lessonTimeZone)
     {
         id = $"draft-{Guid.NewGuid():N}";
         StudentShortName = studentShortName;
-        this.offset = offset;
+        this.lessonTimeZone = lessonTimeZone;
         startsOnDate = null;
         startsAtTimeText = string.Empty;
         state = LessonState.Planned;
         IsInvoiced = false;
-        PaymentStatus = null;
+        InvoiceNumber = null;
+        paymentStatus = null;
         isDraft = true;
     }
 
-    public static LessonDisplayModel CreateDraft(string studentShortName, TimeSpan offset) =>
-        new(studentShortName, offset);
+    public static LessonDisplayModel CreateDraft(string studentShortName, TimeZoneInfo lessonTimeZone) =>
+        new(studentShortName, lessonTimeZone);
 
     public string Id => id;
 
@@ -73,6 +82,7 @@ public sealed class LessonDisplayModel : ViewModelBase
             {
                 OnPropertyChanged(nameof(StartsAt));
                 OnPropertyChanged(nameof(StartsAtText));
+                OnPropertyChanged(nameof(StartsOnDateText));
             }
         }
     }
@@ -114,6 +124,7 @@ public sealed class LessonDisplayModel : ViewModelBase
         {
             if (SetProperty(ref isDraft, value))
             {
+                OnPropertyChanged(nameof(CanEdit));
                 OnPropertyChanged(nameof(CanToggleState));
                 OnPropertyChanged(nameof(HasDateTimeChange));
             }
@@ -122,16 +133,32 @@ public sealed class LessonDisplayModel : ViewModelBase
 
     public bool IsInvoiced { get; }
 
+    public InvoiceNumber? InvoiceNumber { get; }
+
     public bool CanEdit => (IsDraft || State == LessonState.Planned) && !IsInvoiced;
 
     public bool CanToggleState => !IsDraft && !IsInvoiced;
 
     public bool HasDateTimeChange => TryGetStartsAt(out var startsAt) && startsAt != savedStartsAt;
 
-    public PaymentStatus? PaymentStatus { get; }
+    public PaymentStatus? PaymentStatus
+    {
+        get => paymentStatus;
+        set
+        {
+            if (SetProperty(ref paymentStatus, value))
+            {
+                OnPropertyChanged(nameof(PaymentStatusText));
+            }
+        }
+    }
 
     public string StartsAtText => TryGetStartsAt(out var startsAt)
         ? startsAt.ToString("dd-MM-yyyy HH:mm", CultureInfo.InvariantCulture)
+        : string.Empty;
+
+    public string StartsOnDateText => StartsOnDate is { } date
+        ? date.ToString("dddd dd-MM", CultureInfo.InvariantCulture)
         : string.Empty;
 
     public string StateText => State == LessonState.Completed ? "Completed" : "Planned";
@@ -157,7 +184,6 @@ public sealed class LessonDisplayModel : ViewModelBase
     public void AcceptCreatedLesson(CalendarLesson lesson)
     {
         id = lesson.Id;
-        offset = lesson.StartsAt.Offset;
         startsOnDate = lesson.StartsAt.Date;
         startsAtTimeText = lesson.StartsAt.ToString("HH:mm", CultureInfo.InvariantCulture);
         savedStartsAt = lesson.StartsAt;
@@ -165,6 +191,7 @@ public sealed class LessonDisplayModel : ViewModelBase
         OnPropertyChanged(nameof(Id));
         OnPropertyChanged(nameof(StartsAt));
         OnPropertyChanged(nameof(StartsAtText));
+        OnPropertyChanged(nameof(StartsOnDateText));
         OnPropertyChanged(nameof(StartsOnDate));
         OnPropertyChanged(nameof(StartsAtTimeText));
     }
@@ -182,7 +209,8 @@ public sealed class LessonDisplayModel : ViewModelBase
             return false;
         }
 
-        startsAt = new DateTimeOffset(DateOnly.FromDateTime(date).ToDateTime(time), offset);
+        var localDateTime = DateOnly.FromDateTime(date).ToDateTime(time);
+        startsAt = new DateTimeOffset(localDateTime, lessonTimeZone.GetUtcOffset(localDateTime));
         return true;
     }
 }

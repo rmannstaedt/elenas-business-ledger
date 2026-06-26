@@ -4,5 +4,8 @@ namespace MySmallBusinessLedger.Core.Ports;
 
 public interface IInvoicePrinter
 {
-    Task<OperationResult<string>> PrintAsync(string pdfFilePath, CancellationToken cancellationToken);
+    Task<OperationResult<string>> PrintAsync(
+        string pdfFilePath,
+        string configuredPrinterName,
+        CancellationToken cancellationToken);
 }

@@ -8,18 +8,30 @@ namespace MySmallBusinessLedger.App.Services;
 public sealed class InvoiceWorkflowWindowLauncher : IInvoiceWorkflowLauncher
 {
     private readonly IInvoiceWorkflowService invoiceWorkflowService;
+    private readonly IInvoicePrinterConfigurationService printerConfigurationService;
     private readonly IUiClock clock;
 
-    public InvoiceWorkflowWindowLauncher(IInvoiceWorkflowService invoiceWorkflowService, IUiClock clock)
+    public InvoiceWorkflowWindowLauncher(
+        IInvoiceWorkflowService invoiceWorkflowService,
+        IInvoicePrinterConfigurationService printerConfigurationService,
+        IUiClock clock)
     {
         this.invoiceWorkflowService = invoiceWorkflowService;
+        this.printerConfigurationService = printerConfigurationService;
         this.clock = clock;
     }
 
-    public async Task<bool> ShowWriteInvoiceAsync(DateOnly displayMonth, CancellationToken cancellationToken)
+    public async Task<bool> ShowWriteInvoiceAsync(
+        DateOnly displayMonth,
+        string? initialStudentShortName,
+        CancellationToken cancellationToken)
     {
         var today = DateOnly.FromDateTime(clock.Now.DateTime);
-        var candidateViewModel = new InvoiceCandidateDialogViewModel(invoiceWorkflowService, today, clock.Now);
+        var candidateViewModel = new InvoiceCandidateDialogViewModel(
+            invoiceWorkflowService,
+            today,
+            clock.Now,
+            initialStudentShortName);
         await candidateViewModel.LoadAsync();
 
         var candidateWindow = new InvoiceCandidateDialog(candidateViewModel)
@@ -48,7 +60,10 @@ public sealed class InvoiceWorkflowWindowLauncher : IInvoiceWorkflowLauncher
             return false;
         }
 
-        var previewViewModel = new InvoicePreviewViewModel(invoiceWorkflowService, preview.Value!);
+        var previewViewModel = new InvoicePreviewViewModel(
+            invoiceWorkflowService,
+            preview.Value!,
+            EnsureInvoicePrinterConfiguredAsync);
         var previewWindow = new InvoicePreviewView(previewViewModel)
         {
             Owner = Application.Current?.MainWindow
@@ -66,12 +81,27 @@ public sealed class InvoiceWorkflowWindowLauncher : IInvoiceWorkflowLauncher
             return;
         }
 
-        var viewModel = new InvoiceViewerViewModel(invoice);
+        var viewModel = new InvoiceViewerViewModel(
+            invoice,
+            invoiceWorkflowService,
+            EnsureInvoicePrinterConfiguredAsync);
         var window = new InvoiceViewerView(viewModel)
         {
             Owner = Application.Current?.MainWindow
         };
         window.ShowDialog();
+    }
+
+    private async Task<bool> EnsureInvoicePrinterConfiguredAsync(CancellationToken cancellationToken)
+    {
+        var result = await printerConfigurationService.EnsureConfiguredAsync(cancellationToken);
+        if (!result.Succeeded)
+        {
+            ShowWarning(result.Errors.FirstOrDefault()?.Message ?? "The invoice printer could not be configured.");
+            return false;
+        }
+
+        return result.Value;
     }
 
     private static void ShowWarning(string message) =>

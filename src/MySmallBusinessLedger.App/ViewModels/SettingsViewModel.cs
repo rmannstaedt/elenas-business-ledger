@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using MySmallBusinessLedger.App.Commands;
 using MySmallBusinessLedger.App.Services;
 using MySmallBusinessLedger.Core.Company;
@@ -18,6 +19,12 @@ public sealed class SettingsViewModel : ViewModelBase
     private bool isVatRegistered;
     private DateTime? vatRegistrationDate;
     private string invoiceFolderPath = string.Empty;
+    private string configuredInvoicePrinterName = string.Empty;
+    private PaymentInstructionChoice paymentInstructionChoice = PaymentInstructionChoice.DueOnReceipt;
+    private string customPaymentInstructions = string.Empty;
+    private string bankRegistrationNumber = string.Empty;
+    private string bankAccountNumber = string.Empty;
+    private string mobilePayAccount = string.Empty;
     private string calendarId = DefaultCalendarId;
     private string googleAccountEmail = string.Empty;
     private GoogleOAuthClientConfigurationStatus googleOAuthAppConfigurationStatus = GoogleOAuthClientConfigurationStatus.Missing;
@@ -30,6 +37,7 @@ public sealed class SettingsViewModel : ViewModelBase
     {
         this.settingsService = settingsService;
         SaveCommand = new AsyncRelayCommand(SaveAsync);
+        ClearInvoicePrinterCommand = new AsyncRelayCommand(ClearInvoicePrinterAsync);
         ConnectGoogleCalendarCommand = new AsyncRelayCommand(ConnectGoogleCalendarAsync);
         ForgetGoogleAuthorizationCommand = new AsyncRelayCommand(ForgetGoogleAuthorizationAsync);
     }
@@ -51,6 +59,70 @@ public sealed class SettingsViewModel : ViewModelBase
     public DateTime? VatRegistrationDate { get => vatRegistrationDate; set => SetProperty(ref vatRegistrationDate, value); }
 
     public string InvoiceFolderPath { get => invoiceFolderPath; set => SetProperty(ref invoiceFolderPath, value); }
+
+    public string ConfiguredInvoicePrinterName
+    {
+        get => configuredInvoicePrinterName;
+        set => SetProperty(ref configuredInvoicePrinterName, value);
+    }
+
+    public string PaymentInstructions
+    {
+        get => CreatePaymentInstructions();
+        set => ApplyPaymentInstructions(value);
+    }
+
+    public bool IsPaymentDueOnReceipt
+    {
+        get => paymentInstructionChoice == PaymentInstructionChoice.DueOnReceipt;
+        set => SetPaymentInstructionChoice(PaymentInstructionChoice.DueOnReceipt, value);
+    }
+
+    public bool IsPaymentDueIn8Days
+    {
+        get => paymentInstructionChoice == PaymentInstructionChoice.DueIn8Days;
+        set => SetPaymentInstructionChoice(PaymentInstructionChoice.DueIn8Days, value);
+    }
+
+    public bool IsPaymentDueIn30Days
+    {
+        get => paymentInstructionChoice == PaymentInstructionChoice.DueIn30Days;
+        set => SetPaymentInstructionChoice(PaymentInstructionChoice.DueIn30Days, value);
+    }
+
+    public bool IsCustomPaymentInstructions
+    {
+        get => paymentInstructionChoice == PaymentInstructionChoice.Custom;
+        set => SetPaymentInstructionChoice(PaymentInstructionChoice.Custom, value);
+    }
+
+    public string CustomPaymentInstructions
+    {
+        get => customPaymentInstructions;
+        set
+        {
+            if (SetProperty(ref customPaymentInstructions, value) && IsCustomPaymentInstructions)
+            {
+                OnPropertyChanged(nameof(PaymentInstructions));
+            }
+        }
+    }
+
+    public string BankRegistrationNumber
+    {
+        get => bankRegistrationNumber;
+        set => SetProperty(ref bankRegistrationNumber, value);
+    }
+
+    public string BankAccountNumber
+    {
+        get => bankAccountNumber;
+        set => SetProperty(ref bankAccountNumber, value);
+    }
+
+    public string MobilePayAccount { get => mobilePayAccount; set => SetProperty(ref mobilePayAccount, value); }
+
+    public ObservableCollection<string> AvailableInvoicePrinters { get; } = [];
 
     public string CalendarId { get => calendarId; set => SetProperty(ref calendarId, value); }
 
@@ -107,6 +179,8 @@ public sealed class SettingsViewModel : ViewModelBase
 
     public AsyncRelayCommand SaveCommand { get; }
 
+    public AsyncRelayCommand ClearInvoicePrinterCommand { get; }
+
     public AsyncRelayCommand ConnectGoogleCalendarCommand { get; }
 
     public AsyncRelayCommand ForgetGoogleAuthorizationCommand { get; }
@@ -128,6 +202,17 @@ public sealed class SettingsViewModel : ViewModelBase
             IsVatRegistered = company.VatStatus == VatStatus.Registered;
             VatRegistrationDate = company.VatRegistrationDate?.ToDateTime(TimeOnly.MinValue);
             InvoiceFolderPath = company.InvoiceFolderPath;
+            ConfiguredInvoicePrinterName = company.ConfiguredInvoicePrinterName;
+            ApplyPaymentInstructions(company.PaymentInstructions);
+            BankRegistrationNumber = company.BankRegistrationNumber;
+            BankAccountNumber = company.BankAccountNumber;
+            MobilePayAccount = company.MobilePayAccount;
+        }
+
+        AvailableInvoicePrinters.Clear();
+        foreach (var printerName in snapshot.AvailablePrinterNames ?? [])
+        {
+            AvailableInvoicePrinters.Add(printerName);
         }
 
         if (snapshot.CalendarSettings is { } calendar)
@@ -138,7 +223,7 @@ public sealed class SettingsViewModel : ViewModelBase
 
         SetGoogleOAuthAppConfigurationStatus(snapshot.GoogleOAuthAppConfigurationStatus);
         GoogleAuthorizationStatusText = snapshot.HasGoogleAuthorizationTokens
-            ? "Google authorization: Saved locally. Connect again if Google Calendar access fails."
+            ? "Google authorization: Saved locally." + Environment.NewLine + "Connect again if Google Calendar fails."
             : "Google authorization: Not connected";
         AppDataFolderPath = snapshot.AppDataFolderPath;
         DatabasePath = snapshot.DatabasePath;
@@ -159,7 +244,12 @@ public sealed class SettingsViewModel : ViewModelBase
             string.IsNullOrWhiteSpace(CompanyCvr) ? null : CompanyCvr.Trim(),
             IsVatRegistered && VatRegistrationDate is not null ? DateOnly.FromDateTime(VatRegistrationDate.Value) : null,
             IsVatRegistered ? VatStatus.Registered : VatStatus.NotRegistered,
-            InvoiceFolderPath.Trim());
+            InvoiceFolderPath.Trim(),
+            ConfiguredInvoicePrinterName.Trim(),
+            PaymentInstructions.Trim(),
+            BankRegistrationNumber.Trim(),
+            BankAccountNumber.Trim(),
+            MobilePayAccount.Trim());
         CalendarId = NormalizeCalendarId(CalendarId);
         var calendarSettings = new CalendarSettings(CalendarId, GoogleAccountEmail.Trim());
 
@@ -177,6 +267,12 @@ public sealed class SettingsViewModel : ViewModelBase
         WasSaved = true;
         ErrorMessage = null;
         CloseRequested?.Invoke(this, true);
+    }
+
+    private Task ClearInvoicePrinterAsync()
+    {
+        ConfiguredInvoicePrinterName = string.Empty;
+        return Task.CompletedTask;
     }
 
     private async Task ConnectGoogleCalendarAsync()
@@ -252,6 +348,53 @@ public sealed class SettingsViewModel : ViewModelBase
     private static string NormalizeCalendarId(string value) =>
         string.IsNullOrWhiteSpace(value) ? DefaultCalendarId : value.Trim();
 
+    private string CreatePaymentInstructions() =>
+        paymentInstructionChoice switch
+        {
+            PaymentInstructionChoice.DueIn8Days => "8 dage fra fakturadato",
+            PaymentInstructionChoice.DueIn30Days => "30 dage fra fakturadato",
+            PaymentInstructionChoice.Custom => CustomPaymentInstructions.Trim(),
+            _ => "Betales ved modtagelse"
+        };
+
+    private void ApplyPaymentInstructions(string? value)
+    {
+        var normalized = value?.Trim() ?? string.Empty;
+        switch (normalized)
+        {
+            case "":
+            case "Betales ved modtagelse":
+            case "Betales ved modtagelse.":
+                SetPaymentInstructionChoice(PaymentInstructionChoice.DueOnReceipt, true);
+                break;
+            case "8 dage fra fakturadato":
+                SetPaymentInstructionChoice(PaymentInstructionChoice.DueIn8Days, true);
+                break;
+            case "30 dage fra fakturadato":
+                SetPaymentInstructionChoice(PaymentInstructionChoice.DueIn30Days, true);
+                break;
+            default:
+                CustomPaymentInstructions = normalized;
+                SetPaymentInstructionChoice(PaymentInstructionChoice.Custom, true);
+                break;
+        }
+    }
+
+    private void SetPaymentInstructionChoice(PaymentInstructionChoice choice, bool isSelected)
+    {
+        if (!isSelected || paymentInstructionChoice == choice)
+        {
+            return;
+        }
+
+        paymentInstructionChoice = choice;
+        OnPropertyChanged(nameof(IsPaymentDueOnReceipt));
+        OnPropertyChanged(nameof(IsPaymentDueIn8Days));
+        OnPropertyChanged(nameof(IsPaymentDueIn30Days));
+        OnPropertyChanged(nameof(IsCustomPaymentInstructions));
+        OnPropertyChanged(nameof(PaymentInstructions));
+    }
+
     private static (string Line1, string Line2) SplitCompanyAddress(string address)
     {
         var normalized = address.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n');
@@ -273,5 +416,13 @@ public sealed class SettingsViewModel : ViewModelBase
         return string.IsNullOrWhiteSpace(trimmedLine2)
             ? trimmedLine1
             : trimmedLine1 + Environment.NewLine + trimmedLine2;
+    }
+
+    private enum PaymentInstructionChoice
+    {
+        DueOnReceipt,
+        DueIn8Days,
+        DueIn30Days,
+        Custom
     }
 }

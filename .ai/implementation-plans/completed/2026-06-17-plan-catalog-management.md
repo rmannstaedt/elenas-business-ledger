@@ -1,6 +1,6 @@
 # Implementation Plan: Plan Catalog Management
 
-Status: Active
+Status: Completed
 Created: 2026-06-17
 Last updated: 2026-06-17
 Owner/context: Ruben and Codex; Ruben wants Plans to be managed independently from Students through a `Plan > Manage Plans` menu. Plans must be immutable once published, with a Draft -> Active -> Retired lifecycle, so the foundation for lessons and invoicing stays stable.

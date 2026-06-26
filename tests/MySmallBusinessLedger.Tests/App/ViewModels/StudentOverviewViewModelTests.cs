@@ -81,7 +81,8 @@ public sealed class StudentOverviewViewModelTests
             var detailColumns = Assert.Single(FindChildren<WpfGrid>(window), grid => grid.Name == "StudentDetailColumns");
             Assert.Equal(GridUnitType.Pixel, detailColumns.ColumnDefinitions[2].Width.GridUnitType);
             Assert.Equal(GridUnitType.Pixel, detailColumns.ColumnDefinitions[4].Width.GridUnitType);
-            Assert.Equal(detailColumns.ColumnDefinitions[2].Width.Value, detailColumns.ColumnDefinitions[4].Width.Value);
+            Assert.Equal(252, detailColumns.ColumnDefinitions[2].Width.Value);
+            Assert.Equal(252, detailColumns.ColumnDefinitions[4].Width.Value);
 
             var splitter = Assert.Single(FindChildren<WpfGridSplitter>(window), gridSplitter => gridSplitter.Name == "InvoicesPaneSplitter");
             Assert.Equal(System.Windows.Controls.GridResizeDirection.Columns, splitter.ResizeDirection);
@@ -116,7 +117,7 @@ public sealed class StudentOverviewViewModelTests
         Assert.Equal("400 kr.", viewModel.SelectedStudentEditor?.PlanPriceWithoutVatText);
         Assert.Equal("Paid monthly in advance", viewModel.SelectedStudentEditor?.PlanPaymentTerms);
         var invoice = Assert.Single(viewModel.Invoices);
-        Assert.Equal("000001", invoice.InvoiceNumberText);
+        Assert.Equal("001", invoice.InvoiceNumberText);
         Assert.False(viewModel.HasError);
     }
 
@@ -364,6 +365,7 @@ public sealed class StudentOverviewViewModelTests
             isActive).Value!;
 
         var record = new StudentRecord(
+            0,
             student,
             [
                 new StudentPlanPeriod(
@@ -589,7 +591,10 @@ public sealed class StudentOverviewViewModelTests
     {
         public InvoiceNumber? LastViewedInvoiceNumber { get; private set; }
 
-        public Task<bool> ShowWriteInvoiceAsync(DateOnly displayMonth, CancellationToken cancellationToken) =>
+        public Task<bool> ShowWriteInvoiceAsync(
+            DateOnly displayMonth,
+            string? initialStudentShortName,
+            CancellationToken cancellationToken) =>
             Task.FromResult(false);
 
         public Task ShowInvoiceViewerAsync(InvoiceNumber invoiceNumber, CancellationToken cancellationToken)

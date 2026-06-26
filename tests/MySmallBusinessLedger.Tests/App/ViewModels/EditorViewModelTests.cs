@@ -15,6 +15,7 @@ public sealed class EditorViewModelTests
     public void StudentEditorSplitsSavedMultilineAddressAcrossAddressFields()
     {
         var snapshot = new StudentEditorSnapshot(
+            7,
             "Anna",
             "Anna Andersen",
             "Testvej 1" + Environment.NewLine + "1234 Testby",
@@ -221,6 +222,7 @@ public sealed class EditorViewModelTests
     {
         var service = new FakeStudentEditorService();
         var snapshot = new StudentEditorSnapshot(
+            7,
             "Anna",
             "Anna Andersen",
             "Testvej 1",
@@ -321,6 +323,29 @@ public sealed class EditorViewModelTests
         Assert.False(viewModel.WasSaved);
     }
 
+    [Fact]
+    public async Task LessonEditorUsesEditedDateOffsetForLocalTimeZone()
+    {
+        var service = new FakeLessonEditorService();
+        var timeZone = TimeZoneInfo.FindSystemTimeZoneById("Romance Standard Time");
+        var viewModel = LessonEditorViewModel.EditExisting(
+            service,
+            lessonId: "lesson-1",
+            studentShortName: "Anna",
+            startsAt: new DateTimeOffset(2026, 7, 1, 15, 0, 0, TimeSpan.FromHours(2)),
+            isInvoiced: false,
+            refreshMonth: new DateOnly(2026, 6, 1),
+            lessonTimeZone: timeZone);
+        viewModel.DateText = "15-01-2026";
+        viewModel.TimeText = "15:30";
+
+        await viewModel.SaveCommand.ExecuteAsync();
+
+        Assert.Equal(
+            new DateTimeOffset(2026, 1, 15, 15, 30, 0, TimeSpan.FromHours(1)),
+            service.LastEditRequest?.StartsAt);
+    }
+
     private static PlanCatalogItem CreateCatalogPlan(
         string name,
         PlanCatalogState state,
@@ -367,6 +392,8 @@ public sealed class EditorViewModelTests
     {
         public bool EditCalled { get; private set; }
 
+        public LessonEditRequest? LastEditRequest { get; private set; }
+
         public OperationResult<IReadOnlyList<CalendarLesson>> EditResult { get; init; } =
             OperationResult<IReadOnlyList<CalendarLesson>>.Success([]);
 
@@ -376,12 +403,20 @@ public sealed class EditorViewModelTests
             CancellationToken cancellationToken) =>
             Task.FromResult(OperationResult<IReadOnlyList<CalendarLesson>>.Success([]));
 
+        public Task<OperationResult<PopulateCalendarResult>> PopulateCalendarAsync(
+            string studentShortName,
+            DateOnly displayMonth,
+            DateOnly today,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(OperationResult<PopulateCalendarResult>.Success(new PopulateCalendarResult(0, 0, [])));
+
         public Task<OperationResult<IReadOnlyList<CalendarLesson>>> EditAsync(
             LessonEditRequest request,
             DateOnly refreshMonth,
             CancellationToken cancellationToken)
         {
             EditCalled = true;
+            LastEditRequest = request;
             return Task.FromResult(EditResult);
         }
 

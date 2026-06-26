@@ -14,6 +14,11 @@ public interface IGoogleCalendarGateway
         DateOnly refreshMonth,
         CancellationToken cancellationToken);
 
+    Task<OperationResult<IReadOnlyList<CalendarLesson>>> PopulateLessonsAsync(
+        IReadOnlyList<LessonAddRequest> requests,
+        DateOnly refreshMonth,
+        CancellationToken cancellationToken);
+
     Task<OperationResult<IReadOnlyList<CalendarLesson>>> UpdateLessonAsync(
         LessonEditRequest request,
         DateOnly refreshMonth,

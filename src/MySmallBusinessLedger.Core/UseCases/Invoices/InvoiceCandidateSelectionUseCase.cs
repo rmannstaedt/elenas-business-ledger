@@ -8,15 +8,18 @@ public sealed class InvoiceCandidateSelectionUseCase
     private readonly IStudentRepository studentRepository;
     private readonly IGoogleCalendarGateway calendarGateway;
     private readonly IInvoiceRepository invoiceRepository;
+    private readonly TimeSpan lessonDuration;
 
     public InvoiceCandidateSelectionUseCase(
         IStudentRepository studentRepository,
         IGoogleCalendarGateway calendarGateway,
-        IInvoiceRepository invoiceRepository)
+        IInvoiceRepository invoiceRepository,
+        TimeSpan? lessonDuration = null)
     {
         this.studentRepository = studentRepository;
         this.calendarGateway = calendarGateway;
         this.invoiceRepository = invoiceRepository;
+        this.lessonDuration = lessonDuration ?? TimeSpan.FromHours(1);
     }
 
     public async Task<OperationResult<InvoiceCandidateSelectionResult>> ExecuteAsync(
@@ -37,10 +40,21 @@ public sealed class InvoiceCandidateSelectionUseCase
             }
         }
 
-        var preselected = lessons
-            .Where(lesson => lesson.StartsAt == now)
+        var candidateSet = candidates.ToHashSet(StringComparer.Ordinal);
+        var eligibleLessons = lessons
+            .Where(lesson => candidateSet.Contains(lesson.StudentShortName))
+            .OrderBy(lesson => lesson.StartsAt)
+            .ToArray();
+
+        var preselected = eligibleLessons
+            .Where(lesson => lesson.StartsAt <= now && now < lesson.StartsAt.Add(lessonDuration))
             .Select(lesson => lesson.StudentShortName)
-            .FirstOrDefault(shortName => candidates.Contains(shortName, StringComparer.Ordinal));
+            .FirstOrDefault();
+
+        preselected ??= eligibleLessons
+            .Where(lesson => lesson.StartsAt >= now && lesson.StartsAt - now <= TimeSpan.FromMinutes(30))
+            .Select(lesson => lesson.StudentShortName)
+            .FirstOrDefault();
 
         var allStudents = students
             .Select(student => student.Student.ShortName)

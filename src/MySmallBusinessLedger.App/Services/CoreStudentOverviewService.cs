@@ -56,7 +56,7 @@ public sealed class CoreStudentOverviewService : IStudentOverviewService
         return OperationResult<StudentOverviewSnapshot>.Success(
             new StudentOverviewSnapshot(
                 saveResult.Value!,
-                await LoadInvoicesAsync(studentShortName, cancellationToken)));
+                await LoadInvoicesAsync(saveResult.Value!.Student.ShortName, cancellationToken)));
     }
 
     private async Task<IReadOnlyList<IssuedInvoiceSummary>> LoadInvoicesAsync(

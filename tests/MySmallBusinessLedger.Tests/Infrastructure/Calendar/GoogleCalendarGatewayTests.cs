@@ -2,12 +2,22 @@ using MySmallBusinessLedger.Core.Common;
 using MySmallBusinessLedger.Core.Lessons;
 using MySmallBusinessLedger.Core.UseCases.Lessons;
 using MySmallBusinessLedger.Infrastructure.Calendar;
+using Google.Apis.Calendar.v3;
+using Google.Apis.Calendar.v3.Data;
 using Google.Apis.Util.Store;
 
 namespace MySmallBusinessLedger.Tests.Infrastructure.Calendar;
 
 public sealed class GoogleCalendarGatewayTests
 {
+    [Fact]
+    public void CredentialFactoryRequestsOwnedCalendarEventScopeOnly()
+    {
+        Assert.Equal(
+            [CalendarService.Scope.CalendarEventsOwned],
+            GoogleCalendarCredentialFactory.RequestedScopes);
+    }
+
     [Fact]
     public async Task ListLessonsReturnsOnlyEventsMarkedOnTheFirstSummaryLine()
     {
@@ -73,6 +83,41 @@ public sealed class GoogleCalendarGatewayTests
         Assert.Equal(new DateTimeOffset(2026, 6, 20, 15, 0, 0, TimeSpan.FromHours(2)), client.CreatedStartsAt);
         Assert.Equal(TimeSpan.FromMinutes(45), client.CreatedDuration);
         Assert.Contains(result.Value!, lesson => lesson.Id == "created");
+    }
+
+    [Fact]
+    public async Task PopulateLessonsCreatesMarkedEventsWithConfiguredDurationThenRefreshesMonth()
+    {
+        var client = new FakeGoogleCalendarEventClient
+        {
+            Events =
+            [
+                new GoogleCalendarEvent("created-1", "$ Anna", new DateTimeOffset(2026, 6, 23, 15, 0, 0, TimeSpan.FromHours(2))),
+                new GoogleCalendarEvent("created-2", "$ Anna", new DateTimeOffset(2026, 6, 30, 15, 0, 0, TimeSpan.FromHours(2)))
+            ]
+        };
+
+        var gateway = new GoogleCalendarGateway(client, CreateOptions(defaultLessonDuration: TimeSpan.FromMinutes(45)));
+        var result = await gateway.PopulateLessonsAsync(
+            [
+                new LessonAddRequest("Anna", new DateTimeOffset(2026, 6, 23, 15, 0, 0, TimeSpan.FromHours(2))),
+                new LessonAddRequest("Anna", new DateTimeOffset(2026, 6, 30, 15, 0, 0, TimeSpan.FromHours(2)))
+            ],
+            new DateOnly(2026, 6, 1),
+            CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(["$ Anna", "$ Anna"], client.CreatedEvents.Select(created => created.Summary));
+        Assert.Equal(
+            [
+                new DateTimeOffset(2026, 6, 23, 15, 0, 0, TimeSpan.FromHours(2)),
+                new DateTimeOffset(2026, 6, 30, 15, 0, 0, TimeSpan.FromHours(2))
+            ],
+            client.CreatedEvents.Select(created => created.StartsAt));
+        Assert.All(client.CreatedEvents, created => Assert.Equal(TimeSpan.FromMinutes(45), created.Duration));
+        Assert.Equal(new DateTimeOffset(2026, 6, 1, 0, 0, 0, TimeSpan.FromHours(2)), client.LastListFromInclusive);
+        Assert.Equal(new DateTimeOffset(2026, 7, 1, 0, 0, 0, TimeSpan.FromHours(2)), client.LastListToExclusive);
+        Assert.Equal(["created-1", "created-2"], result.Value!.Select(lesson => lesson.Id));
     }
 
     [Fact]
@@ -169,6 +214,84 @@ public sealed class GoogleCalendarGatewayTests
     }
 
     [Fact]
+    public async Task GoogleCalendarServiceEventClientReadsAllEventPages()
+    {
+        var requestedPageTokens = new List<string?>();
+        var client = new GoogleCalendarServiceEventClient(
+            "Romance Standard Time",
+            (calendarId, fromInclusive, toExclusive, pageToken, cancellationToken) =>
+            {
+                requestedPageTokens.Add(pageToken);
+                return Task.FromResult(pageToken is null
+                    ? new Events
+                    {
+                        NextPageToken = "page-2",
+                        Items =
+                        [
+                            new Event
+                            {
+                                Id = "lesson-1",
+                                Summary = "$ Anna",
+                                Start = new EventDateTime
+                                {
+                                    DateTimeDateTimeOffset = new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.FromHours(2))
+                                }
+                            }
+                        ]
+                    }
+                    : new Events
+                    {
+                        Items =
+                        [
+                            new Event
+                            {
+                                Id = "lesson-2",
+                                Summary = "$ Bo",
+                                Start = new EventDateTime
+                                {
+                                    DateTimeDateTimeOffset = new DateTimeOffset(2026, 6, 17, 16, 0, 0, TimeSpan.FromHours(2))
+                                }
+                            }
+                        ]
+                    });
+            });
+
+        var events = await client.ListEventsAsync(
+            "primary",
+            new DateTimeOffset(2026, 6, 1, 0, 0, 0, TimeSpan.FromHours(2)),
+            new DateTimeOffset(2026, 7, 1, 0, 0, 0, TimeSpan.FromHours(2)),
+            CancellationToken.None);
+
+        Assert.Equal(["lesson-1", "lesson-2"], events.Select(calendarEvent => calendarEvent.Id));
+        Assert.Equal([null, "page-2"], requestedPageTokens);
+    }
+
+    [Fact]
+    public async Task GoogleCalendarServiceEventClientCreatesEventsWithIanaTimeZone()
+    {
+        Event? createdEvent = null;
+        var client = new GoogleCalendarServiceEventClient(
+            "Romance Standard Time",
+            "DK",
+            (calendarId, calendarEvent, cancellationToken) =>
+            {
+                createdEvent = calendarEvent;
+                return Task.FromResult(new Event { Id = "created" });
+            });
+
+        var createdId = await client.CreateLessonEventAsync(
+            "primary",
+            "$ Anna",
+            new DateTimeOffset(2026, 6, 23, 15, 0, 0, TimeSpan.FromHours(2)),
+            TimeSpan.FromMinutes(45),
+            CancellationToken.None);
+
+        Assert.Equal("created", createdId);
+        Assert.Equal("Europe/Copenhagen", createdEvent?.Start?.TimeZone);
+        Assert.Equal("Europe/Copenhagen", createdEvent?.End?.TimeZone);
+    }
+
+    [Fact]
     public async Task WindowsProtectedFileDataStoreDoesNotPersistPlaintextTokens()
     {
         if (!OperatingSystem.IsWindows())
@@ -259,6 +382,8 @@ public sealed class GoogleCalendarGatewayTests
 
         public TimeSpan? CreatedDuration { get; private set; }
 
+        public List<CreatedCalendarEvent> CreatedEvents { get; } = [];
+
         public string? MovedEventId { get; private set; }
 
         public DateTimeOffset? MovedStartsAt { get; private set; }
@@ -301,6 +426,7 @@ public sealed class GoogleCalendarGatewayTests
             CreatedSummary = summary;
             CreatedStartsAt = startsAt;
             CreatedDuration = duration;
+            CreatedEvents.Add(new CreatedCalendarEvent(summary, startsAt, duration));
             return Task.FromResult("created");
         }
 
@@ -347,4 +473,9 @@ public sealed class GoogleCalendarGatewayTests
             return Task.CompletedTask;
         }
     }
+
+    private sealed record CreatedCalendarEvent(
+        string Summary,
+        DateTimeOffset StartsAt,
+        TimeSpan Duration);
 }

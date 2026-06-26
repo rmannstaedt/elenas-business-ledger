@@ -21,6 +21,7 @@ public sealed class CoreStudentEditorService : IStudentEditorService
         return student is null
             ? null
             : new StudentEditorSnapshot(
+                student.Id,
                 student.Student.ShortName,
                 student.Student.FullName,
                 student.Student.Address,

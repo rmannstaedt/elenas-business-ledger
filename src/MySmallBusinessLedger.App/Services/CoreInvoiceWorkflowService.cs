@@ -1,6 +1,7 @@
 using MySmallBusinessLedger.Core.Common;
 using MySmallBusinessLedger.Core.Invoices;
 using MySmallBusinessLedger.Core.Ports;
+using MySmallBusinessLedger.Core.Time;
 using MySmallBusinessLedger.Core.UseCases.Invoices;
 using MySmallBusinessLedger.Infrastructure.Invoices.Pdf;
 
@@ -14,6 +15,7 @@ public sealed class CoreInvoiceWorkflowService : IInvoiceWorkflowService
     private readonly IInvoiceRepository invoiceRepository;
     private readonly IInvoicePdfWriter pdfWriter;
     private readonly IInvoicePrinter printer;
+    private readonly IClock clock;
 
     public CoreInvoiceWorkflowService(
         InvoiceCandidateSelectionUseCase candidateSelectionUseCase,
@@ -21,7 +23,8 @@ public sealed class CoreInvoiceWorkflowService : IInvoiceWorkflowService
         ICompanyProfileRepository companyProfileRepository,
         IInvoiceRepository invoiceRepository,
         IInvoicePdfWriter pdfWriter,
-        IInvoicePrinter printer)
+        IInvoicePrinter printer,
+        IClock clock)
     {
         this.candidateSelectionUseCase = candidateSelectionUseCase;
         this.previewUseCase = previewUseCase;
@@ -29,6 +32,7 @@ public sealed class CoreInvoiceWorkflowService : IInvoiceWorkflowService
         this.invoiceRepository = invoiceRepository;
         this.pdfWriter = pdfWriter;
         this.printer = printer;
+        this.clock = clock;
     }
 
     public async Task<OperationResult<InvoiceCandidateSelectionResult>> LoadCandidatesAsync(
@@ -94,7 +98,8 @@ public sealed class CoreInvoiceWorkflowService : IInvoiceWorkflowService
                 invoiceRepository,
                 fileStore,
                 pdfWriter,
-                printer);
+                printer,
+                clock);
 
             return await issueUseCase.ExecuteAsync(draft, cancellationToken);
         }
@@ -102,6 +107,27 @@ public sealed class CoreInvoiceWorkflowService : IInvoiceWorkflowService
         {
             return OperationResult<IssueInvoiceResult>.Failure(
                 new ValidationError("Invoice.IssueFailed", ex.Message));
+        }
+    }
+
+    public async Task<OperationResult<ReprintInvoiceResult>> ReprintAsync(
+        InvoiceNumber invoiceNumber,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var reprintUseCase = new ReprintIssuedInvoiceUseCase(
+                companyProfileRepository,
+                invoiceRepository,
+                printer,
+                clock);
+
+            return await reprintUseCase.ExecuteAsync(invoiceNumber, cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return OperationResult<ReprintInvoiceResult>.Failure(
+                new ValidationError("Invoice.ReprintFailed", ex.Message));
         }
     }
 

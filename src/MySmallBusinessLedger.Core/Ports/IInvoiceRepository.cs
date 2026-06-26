@@ -15,7 +15,28 @@ public interface IInvoiceRepository
 
     Task<OperationResult<IssuedInvoice>> SaveIssuedInvoiceAsync(IssuedInvoice invoice, CancellationToken cancellationToken);
 
+    Task<OperationResult<IssuedInvoice>> ReserveInvoiceAsync(
+        InvoiceDraft draft,
+        InvoiceTotals totals,
+        CancellationToken cancellationToken);
+
+    Task<OperationResult<IssuedInvoice>> FinalizeIssuedInvoiceAsync(
+        InvoiceNumber invoiceNumber,
+        string pdfFilePath,
+        CancellationToken cancellationToken);
+
+    Task ReleaseInvoiceReservationAsync(InvoiceNumber invoiceNumber, CancellationToken cancellationToken);
+
+    Task<OperationResult<IssuedInvoice>> UpdatePrintStatusAsync(
+        InvoiceNumber invoiceNumber,
+        InvoicePrintStatus printStatus,
+        DateTimeOffset? printedAt,
+        string? lastPrintError,
+        CancellationToken cancellationToken);
+
     Task<IssuedInvoice?> GetIssuedInvoiceAsync(InvoiceNumber invoiceNumber, CancellationToken cancellationToken);
+
+    Task<IssuedInvoice?> GetIssuingInvoiceAsync(InvoiceNumber invoiceNumber, CancellationToken cancellationToken);
 
     Task<PaymentStatus> GetPaymentStatusAsync(InvoiceNumber invoiceNumber, CancellationToken cancellationToken);
 

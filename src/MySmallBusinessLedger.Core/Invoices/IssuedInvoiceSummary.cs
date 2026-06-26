@@ -5,4 +5,9 @@ public sealed record IssuedInvoiceSummary(
     string StudentShortName,
     DateOnly InvoiceDate,
     PaymentStatus PaymentStatus,
-    string PdfFilePath);
+    string PdfFilePath,
+    InvoiceIssueStatus IssueStatus = InvoiceIssueStatus.Issued,
+    InvoicePrintStatus PrintStatus = InvoicePrintStatus.NotPrinted,
+    DateTimeOffset? PrintedAt = null,
+    string? LastPrintError = null,
+    InvoicePeriod? Period = null);

@@ -2,18 +2,49 @@ using MySmallBusinessLedger.Core.Calendar;
 using MySmallBusinessLedger.Core.Lessons;
 using Google.Apis.Calendar.v3;
 using Google.Apis.Calendar.v3.Data;
+using System.Globalization;
 
 namespace MySmallBusinessLedger.Infrastructure.Calendar;
 
 public sealed class GoogleCalendarServiceEventClient : IGoogleCalendarEventClient
 {
     private readonly CalendarService calendarService;
+    private readonly EventPageLoader? eventPageLoader;
+    private readonly EventInsert? eventInsert;
     private readonly string timeZoneId;
+
+    internal delegate Task<Events> EventPageLoader(
+        string calendarId,
+        DateTimeOffset fromInclusive,
+        DateTimeOffset toExclusive,
+        string? pageToken,
+        CancellationToken cancellationToken);
+
+    internal delegate Task<Event> EventInsert(
+        string calendarId,
+        Event calendarEvent,
+        CancellationToken cancellationToken);
 
     public GoogleCalendarServiceEventClient(CalendarService calendarService, string timeZoneId)
     {
         this.calendarService = calendarService;
-        this.timeZoneId = timeZoneId;
+        this.timeZoneId = ToGoogleCalendarTimeZoneId(
+            timeZoneId,
+            RegionInfo.CurrentRegion.TwoLetterISORegionName);
+    }
+
+    internal GoogleCalendarServiceEventClient(string timeZoneId, EventPageLoader eventPageLoader)
+    {
+        this.calendarService = null!;
+        this.timeZoneId = ToGoogleCalendarTimeZoneId(timeZoneId);
+        this.eventPageLoader = eventPageLoader;
+    }
+
+    internal GoogleCalendarServiceEventClient(string timeZoneId, string? region, EventInsert eventInsert)
+    {
+        this.calendarService = null!;
+        this.timeZoneId = ToGoogleCalendarTimeZoneId(timeZoneId, region);
+        this.eventInsert = eventInsert;
     }
 
     public async Task<IReadOnlyList<GoogleCalendarEvent>> ListEventsAsync(
@@ -22,18 +53,51 @@ public sealed class GoogleCalendarServiceEventClient : IGoogleCalendarEventClien
         DateTimeOffset toExclusive,
         CancellationToken cancellationToken)
     {
+        var events = new List<GoogleCalendarEvent>();
+        string? pageToken = null;
+        do
+        {
+            var response = await ListEventsPageAsync(
+                calendarId,
+                fromInclusive,
+                toExclusive,
+                pageToken,
+                cancellationToken);
+
+            events.AddRange((response.Items ?? [])
+                .Where(item => !string.IsNullOrWhiteSpace(item.Id) && item.Start?.DateTimeDateTimeOffset is not null)
+                .Select(item => new GoogleCalendarEvent(
+                    item.Id,
+                    item.Summary ?? string.Empty,
+                    item.Start!.DateTimeDateTimeOffset!.Value)));
+
+            pageToken = response.NextPageToken;
+        }
+        while (!string.IsNullOrWhiteSpace(pageToken));
+
+        return events;
+    }
+
+    private async Task<Events> ListEventsPageAsync(
+        string calendarId,
+        DateTimeOffset fromInclusive,
+        DateTimeOffset toExclusive,
+        string? pageToken,
+        CancellationToken cancellationToken)
+    {
+        if (eventPageLoader is not null)
+        {
+            return await eventPageLoader(calendarId, fromInclusive, toExclusive, pageToken, cancellationToken);
+        }
+
         var request = calendarService.Events.List(calendarId);
         request.SingleEvents = true;
         request.OrderBy = EventsResource.ListRequest.OrderByEnum.StartTime;
         request.TimeMinDateTimeOffset = fromInclusive;
         request.TimeMaxDateTimeOffset = toExclusive;
+        request.PageToken = pageToken;
 
-        var response = await request.ExecuteAsync(cancellationToken);
-
-        return (response.Items ?? [])
-            .Where(item => !string.IsNullOrWhiteSpace(item.Id) && item.Start?.DateTimeDateTimeOffset is not null)
-            .Select(item => new GoogleCalendarEvent(item.Id, item.Summary ?? string.Empty, item.Start!.DateTimeDateTimeOffset!.Value))
-            .ToArray();
+        return await request.ExecuteAsync(cancellationToken);
     }
 
     public async Task<string> CreateLessonEventAsync(
@@ -49,6 +113,12 @@ public sealed class GoogleCalendarServiceEventClient : IGoogleCalendarEventClien
             Start = CreateEventDateTime(startsAt),
             End = CreateEventDateTime(startsAt.Add(duration))
         };
+
+        if (eventInsert is not null)
+        {
+            var inserted = await eventInsert(calendarId, calendarEvent, cancellationToken);
+            return inserted.Id;
+        }
 
         var request = calendarService.Events.Insert(calendarEvent, calendarId);
         var created = await request.ExecuteAsync(cancellationToken);
@@ -97,4 +167,17 @@ public sealed class GoogleCalendarServiceEventClient : IGoogleCalendarEventClien
             DateTimeDateTimeOffset = value,
             TimeZone = timeZoneId
         };
+
+    private static string ToGoogleCalendarTimeZoneId(string value, string? region = null)
+    {
+        if (!string.IsNullOrWhiteSpace(region) &&
+            TimeZoneInfo.TryConvertWindowsIdToIanaId(value, region, out var regionalTimeZoneId))
+        {
+            return regionalTimeZoneId;
+        }
+
+        return TimeZoneInfo.TryConvertWindowsIdToIanaId(value, out var timeZoneId)
+            ? timeZoneId
+            : value;
+    }
 }

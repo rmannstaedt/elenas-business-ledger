@@ -103,7 +103,42 @@ public sealed class AppServiceTests
         public Task<OperationResult<IssuedInvoice>> SaveIssuedInvoiceAsync(IssuedInvoice invoice, CancellationToken cancellationToken) =>
             Task.FromResult(OperationResult<IssuedInvoice>.Success(invoice));
 
+        public Task<OperationResult<IssuedInvoice>> ReserveInvoiceAsync(
+            InvoiceDraft draft,
+            InvoiceTotals totals,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(OperationResult<IssuedInvoice>.Success(draft.Issue(
+                new InvoiceNumber(1),
+                totals,
+                pdfFilePath: null,
+                InvoiceIssueStatus.Issuing,
+                InvoicePrintStatus.NotPrinted,
+                printedAt: null,
+                lastPrintError: null)));
+
+        public Task<OperationResult<IssuedInvoice>> FinalizeIssuedInvoiceAsync(
+            InvoiceNumber invoiceNumber,
+            string pdfFilePath,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(OperationResult<IssuedInvoice>.Failure(
+                new ValidationError("Invoice.NotConfigured", "Invoice finalization is not configured.")));
+
+        public Task ReleaseInvoiceReservationAsync(InvoiceNumber invoiceNumber, CancellationToken cancellationToken) =>
+            Task.CompletedTask;
+
+        public Task<OperationResult<IssuedInvoice>> UpdatePrintStatusAsync(
+            InvoiceNumber invoiceNumber,
+            InvoicePrintStatus printStatus,
+            DateTimeOffset? printedAt,
+            string? lastPrintError,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(OperationResult<IssuedInvoice>.Failure(
+                new ValidationError("Invoice.NotConfigured", "Invoice print status is not configured.")));
+
         public Task<IssuedInvoice?> GetIssuedInvoiceAsync(InvoiceNumber invoiceNumber, CancellationToken cancellationToken) =>
+            Task.FromResult<IssuedInvoice?>(null);
+
+        public Task<IssuedInvoice?> GetIssuingInvoiceAsync(InvoiceNumber invoiceNumber, CancellationToken cancellationToken) =>
             Task.FromResult<IssuedInvoice?>(null);
 
         public Task<PaymentStatus> GetPaymentStatusAsync(InvoiceNumber invoiceNumber, CancellationToken cancellationToken) =>
@@ -119,6 +154,12 @@ public sealed class AppServiceTests
             throw new InvalidOperationException(message);
 
         public Task<OperationResult<IReadOnlyList<CalendarLesson>>> AddLessonAsync(LessonAddRequest request, DateOnly refreshMonth, CancellationToken cancellationToken) =>
+            Task.FromResult(OperationResult<IReadOnlyList<CalendarLesson>>.Failure(new ValidationError("Calendar.NotConfigured", message)));
+
+        public Task<OperationResult<IReadOnlyList<CalendarLesson>>> PopulateLessonsAsync(
+            IReadOnlyList<LessonAddRequest> requests,
+            DateOnly refreshMonth,
+            CancellationToken cancellationToken) =>
             Task.FromResult(OperationResult<IReadOnlyList<CalendarLesson>>.Failure(new ValidationError("Calendar.NotConfigured", message)));
 
         public Task<OperationResult<IReadOnlyList<CalendarLesson>>> UpdateLessonAsync(LessonEditRequest request, DateOnly refreshMonth, CancellationToken cancellationToken) =>
@@ -152,18 +193,13 @@ public sealed class AppServiceTests
         {
             var database = new TestDatabase(Path.Combine(Path.GetTempPath(), "MySmallBusinessLedgerAppServiceTests", Guid.NewGuid().ToString("N")));
             Directory.CreateDirectory(database.directory);
-            await using var context = database.CreateContext();
-            await context.Database.EnsureCreatedAsync();
+            await new LedgerDatabaseMigrator(database.CreateContext).MigrateAsync(TestContext.Current.CancellationToken);
             return database;
         }
 
         public LedgerDbContext CreateContext()
         {
-            var options = new DbContextOptionsBuilder<LedgerDbContext>()
-                .UseSqlite($"Data Source={DatabasePath};Pooling=False")
-                .Options;
-
-            return new LedgerDbContext(options);
+            return new LedgerDbContext(SqliteLedgerDbContextFactory.CreateOptions(DatabasePath, pooling: false));
         }
 
         public void Dispose()

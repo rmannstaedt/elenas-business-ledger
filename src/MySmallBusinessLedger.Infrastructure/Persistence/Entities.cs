@@ -24,6 +24,16 @@ public sealed class CompanyProfileEntity
     public VatStatus VatStatus { get; set; }
 
     public string InvoiceFolderPath { get; set; } = string.Empty;
+
+    public string ConfiguredInvoicePrinterName { get; set; } = string.Empty;
+
+    public string PaymentInstructions { get; set; } = string.Empty;
+
+    public string BankRegistrationNumber { get; set; } = string.Empty;
+
+    public string BankAccountNumber { get; set; } = string.Empty;
+
+    public string MobilePayAccount { get; set; } = string.Empty;
 }
 
 public sealed class CalendarSettingsEntity
@@ -154,11 +164,23 @@ public sealed class IssuedInvoiceEntity
 
     public DateOnly InvoiceDate { get; set; }
 
+    public DateOnly PeriodFrom { get; set; }
+
+    public DateOnly PeriodTo { get; set; }
+
     public string CompanyName { get; set; } = string.Empty;
 
     public string CompanyAddress { get; set; } = string.Empty;
 
     public string? CompanyCvr { get; set; }
+
+    public string CompanyPaymentInstructions { get; set; } = string.Empty;
+
+    public string CompanyBankRegistrationNumber { get; set; } = string.Empty;
+
+    public string CompanyBankAccountNumber { get; set; } = string.Empty;
+
+    public string CompanyMobilePayAccount { get; set; } = string.Empty;
 
     public string StudentShortName { get; set; } = string.Empty;
 
@@ -177,6 +199,14 @@ public sealed class IssuedInvoiceEntity
     public string PdfFilePath { get; set; } = string.Empty;
 
     public PaymentStatus PaymentStatus { get; set; }
+
+    public InvoiceIssueStatus IssueStatus { get; set; } = InvoiceIssueStatus.Issued;
+
+    public InvoicePrintStatus PrintStatus { get; set; } = InvoicePrintStatus.NotPrinted;
+
+    public DateTimeOffset? PrintedAt { get; set; }
+
+    public string? LastPrintError { get; set; }
 
     public List<IssuedInvoiceLineEntity> Lines { get; } = [];
 }

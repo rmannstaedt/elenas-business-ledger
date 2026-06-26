@@ -15,6 +15,122 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{0AB3BF05
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MySmallBusinessLedger.Tests", "tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj", "{3AE71461-ED04-4B23-9A81-F7B4765FBCE6}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Project Guidance", "Project Guidance", "{4D50D36A-3B0A-4C2A-9DF9-D2552657F947}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Root Docs", "Root Docs", "{35605F26-0652-45FC-8099-F906966D57A1}"
+	ProjectSection(SolutionItems) = preProject
+		AGENTS.md = AGENTS.md
+		README.md = README.md
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".ai", ".ai", "{BAFBA7BC-7DA9-4530-B94E-68F5685EDC47}"
+	ProjectSection(SolutionItems) = preProject
+		.ai\project-profile.md = .ai\project-profile.md
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "context", "context", "{3F71EF49-EF4A-4739-8E8F-93F22A755BA6}"
+	ProjectSection(SolutionItems) = preProject
+		.ai\context\HANDOFF.md = .ai\context\HANDOFF.md
+		.ai\context\HANDOFF.template.md = .ai\context\HANDOFF.template.md
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "implementation-plans", "implementation-plans", "{6FCE26EF-5322-42F3-A44F-F1E6B32D370D}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "active", "active", "{1A14E3F5-AED5-4DA8-AC1B-1094506722F4}"
+	ProjectSection(SolutionItems) = preProject
+		.ai\implementation-plans\active\2026-06-20-student-overview-management.md = .ai\implementation-plans\active\2026-06-20-student-overview-management.md
+		.ai\implementation-plans\active\2026-06-22-invoice-issue-finalization-and-print-status.md = .ai\implementation-plans\active\2026-06-22-invoice-issue-finalization-and-print-status.md
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "completed", "completed", "{AC8E7A53-7F97-4E8A-9852-C3E145482613}"
+	ProjectSection(SolutionItems) = preProject
+		.ai\implementation-plans\completed\2026-06-16-v1-invoice-printer.md = .ai\implementation-plans\completed\2026-06-16-v1-invoice-printer.md
+		.ai\implementation-plans\completed\2026-06-17-plan-catalog-management.md = .ai\implementation-plans\completed\2026-06-17-plan-catalog-management.md
+		.ai\implementation-plans\completed\2026-06-17-publisher-google-oauth-app.md = .ai\implementation-plans\completed\2026-06-17-publisher-google-oauth-app.md
+		.ai\implementation-plans\completed\2026-06-20-invoice-plan-lineage.md = .ai\implementation-plans\completed\2026-06-20-invoice-plan-lineage.md
+		.ai\implementation-plans\completed\2026-06-20-plan-identity-foreign-key.md = .ai\implementation-plans\completed\2026-06-20-plan-identity-foreign-key.md
+		.ai\implementation-plans\completed\2026-06-20-student-overview-embedded-editing.md = .ai\implementation-plans\completed\2026-06-20-student-overview-embedded-editing.md
+		.ai\implementation-plans\completed\2026-06-22-ef-migrations-and-startup-bootstrapper.md = .ai\implementation-plans\completed\2026-06-22-ef-migrations-and-startup-bootstrapper.md
+		.ai\implementation-plans\completed\2026-06-23-code-review-fixes.md = .ai\implementation-plans\completed\2026-06-23-code-review-fixes.md
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "superseded", "superseded", "{7B75D393-B154-4442-B737-F037C97782AF}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "prompts", "prompts", "{9F8628D6-4E1B-4EBB-96D8-960B47697398}"
+	ProjectSection(SolutionItems) = preProject
+		.ai\prompts\onboarding.md = .ai\prompts\onboarding.md
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "standards", "standards", "{7E43647C-D0E8-4423-B92D-D1C45B1A2F82}"
+	ProjectSection(SolutionItems) = preProject
+		.ai\standards\architecture-principles.md = .ai\standards\architecture-principles.md
+		.ai\standards\coding-standards.md = .ai\standards\coding-standards.md
+		.ai\standards\database-standards.md = .ai\standards\database-standards.md
+		.ai\standards\persistence-and-artifacts.md = .ai\standards\persistence-and-artifacts.md
+		.ai\standards\review-checklists.md = .ai\standards\review-checklists.md
+		.ai\standards\security-and-boundaries.md = .ai\standards\security-and-boundaries.md
+		.ai\standards\service-worker-and-job-design.md = .ai\standards\service-worker-and-job-design.md
+		.ai\standards\testing-and-verification.md = .ai\standards\testing-and-verification.md
+		.ai\standards\tooling-and-dependencies.md = .ai\standards\tooling-and-dependencies.md
+		.ai\standards\ui-design-standards.md = .ai\standards\ui-design-standards.md
+		.ai\standards\wpf-mvvm-standards.md = .ai\standards\wpf-mvvm-standards.md
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "templates", "templates", "{25517552-EF5B-44CD-BAB8-133CC45C049D}"
+	ProjectSection(SolutionItems) = preProject
+		.ai\templates\editorconfig.recommended = .ai\templates\editorconfig.recommended
+		.ai\templates\implementation-plan.template.md = .ai\templates\implementation-plan.template.md
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".agents", ".agents", "{47C18788-D2CF-4D0E-8C1F-83D3157057CE}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "skills", "skills", "{D23E6F25-9000-42E5-A782-5601A9B3F9F7}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "architecture-review", "architecture-review", "{8ACBD863-A78C-44F4-B87C-3B1FB6CBE3B6}"
+	ProjectSection(SolutionItems) = preProject
+		.agents\skills\architecture-review\SKILL.md = .agents\skills\architecture-review\SKILL.md
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "code-review", "code-review", "{C5025854-FD6B-46CA-82A4-053878FE49D5}"
+	ProjectSection(SolutionItems) = preProject
+		.agents\skills\code-review\SKILL.md = .agents\skills\code-review\SKILL.md
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "references", "references", "{EF7C20D9-EC37-48C1-90B0-BC9C65082D40}"
+	ProjectSection(SolutionItems) = preProject
+		.agents\skills\code-review\references\code-review-checks.md = .agents\skills\code-review\references\code-review-checks.md
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "documentation-refresh", "documentation-refresh", "{9C269D24-17B8-4397-8A77-E2DB07B05F01}"
+	ProjectSection(SolutionItems) = preProject
+		.agents\skills\documentation-refresh\SKILL.md = .agents\skills\documentation-refresh\SKILL.md
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "handoff-generation", "handoff-generation", "{029101DA-3178-4C6C-8097-7B3E13B51029}"
+	ProjectSection(SolutionItems) = preProject
+		.agents\skills\handoff-generation\SKILL.md = .agents\skills\handoff-generation\SKILL.md
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "implementation-plan", "implementation-plan", "{61E42627-2195-4899-9257-04FAD12A66D7}"
+	ProjectSection(SolutionItems) = preProject
+		.agents\skills\implementation-plan\SKILL.md = .agents\skills\implementation-plan\SKILL.md
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "plan-runner", "plan-runner", "{F3395B97-A2F4-4B47-A0C2-8B056D4BE55F}"
+	ProjectSection(SolutionItems) = preProject
+		.agents\skills\plan-runner\SKILL.md = .agents\skills\plan-runner\SKILL.md
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "refactor-planning", "refactor-planning", "{700618F0-C01E-496A-95C3-B72BB9528392}"
+	ProjectSection(SolutionItems) = preProject
+		.agents\skills\refactor-planning\SKILL.md = .agents\skills\refactor-planning\SKILL.md
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "ui-review", "ui-review", "{53696B22-6706-420D-B46C-1E5E587F7E2B}"
+	ProjectSection(SolutionItems) = preProject
+		.agents\skills\ui-review\SKILL.md = .agents\skills\ui-review\SKILL.md
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -82,5 +198,26 @@ Global
 		{7625F019-3B15-4A09-AF1B-24D553924F4C} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{ACDCDF22-D5D4-4B58-8477-D67500510733} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{3AE71461-ED04-4B23-9A81-F7B4765FBCE6} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
+		{35605F26-0652-45FC-8099-F906966D57A1} = {4D50D36A-3B0A-4C2A-9DF9-D2552657F947}
+		{BAFBA7BC-7DA9-4530-B94E-68F5685EDC47} = {4D50D36A-3B0A-4C2A-9DF9-D2552657F947}
+		{47C18788-D2CF-4D0E-8C1F-83D3157057CE} = {4D50D36A-3B0A-4C2A-9DF9-D2552657F947}
+		{3F71EF49-EF4A-4739-8E8F-93F22A755BA6} = {BAFBA7BC-7DA9-4530-B94E-68F5685EDC47}
+		{6FCE26EF-5322-42F3-A44F-F1E6B32D370D} = {BAFBA7BC-7DA9-4530-B94E-68F5685EDC47}
+		{9F8628D6-4E1B-4EBB-96D8-960B47697398} = {BAFBA7BC-7DA9-4530-B94E-68F5685EDC47}
+		{7E43647C-D0E8-4423-B92D-D1C45B1A2F82} = {BAFBA7BC-7DA9-4530-B94E-68F5685EDC47}
+		{25517552-EF5B-44CD-BAB8-133CC45C049D} = {BAFBA7BC-7DA9-4530-B94E-68F5685EDC47}
+		{1A14E3F5-AED5-4DA8-AC1B-1094506722F4} = {6FCE26EF-5322-42F3-A44F-F1E6B32D370D}
+		{AC8E7A53-7F97-4E8A-9852-C3E145482613} = {6FCE26EF-5322-42F3-A44F-F1E6B32D370D}
+		{7B75D393-B154-4442-B737-F037C97782AF} = {6FCE26EF-5322-42F3-A44F-F1E6B32D370D}
+		{D23E6F25-9000-42E5-A782-5601A9B3F9F7} = {47C18788-D2CF-4D0E-8C1F-83D3157057CE}
+		{8ACBD863-A78C-44F4-B87C-3B1FB6CBE3B6} = {D23E6F25-9000-42E5-A782-5601A9B3F9F7}
+		{C5025854-FD6B-46CA-82A4-053878FE49D5} = {D23E6F25-9000-42E5-A782-5601A9B3F9F7}
+		{9C269D24-17B8-4397-8A77-E2DB07B05F01} = {D23E6F25-9000-42E5-A782-5601A9B3F9F7}
+		{029101DA-3178-4C6C-8097-7B3E13B51029} = {D23E6F25-9000-42E5-A782-5601A9B3F9F7}
+		{61E42627-2195-4899-9257-04FAD12A66D7} = {D23E6F25-9000-42E5-A782-5601A9B3F9F7}
+		{F3395B97-A2F4-4B47-A0C2-8B056D4BE55F} = {D23E6F25-9000-42E5-A782-5601A9B3F9F7}
+		{700618F0-C01E-496A-95C3-B72BB9528392} = {D23E6F25-9000-42E5-A782-5601A9B3F9F7}
+		{53696B22-6706-420D-B46C-1E5E587F7E2B} = {D23E6F25-9000-42E5-A782-5601A9B3F9F7}
+		{EF7C20D9-EC37-48C1-90B0-BC9C65082D40} = {C5025854-FD6B-46CA-82A4-053878FE49D5}
 	EndGlobalSection
 EndGlobal

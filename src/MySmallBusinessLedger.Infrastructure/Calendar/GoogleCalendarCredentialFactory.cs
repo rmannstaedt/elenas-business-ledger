@@ -7,7 +7,7 @@ namespace MySmallBusinessLedger.Infrastructure.Calendar;
 
 public sealed class GoogleCalendarCredentialFactory
 {
-    private static readonly string[] Scopes = [CalendarService.Scope.CalendarEvents];
+    internal static readonly string[] RequestedScopes = [CalendarService.Scope.CalendarEventsOwned];
     private readonly ClientSecrets clientSecrets;
     private readonly IDataStore tokenStore;
     private readonly string applicationName;
@@ -26,7 +26,7 @@ public sealed class GoogleCalendarCredentialFactory
     {
         var credential = await GoogleWebAuthorizationBroker.AuthorizeAsync(
             clientSecrets,
-            Scopes,
+            RequestedScopes,
             userId,
             cancellationToken,
             tokenStore);

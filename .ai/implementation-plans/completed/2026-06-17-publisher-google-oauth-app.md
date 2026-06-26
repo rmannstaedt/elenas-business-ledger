@@ -10,9 +10,9 @@
 
 ---
 
-Status: Active
+Status: Completed
 Created: 2026-06-17
-Last updated: 2026-06-17
+Last updated: 2026-06-23
 Owner/context: Ruben and Codex; Ruben wants the product to use a publisher-owned Google OAuth app immediately rather than continuing with per-user/manual Google developer credential setup.
 
 ## Related Docs And Standards
@@ -685,7 +685,7 @@ Runner may continue automatically after this stage: no. Blocking action required
 ### Stage 6: Final Build, Test, And Real OAuth User Test
 
 Type: verification
-Status: Not started
+Status: Completed
 
 Goal:
 
@@ -903,3 +903,11 @@ Cleanup/reset instructions:
   - Tests/verification run: red/green Settings ViewModel, app settings service, and external calendar launcher tests; `dotnet build MySmallBusinessLedger.sln -nodeReuse:false`; `dotnet test MySmallBusinessLedger.sln -nodeReuse:false`.
   - Results: Full build passed with 0 warnings and 0 errors; full test suite passed with 119/119 tests.
   - Risks/open questions: The `authuser` browser hint depends on the account already being signed into the user's browser; if Google cannot match it, Google may still ask the user to sign in or choose an account.
+- 2026-06-23:
+  - Stage: Stage 6 final real OAuth user test
+  - Files changed: `.ai/implementation-plans/active/2026-06-17-publisher-google-oauth-app.md`
+  - Summary: Ruben confirmed the real user OAuth browser consent flow has been tested and passed with the publisher OAuth app path.
+  - Tests/verification run: Manual user OAuth test performed by Ruben; no automated tests were run for this documentation/status update.
+  - Results: Stage 6 manual OAuth verification passed. The plan is complete and ready to move to `completed/`.
+  - Deviations: None.
+  - Risks/open questions: Public/shareware release still requires the separate Google OAuth publishing/verification process if Google requires it for wider external users.

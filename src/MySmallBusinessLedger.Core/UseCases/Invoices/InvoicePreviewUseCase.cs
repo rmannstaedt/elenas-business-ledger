@@ -71,10 +71,18 @@ public sealed class InvoicePreviewUseCase
 
         var draftResult = InvoiceDraft.TryCreate(
             invoiceDate,
-            new CompanySnapshot(company.Name, company.Address, company.Cvr),
+            new CompanySnapshot(
+                company.Name,
+                company.Address,
+                company.Cvr,
+                company.PaymentInstructions,
+                company.BankRegistrationNumber,
+                company.BankAccountNumber,
+                company.MobilePayAccount),
             new StudentSnapshot(student.Student.ShortName, student.Student.FullName, student.Student.Address),
             lines.ToArray(),
-            priceAdjustment: null);
+            priceAdjustment: null,
+            period: new InvoicePeriod(from, to));
 
         if (!draftResult.Succeeded)
         {

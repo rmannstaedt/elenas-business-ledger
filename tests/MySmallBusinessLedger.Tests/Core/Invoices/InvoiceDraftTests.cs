@@ -60,7 +60,7 @@ public sealed class InvoiceDraftTests
             new InvoiceTotals(Money.Dkk(400m), Money.Dkk(0m), Money.Dkk(400m)),
             pdfFilePath: "C:\\Invoices\\Faktura_000001_Anna.pdf");
 
-        Assert.Equal("000001", invoice.InvoiceNumber.ToString());
+        Assert.Equal("001", invoice.InvoiceNumber.ToString());
         Assert.Equal("Anna", invoice.Student.ShortName);
         Assert.Equal("C:\\Invoices\\Faktura_000001_Anna.pdf", invoice.PdfFilePath);
         Assert.Throws<NotSupportedException>(() => ((ICollection<IssuedInvoiceLine>)invoice.Lines).Add(

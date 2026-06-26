@@ -12,6 +12,7 @@ public sealed class StudentEditorViewModel : ViewModelBase
 {
     private readonly IStudentEditorService studentEditorService;
     private readonly bool requestCloseOnSave;
+    private int studentId;
     private string shortName = string.Empty;
     private string fullName = string.Empty;
     private string address = string.Empty;
@@ -73,6 +74,7 @@ public sealed class StudentEditorViewModel : ViewModelBase
     {
         var viewModel = new StudentEditorViewModel(studentEditorService, assignablePlans ?? [], requestCloseOnSave)
         {
+            studentId = snapshot.StudentId,
             ShortName = snapshot.ShortName,
             FullName = snapshot.FullName,
             Phone = snapshot.Phone,
@@ -401,6 +403,7 @@ public sealed class StudentEditorViewModel : ViewModelBase
 
         ErrorMessage = null;
         return new SaveStudentRequest(
+            studentId,
             ShortName,
             FullName,
             CombineAddress(Address, AddressLine2),

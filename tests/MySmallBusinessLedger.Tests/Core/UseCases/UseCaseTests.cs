@@ -77,6 +77,95 @@ public sealed class UseCaseTests
     }
 
     [Fact]
+    public async Task StartupDashboardNavigationFollowsCalendarLessonOrderAndRepeatsStudents()
+    {
+        var clock = new FakeClock(new DateTimeOffset(2026, 6, 16, 12, 0, 0, TimeSpan.Zero));
+        var students = new FakeStudentRepository(
+        [
+            CreateStudentRecord("Anna", []),
+            CreateStudentRecord("Bo", [])
+        ]);
+        var calendar = new FakeCalendarGateway(
+        [
+            new CalendarLesson("anna-2", "Anna", new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.Zero)),
+            new CalendarLesson("bo-1", "Bo", new DateTimeOffset(2026, 6, 8, 14, 0, 0, TimeSpan.Zero)),
+            new CalendarLesson("anna-1", "Anna", new DateTimeOffset(2026, 6, 9, 15, 0, 0, TimeSpan.Zero))
+        ]);
+        var query = new StartupDashboardQuery(students, calendar, new FakeInvoiceRepository(), clock, TimeZoneInfo.Utc);
+
+        var result = await query.ExecuteAsync(new DateOnly(2026, 6, 1), "Anna", CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(
+            ["Bo", "Anna", "Anna"],
+            result.Value!.StudentNavigationEntries.Select(entry => entry.StudentShortName).ToArray());
+        Assert.Equal(
+            [
+                new DateTimeOffset(2026, 6, 8, 14, 0, 0, TimeSpan.Zero),
+                new DateTimeOffset(2026, 6, 9, 15, 0, 0, TimeSpan.Zero),
+                new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.Zero)
+            ],
+            result.Value.StudentNavigationEntries.Select(entry => entry.StartsAt).ToArray());
+    }
+
+    [Fact]
+    public async Task StartupDashboardNavigationIncludesAdjacentMonthCalendarLessons()
+    {
+        var clock = new FakeClock(new DateTimeOffset(2026, 6, 16, 12, 0, 0, TimeSpan.Zero));
+        var students = new FakeStudentRepository(
+        [
+            CreateStudentRecord("Anna", []),
+            CreateStudentRecord("Bo", [])
+        ]);
+        var calendar = new FakeCalendarGateway(
+        [
+            new CalendarLesson("anna-june", "Anna", new DateTimeOffset(2026, 6, 29, 15, 0, 0, TimeSpan.Zero)),
+            new CalendarLesson("bo-july", "Bo", new DateTimeOffset(2026, 7, 6, 14, 0, 0, TimeSpan.Zero))
+        ]);
+        var query = new StartupDashboardQuery(students, calendar, new FakeInvoiceRepository(), clock);
+
+        var result = await query.ExecuteAsync(new DateOnly(2026, 6, 1), "Anna", CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(
+            ["Anna", "Bo"],
+            result.Value!.StudentNavigationEntries.Select(entry => entry.StudentShortName).ToArray());
+        Assert.Equal(
+            [
+                new DateTimeOffset(2026, 6, 29, 15, 0, 0, TimeSpan.Zero),
+                new DateTimeOffset(2026, 7, 6, 14, 0, 0, TimeSpan.Zero)
+            ],
+            result.Value.StudentNavigationEntries.Select(entry => entry.StartsAt).ToArray());
+    }
+
+    [Fact]
+    public async Task StartupDashboardNavigationFallsBackToDefaultSchedulesWhenMonthHasNoCalendarLessons()
+    {
+        var clock = new FakeClock(new DateTimeOffset(2026, 6, 16, 12, 0, 0, TimeSpan.Zero));
+        var students = new FakeStudentRepository(
+        [
+            CreateStudentRecord("Anna", [new StudentScheduleEntry(DayOfWeek.Tuesday, new TimeOnly(15, 0))]),
+            CreateStudentRecord("Bo", [new StudentScheduleEntry(DayOfWeek.Monday, new TimeOnly(14, 0))])
+        ]);
+        var query = new StartupDashboardQuery(students, new FakeCalendarGateway([]), new FakeInvoiceRepository(), clock, TimeZoneInfo.Utc);
+
+        var result = await query.ExecuteAsync(new DateOnly(2026, 6, 1), "Anna", CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(
+            ["Bo", "Anna", "Bo", "Anna"],
+            result.Value!.StudentNavigationEntries.Take(4).Select(entry => entry.StudentShortName).ToArray());
+        Assert.Equal(
+            [
+                new DateTimeOffset(2026, 6, 1, 14, 0, 0, TimeSpan.Zero),
+                new DateTimeOffset(2026, 6, 2, 15, 0, 0, TimeSpan.Zero),
+                new DateTimeOffset(2026, 6, 8, 14, 0, 0, TimeSpan.Zero),
+                new DateTimeOffset(2026, 6, 9, 15, 0, 0, TimeSpan.Zero)
+            ],
+            result.Value.StudentNavigationEntries.Take(4).Select(entry => entry.StartsAt).ToArray());
+    }
+
+    [Fact]
     public async Task EditingUninvoicedLessonRefreshesFromCalendarAfterCalendarUpdateSucceeds()
     {
         var updatedLesson = new CalendarLesson("lesson-1", "Anna", new DateTimeOffset(2026, 6, 17, 15, 0, 0, TimeSpan.Zero));
@@ -126,6 +215,113 @@ public sealed class UseCaseTests
 
         Assert.True(result.Succeeded);
         Assert.Contains(result.Value!, lesson => lesson.Id == addedLesson.Id && lesson.StartsAt == addedLesson.StartsAt);
+    }
+
+    [Fact]
+    public async Task PopulateCalendarCurrentMonthStartsTodayAndSkipsExactDuplicates()
+    {
+        var timeZone = TimeZoneInfo.FindSystemTimeZoneById("Romance Standard Time");
+        var existingDuplicate = new CalendarLesson(
+            "existing",
+            "Anna",
+            new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.FromHours(2)));
+        var students = new FakeStudentRepository([CreateStudentRecord("Anna")]);
+        var calendar = new FakeCalendarGateway([existingDuplicate]);
+        var useCase = new PopulateCalendarUseCase(students, calendar, timeZone);
+
+        var result = await useCase.ExecuteAsync(
+            new PopulateCalendarRequest("Anna", new DateOnly(2026, 6, 1), new DateOnly(2026, 6, 16)),
+            CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(2, result.Value!.CreatedCount);
+        Assert.Equal(1, result.Value.SkippedDuplicateCount);
+        Assert.Equal(
+            [
+                new DateTimeOffset(2026, 6, 23, 15, 0, 0, TimeSpan.FromHours(2)),
+                new DateTimeOffset(2026, 6, 30, 15, 0, 0, TimeSpan.FromHours(2))
+            ],
+            calendar.PopulatedRequests.Select(request => request.StartsAt).ToArray());
+    }
+
+    [Fact]
+    public async Task PopulateCalendarFutureMonthSeedsWholeMonth()
+    {
+        var timeZone = TimeZoneInfo.FindSystemTimeZoneById("Romance Standard Time");
+        var students = new FakeStudentRepository([CreateStudentRecord("Anna")]);
+        var calendar = new FakeCalendarGateway([]);
+        var useCase = new PopulateCalendarUseCase(students, calendar, timeZone);
+
+        var result = await useCase.ExecuteAsync(
+            new PopulateCalendarRequest("Anna", new DateOnly(2026, 7, 1), new DateOnly(2026, 6, 16)),
+            CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(4, result.Value!.CreatedCount);
+        Assert.Equal(
+            [
+                new DateTimeOffset(2026, 7, 7, 15, 0, 0, TimeSpan.FromHours(2)),
+                new DateTimeOffset(2026, 7, 14, 15, 0, 0, TimeSpan.FromHours(2)),
+                new DateTimeOffset(2026, 7, 21, 15, 0, 0, TimeSpan.FromHours(2)),
+                new DateTimeOffset(2026, 7, 28, 15, 0, 0, TimeSpan.FromHours(2))
+            ],
+            calendar.PopulatedRequests.Select(request => request.StartsAt).ToArray());
+    }
+
+    [Fact]
+    public async Task PopulateCalendarRejectsPastMonthWithoutWriting()
+    {
+        var timeZone = TimeZoneInfo.FindSystemTimeZoneById("Romance Standard Time");
+        var students = new FakeStudentRepository([CreateStudentRecord("Anna")]);
+        var calendar = new FakeCalendarGateway([]);
+        var useCase = new PopulateCalendarUseCase(students, calendar, timeZone);
+
+        var result = await useCase.ExecuteAsync(
+            new PopulateCalendarRequest("Anna", new DateOnly(2026, 5, 1), new DateOnly(2026, 6, 16)),
+            CancellationToken.None);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Errors, error => error.Code == "CalendarPopulate.PastMonth");
+        Assert.Empty(calendar.PopulatedRequests);
+    }
+
+    [Fact]
+    public async Task PopulateCalendarRequiresSavedStudentSchedule()
+    {
+        var timeZone = TimeZoneInfo.FindSystemTimeZoneById("Romance Standard Time");
+        var studentWithoutSchedule = CreateStudentRecord("Anna") with { Schedule = [] };
+        var students = new FakeStudentRepository([studentWithoutSchedule]);
+        var calendar = new FakeCalendarGateway([]);
+        var useCase = new PopulateCalendarUseCase(students, calendar, timeZone);
+
+        var result = await useCase.ExecuteAsync(
+            new PopulateCalendarRequest("Anna", new DateOnly(2026, 6, 1), new DateOnly(2026, 6, 16)),
+            CancellationToken.None);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Errors, error => error.Code == "CalendarPopulate.NoSchedule");
+        Assert.Empty(calendar.PopulatedRequests);
+    }
+
+    [Fact]
+    public async Task PopulateCalendarReportsGoogleCalendarWriteFailure()
+    {
+        var timeZone = TimeZoneInfo.FindSystemTimeZoneById("Romance Standard Time");
+        var students = new FakeStudentRepository([CreateStudentRecord("Anna")]);
+        var calendar = new FakeCalendarGateway([])
+        {
+            UpdateResult = OperationResult<IReadOnlyList<CalendarLesson>>.Failure(
+                new ValidationError("Calendar.UpdateFailed", "Google Calendar could not be updated."))
+        };
+        var useCase = new PopulateCalendarUseCase(students, calendar, timeZone);
+
+        var result = await useCase.ExecuteAsync(
+            new PopulateCalendarRequest("Anna", new DateOnly(2026, 6, 1), new DateOnly(2026, 6, 16)),
+            CancellationToken.None);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Errors, error => error.Code == "Calendar.UpdateFailed");
+        Assert.NotEmpty(calendar.PopulatedRequests);
     }
 
     [Fact]
@@ -195,6 +391,56 @@ public sealed class UseCaseTests
     }
 
     [Fact]
+    public async Task InvoiceCandidateSelectionPreselectsLessonActiveAtCurrentTime()
+    {
+        var students = new FakeStudentRepository([CreateStudentRecord("Anna")]);
+        var calendar = new FakeCalendarGateway(
+        [
+            new CalendarLesson("anna-today", "Anna", new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.Zero))
+        ]);
+        var invoices = new FakeInvoiceRepository();
+        var useCase = new InvoiceCandidateSelectionUseCase(
+            students,
+            calendar,
+            invoices,
+            lessonDuration: TimeSpan.FromMinutes(60));
+
+        var result = await useCase.ExecuteAsync(
+            new DateOnly(2026, 6, 16),
+            new DateTimeOffset(2026, 6, 16, 15, 25, 0, TimeSpan.Zero),
+            CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal("Anna", result.Value!.PreselectedStudentShortName);
+    }
+
+    [Fact]
+    public async Task InvoiceCandidateSelectionFallsBackToNextLessonWithinThirtyMinutesWhenCurrentStudentIsAlreadyInvoiced()
+    {
+        var students = new FakeStudentRepository([CreateStudentRecord("Anna"), CreateStudentRecord("Bo")]);
+        var calendar = new FakeCalendarGateway(
+        [
+            new CalendarLesson("anna-today", "Anna", new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.Zero)),
+            new CalendarLesson("bo-today", "Bo", new DateTimeOffset(2026, 6, 16, 15, 25, 0, TimeSpan.Zero)),
+            new CalendarLesson("cara-today", "Cara", new DateTimeOffset(2026, 6, 16, 16, 0, 0, TimeSpan.Zero))
+        ]);
+        var invoices = new FakeInvoiceRepository { StudentsWithInvoiceThisMonth = ["Anna"] };
+        var useCase = new InvoiceCandidateSelectionUseCase(
+            students,
+            calendar,
+            invoices,
+            lessonDuration: TimeSpan.FromMinutes(60));
+
+        var result = await useCase.ExecuteAsync(
+            new DateOnly(2026, 6, 16),
+            new DateTimeOffset(2026, 6, 16, 15, 10, 0, TimeSpan.Zero),
+            CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal("Bo", result.Value!.PreselectedStudentShortName);
+    }
+
+    [Fact]
     public async Task InvoicePreviewCreatesDraftFromCalendarLessonsAndActivePlan()
     {
         var students = new FakeStudentRepository([CreateStudentRecord("Anna")]);
@@ -254,46 +500,236 @@ public sealed class UseCaseTests
     }
 
     [Fact]
-    public async Task IssueInvoiceDoesNotSaveInvoiceOrPrintWhenPdfWriteFails()
+    public async Task IssueInvoiceDoesNotFinalizeInvoiceOrPrintWhenPdfWriteFails()
     {
+        var calls = new List<string>();
         var company = new FakeCompanyProfileRepository();
-        var invoices = new FakeInvoiceRepository();
-        var fileStore = new FakeInvoiceFileStore();
+        var invoices = new FakeInvoiceRepository(calls);
+        var fileStore = new FakeInvoiceFileStore(calls);
         var pdfWriter = new FakeInvoicePdfWriter
         {
+            Calls = calls,
             WriteResult = OperationResult<string>.Failure(
                 new ValidationError("InvoicePdf.WriteFailed", "The PDF could not be written."))
         };
-        var printer = new FakeInvoicePrinter();
-        var useCase = new IssueInvoiceUseCase(company, invoices, fileStore, pdfWriter, printer);
+        var printer = new FakeInvoicePrinter(calls);
+        var useCase = new IssueInvoiceUseCase(
+            company,
+            invoices,
+            fileStore,
+            pdfWriter,
+            printer,
+            new FakeClock(new DateTimeOffset(2026, 6, 16, 17, 30, 0, TimeSpan.Zero)));
 
         var result = await useCase.ExecuteAsync(CreateInvoiceDraft(), CancellationToken.None);
 
         Assert.False(result.Succeeded);
-        Assert.False(invoices.SaveIssuedCalled);
+        Assert.True(invoices.ReserveCalled);
+        Assert.Equal(
+            [
+                "reserve",
+                "stage:001",
+                "write:C:\\Invoices\\.staging\\001.pdf",
+                "discard:C:\\Invoices\\.staging\\001.pdf",
+                "release:001"
+            ],
+            calls);
+        Assert.True(invoices.ReleaseReservationCalled);
+        Assert.False(invoices.FinalizeCalled);
+        Assert.False(invoices.UpdatePrintStatusCalled);
         Assert.False(printer.PrintCalled);
     }
 
     [Fact]
-    public async Task IssueInvoiceStagesVerifiesPublishesSavesAndPrintsInOrder()
+    public async Task IssueInvoiceReservesFinalizesPrintsAndRecordsPrintedStatusInOrder()
     {
+        var calls = new List<string>();
         var company = new FakeCompanyProfileRepository();
-        var invoices = new FakeInvoiceRepository();
-        var fileStore = new FakeInvoiceFileStore();
-        var pdfWriter = new FakeInvoicePdfWriter();
-        var printer = new FakeInvoicePrinter();
-        var useCase = new IssueInvoiceUseCase(company, invoices, fileStore, pdfWriter, printer);
+        var invoices = new FakeInvoiceRepository(calls);
+        var fileStore = new FakeInvoiceFileStore(calls);
+        var pdfWriter = new FakeInvoicePdfWriter { Calls = calls };
+        var printer = new FakeInvoicePrinter(calls);
+        var useCase = new IssueInvoiceUseCase(
+            company,
+            invoices,
+            fileStore,
+            pdfWriter,
+            printer,
+            new FakeClock(new DateTimeOffset(2026, 6, 16, 17, 30, 0, TimeSpan.Zero)));
 
         var result = await useCase.ExecuteAsync(CreateInvoiceDraft(), CancellationToken.None);
 
         Assert.True(result.Succeeded);
-        Assert.Equal("stage:000001", fileStore.Calls[0]);
-        Assert.Equal("write:C:\\Invoices\\.staging\\000001.pdf", pdfWriter.Calls[0]);
-        Assert.Equal("verify:C:\\Invoices\\.staging\\000001.pdf", fileStore.Calls[1]);
-        Assert.Equal("publish:C:\\Invoices\\.staging\\000001.pdf", fileStore.Calls[2]);
-        Assert.True(invoices.SaveIssuedCalled);
-        Assert.True(printer.PrintCalled);
-        Assert.Equal("C:\\Invoices\\000001.pdf", result.Value!.Invoice.PdfFilePath);
+        Assert.Equal(
+            [
+                "reserve",
+                "stage:001",
+                "write:C:\\Invoices\\.staging\\001.pdf",
+                "verify:C:\\Invoices\\.staging\\001.pdf",
+                "publish:C:\\Invoices\\.staging\\001.pdf",
+                "finalize:C:\\Invoices\\001.pdf",
+                "print:C:\\Invoices\\001.pdf:Office Printer",
+                "print-status:Printed:2026-06-16T17:30:00.0000000+00:00:"
+            ],
+            calls);
+        Assert.Equal(InvoiceIssueStatus.Issued, result.Value!.Invoice.IssueStatus);
+        Assert.Equal(InvoicePrintStatus.Printed, result.Value.Invoice.PrintStatus);
+        Assert.Equal(new DateTimeOffset(2026, 6, 16, 17, 30, 0, TimeSpan.Zero), result.Value.Invoice.PrintedAt);
+        Assert.Equal("C:\\Invoices\\001.pdf", result.Value!.Invoice.PdfFilePath);
+    }
+
+    [Fact]
+    public async Task IssueInvoiceReturnsIssuedInvoiceWithPrintFailedStatusWhenPrintingFails()
+    {
+        var calls = new List<string>();
+        var company = new FakeCompanyProfileRepository();
+        var invoices = new FakeInvoiceRepository(calls);
+        var fileStore = new FakeInvoiceFileStore(calls);
+        var pdfWriter = new FakeInvoicePdfWriter { Calls = calls };
+        var printer = new FakeInvoicePrinter(calls)
+        {
+            PrintResult = OperationResult<string>.Failure(new ValidationError(
+                "InvoicePrint.Failed",
+                "The invoice could not be printed."))
+        };
+        var useCase = new IssueInvoiceUseCase(
+            company,
+            invoices,
+            fileStore,
+            pdfWriter,
+            printer,
+            new FakeClock(new DateTimeOffset(2026, 6, 16, 17, 30, 0, TimeSpan.Zero)));
+
+        var result = await useCase.ExecuteAsync(CreateInvoiceDraft(), CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(InvoiceIssueStatus.Issued, result.Value!.Invoice.IssueStatus);
+        Assert.Equal(InvoicePrintStatus.PrintFailed, result.Value.Invoice.PrintStatus);
+        Assert.Null(result.Value.Invoice.PrintedAt);
+        Assert.Equal("The invoice could not be printed.", result.Value.Invoice.LastPrintError);
+        Assert.False(result.Value.PrintSucceeded);
+        Assert.Contains(result.Value.PrintErrors, error => error.Code == "InvoicePrint.Failed");
+    }
+
+    [Fact]
+    public async Task IssueInvoiceReleasesReservedInvoiceNumberWhenPdfPublishFails()
+    {
+        var calls = new List<string>();
+        var company = new FakeCompanyProfileRepository();
+        var invoices = new FakeInvoiceRepository(calls);
+        var fileStore = new FakeInvoiceFileStore(calls)
+        {
+            PublishResult = OperationResult<string>.Failure(new ValidationError(
+                "InvoicePdf.FinalFileAlreadyExists",
+                "An invoice PDF already exists for this invoice number."))
+        };
+        var pdfWriter = new FakeInvoicePdfWriter { Calls = calls };
+        var printer = new FakeInvoicePrinter(calls);
+        var useCase = new IssueInvoiceUseCase(
+            company,
+            invoices,
+            fileStore,
+            pdfWriter,
+            printer,
+            new FakeClock(new DateTimeOffset(2026, 6, 16, 17, 30, 0, TimeSpan.Zero)));
+
+        var result = await useCase.ExecuteAsync(CreateInvoiceDraft(), CancellationToken.None);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Errors, error => error.Code == "InvoicePdf.FinalFileAlreadyExists");
+        Assert.Equal(
+            [
+                "reserve",
+                "stage:001",
+                "write:C:\\Invoices\\.staging\\001.pdf",
+                "verify:C:\\Invoices\\.staging\\001.pdf",
+                "publish:C:\\Invoices\\.staging\\001.pdf",
+                "discard:C:\\Invoices\\.staging\\001.pdf",
+                "release:001"
+            ],
+            calls);
+        Assert.True(invoices.ReleaseReservationCalled);
+        Assert.False(invoices.FinalizeCalled);
+        Assert.False(printer.PrintCalled);
+    }
+
+    [Fact]
+    public async Task ReprintIssuedInvoiceUsesStoredPdfAndUpdatesOnlyPrintStatus()
+    {
+        var calls = new List<string>();
+        var invoice = CreateInvoiceDraft().Issue(
+            new InvoiceNumber(7),
+            CreateInvoiceDraft().CalculateTotals(CreateCompanyProfile()),
+            "C:\\Invoices\\007.pdf",
+            InvoiceIssueStatus.Issued,
+            InvoicePrintStatus.PrintFailed,
+            printedAt: null,
+            lastPrintError: "Previous printer error.");
+        var company = new FakeCompanyProfileRepository();
+        var invoices = new FakeInvoiceRepository(calls)
+        {
+            IssuedInvoiceToReturn = invoice
+        };
+        var printer = new FakeInvoicePrinter(calls);
+        var useCase = new ReprintIssuedInvoiceUseCase(
+            company,
+            invoices,
+            printer,
+            new FakeClock(new DateTimeOffset(2026, 6, 16, 18, 0, 0, TimeSpan.Zero)));
+
+        var result = await useCase.ExecuteAsync(new InvoiceNumber(7), CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        Assert.False(invoices.ReserveCalled);
+        Assert.False(invoices.FinalizeCalled);
+        Assert.Equal(
+            [
+                "print:C:\\Invoices\\007.pdf:Office Printer",
+                "print-status:Printed:2026-06-16T18:00:00.0000000+00:00:"
+            ],
+            calls);
+        Assert.Equal(new InvoiceNumber(7), result.Value!.Invoice.InvoiceNumber);
+        Assert.Equal("C:\\Invoices\\007.pdf", result.Value.Invoice.PdfFilePath);
+        Assert.Equal(InvoicePrintStatus.Printed, result.Value.Invoice.PrintStatus);
+        Assert.Null(result.Value.Invoice.LastPrintError);
+    }
+
+    [Fact]
+    public async Task ReprintIssuedInvoiceRecordsPrintFailureWithoutChangingIssueState()
+    {
+        var invoice = CreateInvoiceDraft().Issue(
+            new InvoiceNumber(7),
+            CreateInvoiceDraft().CalculateTotals(CreateCompanyProfile()),
+            "C:\\Invoices\\007.pdf",
+            InvoiceIssueStatus.Issued,
+            InvoicePrintStatus.Printed,
+            printedAt: new DateTimeOffset(2026, 6, 15, 18, 0, 0, TimeSpan.Zero),
+            lastPrintError: null);
+        var company = new FakeCompanyProfileRepository();
+        var invoices = new FakeInvoiceRepository
+        {
+            IssuedInvoiceToReturn = invoice
+        };
+        var printer = new FakeInvoicePrinter
+        {
+            PrintResult = OperationResult<string>.Failure(new ValidationError(
+                "InvoicePrinter.Unavailable",
+                "The configured invoice printer is not available."))
+        };
+        var useCase = new ReprintIssuedInvoiceUseCase(
+            company,
+            invoices,
+            printer,
+            new FakeClock(new DateTimeOffset(2026, 6, 16, 18, 0, 0, TimeSpan.Zero)));
+
+        var result = await useCase.ExecuteAsync(new InvoiceNumber(7), CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(InvoiceIssueStatus.Issued, result.Value!.Invoice.IssueStatus);
+        Assert.Equal(InvoicePrintStatus.PrintFailed, result.Value.Invoice.PrintStatus);
+        Assert.Null(result.Value.Invoice.PrintedAt);
+        Assert.Equal("The configured invoice printer is not available.", result.Value.Invoice.LastPrintError);
+        Assert.False(result.Value.PrintSucceeded);
     }
 
     [Fact]
@@ -325,7 +761,21 @@ public sealed class UseCaseTests
             ],
             priceAdjustment: null);
 
-    private static StudentRecord CreateStudentRecord(string shortName)
+    private static CompanyProfile CreateCompanyProfile() =>
+        CompanyProfile.Create(
+            "Maple Key Studio",
+            "Musikvej 1",
+            "12345678",
+            "elena@example.test",
+            cvr: null,
+            vatRegistrationDate: null,
+            VatStatus.NotRegistered,
+            "C:\\Invoices",
+            configuredInvoicePrinterName: "Office Printer");
+
+    private static StudentRecord CreateStudentRecord(
+        string shortName,
+        IReadOnlyList<StudentScheduleEntry>? schedule = null)
     {
         var student = Student.Create(
             shortName,
@@ -348,9 +798,10 @@ public sealed class UseCaseTests
             planCatalogId: 42);
 
         return new StudentRecord(
+            0,
             student,
             [new StudentPlanPeriod(plan, new DateOnly(2026, 1, 1), EndsOn: null)],
-            [new StudentScheduleEntry(DayOfWeek.Tuesday, new TimeOnly(15, 0))]);
+            schedule ?? [new StudentScheduleEntry(DayOfWeek.Tuesday, new TimeOnly(15, 0))]);
     }
 
     private sealed class FakeClock(DateTimeOffset now) : IClock
@@ -384,7 +835,8 @@ public sealed class UseCaseTests
                 cvr: null,
                 vatRegistrationDate: null,
                 VatStatus.NotRegistered,
-                "C:\\Invoices"));
+                "C:\\Invoices",
+                configuredInvoicePrinterName: "Office Printer"));
 
         public Task SaveAsync(CompanyProfile profile, CancellationToken cancellationToken) =>
             Task.CompletedTask;
@@ -399,6 +851,8 @@ public sealed class UseCaseTests
 
         public List<LessonState> SavedLessonStates { get; } = [];
 
+        public List<LessonAddRequest> PopulatedRequests { get; } = [];
+
         public Task<IReadOnlyList<CalendarLesson>> ListLessonsAsync(DateOnly from, DateOnly to, CancellationToken cancellationToken)
         {
             var matchingLessons = lessons
@@ -411,6 +865,15 @@ public sealed class UseCaseTests
 
         public Task<OperationResult<IReadOnlyList<CalendarLesson>>> AddLessonAsync(LessonAddRequest request, DateOnly refreshMonth, CancellationToken cancellationToken) =>
             Task.FromResult(UpdateResult);
+
+        public Task<OperationResult<IReadOnlyList<CalendarLesson>>> PopulateLessonsAsync(
+            IReadOnlyList<LessonAddRequest> requests,
+            DateOnly refreshMonth,
+            CancellationToken cancellationToken)
+        {
+            PopulatedRequests.AddRange(requests);
+            return Task.FromResult(UpdateResult);
+        }
 
         public Task<OperationResult<IReadOnlyList<CalendarLesson>>> UpdateLessonAsync(LessonEditRequest request, DateOnly refreshMonth, CancellationToken cancellationToken)
         {
@@ -431,7 +894,7 @@ public sealed class UseCaseTests
         }
     }
 
-    private sealed class FakeInvoiceRepository : IInvoiceRepository
+    private sealed class FakeInvoiceRepository(List<string>? calls = null) : IInvoiceRepository
     {
         public IReadOnlyList<InvoiceLessonStatus> LessonStatuses { get; init; } = [];
 
@@ -441,7 +904,15 @@ public sealed class UseCaseTests
 
         public PaymentStatus CurrentPaymentStatus { get; init; } = PaymentStatus.Outstanding;
 
-        public bool SaveIssuedCalled { get; private set; }
+        public IssuedInvoice? IssuedInvoiceToReturn { get; init; }
+
+        public bool ReserveCalled { get; private set; }
+
+        public bool FinalizeCalled { get; private set; }
+
+        public bool UpdatePrintStatusCalled { get; private set; }
+
+        public bool ReleaseReservationCalled { get; private set; }
 
         public bool SavePaymentStatusCalledBeforeConfirmation { get; private set; }
 
@@ -459,13 +930,103 @@ public sealed class UseCaseTests
         public Task<InvoiceNumber> GetNextInvoiceNumberAsync(CancellationToken cancellationToken) =>
             Task.FromResult(new InvoiceNumber(1));
 
-        public Task<OperationResult<IssuedInvoice>> SaveIssuedInvoiceAsync(IssuedInvoice invoice, CancellationToken cancellationToken)
+        public Task<OperationResult<IssuedInvoice>> SaveIssuedInvoiceAsync(IssuedInvoice invoice, CancellationToken cancellationToken) =>
+            Task.FromResult(OperationResult<IssuedInvoice>.Success(invoice));
+
+        public Task<OperationResult<IssuedInvoice>> ReserveInvoiceAsync(
+            InvoiceDraft draft,
+            InvoiceTotals totals,
+            CancellationToken cancellationToken)
         {
-            SaveIssuedCalled = true;
-            return Task.FromResult(OperationResult<IssuedInvoice>.Success(invoice));
+            ReserveCalled = true;
+            calls?.Add("reserve");
+            return Task.FromResult(OperationResult<IssuedInvoice>.Success(draft.Issue(
+                new InvoiceNumber(1),
+                totals,
+                pdfFilePath: null,
+                InvoiceIssueStatus.Issuing,
+                InvoicePrintStatus.NotPrinted,
+                printedAt: null,
+                lastPrintError: null)));
+        }
+
+        public Task<OperationResult<IssuedInvoice>> FinalizeIssuedInvoiceAsync(
+            InvoiceNumber invoiceNumber,
+            string pdfFilePath,
+            CancellationToken cancellationToken)
+        {
+            FinalizeCalled = true;
+            calls?.Add($"finalize:{pdfFilePath}");
+            return Task.FromResult(OperationResult<IssuedInvoice>.Success(CreateInvoiceDraft().Issue(
+                invoiceNumber,
+                CreateInvoiceDraft().CalculateTotals(CompanyProfile.Create(
+                    "Maple Key Studio",
+                    "Musikvej 1",
+                    "12345678",
+                    "elena@example.test",
+                    cvr: null,
+                    vatRegistrationDate: null,
+                    VatStatus.NotRegistered,
+                    "C:\\Invoices")),
+                pdfFilePath,
+                InvoiceIssueStatus.Issued,
+                InvoicePrintStatus.NotPrinted,
+                printedAt: null,
+                lastPrintError: null)));
+        }
+
+        public Task ReleaseInvoiceReservationAsync(InvoiceNumber invoiceNumber, CancellationToken cancellationToken)
+        {
+            ReleaseReservationCalled = true;
+            calls?.Add($"release:{invoiceNumber}");
+            return Task.CompletedTask;
+        }
+
+        public Task<OperationResult<IssuedInvoice>> UpdatePrintStatusAsync(
+            InvoiceNumber invoiceNumber,
+            InvoicePrintStatus printStatus,
+            DateTimeOffset? printedAt,
+            string? lastPrintError,
+            CancellationToken cancellationToken)
+        {
+            UpdatePrintStatusCalled = true;
+            calls?.Add($"print-status:{printStatus}:{printedAt:O}:{lastPrintError}");
+            var source = IssuedInvoiceToReturn ?? CreateInvoiceDraft().Issue(
+                invoiceNumber,
+                CreateInvoiceDraft().CalculateTotals(CompanyProfile.Create(
+                    "Maple Key Studio",
+                    "Musikvej 1",
+                    "12345678",
+                    "elena@example.test",
+                    cvr: null,
+                    vatRegistrationDate: null,
+                    VatStatus.NotRegistered,
+                    "C:\\Invoices")),
+                "C:\\Invoices\\001.pdf",
+                InvoiceIssueStatus.Issued,
+                InvoicePrintStatus.NotPrinted,
+                printedAt: null,
+                lastPrintError: null);
+
+            return Task.FromResult(OperationResult<IssuedInvoice>.Success(new IssuedInvoice(
+                invoiceNumber,
+                source.InvoiceDate,
+                source.Period,
+                source.Company,
+                source.Student,
+                source.Lines,
+                source.Totals,
+                source.PdfFilePath,
+                source.IssueStatus,
+                printStatus,
+                printedAt,
+                lastPrintError)));
         }
 
         public Task<IssuedInvoice?> GetIssuedInvoiceAsync(InvoiceNumber invoiceNumber, CancellationToken cancellationToken) =>
+            Task.FromResult(IssuedInvoiceToReturn);
+
+        public Task<IssuedInvoice?> GetIssuingInvoiceAsync(InvoiceNumber invoiceNumber, CancellationToken cancellationToken) =>
             Task.FromResult<IssuedInvoice?>(null);
 
         public Task<PaymentStatus> GetPaymentStatusAsync(InvoiceNumber invoiceNumber, CancellationToken cancellationToken) =>
@@ -483,35 +1044,42 @@ public sealed class UseCaseTests
         }
     }
 
-    private sealed class FakeInvoiceFileStore : IInvoiceFileStore
+    private sealed class FakeInvoiceFileStore(List<string>? calls = null) : IInvoiceFileStore
     {
-        public List<string> Calls { get; } = [];
+        public OperationResult<string> PublishResult { get; init; } =
+            OperationResult<string>.Success("C:\\Invoices\\001.pdf");
 
         public Task<OperationResult<string>> CreateStagingPathAsync(InvoiceDraft draft, InvoiceNumber invoiceNumber, CancellationToken cancellationToken)
         {
-            Calls.Add($"stage:{invoiceNumber}");
-            return Task.FromResult(OperationResult<string>.Success("C:\\Invoices\\.staging\\000001.pdf"));
+            calls?.Add($"stage:{invoiceNumber}");
+            return Task.FromResult(OperationResult<string>.Success("C:\\Invoices\\.staging\\001.pdf"));
         }
 
         public Task<OperationResult<string>> VerifyStagedPdfAsync(string stagingPath, CancellationToken cancellationToken)
         {
-            Calls.Add($"verify:{stagingPath}");
+            calls?.Add($"verify:{stagingPath}");
             return Task.FromResult(OperationResult<string>.Success(stagingPath));
         }
 
         public Task<OperationResult<string>> PublishAsync(string stagingPath, InvoiceDraft draft, InvoiceNumber invoiceNumber, CancellationToken cancellationToken)
         {
-            Calls.Add($"publish:{stagingPath}");
-            return Task.FromResult(OperationResult<string>.Success("C:\\Invoices\\000001.pdf"));
+            calls?.Add($"publish:{stagingPath}");
+            return Task.FromResult(PublishResult);
+        }
+
+        public Task<OperationResult<string>> DiscardStagingPathAsync(string stagingPath, CancellationToken cancellationToken)
+        {
+            calls?.Add($"discard:{stagingPath}");
+            return Task.FromResult(OperationResult<string>.Success(stagingPath));
         }
     }
 
     private sealed class FakeInvoicePdfWriter : IInvoicePdfWriter
     {
         public OperationResult<string> WriteResult { get; init; } =
-            OperationResult<string>.Success("C:\\Invoices\\.staging\\000001.pdf");
+            OperationResult<string>.Success("C:\\Invoices\\.staging\\001.pdf");
 
-        public List<string> Calls { get; } = [];
+        public List<string>? Calls { get; init; }
 
         public Task<OperationResult<string>> WriteAsync(
             InvoiceDraft draft,
@@ -520,19 +1088,26 @@ public sealed class UseCaseTests
             string stagingPath,
             CancellationToken cancellationToken)
         {
-            Calls.Add($"write:{stagingPath}");
+            Calls?.Add($"write:{stagingPath}");
             return Task.FromResult(WriteResult);
         }
     }
 
-    private sealed class FakeInvoicePrinter : IInvoicePrinter
+    private sealed class FakeInvoicePrinter(List<string>? calls = null) : IInvoicePrinter
     {
+        public OperationResult<string> PrintResult { get; init; } =
+            OperationResult<string>.Success("C:\\Invoices\\001.pdf");
+
         public bool PrintCalled { get; private set; }
 
-        public Task<OperationResult<string>> PrintAsync(string pdfFilePath, CancellationToken cancellationToken)
+        public Task<OperationResult<string>> PrintAsync(
+            string pdfFilePath,
+            string configuredPrinterName,
+            CancellationToken cancellationToken)
         {
             PrintCalled = true;
-            return Task.FromResult(OperationResult<string>.Success(pdfFilePath));
+            calls?.Add($"print:{pdfFilePath}:{configuredPrinterName}");
+            return Task.FromResult(PrintResult);
         }
     }
 }
