@@ -224,6 +224,8 @@ public sealed class IssuedInvoiceLineEntity
 
     public string LessonDateTime { get; set; } = string.Empty;
 
+    public bool HasKnownLessonTime { get; set; } = true;
+
     public string PlanName { get; set; } = string.Empty;
 
     public int PlanCatalogId { get; set; }
@@ -248,6 +250,8 @@ public sealed class LessonEntity
     public string PlanName { get; set; } = string.Empty;
 
     public DateTimeOffset StartsAt { get; set; }
+
+    public bool HasKnownStartTime { get; set; } = true;
 
     public int DurationMinutes { get; set; }
 

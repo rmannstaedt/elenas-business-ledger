@@ -12,4 +12,5 @@ public sealed record LessonRecord(
     int DurationMinutes,
     LessonState State,
     string? GoogleCalendarEventId,
-    InvoiceNumber? InvoiceNumber);
+    InvoiceNumber? InvoiceNumber,
+    bool HasKnownStartTime = true);

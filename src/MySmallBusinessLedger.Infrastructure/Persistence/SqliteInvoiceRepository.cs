@@ -332,6 +332,7 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
             entity.Lines.Add(new IssuedInvoiceLineEntity
             {
                 LessonDateTime = FormatLessonDateTime(line.LessonDateTime),
+                HasKnownLessonTime = line.HasKnownLessonTime,
                 PlanName = line.PlanName,
                 PlanCatalogId = line.PlanCatalogId,
                 PriceWithoutVatAmount = line.PriceWithoutVat.Amount,
@@ -351,7 +352,8 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
                 ParseLessonDateTime(line.LessonDateTime),
                 line.PlanName,
                 new MoneyAmount(line.PriceWithoutVatAmount, line.Currency),
-                line.PlanCatalogId))
+                line.PlanCatalogId,
+                line.HasKnownLessonTime))
             .ToArray();
 
         var pdfFilePath = entity.IssueStatus == InvoiceIssueStatus.Issuing &&

@@ -89,6 +89,7 @@ The following must remain unchanged unless this plan explicitly says otherwise:
 - A student can receive more than one invoice for the same month when new uninvoiced lessons are added later.
 - Lesson rows show and allow editing the selected Plan until invoiced.
 - Add Lesson defaults its date to the first day of the displayed month when the displayed month is not the current month.
+- Lesson date is required, but lesson time is optional. Lessons without a known time sync to Google Calendar as all-day events and display/print without a time.
 
 ## Affected Files, Projects, Commands, Docs, Schemas, Or Artifacts
 
@@ -308,7 +309,7 @@ Concrete steps:
 
 Behavior that must remain unchanged:
 
-- Date/time inline editing, auto-save, incomplete draft preservation, delete, state toggle, invoice/payment display.
+- Date/time inline editing, optional lesson time, auto-save, incomplete draft preservation, delete, state toggle, invoice/payment display.
 
 Tests to add/update:
 
@@ -320,7 +321,7 @@ Verification commands/manual checks:
 
 Risks:
 
-- Dropdown auto-save may fire too early for incomplete drafts. Mitigate by saving plan only for existing local lessons or including selected plan in draft creation once date/time are complete.
+- Draft auto-save may fire too early while the user is still editing date/time. Mitigate with debounced draft auto-save and refreshed-row selection preservation.
 
 Rollback point:
 
@@ -473,5 +474,19 @@ Cleanup/reset instructions:
   - Summary: Added durable local Lessons rows, reconciled uninvoiced calendar lessons into local records, kept invoiced lessons locked against later calendar edits/deletes, switched invoice candidate/preview/issue flow to local uninvoiced lessons, added Plan column/dropdown for uninvoiced local lessons, and defaulted Add Lesson in non-current months to the first day of the displayed month.
   - Tests/verification run: `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj -nodeReuse:false` with `MSBL_RUN_UI_TESTS=1`; `dotnet build MySmallBusinessLedger.sln -nodeReuse:false`; `dotnet test MySmallBusinessLedger.sln -nodeReuse:false` with `MSBL_RUN_UI_TESTS=1`
   - Results: build passed with 0 warnings; solution tests passed, 289 tests
-  - Deviations: newly autosaved draft rows still become fully plan-editable after the next dashboard reconciliation/refresh because the Google Calendar add response does not carry a local lesson id.
+  - Deviations: newly autosaved draft rows become fully plan-editable after immediate dashboard reconciliation/refresh because the Google Calendar add response does not carry a local lesson id.
   - Risks/open questions: local plan metadata is still not mirrored visibly into Google Calendar for v1.
+- 2026-06-26:
+  - Stage: Optional lesson time support
+  - Files changed: Core lesson/calendar/invoice models, Google Calendar event client/gateway, SQLite lesson/invoice-line schema, main-window lesson display/save flow, invoice date display, requirements/context docs, ViewModel/calendar tests.
+  - Summary: Made lesson time optional. Date-only lessons save as Google Calendar all-day events, persist known-time state locally, remain selected after reconciliation, become plan-editable after immediate refresh, and display/print without fake midnight times. Draft autosave is debounced so quick date-then-time edits save the intended timed lesson instead of prematurely saving all-day.
+  - Tests/verification run: `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj -nodeReuse:false --filter "FullyQualifiedName~MainWindowViewModelTests"`; `dotnet test MySmallBusinessLedger.sln -nodeReuse:false`
+  - Results: main-window tests passed, 70 tests; solution tests passed, 293 tests
+- 2026-06-26:
+  - Stage: Startup regression hardening
+  - Files changed: `StartupDashboardQuery`, `UseCaseTests`
+  - Summary: Prevented calendar entries for unknown/inactive students from being selected or reconciled into local Lessons rows, avoiding invalid local `StudentId` persistence on startup.
+  - Tests/verification run: `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~UseCaseTests.StartupDashboardIgnoresCalendarLessonsWithoutKnownActiveStudentWhenUsingLocalLessonLedger" -nodeReuse:false`; `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~UseCaseTests.StartupDashboard" -nodeReuse:false`
+  - Results: passed
+  - Deviations: none
+  - Risks/open questions: none

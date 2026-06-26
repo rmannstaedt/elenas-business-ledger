@@ -14,6 +14,7 @@ public interface IGoogleCalendarEventClient
         string calendarId,
         string summary,
         DateTimeOffset startsAt,
+        bool hasKnownStartTime,
         TimeSpan duration,
         CancellationToken cancellationToken);
 
@@ -21,6 +22,7 @@ public interface IGoogleCalendarEventClient
         string calendarId,
         string eventId,
         DateTimeOffset startsAt,
+        bool hasKnownStartTime,
         CancellationToken cancellationToken);
 
     Task DeleteEventAsync(

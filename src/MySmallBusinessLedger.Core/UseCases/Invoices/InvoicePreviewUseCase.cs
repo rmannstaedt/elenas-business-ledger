@@ -72,7 +72,8 @@ public sealed class InvoicePreviewUseCase
                 lesson.StartsAt,
                 plan.Name,
                 MoneyAmount.Dkk(plan.PriceWithoutVat),
-                plan.PlanCatalogId));
+                plan.PlanCatalogId,
+                hasKnownLessonTime: lesson.HasKnownStartTime));
         }
 
         if (errors.Count > 0)
@@ -142,7 +143,8 @@ public sealed class InvoicePreviewUseCase
                 string.IsNullOrWhiteSpace(lesson.PlanName) ? plan.Name : lesson.PlanName,
                 MoneyAmount.Dkk(plan.PriceWithoutVat.Value),
                 lesson.PlanCatalogId,
-                lesson.Id));
+                lesson.Id,
+                lesson.HasKnownStartTime));
         }
 
         if (errors.Count > 0)

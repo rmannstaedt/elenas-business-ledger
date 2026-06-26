@@ -45,7 +45,16 @@ public sealed class StartupDashboardQuery
         var to = selectedMonth.AddMonths(2).WithDay(1).AddDays(-1);
         var students = await studentRepository.ListActiveStudentsAsync(cancellationToken);
         var calendarLessons = await calendarGateway.ListLessonsAsync(from, to, cancellationToken);
-        var currentStudent = selectedStudentShortName ?? PickCurrentStudent(calendarLessons, students);
+        var activeStudentShortNames = students
+            .Select(student => student.Student.ShortName)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var knownCalendarLessons = calendarLessons
+            .Where(lesson => activeStudentShortNames.Contains(lesson.StudentShortName))
+            .ToArray();
+        var currentStudent = selectedStudentShortName is not null &&
+                             activeStudentShortNames.Contains(selectedStudentShortName)
+            ? selectedStudentShortName
+            : PickCurrentStudent(knownCalendarLessons, students);
 
         var lessonStatuses = await invoiceRepository.ListLessonStatusesAsync(from, to, cancellationToken);
         var statusLookup = lessonStatuses.ToDictionary(
@@ -60,7 +69,7 @@ public sealed class StartupDashboardQuery
 
         var dashboardLessons = new List<DashboardLesson>();
         var representedLocalLessonIds = new HashSet<int>();
-        foreach (var lesson in calendarLessons.OrderBy(lesson => lesson.StartsAt))
+        foreach (var lesson in knownCalendarLessons.OrderBy(lesson => lesson.StartsAt))
         {
             if (currentStudent is not null && lesson.StudentShortName != currentStudent)
             {
@@ -82,7 +91,7 @@ public sealed class StartupDashboardQuery
 
         if (lessonRepository is not null)
         {
-            var currentCalendarLessonIds = calendarLessons
+            var currentCalendarLessonIds = knownCalendarLessons
                 .Select(lesson => lesson.Id)
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
             var missingUninvoicedLocalLessonIds = localLessons
@@ -116,7 +125,7 @@ public sealed class StartupDashboardQuery
             .Select(student => student.Student.ShortName)
             .Order(StringComparer.OrdinalIgnoreCase)
             .ToArray();
-        var studentNavigationEntries = CreateStudentNavigationEntries(selectedMonth, calendarLessons, students);
+        var studentNavigationEntries = CreateStudentNavigationEntries(selectedMonth, knownCalendarLessons, students);
         var planOptions = await CreatePlanOptionsAsync(students, cancellationToken);
 
         return OperationResult<StartupDashboardResult>.Success(
@@ -142,7 +151,8 @@ public sealed class StartupDashboardQuery
                 lesson.StartsAt,
                 lesson.State,
                 IsInvoiced: false,
-                PaymentStatus: null);
+                PaymentStatus: null,
+                HasKnownStartTime: lesson.HasKnownStartTime);
         }
 
         return new DashboardLesson(
@@ -152,7 +162,8 @@ public sealed class StartupDashboardQuery
             LessonState.Completed,
             IsInvoiced: true,
             invoiceStatus.PaymentStatus,
-            invoiceStatus.InvoiceNumber);
+            invoiceStatus.InvoiceNumber,
+            HasKnownStartTime: lesson.HasKnownStartTime);
     }
 
     private async Task<DashboardLesson> ReconcileCalendarLessonAsync(
@@ -168,6 +179,7 @@ public sealed class StartupDashboardQuery
                 ? localLesson with
                 {
                     StartsAt = calendarLesson.StartsAt,
+                    HasKnownStartTime = calendarLesson.HasKnownStartTime,
                     State = calendarLesson.State
                 }
                 : localLesson;
@@ -190,7 +202,8 @@ public sealed class StartupDashboardQuery
             record.InvoiceNumber,
             record.PlanCatalogId,
             record.PlanName,
-            record.Id);
+            record.Id,
+            record.HasKnownStartTime);
 
     private async Task<IReadOnlyList<DashboardPlanOption>> CreatePlanOptionsAsync(
         IReadOnlyList<StudentRecord> students,
@@ -236,7 +249,8 @@ public sealed class StartupDashboardQuery
             DurationMinutes: plan?.DurationMinutes ?? 60,
             State: calendarLesson.State,
             GoogleCalendarEventId: calendarLesson.Id,
-            InvoiceNumber: invoiceStatus?.InvoiceNumber);
+            InvoiceNumber: invoiceStatus?.InvoiceNumber,
+            HasKnownStartTime: calendarLesson.HasKnownStartTime);
     }
 
     private static bool CurrentStudentHasSchedule(IReadOnlyList<StudentRecord> students, string? currentStudent) =>

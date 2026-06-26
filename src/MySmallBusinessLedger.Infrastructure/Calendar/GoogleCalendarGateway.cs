@@ -32,11 +32,21 @@ public sealed class GoogleCalendarGateway : IGoogleCalendarGateway
             .Where(calendarEvent => CalendarLessonEntry.TryParse(
                 calendarEvent.Summary,
                 calendarEvent.StartsAt,
-                out _))
+                out _,
+                calendarEvent.HasKnownStartTime))
             .Select(calendarEvent =>
             {
-                CalendarLessonEntry.TryParse(calendarEvent.Summary, calendarEvent.StartsAt, out var entry);
-                return new CalendarLesson(calendarEvent.Id, entry!.StudentShortName, entry.StartsAt, entry.State);
+                CalendarLessonEntry.TryParse(
+                    calendarEvent.Summary,
+                    calendarEvent.StartsAt,
+                    out var entry,
+                    calendarEvent.HasKnownStartTime);
+                return new CalendarLesson(
+                    calendarEvent.Id,
+                    entry!.StudentShortName,
+                    entry.StartsAt,
+                    entry.State,
+                    entry.HasKnownStartTime);
             })
             .OrderBy(lesson => lesson.StartsAt)
             .ToArray();
@@ -63,6 +73,7 @@ public sealed class GoogleCalendarGateway : IGoogleCalendarGateway
                     options.CalendarId,
                     $"$ {request.StudentShortName}",
                     request.StartsAt,
+                    request.HasKnownStartTime,
                     options.DefaultLessonDuration,
                     cancellationToken);
             }
@@ -82,7 +93,12 @@ public sealed class GoogleCalendarGateway : IGoogleCalendarGateway
     {
         try
         {
-            await eventClient.MoveEventAsync(options.CalendarId, request.LessonId, request.StartsAt, cancellationToken);
+            await eventClient.MoveEventAsync(
+                options.CalendarId,
+                request.LessonId,
+                request.StartsAt,
+                request.HasKnownStartTime,
+                cancellationToken);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

@@ -31,6 +31,7 @@ public sealed class SqliteLessonRepository : ILessonRepository
         entity.PlanCatalogId = lesson.PlanCatalogId;
         entity.PlanName = lesson.PlanName;
         entity.StartsAt = lesson.StartsAt;
+        entity.HasKnownStartTime = lesson.HasKnownStartTime;
         entity.DurationMinutes = lesson.DurationMinutes;
         entity.State = lesson.State;
         entity.GoogleCalendarEventId = lesson.GoogleCalendarEventId;
@@ -166,5 +167,6 @@ public sealed class SqliteLessonRepository : ILessonRepository
             entity.DurationMinutes,
             entity.State,
             entity.GoogleCalendarEventId,
-            entity.InvoiceNumber is null ? null : new InvoiceNumber(entity.InvoiceNumber.Value));
+            entity.InvoiceNumber is null ? null : new InvoiceNumber(entity.InvoiceNumber.Value),
+            entity.HasKnownStartTime);
 }

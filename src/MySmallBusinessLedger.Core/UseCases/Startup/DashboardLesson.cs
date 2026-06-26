@@ -13,4 +13,5 @@ public sealed record DashboardLesson(
     InvoiceNumber? InvoiceNumber = null,
     int PlanCatalogId = 0,
     string PlanName = "",
-    int LocalLessonId = 0);
+    int LocalLessonId = 0,
+    bool HasKnownStartTime = true);

@@ -2,11 +2,19 @@ using MySmallBusinessLedger.Core.Lessons;
 
 namespace MySmallBusinessLedger.Core.Calendar;
 
-public sealed record CalendarLessonEntry(string StudentShortName, DateTimeOffset StartsAt, LessonState State = LessonState.Planned)
+public sealed record CalendarLessonEntry(
+    string StudentShortName,
+    DateTimeOffset StartsAt,
+    LessonState State = LessonState.Planned,
+    bool HasKnownStartTime = true)
 {
     private const string CompletedStatusLine = "Status: Completed";
 
-    public static bool TryParse(string text, DateTimeOffset startsAt, out CalendarLessonEntry? entry)
+    public static bool TryParse(
+        string text,
+        DateTimeOffset startsAt,
+        out CalendarLessonEntry? entry,
+        bool hasKnownStartTime = true)
     {
         entry = null;
 
@@ -25,7 +33,7 @@ public sealed record CalendarLessonEntry(string StudentShortName, DateTimeOffset
         }
 
         var state = ParseState(text);
-        entry = new CalendarLessonEntry(shortName, startsAt, state);
+        entry = new CalendarLessonEntry(shortName, startsAt, state, hasKnownStartTime);
         return true;
     }
 

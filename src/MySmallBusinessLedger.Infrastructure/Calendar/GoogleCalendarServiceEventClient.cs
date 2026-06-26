@@ -65,11 +65,10 @@ public sealed class GoogleCalendarServiceEventClient : IGoogleCalendarEventClien
                 cancellationToken);
 
             events.AddRange((response.Items ?? [])
-                .Where(item => !string.IsNullOrWhiteSpace(item.Id) && item.Start?.DateTimeDateTimeOffset is not null)
-                .Select(item => new GoogleCalendarEvent(
-                    item.Id,
-                    item.Summary ?? string.Empty,
-                    item.Start!.DateTimeDateTimeOffset!.Value)));
+                .Where(item => !string.IsNullOrWhiteSpace(item.Id))
+                .Select(TryCreateGoogleCalendarEvent)
+                .Where(calendarEvent => calendarEvent is not null)
+                .Select(calendarEvent => calendarEvent!));
 
             pageToken = response.NextPageToken;
         }
@@ -104,14 +103,17 @@ public sealed class GoogleCalendarServiceEventClient : IGoogleCalendarEventClien
         string calendarId,
         string summary,
         DateTimeOffset startsAt,
+        bool hasKnownStartTime,
         TimeSpan duration,
         CancellationToken cancellationToken)
     {
         var calendarEvent = new Event
         {
             Summary = summary,
-            Start = CreateEventDateTime(startsAt),
-            End = CreateEventDateTime(startsAt.Add(duration))
+            Start = CreateEventDateTime(startsAt, hasKnownStartTime),
+            End = CreateEventDateTime(
+                hasKnownStartTime ? startsAt.Add(duration) : startsAt.AddDays(1),
+                hasKnownStartTime)
         };
 
         if (eventInsert is not null)
@@ -129,6 +131,7 @@ public sealed class GoogleCalendarServiceEventClient : IGoogleCalendarEventClien
         string calendarId,
         string eventId,
         DateTimeOffset startsAt,
+        bool hasKnownStartTime,
         CancellationToken cancellationToken)
     {
         var getRequest = calendarService.Events.Get(calendarId, eventId);
@@ -137,8 +140,10 @@ public sealed class GoogleCalendarServiceEventClient : IGoogleCalendarEventClien
         var duration = (existing.End?.DateTimeDateTimeOffset - existing.Start?.DateTimeDateTimeOffset)
             ?? TimeSpan.FromHours(1);
 
-        existing.Start = CreateEventDateTime(startsAt);
-        existing.End = CreateEventDateTime(startsAt.Add(duration));
+        existing.Start = CreateEventDateTime(startsAt, hasKnownStartTime);
+        existing.End = CreateEventDateTime(
+            hasKnownStartTime ? startsAt.Add(duration) : startsAt.AddDays(1),
+            hasKnownStartTime);
 
         var updateRequest = calendarService.Events.Update(existing, calendarId, eventId);
         await updateRequest.ExecuteAsync(cancellationToken);
@@ -161,12 +166,37 @@ public sealed class GoogleCalendarServiceEventClient : IGoogleCalendarEventClien
         await updateRequest.ExecuteAsync(cancellationToken);
     }
 
-    private EventDateTime CreateEventDateTime(DateTimeOffset value) =>
-        new()
+    private static GoogleCalendarEvent? TryCreateGoogleCalendarEvent(Event item)
+    {
+        if (item.Start?.DateTimeDateTimeOffset is { } dateTime)
         {
-            DateTimeDateTimeOffset = value,
-            TimeZone = timeZoneId
-        };
+            return new GoogleCalendarEvent(item.Id, item.Summary ?? string.Empty, dateTime);
+        }
+
+        if (!string.IsNullOrWhiteSpace(item.Start?.Date) &&
+            DateOnly.TryParseExact(item.Start.Date, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var date))
+        {
+            return new GoogleCalendarEvent(
+                item.Id,
+                item.Summary ?? string.Empty,
+                new DateTimeOffset(date.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero),
+                HasKnownStartTime: false);
+        }
+
+        return null;
+    }
+
+    private EventDateTime CreateEventDateTime(DateTimeOffset value, bool hasKnownStartTime) =>
+        hasKnownStartTime
+            ? new EventDateTime
+            {
+                DateTimeDateTimeOffset = value,
+                TimeZone = timeZoneId
+            }
+            : new EventDateTime
+            {
+                Date = DateOnly.FromDateTime(value.DateTime).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)
+            };
 
     private static string ToGoogleCalendarTimeZoneId(string value, string? region = null)
     {

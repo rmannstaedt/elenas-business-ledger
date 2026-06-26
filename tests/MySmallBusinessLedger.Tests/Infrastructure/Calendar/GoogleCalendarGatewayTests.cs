@@ -86,6 +86,31 @@ public sealed class GoogleCalendarGatewayTests
     }
 
     [Fact]
+    public async Task AddDateOnlyLessonCreatesMarkedAllDayEventThenRefreshesMonth()
+    {
+        var startsAt = new DateTimeOffset(2026, 6, 20, 0, 0, 0, TimeSpan.FromHours(2));
+        var client = new FakeGoogleCalendarEventClient
+        {
+            Events =
+            [
+                new GoogleCalendarEvent("created", "$ Anna", startsAt, HasKnownStartTime: false)
+            ]
+        };
+
+        var gateway = new GoogleCalendarGateway(client, CreateOptions(defaultLessonDuration: TimeSpan.FromMinutes(45)));
+        var result = await gateway.AddLessonAsync(
+            new LessonAddRequest("Anna", startsAt, HasKnownStartTime: false),
+            new DateOnly(2026, 6, 1),
+            CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal("$ Anna", client.CreatedSummary);
+        Assert.Equal(startsAt, client.CreatedStartsAt);
+        Assert.False(client.CreatedHasKnownStartTime);
+        Assert.Contains(result.Value!, lesson => lesson.Id == "created" && !lesson.HasKnownStartTime);
+    }
+
+    [Fact]
     public async Task PopulateLessonsCreatesMarkedEventsWithConfiguredDurationThenRefreshesMonth()
     {
         var client = new FakeGoogleCalendarEventClient
@@ -283,12 +308,41 @@ public sealed class GoogleCalendarGatewayTests
             "primary",
             "$ Anna",
             new DateTimeOffset(2026, 6, 23, 15, 0, 0, TimeSpan.FromHours(2)),
+            hasKnownStartTime: true,
             TimeSpan.FromMinutes(45),
             CancellationToken.None);
 
         Assert.Equal("created", createdId);
         Assert.Equal("Europe/Copenhagen", createdEvent?.Start?.TimeZone);
         Assert.Equal("Europe/Copenhagen", createdEvent?.End?.TimeZone);
+    }
+
+    [Fact]
+    public async Task GoogleCalendarServiceEventClientCreatesAllDayEventsForDateOnlyLessons()
+    {
+        Event? createdEvent = null;
+        var client = new GoogleCalendarServiceEventClient(
+            "Romance Standard Time",
+            "DK",
+            (calendarId, calendarEvent, cancellationToken) =>
+            {
+                createdEvent = calendarEvent;
+                return Task.FromResult(new Event { Id = "created" });
+            });
+
+        var createdId = await client.CreateLessonEventAsync(
+            "primary",
+            "$ Anna",
+            new DateTimeOffset(2026, 6, 23, 0, 0, 0, TimeSpan.FromHours(2)),
+            hasKnownStartTime: false,
+            TimeSpan.FromMinutes(45),
+            CancellationToken.None);
+
+        Assert.Equal("created", createdId);
+        Assert.Equal("2026-06-23", createdEvent?.Start?.Date);
+        Assert.Equal("2026-06-24", createdEvent?.End?.Date);
+        Assert.Null(createdEvent?.Start?.DateTimeDateTimeOffset);
+        Assert.Null(createdEvent?.End?.DateTimeDateTimeOffset);
     }
 
     [Fact]
@@ -380,6 +434,8 @@ public sealed class GoogleCalendarGatewayTests
 
         public DateTimeOffset? CreatedStartsAt { get; private set; }
 
+        public bool CreatedHasKnownStartTime { get; private set; } = true;
+
         public TimeSpan? CreatedDuration { get; private set; }
 
         public List<CreatedCalendarEvent> CreatedEvents { get; } = [];
@@ -387,6 +443,8 @@ public sealed class GoogleCalendarGatewayTests
         public string? MovedEventId { get; private set; }
 
         public DateTimeOffset? MovedStartsAt { get; private set; }
+
+        public bool MovedHasKnownStartTime { get; private set; } = true;
 
         public string? DeletedEventId { get; private set; }
 
@@ -415,6 +473,7 @@ public sealed class GoogleCalendarGatewayTests
             string calendarId,
             string summary,
             DateTimeOffset startsAt,
+            bool hasKnownStartTime,
             TimeSpan duration,
             CancellationToken cancellationToken)
         {
@@ -425,8 +484,9 @@ public sealed class GoogleCalendarGatewayTests
 
             CreatedSummary = summary;
             CreatedStartsAt = startsAt;
+            CreatedHasKnownStartTime = hasKnownStartTime;
             CreatedDuration = duration;
-            CreatedEvents.Add(new CreatedCalendarEvent(summary, startsAt, duration));
+            CreatedEvents.Add(new CreatedCalendarEvent(summary, startsAt, hasKnownStartTime, duration));
             return Task.FromResult("created");
         }
 
@@ -434,6 +494,7 @@ public sealed class GoogleCalendarGatewayTests
             string calendarId,
             string eventId,
             DateTimeOffset startsAt,
+            bool hasKnownStartTime,
             CancellationToken cancellationToken)
         {
             if (WriteException is not null)
@@ -443,6 +504,7 @@ public sealed class GoogleCalendarGatewayTests
 
             MovedEventId = eventId;
             MovedStartsAt = startsAt;
+            MovedHasKnownStartTime = hasKnownStartTime;
             return Task.CompletedTask;
         }
 
@@ -477,5 +539,6 @@ public sealed class GoogleCalendarGatewayTests
     private sealed record CreatedCalendarEvent(
         string Summary,
         DateTimeOffset StartsAt,
+        bool HasKnownStartTime,
         TimeSpan Duration);
 }

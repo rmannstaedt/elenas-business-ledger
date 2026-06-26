@@ -11,17 +11,22 @@ public sealed class LessonDisplayModel : ViewModelBase
     private const int FirstTimeOptionHour = 8;
     private const int LastTimeOptionHour = 20;
     private const int TimeOptionIntervalMinutes = 15;
+    public const string NoTimeOptionText = "No time";
 
-    private static readonly IReadOnlyList<string> TimeOptionValues = Enumerable
-        .Range(0, (((LastTimeOptionHour - FirstTimeOptionHour) * 60) / TimeOptionIntervalMinutes) + 1)
-        .Select(index => new TimeOnly(FirstTimeOptionHour, 0)
-            .AddMinutes(index * TimeOptionIntervalMinutes)
-            .ToString("HH\\:mm", CultureInfo.InvariantCulture))
-        .ToArray();
+    private static readonly IReadOnlyList<string> TimeOptionValues =
+    [
+        NoTimeOptionText,
+        .. Enumerable
+            .Range(0, (((LastTimeOptionHour - FirstTimeOptionHour) * 60) / TimeOptionIntervalMinutes) + 1)
+            .Select(index => new TimeOnly(FirstTimeOptionHour, 0)
+                .AddMinutes(index * TimeOptionIntervalMinutes)
+                .ToString("HH\\:mm", CultureInfo.InvariantCulture))
+    ];
 
     private TimeZoneInfo lessonTimeZone;
     private string id;
     private DateTimeOffset? savedStartsAt;
+    private bool savedHasKnownStartTime = true;
     private DateTime? startsOnDate;
     private string startsAtTimeText;
     private LessonState state;
@@ -36,8 +41,11 @@ public sealed class LessonDisplayModel : ViewModelBase
         StudentShortName = lesson.StudentShortName;
         this.lessonTimeZone = lessonTimeZone ?? TimeZoneInfo.Local;
         startsOnDate = lesson.StartsAt.Date;
-        startsAtTimeText = lesson.StartsAt.ToString("HH:mm", CultureInfo.InvariantCulture);
+        startsAtTimeText = lesson.HasKnownStartTime
+            ? lesson.StartsAt.ToString("HH:mm", CultureInfo.InvariantCulture)
+            : string.Empty;
         savedStartsAt = lesson.StartsAt;
+        savedHasKnownStartTime = lesson.HasKnownStartTime;
         state = lesson.State;
         IsInvoiced = lesson.IsInvoiced;
         InvoiceNumber = lesson.InvoiceNumber;
@@ -93,6 +101,7 @@ public sealed class LessonDisplayModel : ViewModelBase
                 OnPropertyChanged(nameof(StartsAt));
                 OnPropertyChanged(nameof(StartsAtText));
                 OnPropertyChanged(nameof(StartsOnDateText));
+                OnPropertyChanged(nameof(HasDateTimeChange));
             }
         }
     }
@@ -106,6 +115,8 @@ public sealed class LessonDisplayModel : ViewModelBase
             {
                 OnPropertyChanged(nameof(StartsAt));
                 OnPropertyChanged(nameof(StartsAtText));
+                OnPropertyChanged(nameof(HasKnownStartTime));
+                OnPropertyChanged(nameof(HasDateTimeChange));
             }
         }
     }
@@ -153,7 +164,8 @@ public sealed class LessonDisplayModel : ViewModelBase
 
     public bool CanToggleState => !IsDraft && !IsInvoiced;
 
-    public bool HasDateTimeChange => TryGetStartsAt(out var startsAt) && startsAt != savedStartsAt;
+    public bool HasDateTimeChange => HasDateOrTimeChange();
+    public bool HasKnownStartTime => !string.IsNullOrWhiteSpace(StartsAtTimeText);
 
     public PaymentStatus? PaymentStatus
     {
@@ -168,7 +180,9 @@ public sealed class LessonDisplayModel : ViewModelBase
     }
 
     public string StartsAtText => TryGetStartsAt(out var startsAt)
-        ? startsAt.ToString("dd-MM-yyyy HH:mm", CultureInfo.InvariantCulture)
+        ? HasKnownStartTime
+            ? startsAt.ToString("dd-MM-yyyy HH:mm", CultureInfo.InvariantCulture)
+            : startsAt.ToString("dd-MM-yyyy", CultureInfo.InvariantCulture)
         : string.Empty;
 
     public string StartsOnDateText => StartsOnDate is { } date
@@ -205,14 +219,18 @@ public sealed class LessonDisplayModel : ViewModelBase
     public void AcceptDateTimeChange()
     {
         savedStartsAt = StartsAt;
+        savedHasKnownStartTime = HasKnownStartTime;
     }
 
     public void AcceptCreatedLesson(CalendarLesson lesson)
     {
         id = lesson.Id;
         startsOnDate = lesson.StartsAt.Date;
-        startsAtTimeText = lesson.StartsAt.ToString("HH:mm", CultureInfo.InvariantCulture);
+        startsAtTimeText = lesson.HasKnownStartTime
+            ? lesson.StartsAt.ToString("HH:mm", CultureInfo.InvariantCulture)
+            : string.Empty;
         savedStartsAt = lesson.StartsAt;
+        savedHasKnownStartTime = lesson.HasKnownStartTime;
         IsDraft = false;
         OnPropertyChanged(nameof(Id));
         OnPropertyChanged(nameof(CanEditPlan));
@@ -232,13 +250,29 @@ public sealed class LessonDisplayModel : ViewModelBase
 
     public bool TryGetStartsAt(out DateTimeOffset startsAt)
     {
+        return TryGetStartsAt(out startsAt, out _);
+    }
+
+    public bool TryGetStartsAt(out DateTimeOffset startsAt, out bool hasKnownStartTime)
+    {
         startsAt = default;
+        hasKnownStartTime = false;
         if (StartsOnDate is not { } date)
         {
             return false;
         }
 
-        if (!TimeOnly.TryParseExact(StartsAtTimeText, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var time))
+        TimeOnly time;
+        if (string.IsNullOrWhiteSpace(StartsAtTimeText))
+        {
+            time = TimeOnly.MinValue;
+        }
+        else if (TimeOnly.TryParseExact(StartsAtTimeText, "HH:mm", CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsedTime))
+        {
+            time = parsedTime;
+            hasKnownStartTime = true;
+        }
+        else
         {
             return false;
         }
@@ -247,4 +281,8 @@ public sealed class LessonDisplayModel : ViewModelBase
         startsAt = new DateTimeOffset(localDateTime, lessonTimeZone.GetUtcOffset(localDateTime));
         return true;
     }
+
+    public bool HasDateOrTimeChange() =>
+        TryGetStartsAt(out var startsAt, out var hasKnownStartTime) &&
+        (startsAt != savedStartsAt || hasKnownStartTime != savedHasKnownStartTime);
 }

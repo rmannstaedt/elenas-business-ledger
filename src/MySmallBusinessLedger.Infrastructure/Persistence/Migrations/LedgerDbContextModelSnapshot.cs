@@ -241,6 +241,11 @@ namespace MySmallBusinessLedger.Infrastructure.Persistence.Migrations
                     b.Property<int>("IssuedInvoiceEntityId")
                         .HasColumnType("INTEGER");
 
+                    b.Property<bool>("HasKnownLessonTime")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(true);
+
                     b.Property<string>("LessonDateTime")
                         .IsRequired()
                         .HasMaxLength(40)
@@ -280,6 +285,11 @@ namespace MySmallBusinessLedger.Infrastructure.Persistence.Migrations
                     b.Property<string>("GoogleCalendarEventId")
                         .HasMaxLength(500)
                         .HasColumnType("TEXT");
+
+                    b.Property<bool>("HasKnownStartTime")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(true);
 
                     b.Property<int?>("InvoiceNumber")
                         .HasColumnType("INTEGER");

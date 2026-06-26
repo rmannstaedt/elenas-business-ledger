@@ -1,3 +1,6 @@
 namespace MySmallBusinessLedger.Core.UseCases.Lessons;
 
-public sealed record LessonAddRequest(string StudentShortName, DateTimeOffset StartsAt);
+public sealed record LessonAddRequest(
+    string StudentShortName,
+    DateTimeOffset StartsAt,
+    bool HasKnownStartTime = true);

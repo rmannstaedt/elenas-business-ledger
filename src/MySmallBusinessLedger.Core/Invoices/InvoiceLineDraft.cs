@@ -9,9 +9,11 @@ public sealed class InvoiceLineDraft
         string planName,
         MoneyAmount priceWithoutVat,
         int planCatalogId = 0,
-        int lessonId = 0)
+        int lessonId = 0,
+        bool hasKnownLessonTime = true)
     {
         LessonDateTime = lessonDateTime;
+        HasKnownLessonTime = hasKnownLessonTime;
         PlanName = planName;
         PriceWithoutVat = priceWithoutVat;
         PlanCatalogId = planCatalogId;
@@ -19,6 +21,8 @@ public sealed class InvoiceLineDraft
     }
 
     public DateTimeOffset LessonDateTime { get; }
+
+    public bool HasKnownLessonTime { get; }
 
     public string PlanName { get; }
 

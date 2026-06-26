@@ -1398,7 +1398,8 @@ public sealed class MainWindowViewModelTests
 
         var options = viewModel.Lessons[0].TimeOptions;
 
-        Assert.Equal("08:00", options.First());
+        Assert.Equal(LessonDisplayModel.NoTimeOptionText, options.First());
+        Assert.Equal("08:00", options.Skip(1).First());
         Assert.Equal("20:00", options.Last());
         Assert.DoesNotContain("07:45", options);
         Assert.DoesNotContain("20:15", options);
@@ -1407,8 +1408,25 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public async Task DatedDraftLessonSortsIntoLessonListAndRemainsSelected()
     {
+        var dashboard = new FakeDashboardService
+        {
+            LessonState = LessonState.Planned,
+            LessonIsInvoiced = false,
+            LessonPaymentStatus = null,
+            DashboardLessonsAfterFirstLoad =
+            [
+                new DashboardLesson(
+                    "new-lesson",
+                    "Anna",
+                    new DateTimeOffset(2026, 6, 15, 14, 0, 0, TimeSpan.FromHours(2)),
+                    LessonState.Planned,
+                    IsInvoiced: false,
+                    PaymentStatus: null,
+                    LocalLessonId: 19)
+            ]
+        };
         var viewModel = CreateViewModel(
-            dashboard: new FakeDashboardService { LessonState = LessonState.Planned, LessonIsInvoiced = false, LessonPaymentStatus = null },
+            dashboard: dashboard,
             lessonTimeZone: TimeZoneInfo.FindSystemTimeZoneById("Romance Standard Time"));
         await viewModel.LoadAsync();
         await viewModel.AddLessonCommand.ExecuteAsync();
@@ -1417,17 +1435,36 @@ public sealed class MainWindowViewModelTests
         draft.StartsAtTimeText = "14:00";
         draft.StartsOnDate = new DateTime(2026, 6, 15);
 
-        Assert.Same(draft, viewModel.Lessons[0]);
-        Assert.Same(draft, viewModel.SelectedLesson);
-        Assert.Equal("Monday 15-06", draft.StartsOnDateText);
+        await EventuallyAsync(() => viewModel.SelectedLesson?.Id == "new-lesson");
+        var selectedLesson = viewModel.SelectedLesson!;
+        Assert.Same(selectedLesson, viewModel.Lessons[0]);
+        Assert.Equal("Monday 15-06", selectedLesson.StartsOnDateText);
+        Assert.True(selectedLesson.CanEditPlan);
     }
 
     [Fact]
     public async Task CompleteDraftLessonAutosavesWhenDateAndTimeAreSet()
     {
         var lessonEditor = new FakeLessonEditorService();
+        var dashboard = new FakeDashboardService
+        {
+            LessonState = LessonState.Planned,
+            LessonIsInvoiced = false,
+            LessonPaymentStatus = null,
+            DashboardLessonsAfterFirstLoad =
+            [
+                new DashboardLesson(
+                    "new-lesson",
+                    "Anna",
+                    new DateTimeOffset(2026, 6, 15, 14, 0, 0, TimeSpan.FromHours(2)),
+                    LessonState.Planned,
+                    IsInvoiced: false,
+                    PaymentStatus: null,
+                    LocalLessonId: 19)
+            ]
+        };
         var viewModel = CreateViewModel(
-            dashboard: new FakeDashboardService { LessonState = LessonState.Planned, LessonIsInvoiced = false, LessonPaymentStatus = null },
+            dashboard: dashboard,
             lessonEditorService: lessonEditor,
             lessonTimeZone: TimeZoneInfo.FindSystemTimeZoneById("Romance Standard Time"));
         await viewModel.LoadAsync();
@@ -1440,8 +1477,53 @@ public sealed class MainWindowViewModelTests
         await EventuallyAsync(() => lessonEditor.AddWasCalled);
         Assert.Equal("Anna", lessonEditor.LastAddRequest?.StudentShortName);
         Assert.Equal(new DateTimeOffset(2026, 6, 15, 14, 0, 0, TimeSpan.FromHours(2)), lessonEditor.LastAddRequest?.StartsAt);
+        Assert.True(lessonEditor.LastAddRequest?.HasKnownStartTime == true);
         Assert.False(draft.IsDraft);
-        Assert.Same(draft, viewModel.SelectedLesson);
+        await EventuallyAsync(() => viewModel.SelectedLesson?.Id == "new-lesson");
+        Assert.True(viewModel.SelectedLesson!.CanEditPlan);
+    }
+
+    [Fact]
+    public async Task DateOnlyDraftLessonAutosavesAndRemainsDateOnlyAfterRefresh()
+    {
+        var lessonEditor = new FakeLessonEditorService();
+        var dashboard = new FakeDashboardService
+        {
+            LessonState = LessonState.Planned,
+            LessonIsInvoiced = false,
+            LessonPaymentStatus = null,
+            DashboardLessonsAfterFirstLoad =
+            [
+                new DashboardLesson(
+                    "new-lesson",
+                    "Anna",
+                    new DateTimeOffset(2026, 6, 15, 0, 0, 0, TimeSpan.FromHours(2)),
+                    LessonState.Planned,
+                    IsInvoiced: false,
+                    PaymentStatus: null,
+                    LocalLessonId: 19,
+                    HasKnownStartTime: false)
+            ]
+        };
+        var viewModel = CreateViewModel(
+            dashboard: dashboard,
+            lessonEditorService: lessonEditor,
+            lessonTimeZone: TimeZoneInfo.FindSystemTimeZoneById("Romance Standard Time"));
+        await viewModel.LoadAsync();
+        await viewModel.AddLessonCommand.ExecuteAsync();
+        var draft = viewModel.SelectedLesson!;
+
+        draft.StartsOnDate = new DateTime(2026, 6, 15);
+
+        await EventuallyAsync(() => lessonEditor.AddWasCalled);
+        Assert.Equal("Anna", lessonEditor.LastAddRequest?.StudentShortName);
+        Assert.Equal(new DateTimeOffset(2026, 6, 15, 0, 0, 0, TimeSpan.FromHours(2)), lessonEditor.LastAddRequest?.StartsAt);
+        Assert.True(lessonEditor.LastAddRequest?.HasKnownStartTime == false);
+        await EventuallyAsync(() => viewModel.SelectedLesson?.Id == "new-lesson");
+        var selectedLesson = viewModel.SelectedLesson!;
+        Assert.False(selectedLesson.HasKnownStartTime);
+        Assert.Equal(string.Empty, selectedLesson.StartsAtTimeText);
+        Assert.True(selectedLesson.CanEditPlan);
     }
 
     [Fact]
@@ -1477,7 +1559,6 @@ public sealed class MainWindowViewModelTests
         await viewModel.LoadAsync();
         await viewModel.AddLessonCommand.ExecuteAsync();
         var draft = viewModel.SelectedLesson!;
-        draft.StartsOnDate = new DateTime(2026, 6, 1);
         clock.Now = clock.Now.AddSeconds(11);
 
         await viewModel.RefreshAfterActivationAsync();
@@ -2003,6 +2084,8 @@ public sealed class MainWindowViewModelTests
 
         public IReadOnlyList<DashboardLesson>? DashboardLessons { get; init; }
 
+        public IReadOnlyList<DashboardLesson>? DashboardLessonsAfterFirstLoad { get; init; }
+
         public IReadOnlyList<DashboardPlanOption>? PlanOptions { get; init; }
 
         public OperationResult<StartupDashboardResult>? NextResult { get; set; }
@@ -2042,11 +2125,14 @@ public sealed class MainWindowViewModelTests
                 await BeforeReturnAsync(selectedStudentShortName);
             }
 
+            var dashboardLessons = LoadCount > 1 && DashboardLessonsAfterFirstLoad is not null
+                ? DashboardLessonsAfterFirstLoad
+                : DashboardLessons;
             var result = NextResult ?? OperationResult<StartupDashboardResult>.Success(
                 new StartupDashboardResult(
                     currentStudent,
                     StudentShortNames,
-                    DashboardLessons ??
+                    dashboardLessons ??
                     [
                             new DashboardLesson(
                                 "lesson-1",
@@ -2284,7 +2370,11 @@ public sealed class MainWindowViewModelTests
             AddWasCalled = true;
             LastAddRequest = request;
             return Task.FromResult(OperationResult<IReadOnlyList<MySmallBusinessLedger.Core.Calendar.CalendarLesson>>.Success(
-                [new MySmallBusinessLedger.Core.Calendar.CalendarLesson("new-lesson", request.StudentShortName, request.StartsAt)]));
+                [new MySmallBusinessLedger.Core.Calendar.CalendarLesson(
+                    "new-lesson",
+                    request.StudentShortName,
+                    request.StartsAt,
+                    HasKnownStartTime: request.HasKnownStartTime)]));
         }
 
         public Task<OperationResult<PopulateCalendarResult>> PopulateCalendarAsync(

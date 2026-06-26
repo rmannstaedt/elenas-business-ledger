@@ -156,6 +156,7 @@ public sealed class LedgerDbContext : DbContext
             entity.HasIndex(line => line.LessonDateTime);
             entity.HasIndex(line => line.PlanCatalogId);
             entity.Property(line => line.LessonDateTime).HasMaxLength(40).IsRequired();
+            entity.Property(line => line.HasKnownLessonTime).HasDefaultValue(true);
             entity.Property(line => line.PlanName).HasMaxLength(200).IsRequired();
             entity.Property(line => line.Currency).HasMaxLength(3).IsRequired();
         });
@@ -164,6 +165,7 @@ public sealed class LedgerDbContext : DbContext
         {
             entity.HasKey(lesson => lesson.Id);
             entity.Property(lesson => lesson.PlanName).HasMaxLength(200).IsRequired();
+            entity.Property(lesson => lesson.HasKnownStartTime).HasDefaultValue(true);
             entity.Property(lesson => lesson.State).HasConversion<string>().HasMaxLength(50).IsRequired();
             entity.Property(lesson => lesson.GoogleCalendarEventId).HasMaxLength(500);
             entity.HasIndex(lesson => lesson.GoogleCalendarEventId).IsUnique();

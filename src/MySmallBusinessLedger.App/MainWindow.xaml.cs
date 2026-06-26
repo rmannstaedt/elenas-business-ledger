@@ -440,7 +440,7 @@ public partial class MainWindow : Window
             MinWidth = width,
             Width = width,
             SelectedItem = string.IsNullOrWhiteSpace(lesson.StartsAtTimeText)
-                ? null
+                ? LessonDisplayModel.NoTimeOptionText
                 : lesson.StartsAtTimeText
         };
         timeList.SelectionChanged += OnLessonTimeSelectionChanged;
@@ -497,7 +497,9 @@ public partial class MainWindow : Window
             return;
         }
 
-        lesson.StartsAtTimeText = selectedTime;
+        lesson.StartsAtTimeText = selectedTime == LessonDisplayModel.NoTimeOptionText
+            ? string.Empty
+            : selectedTime;
         CloseOpenLessonTimePanel();
         await ViewModel.SaveLessonCommand.ExecuteAsync(lesson);
     }

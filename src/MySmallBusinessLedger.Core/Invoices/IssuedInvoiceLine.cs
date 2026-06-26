@@ -6,4 +6,5 @@ public sealed record IssuedInvoiceLine(
     DateTimeOffset LessonDateTime,
     string PlanName,
     MoneyAmount PriceWithoutVat,
-    int PlanCatalogId = 0);
+    int PlanCatalogId = 0,
+    bool HasKnownLessonTime = true);

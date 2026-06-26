@@ -105,6 +105,28 @@ public sealed class UseCaseTests
     }
 
     [Fact]
+    public async Task StartupDashboardIgnoresCalendarLessonsWithoutKnownActiveStudentWhenUsingLocalLessonLedger()
+    {
+        var startsAt = new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.Zero);
+        var students = new FakeStudentRepository([]);
+        var calendar = new FakeCalendarGateway([new CalendarLesson("calendar-unknown", "Unknown", startsAt)]);
+        var lessons = new FakeLessonRepository();
+        var query = new StartupDashboardQuery(
+            students,
+            calendar,
+            new FakeInvoiceRepository(),
+            new FakeClock(startsAt),
+            lessonRepository: lessons);
+
+        var result = await query.ExecuteAsync(new DateOnly(2026, 6, 1), selectedStudentShortName: null, CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        Assert.Null(result.Value!.CurrentStudentShortName);
+        Assert.Empty(result.Value.Lessons);
+        Assert.Empty(lessons.SavedLessons);
+    }
+
+    [Fact]
     public async Task StartupDashboardKeepsInvoicedLocalLessonWhenCalendarEventWasDeleted()
     {
         var startsAt = new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.Zero);

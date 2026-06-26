@@ -187,14 +187,15 @@ Lessons that are completed or invoiced:yes CAN NOT be edited or deleted in the m
 The only allowed operation on a Completed lesson is to mark it back to Planned. This requires an explicit confirmation prompt. Once a Completed lesson has been marked back to Planned, and provided it is still invoiced:no, it can again be edited as a planned lesson.
 
 The planned and invoiced:no entries in the lesson list may be edited directly in the main window:
-  * date/time may be changed
+  * date may be changed
+  * time may be changed or cleared
   * plan may be changed
   * lesson may be cancelled (deleted)
   * new lesson may be added
 
-Adding a lesson creates a new empty planned row for the current student in the main lesson list. If the displayed month is not the current month, the new row starts on the first day of the displayed month. The user fills in the date/time directly in that row.
+Adding a lesson creates a new empty planned row for the current student in the main lesson list. If the displayed month is not the current month, the new row starts on the first day of the displayed month. The user fills in the date, and may optionally fill in a time, directly in that row.
 
-Lesson date editing uses a date selector. Lesson time editing provides a time selector from 08:00 through 20:00 in 15-minute increments while still allowing typed time input. Lesson cancellation uses an explicit delete action with a confirmation prompt.
+Lesson date editing uses a date selector. A lesson date is required. Lesson time is optional: a lesson without a known time is saved as an all-day Google Calendar event, displays without a time in the lesson list, and prints without a time on invoices. Lesson time editing provides a no-time option plus a time selector from 08:00 through 20:00 in 15-minute increments while still allowing typed time input. Lesson cancellation uses an explicit delete action with a confirmation prompt.
 
 Schedule changes to the lessons in the lesson list are saved directly in Google Calendar.
 If the update of Google Calendar fails, the user is notified immediately so they can take corrective action.
