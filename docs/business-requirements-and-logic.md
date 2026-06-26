@@ -25,7 +25,10 @@
 ### Lesson
     date/time
     student
+    plan identity
     plan name
+    Google Calendar event id, when linked
+    invoice number, when invoiced
 
 ### Company
     name
@@ -69,7 +72,7 @@
 
 The student schedule is the agreed weekday(s) and time(s) that the student will have their Lesson. This is an indication and individual Lessons may be cancelled or moved. Likewise, the student schedule may be edited for permanent alteration.
 
-Issued invoice lines are stored when an invoice is issued. The local app does not maintain a separate Lessons table; lesson invoice/payment status is derived from issued invoice data and Google Calendar remains the lesson schedule source.
+Lessons are stored locally before invoice issue. Google Calendar remains the operational schedule source for uninvoiced lessons, but local `Lessons` records are the durable ledger records used for billing and invoice locking.
 
 The Plan is an agreement between teacher and student and determines how many lessons there are per week and how much the student will pay for them. If the 'lessons per week' is 'by appointment', there is no fixed number.
 
@@ -101,9 +104,9 @@ When a Student starts, the Student Plan start date marks the first lesson.
 
 The application will sync with Google Calendar.
 
-Google Calendar is the repository of truth for all future lessons.
-Google Calendar is also the repository of truth for past lessons *until* an invoice is issued for them.
-Once an invoice is issued, issued invoice lines are the durable local repository of truth for the invoiced lesson snapshots.
+Google Calendar is the repository of truth for scheduling details of uninvoiced lessons.
+Once a lesson is invoiced, the local lesson record is locked to that invoice and later Google Calendar edits or deletions are ignored for billing and audit purposes.
+Issued invoice lines remain immutable invoice-time snapshots for the printed invoice content.
 
 Google authorization requests the `https://www.googleapis.com/auth/calendar.events.owned` OAuth scope. This lets the app read, create, move, complete, and delete events on Google calendars owned by the signed-in account, including lesson appointments the user creates manually in Google Calendar. The configured calendar should therefore be owned by that account; the app does not request broader all-calendar event access merely to inspect shared calendars.
 
@@ -118,7 +121,7 @@ The first line remains the ownership/matching marker. A completed uninvoiced les
 
 If that later status line is absent, the lesson is treated as Planned.
 
-When an Invoice is issued, it is added to the Invoice table with its issued invoice lines. Those issued invoice lines are the durable local record of which lessons were invoiced.
+When an Invoice is issued, it is added to the Invoice table with its issued invoice lines, and the included local Lessons are linked to that Invoice number. Those lesson links are the durable local record of which lessons were invoiced.
 
 Issued Invoice lines store the catalog Plan identity for lineage/reporting and also store the Plan name as it appeared when the Invoice was issued. Invoice viewing and PDF output use the stored issued-time Plan name snapshot, not current catalog names and not a derived lookup through Plan name-change history.
 
@@ -135,6 +138,7 @@ Upon startup the application displays a window containing the current student sh
 
 Each lesson in the list contains:
   - date/time
+  - plan
   - state: completed / planned
   - invoiced: yes / no
   - paid: yes / outstanding (only if invoiced)
@@ -184,10 +188,11 @@ The only allowed operation on a Completed lesson is to mark it back to Planned. 
 
 The planned and invoiced:no entries in the lesson list may be edited directly in the main window:
   * date/time may be changed
+  * plan may be changed
   * lesson may be cancelled (deleted)
   * new lesson may be added
 
-Adding a lesson creates a new empty planned row for the current student in the main lesson list. The user fills in the date/time directly in that row.
+Adding a lesson creates a new empty planned row for the current student in the main lesson list. If the displayed month is not the current month, the new row starts on the first day of the displayed month. The user fills in the date/time directly in that row.
 
 Lesson date editing uses a date selector. Lesson time editing provides a time selector from 08:00 through 20:00 in 15-minute increments while still allowing typed time input. Lesson cancellation uses an explicit delete action with a confirmation prompt.
 
@@ -199,7 +204,7 @@ If the update of Google Calendar fails, the user is notified immediately so they
 Invoices are written by the press of a button in the main application window: "Write Invoice"
 
 Before the invoice is written, the system will display a dialogue with student short names.
-The dialogue will list all students with lessons that day, who have not yet had an invoice printed this month.
+The dialogue will list all students with local uninvoiced lessons in the selected period. A student may appear even if another invoice already exists for that same month, provided later lessons remain uninvoiced.
 When opened from the main window, the dialogue will preselect the currently displayed Student if that Student is still in the all-students list.
 If the currently displayed Student is not available, the dialogue will preselect the Student who has a lesson at the current time/date.
 If neither of those choices is available, the dialogue falls back to the first listed candidate/all-student entry so the visible selection remains explicit before Continue.
@@ -212,7 +217,7 @@ The Invoice will contain the Company information.
 The Invoice will contain the Student information.
 The Invoice will contain the period/month it is written for.
 The Invoice will contain grouped service lines summarizing lessons by issued lesson plan and price.
-The Invoice will contain a single clear list of lessons matching the information for that Student in Google Calendar.
+The Invoice will contain a single clear list of local uninvoiced lessons selected for that Student.
 If the invoice covers lessons under more than one Plan, the explanatory text lists the plan change with the cut-over date.
 The Invoice will contain VAT information, if currently relevant.
 VAT applicability is based on the invoice period start date, not the invoice issue/print date.

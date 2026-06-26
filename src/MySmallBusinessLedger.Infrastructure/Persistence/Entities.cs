@@ -1,5 +1,6 @@
 using MySmallBusinessLedger.Core.Company;
 using MySmallBusinessLedger.Core.Invoices;
+using MySmallBusinessLedger.Core.Lessons;
 using MySmallBusinessLedger.Core.Plans;
 using MySmallBusinessLedger.Core.Students;
 
@@ -93,6 +94,8 @@ public sealed class StudentEntity
     public List<StudentPlanPeriodEntity> PlanPeriods { get; } = [];
 
     public List<StudentScheduleEntryEntity> ScheduleEntries { get; } = [];
+
+    public List<LessonEntity> Lessons { get; } = [];
 }
 
 public sealed class StudentPlanPeriodEntity
@@ -228,4 +231,29 @@ public sealed class IssuedInvoiceLineEntity
     public decimal PriceWithoutVatAmount { get; set; }
 
     public string Currency { get; set; } = "DKK";
+}
+
+public sealed class LessonEntity
+{
+    public int Id { get; set; }
+
+    public int StudentId { get; set; }
+
+    public StudentEntity Student { get; set; } = null!;
+
+    public int PlanCatalogId { get; set; }
+
+    public PlanCatalogEntity PlanCatalog { get; set; } = null!;
+
+    public string PlanName { get; set; } = string.Empty;
+
+    public DateTimeOffset StartsAt { get; set; }
+
+    public int DurationMinutes { get; set; }
+
+    public LessonState State { get; set; }
+
+    public string? GoogleCalendarEventId { get; set; }
+
+    public int? InvoiceNumber { get; set; }
 }

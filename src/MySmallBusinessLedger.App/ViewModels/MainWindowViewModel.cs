@@ -28,6 +28,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private readonly IUiClock clock;
     private readonly TimeZoneInfo lessonTimeZone;
     private readonly HashSet<LessonDisplayModel> autoSavingDraftLessons = [];
+    private readonly HashSet<LessonDisplayModel> savingPlanLessons = [];
     private long studentOverviewSelectionVersion;
     private DateTimeOffset? lastRefreshAt;
     private string? currentStudentShortName;
@@ -122,6 +123,8 @@ public sealed class MainWindowViewModel : ViewModelBase
     }
 
     public ObservableCollection<LessonDisplayModel> Lessons { get; } = [];
+
+    public ObservableCollection<DashboardPlanOption> PlanOptions { get; } = [];
 
     public ObservableCollection<InvoiceDisplayModel> Invoices { get; } = [];
 
@@ -481,7 +484,10 @@ public sealed class MainWindowViewModel : ViewModelBase
             return Task.CompletedTask;
         }
 
-        var draft = LessonDisplayModel.CreateDraft(CurrentStudentShortName, lessonTimeZone);
+        DateTime? defaultDate = DisplayMonth == CurrentMonth()
+            ? null
+            : DisplayMonth.ToDateTime(TimeOnly.MinValue);
+        var draft = LessonDisplayModel.CreateDraft(CurrentStudentShortName, lessonTimeZone, defaultDate);
         AddLessonRow(draft);
         SelectedLesson = draft;
         RaiseCommandAvailabilityChanged();
@@ -749,6 +755,12 @@ public sealed class MainWindowViewModel : ViewModelBase
             .ToArray();
         RefreshSelectableStudentShortNames();
         studentNavigationEntries = dashboard.StudentNavigationEntries.ToArray();
+        PlanOptions.Clear();
+        foreach (var planOption in dashboard.PlanOptions ?? [])
+        {
+            PlanOptions.Add(planOption);
+        }
+
         var suppressNavigationSelection = suppressNavigationSelectionOnce;
         suppressNavigationSelectionOnce = false;
         selectedStudentNavigationIndex = suppressNavigationSelection
@@ -957,13 +969,57 @@ public sealed class MainWindowViewModel : ViewModelBase
     private void OnLessonPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (sender is not LessonDisplayModel lesson ||
-            e.PropertyName is not (nameof(LessonDisplayModel.StartsAt) or nameof(LessonDisplayModel.StartsAtTimeText)))
+            e.PropertyName is not (nameof(LessonDisplayModel.StartsAt) or
+                                   nameof(LessonDisplayModel.StartsAtTimeText) or
+                                   nameof(LessonDisplayModel.PlanCatalogId)))
         {
+            return;
+        }
+
+        if (e.PropertyName == nameof(LessonDisplayModel.PlanCatalogId))
+        {
+            TrySaveLessonPlanChange(lesson);
             return;
         }
 
         SortLessonsPreservingSelection(lesson);
         TryAutoSaveCompleteDraftLesson(lesson);
+    }
+
+    private void TrySaveLessonPlanChange(LessonDisplayModel lesson)
+    {
+        if (!lesson.CanEditPlan ||
+            lesson.PlanCatalogId <= 0 ||
+            savingPlanLessons.Contains(lesson))
+        {
+            return;
+        }
+
+        savingPlanLessons.Add(lesson);
+        _ = SaveLessonPlanChangeAsync(lesson);
+    }
+
+    private async Task SaveLessonPlanChangeAsync(LessonDisplayModel lesson)
+    {
+        try
+        {
+            var result = await lessonEditorService.UpdatePlanAsync(
+                lesson.LocalLessonId,
+                lesson.PlanCatalogId,
+                CancellationToken.None);
+            if (!result.Succeeded)
+            {
+                ErrorMessage = result.Errors.FirstOrDefault()?.Message ?? "Could not update lesson plan.";
+                return;
+            }
+
+            lesson.AcceptPlanChange(result.Value!);
+            ErrorMessage = null;
+        }
+        finally
+        {
+            savingPlanLessons.Remove(lesson);
+        }
     }
 
     private void SortLessonsPreservingSelection(LessonDisplayModel? lessonToKeepSelected)

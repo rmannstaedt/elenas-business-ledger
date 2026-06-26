@@ -2,6 +2,7 @@ using MySmallBusinessLedger.App.Services;
 using MySmallBusinessLedger.App.ViewModels;
 using MySmallBusinessLedger.Core.Calendar;
 using MySmallBusinessLedger.Core.Common;
+using MySmallBusinessLedger.Core.Lessons;
 using MySmallBusinessLedger.Core.Plans;
 using MySmallBusinessLedger.Core.Students;
 using MySmallBusinessLedger.Core.UseCases.Lessons;
@@ -425,6 +426,13 @@ public sealed class EditorViewModelTests
             DateOnly refreshMonth,
             CancellationToken cancellationToken) =>
             Task.FromResult(OperationResult<IReadOnlyList<CalendarLesson>>.Success([]));
+
+        public Task<OperationResult<LessonRecord>> UpdatePlanAsync(
+            int lessonId,
+            int planCatalogId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(OperationResult<LessonRecord>.Failure(
+                new ValidationError("Test.NotImplemented", "This fake does not update lesson plans.")));
     }
 
 }

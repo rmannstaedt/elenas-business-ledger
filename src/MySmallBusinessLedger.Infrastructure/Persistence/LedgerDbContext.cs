@@ -27,6 +27,8 @@ public sealed class LedgerDbContext : DbContext
 
     public DbSet<IssuedInvoiceLineEntity> IssuedInvoiceLines => Set<IssuedInvoiceLineEntity>();
 
+    public DbSet<LessonEntity> Lessons => Set<LessonEntity>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<CompanyProfileEntity>(entity =>
@@ -95,6 +97,10 @@ public sealed class LedgerDbContext : DbContext
                 .WithOne(schedule => schedule.Student)
                 .HasForeignKey(schedule => schedule.StudentId)
                 .OnDelete(DeleteBehavior.Cascade);
+            entity.HasMany(student => student.Lessons)
+                .WithOne(lesson => lesson.Student)
+                .HasForeignKey(lesson => lesson.StudentId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<StudentPlanPeriodEntity>(entity =>
@@ -152,6 +158,21 @@ public sealed class LedgerDbContext : DbContext
             entity.Property(line => line.LessonDateTime).HasMaxLength(40).IsRequired();
             entity.Property(line => line.PlanName).HasMaxLength(200).IsRequired();
             entity.Property(line => line.Currency).HasMaxLength(3).IsRequired();
+        });
+
+        modelBuilder.Entity<LessonEntity>(entity =>
+        {
+            entity.HasKey(lesson => lesson.Id);
+            entity.Property(lesson => lesson.PlanName).HasMaxLength(200).IsRequired();
+            entity.Property(lesson => lesson.State).HasConversion<string>().HasMaxLength(50).IsRequired();
+            entity.Property(lesson => lesson.GoogleCalendarEventId).HasMaxLength(500);
+            entity.HasIndex(lesson => lesson.GoogleCalendarEventId).IsUnique();
+            entity.HasIndex(lesson => lesson.StartsAt);
+            entity.HasIndex(lesson => new { lesson.StudentId, lesson.StartsAt });
+            entity.HasOne(lesson => lesson.PlanCatalog)
+                .WithMany()
+                .HasForeignKey(lesson => lesson.PlanCatalogId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
     }
 }

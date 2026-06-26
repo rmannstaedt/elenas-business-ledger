@@ -27,6 +27,8 @@ public sealed class LessonDisplayModel : ViewModelBase
     private LessonState state;
     private PaymentStatus? paymentStatus;
     private bool isDraft;
+    private int planCatalogId;
+    private string planName = string.Empty;
 
     public LessonDisplayModel(DashboardLesson lesson, TimeZoneInfo? lessonTimeZone = null)
     {
@@ -40,14 +42,17 @@ public sealed class LessonDisplayModel : ViewModelBase
         IsInvoiced = lesson.IsInvoiced;
         InvoiceNumber = lesson.InvoiceNumber;
         paymentStatus = lesson.PaymentStatus;
+        LocalLessonId = lesson.LocalLessonId;
+        planCatalogId = lesson.PlanCatalogId;
+        planName = lesson.PlanName;
     }
 
-    private LessonDisplayModel(string studentShortName, TimeZoneInfo lessonTimeZone)
+    private LessonDisplayModel(string studentShortName, TimeZoneInfo lessonTimeZone, DateTime? startsOnDate)
     {
         id = $"draft-{Guid.NewGuid():N}";
         StudentShortName = studentShortName;
         this.lessonTimeZone = lessonTimeZone;
-        startsOnDate = null;
+        this.startsOnDate = startsOnDate;
         startsAtTimeText = string.Empty;
         state = LessonState.Planned;
         IsInvoiced = false;
@@ -56,12 +61,17 @@ public sealed class LessonDisplayModel : ViewModelBase
         isDraft = true;
     }
 
-    public static LessonDisplayModel CreateDraft(string studentShortName, TimeZoneInfo lessonTimeZone) =>
-        new(studentShortName, lessonTimeZone);
+    public static LessonDisplayModel CreateDraft(
+        string studentShortName,
+        TimeZoneInfo lessonTimeZone,
+        DateTime? startsOnDate = null) =>
+        new(studentShortName, lessonTimeZone, startsOnDate);
 
     public string Id => id;
 
     public string StudentShortName { get; }
+
+    public int LocalLessonId { get; private set; }
 
     public DateTimeOffset StartsAt
     {
@@ -111,6 +121,7 @@ public sealed class LessonDisplayModel : ViewModelBase
             {
                 OnPropertyChanged(nameof(StateText));
                 OnPropertyChanged(nameof(CanEdit));
+                OnPropertyChanged(nameof(CanEditPlan));
                 OnPropertyChanged(nameof(CanToggleState));
                 OnPropertyChanged(nameof(StateToggleToolTip));
             }
@@ -125,6 +136,7 @@ public sealed class LessonDisplayModel : ViewModelBase
             if (SetProperty(ref isDraft, value))
             {
                 OnPropertyChanged(nameof(CanEdit));
+                OnPropertyChanged(nameof(CanEditPlan));
                 OnPropertyChanged(nameof(CanToggleState));
                 OnPropertyChanged(nameof(HasDateTimeChange));
             }
@@ -136,6 +148,8 @@ public sealed class LessonDisplayModel : ViewModelBase
     public InvoiceNumber? InvoiceNumber { get; }
 
     public bool CanEdit => (IsDraft || State == LessonState.Planned) && !IsInvoiced;
+
+    public bool CanEditPlan => CanEdit && !IsDraft && LocalLessonId > 0;
 
     public bool CanToggleState => !IsDraft && !IsInvoiced;
 
@@ -163,6 +177,18 @@ public sealed class LessonDisplayModel : ViewModelBase
 
     public string StateText => State == LessonState.Completed ? "Completed" : "Planned";
 
+    public int PlanCatalogId
+    {
+        get => planCatalogId;
+        set => SetProperty(ref planCatalogId, value);
+    }
+
+    public string PlanName
+    {
+        get => planName;
+        private set => SetProperty(ref planName, value);
+    }
+
     public string StateToggleToolTip => State == LessonState.Completed
         ? "Mark lesson as planned"
         : "Mark lesson as completed";
@@ -189,11 +215,19 @@ public sealed class LessonDisplayModel : ViewModelBase
         savedStartsAt = lesson.StartsAt;
         IsDraft = false;
         OnPropertyChanged(nameof(Id));
+        OnPropertyChanged(nameof(CanEditPlan));
         OnPropertyChanged(nameof(StartsAt));
         OnPropertyChanged(nameof(StartsAtText));
         OnPropertyChanged(nameof(StartsOnDateText));
         OnPropertyChanged(nameof(StartsOnDate));
         OnPropertyChanged(nameof(StartsAtTimeText));
+    }
+
+    public void AcceptPlanChange(LessonRecord lesson)
+    {
+        planCatalogId = lesson.PlanCatalogId;
+        PlanName = lesson.PlanName;
+        OnPropertyChanged(nameof(PlanCatalogId));
     }
 
     public bool TryGetStartsAt(out DateTimeOffset startsAt)

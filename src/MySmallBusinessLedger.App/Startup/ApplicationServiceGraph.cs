@@ -18,6 +18,7 @@ internal sealed class ApplicationServiceGraph
     private ApplicationServiceGraph(
         AppPaths appPaths,
         IStudentRepository studentRepository,
+        ILessonRepository lessonRepository,
         IInvoiceRepository invoiceRepository,
         ICompanyProfileRepository companyProfileRepository,
         SqliteCalendarSettingsRepository calendarSettingsRepository,
@@ -34,6 +35,7 @@ internal sealed class ApplicationServiceGraph
     {
         AppPaths = appPaths;
         StudentRepository = studentRepository;
+        LessonRepository = lessonRepository;
         InvoiceRepository = invoiceRepository;
         CompanyProfileRepository = companyProfileRepository;
         CalendarSettingsRepository = calendarSettingsRepository;
@@ -52,6 +54,8 @@ internal sealed class ApplicationServiceGraph
     public AppPaths AppPaths { get; }
 
     public IStudentRepository StudentRepository { get; }
+
+    public ILessonRepository LessonRepository { get; }
 
     public IInvoiceRepository InvoiceRepository { get; }
 
@@ -82,6 +86,7 @@ internal sealed class ApplicationServiceGraph
     public static ApplicationServiceGraph Create(AppPaths appPaths, Func<LedgerDbContext> createContext)
     {
         var studentRepository = new SqliteStudentRepository(createContext);
+        var lessonRepository = new SqliteLessonRepository(createContext);
         var invoiceRepository = new SqliteInvoiceRepository(createContext);
         var companyProfileRepository = new SqliteCompanyProfileRepository(createContext);
         var calendarSettingsRepository = new SqliteCalendarSettingsRepository(createContext);
@@ -107,12 +112,23 @@ internal sealed class ApplicationServiceGraph
             new AddLessonUseCase(calendarGateway),
             new EditLessonUseCase(calendarGateway),
             new DeleteLessonUseCase(calendarGateway),
-            new PopulateCalendarUseCase(studentRepository, calendarGateway, TimeZoneInfo.Local));
+            new PopulateCalendarUseCase(studentRepository, calendarGateway, TimeZoneInfo.Local),
+            new UpdateLessonPlanUseCase(lessonRepository, planCatalogRepository));
         var invoiceWorkflowService = new CoreInvoiceWorkflowService(
-            new InvoiceCandidateSelectionUseCase(studentRepository, calendarGateway, invoiceRepository),
-            new InvoicePreviewUseCase(studentRepository, companyProfileRepository, calendarGateway),
+            new InvoiceCandidateSelectionUseCase(
+                studentRepository,
+                calendarGateway,
+                invoiceRepository,
+                lessonRepository: lessonRepository),
+            new InvoicePreviewUseCase(
+                studentRepository,
+                companyProfileRepository,
+                calendarGateway,
+                lessonRepository,
+                planCatalogRepository),
             companyProfileRepository,
             invoiceRepository,
+            lessonRepository,
             new QuestPdfInvoicePdfWriter(),
             new SavedPdfPrinter(new ShellPrintProcessLauncher(), new WindowsPrinterCatalog()),
             systemClock);
@@ -133,6 +149,7 @@ internal sealed class ApplicationServiceGraph
         return new ApplicationServiceGraph(
             appPaths,
             studentRepository,
+            lessonRepository,
             invoiceRepository,
             companyProfileRepository,
             calendarSettingsRepository,

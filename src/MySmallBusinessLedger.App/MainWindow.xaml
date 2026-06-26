@@ -415,7 +415,7 @@
                 </Grid.ColumnDefinitions>
 
                 <Grid Grid.Column="0"
-                      Width="528"
+                      Width="640"
                       HorizontalAlignment="Left"
                       AutomationProperties.Name="Lessons pane">
                     <Grid.RowDefinitions>
@@ -525,6 +525,21 @@
                                                       VerticalAlignment="Center" />
                                             </StackPanel>
                                         </Button>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                            <DataGridTemplateColumn Header="Plan" Width="112">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <ComboBox ItemsSource="{Binding DataContext.PlanOptions, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                  DisplayMemberPath="Name"
+                                                  SelectedValuePath="PlanCatalogId"
+                                                  SelectedValue="{Binding PlanCatalogId, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                  IsEnabled="{Binding CanEditPlan}"
+                                                  HorizontalContentAlignment="Left"
+                                                  Padding="4,0"
+                                                  Height="25"
+                                                  AutomationProperties.Name="Lesson plan" />
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>

@@ -13,6 +13,7 @@ public sealed class CoreInvoiceWorkflowService : IInvoiceWorkflowService
     private readonly InvoicePreviewUseCase previewUseCase;
     private readonly ICompanyProfileRepository companyProfileRepository;
     private readonly IInvoiceRepository invoiceRepository;
+    private readonly ILessonRepository lessonRepository;
     private readonly IInvoicePdfWriter pdfWriter;
     private readonly IInvoicePrinter printer;
     private readonly IClock clock;
@@ -22,6 +23,7 @@ public sealed class CoreInvoiceWorkflowService : IInvoiceWorkflowService
         InvoicePreviewUseCase previewUseCase,
         ICompanyProfileRepository companyProfileRepository,
         IInvoiceRepository invoiceRepository,
+        ILessonRepository lessonRepository,
         IInvoicePdfWriter pdfWriter,
         IInvoicePrinter printer,
         IClock clock)
@@ -30,6 +32,7 @@ public sealed class CoreInvoiceWorkflowService : IInvoiceWorkflowService
         this.previewUseCase = previewUseCase;
         this.companyProfileRepository = companyProfileRepository;
         this.invoiceRepository = invoiceRepository;
+        this.lessonRepository = lessonRepository;
         this.pdfWriter = pdfWriter;
         this.printer = printer;
         this.clock = clock;
@@ -99,7 +102,8 @@ public sealed class CoreInvoiceWorkflowService : IInvoiceWorkflowService
                 fileStore,
                 pdfWriter,
                 printer,
-                clock);
+                clock,
+                lessonRepository);
 
             return await issueUseCase.ExecuteAsync(draft, cancellationToken);
         }

@@ -77,6 +77,141 @@ public sealed class UseCaseTests
     }
 
     [Fact]
+    public async Task StartupDashboardCreatesLocalLessonForUninvoicedCalendarLessonWithActivePlan()
+    {
+        var startsAt = new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.Zero);
+        var clock = new FakeClock(startsAt);
+        var students = new FakeStudentRepository([CreateStudentRecord("Anna")]);
+        var calendar = new FakeCalendarGateway([new CalendarLesson("calendar-1", "Anna", startsAt)]);
+        var lessons = new FakeLessonRepository();
+        var query = new StartupDashboardQuery(
+            students,
+            calendar,
+            new FakeInvoiceRepository(),
+            clock,
+            lessonRepository: lessons);
+
+        var result = await query.ExecuteAsync(new DateOnly(2026, 6, 1), "Anna", CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        var dashboardLesson = Assert.Single(result.Value!.Lessons);
+        Assert.Equal("calendar-1", dashboardLesson.Id);
+        Assert.Equal(42, dashboardLesson.PlanCatalogId);
+        Assert.Equal("Standard", dashboardLesson.PlanName);
+        var savedLesson = Assert.Single(lessons.SavedLessons);
+        Assert.Equal("calendar-1", savedLesson.GoogleCalendarEventId);
+        Assert.Equal(42, savedLesson.PlanCatalogId);
+        Assert.Equal("Standard", savedLesson.PlanName);
+    }
+
+    [Fact]
+    public async Task StartupDashboardKeepsInvoicedLocalLessonWhenCalendarEventWasDeleted()
+    {
+        var startsAt = new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.Zero);
+        var clock = new FakeClock(startsAt);
+        var students = new FakeStudentRepository([CreateStudentRecord("Anna")]);
+        var lessons = new FakeLessonRepository();
+        await lessons.SaveAsync(new LessonRecord(
+            Id: 0,
+            StudentId: 1,
+            StudentShortName: "Anna",
+            PlanCatalogId: 42,
+            PlanName: "Standard",
+            StartsAt: startsAt,
+            DurationMinutes: 60,
+            State: LessonState.Planned,
+            GoogleCalendarEventId: "calendar-deleted",
+            InvoiceNumber: new InvoiceNumber(7)),
+            CancellationToken.None);
+        var query = new StartupDashboardQuery(
+            students,
+            new FakeCalendarGateway([]),
+            new FakeInvoiceRepository
+            {
+                LessonStatuses =
+                [
+                    new InvoiceLessonStatus("Anna", startsAt, PaymentStatus.Outstanding, new InvoiceNumber(7))
+                ]
+            },
+            clock,
+            lessonRepository: lessons);
+
+        var result = await query.ExecuteAsync(new DateOnly(2026, 6, 1), "Anna", CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        var dashboardLesson = Assert.Single(result.Value!.Lessons);
+        Assert.Equal("calendar-deleted", dashboardLesson.Id);
+        Assert.True(dashboardLesson.IsInvoiced);
+        Assert.Equal(LessonState.Completed, dashboardLesson.State);
+        Assert.Equal(new InvoiceNumber(7), dashboardLesson.InvoiceNumber);
+        Assert.Equal(PaymentStatus.Outstanding, dashboardLesson.PaymentStatus);
+    }
+
+    [Fact]
+    public async Task StartupDashboardIgnoresCalendarEditsForInvoicedLocalLesson()
+    {
+        var invoicedStartsAt = new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.Zero);
+        var editedCalendarStartsAt = new DateTimeOffset(2026, 6, 19, 12, 0, 0, TimeSpan.Zero);
+        var clock = new FakeClock(invoicedStartsAt);
+        var students = new FakeStudentRepository([CreateStudentRecord("Anna")]);
+        var lessons = new FakeLessonRepository();
+        await lessons.SaveAsync(new LessonRecord(
+            Id: 0,
+            StudentId: 1,
+            StudentShortName: "Anna",
+            PlanCatalogId: 42,
+            PlanName: "Standard",
+            StartsAt: invoicedStartsAt,
+            DurationMinutes: 60,
+            State: LessonState.Completed,
+            GoogleCalendarEventId: "calendar-1",
+            InvoiceNumber: new InvoiceNumber(7)),
+            CancellationToken.None);
+        var calendar = new FakeCalendarGateway(
+        [
+            new CalendarLesson("calendar-1", "Anna", editedCalendarStartsAt, LessonState.Planned)
+        ]);
+        var query = new StartupDashboardQuery(
+            students,
+            calendar,
+            new FakeInvoiceRepository(),
+            clock,
+            lessonRepository: lessons);
+
+        var result = await query.ExecuteAsync(new DateOnly(2026, 6, 1), "Anna", CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        var dashboardLesson = Assert.Single(result.Value!.Lessons);
+        Assert.Equal(invoicedStartsAt, dashboardLesson.StartsAt);
+        Assert.True(dashboardLesson.IsInvoiced);
+        Assert.Equal(LessonState.Completed, dashboardLesson.State);
+        Assert.Equal(invoicedStartsAt, Assert.Single(lessons.SavedLessons).StartsAt);
+    }
+
+    [Fact]
+    public async Task StartupDashboardRemovesUninvoicedLocalLessonWhenCalendarEventWasDeleted()
+    {
+        var startsAt = new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.Zero);
+        var clock = new FakeClock(startsAt);
+        var students = new FakeStudentRepository([CreateStudentRecord("Anna")]);
+        var lessons = new FakeLessonRepository();
+        var saved = await lessons.SaveAsync(CreateLessonRecord("Anna", startsAt), CancellationToken.None);
+        var query = new StartupDashboardQuery(
+            students,
+            new FakeCalendarGateway([]),
+            new FakeInvoiceRepository(),
+            clock,
+            lessonRepository: lessons);
+
+        var result = await query.ExecuteAsync(new DateOnly(2026, 6, 1), "Anna", CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        Assert.Empty(result.Value!.Lessons);
+        Assert.Equal([saved.Id], lessons.DeletedLessonIds);
+        Assert.Empty(lessons.SavedLessons);
+    }
+
+    [Fact]
     public async Task StartupDashboardNavigationFollowsCalendarLessonOrderAndRepeatsStudents()
     {
         var clock = new FakeClock(new DateTimeOffset(2026, 6, 16, 12, 0, 0, TimeSpan.Zero));
@@ -441,6 +576,31 @@ public sealed class UseCaseTests
     }
 
     [Fact]
+    public async Task InvoiceCandidateSelectionUsesLocalUninvoicedLessonsEvenWhenStudentAlreadyHasSameMonthInvoice()
+    {
+        var startsAt = new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.Zero);
+        var students = new FakeStudentRepository([CreateStudentRecord("Anna"), CreateStudentRecord("Bo")]);
+        var lessons = new FakeLessonRepository();
+        await lessons.SaveAsync(CreateLessonRecord("Anna", startsAt), CancellationToken.None);
+        await lessons.SaveAsync(CreateLessonRecord("Bo", startsAt, invoiceNumber: new InvoiceNumber(3)), CancellationToken.None);
+        var invoices = new FakeInvoiceRepository { StudentsWithInvoiceThisMonth = ["Anna", "Bo"] };
+        var useCase = new InvoiceCandidateSelectionUseCase(
+            students,
+            new FakeCalendarGateway([]),
+            invoices,
+            lessonRepository: lessons);
+
+        var result = await useCase.ExecuteAsync(
+            new DateOnly(2026, 6, 16),
+            startsAt,
+            CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(["Anna"], result.Value!.CandidateStudentShortNames);
+        Assert.Equal("Anna", result.Value.PreselectedStudentShortName);
+    }
+
+    [Fact]
     public async Task InvoicePreviewCreatesDraftFromCalendarLessonsAndActivePlan()
     {
         var students = new FakeStudentRepository([CreateStudentRecord("Anna")]);
@@ -497,6 +657,41 @@ public sealed class UseCaseTests
 
         Assert.False(result.Succeeded);
         Assert.Contains(result.Errors, error => error.Code == "Invoice.NoActivePlanForLesson");
+    }
+
+    [Fact]
+    public async Task InvoicePreviewCreatesDraftFromLocalUninvoicedLessonsAndSelectedPlan()
+    {
+        var startsAt = new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.Zero);
+        var students = new FakeStudentRepository([CreateStudentRecord("Anna")]);
+        var company = new FakeCompanyProfileRepository();
+        var lessons = new FakeLessonRepository();
+        await lessons.SaveAsync(CreateLessonRecord("Anna", startsAt, planCatalogId: 77, planName: "Proevetime"), CancellationToken.None);
+        await lessons.SaveAsync(CreateLessonRecord("Anna", startsAt.AddDays(7), invoiceNumber: new InvoiceNumber(4)), CancellationToken.None);
+        var plans = new FakePlanCatalogRepository(
+        [
+            CreatePlanCatalogItem(77, "Proevetime", 250m)
+        ]);
+        var useCase = new InvoicePreviewUseCase(
+            students,
+            company,
+            new FakeCalendarGateway([]),
+            lessonRepository: lessons,
+            planCatalogRepository: plans);
+
+        var result = await useCase.CreateAsync(
+            "Anna",
+            new DateOnly(2026, 6, 16),
+            new DateOnly(2026, 6, 1),
+            new DateOnly(2026, 6, 30),
+            CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        var line = Assert.Single(result.Value!.Draft.Lines);
+        Assert.Equal(1, line.LessonId);
+        Assert.Equal("Proevetime", line.PlanName);
+        Assert.Equal(77, line.PlanCatalogId);
+        Assert.Equal(Money.Dkk(250m), line.PriceWithoutVat);
     }
 
     [Fact]
@@ -576,6 +771,77 @@ public sealed class UseCaseTests
         Assert.Equal(InvoicePrintStatus.Printed, result.Value.Invoice.PrintStatus);
         Assert.Equal(new DateTimeOffset(2026, 6, 16, 17, 30, 0, TimeSpan.Zero), result.Value.Invoice.PrintedAt);
         Assert.Equal("C:\\Invoices\\001.pdf", result.Value!.Invoice.PdfFilePath);
+    }
+
+    [Fact]
+    public async Task IssueInvoiceLocksLocalLessonsAfterFinalPdfPublish()
+    {
+        var calls = new List<string>();
+        var lessons = new FakeLessonRepository();
+        var company = new FakeCompanyProfileRepository();
+        var invoices = new FakeInvoiceRepository(calls);
+        var fileStore = new FakeInvoiceFileStore(calls);
+        var pdfWriter = new FakeInvoicePdfWriter { Calls = calls };
+        var printer = new FakeInvoicePrinter(calls);
+        var useCase = new IssueInvoiceUseCase(
+            company,
+            invoices,
+            fileStore,
+            pdfWriter,
+            printer,
+            new FakeClock(new DateTimeOffset(2026, 6, 16, 17, 30, 0, TimeSpan.Zero)),
+            lessons);
+
+        var result = await useCase.ExecuteAsync(CreateInvoiceDraft(lessonId: 12), CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal([12], lessons.LockedLessonIds);
+        Assert.Equal(new InvoiceNumber(1), lessons.LockedInvoiceNumber);
+        Assert.Contains(calls, call => call == "finalize:C:\\Invoices\\001.pdf");
+    }
+
+    [Fact]
+    public async Task UpdateLessonPlanChangesOnlyUninvoicedLocalLesson()
+    {
+        var lessonRepository = new FakeLessonRepository();
+        var savedLesson = await lessonRepository.SaveAsync(
+            CreateLessonRecord("Anna", new DateTimeOffset(2026, 6, 4, 16, 0, 0, TimeSpan.Zero)),
+            CancellationToken.None);
+        var planRepository = new FakePlanCatalogRepository(
+        [
+            CreatePlanCatalogItem(77, "Proevetime", 250m)
+        ]);
+        var useCase = new UpdateLessonPlanUseCase(lessonRepository, planRepository);
+
+        var result = await useCase.ExecuteAsync(savedLesson.Id, 77, CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(77, result.Value!.PlanCatalogId);
+        Assert.Equal("Proevetime", result.Value.PlanName);
+        Assert.Equal(77, lessonRepository.SavedLessons.Single().PlanCatalogId);
+    }
+
+    [Fact]
+    public async Task UpdateLessonPlanRejectsInvoicedLocalLesson()
+    {
+        var lessonRepository = new FakeLessonRepository();
+        var savedLesson = await lessonRepository.SaveAsync(
+            CreateLessonRecord(
+                "Anna",
+                new DateTimeOffset(2026, 6, 4, 16, 0, 0, TimeSpan.Zero),
+                invoiceNumber: new InvoiceNumber(5)),
+            CancellationToken.None);
+        var planRepository = new FakePlanCatalogRepository(
+        [
+            CreatePlanCatalogItem(77, "Proevetime", 250m)
+        ]);
+        var useCase = new UpdateLessonPlanUseCase(lessonRepository, planRepository);
+
+        var result = await useCase.ExecuteAsync(savedLesson.Id, 77, CancellationToken.None);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal("Lesson.PlanLocked", Assert.Single(result.Errors).Code);
+        Assert.Equal(42, lessonRepository.SavedLessons.Single().PlanCatalogId);
     }
 
     [Fact]
@@ -747,7 +1013,7 @@ public sealed class UseCaseTests
         Assert.Equal(PaymentStatus.Outstanding, invoices.SavedPaymentStatus);
     }
 
-    private static InvoiceDraft CreateInvoiceDraft() =>
+    private static InvoiceDraft CreateInvoiceDraft(int lessonId = 0) =>
         InvoiceDraft.Create(
             invoiceDate: new DateOnly(2026, 6, 16),
             companySnapshot: new CompanySnapshot("Maple Key Studio", "Musikvej 1", null),
@@ -757,9 +1023,43 @@ public sealed class UseCaseTests
                 new InvoiceLineDraft(
                     lessonDateTime: new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.Zero),
                     planName: "Standard",
-                    priceWithoutVat: Money.Dkk(400m))
+                    priceWithoutVat: Money.Dkk(400m),
+                    lessonId: lessonId)
             ],
             priceAdjustment: null);
+
+    private static LessonRecord CreateLessonRecord(
+        string studentShortName,
+        DateTimeOffset startsAt,
+        int studentId = 1,
+        int planCatalogId = 42,
+        string planName = "Standard",
+        InvoiceNumber? invoiceNumber = null) =>
+        new(
+            Id: 0,
+            StudentId: studentId,
+            StudentShortName: studentShortName,
+            PlanCatalogId: planCatalogId,
+            PlanName: planName,
+            StartsAt: startsAt,
+            DurationMinutes: 60,
+            State: LessonState.Planned,
+            GoogleCalendarEventId: $"{studentShortName}-{startsAt:yyyyMMddHHmm}",
+            InvoiceNumber: invoiceNumber);
+
+    private static PlanCatalogItem CreatePlanCatalogItem(int id, string name, decimal priceWithoutVat) =>
+        new(
+            id,
+            name,
+            priceWithoutVat,
+            LessonsPerWeek.One,
+            60,
+            PlanFlexibility.MoveOrCancelByAgreement,
+            1,
+            new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
+            "Paid per lesson",
+            RetireOn: null,
+            PlanCatalogState.Active);
 
     private static CompanyProfile CreateCompanyProfile() =>
         CompanyProfile.Create(
@@ -840,6 +1140,134 @@ public sealed class UseCaseTests
 
         public Task SaveAsync(CompanyProfile profile, CancellationToken cancellationToken) =>
             Task.CompletedTask;
+    }
+
+    private sealed class FakeLessonRepository : ILessonRepository
+    {
+        private readonly List<LessonRecord> lessons = [];
+
+        public IReadOnlyList<LessonRecord> SavedLessons => lessons;
+
+        public IReadOnlyList<int> LockedLessonIds { get; private set; } = [];
+
+        public InvoiceNumber? LockedInvoiceNumber { get; private set; }
+
+        public IReadOnlyList<int> DeletedLessonIds { get; private set; } = [];
+
+        public Task<LessonRecord> SaveAsync(LessonRecord lesson, CancellationToken cancellationToken)
+        {
+            var savedLesson = lesson.Id > 0
+                ? lesson
+                : lesson with { Id = lessons.Count + 1 };
+            var existingIndex = lessons.FindIndex(storedLesson => storedLesson.Id == savedLesson.Id);
+            if (existingIndex >= 0)
+            {
+                lessons[existingIndex] = savedLesson;
+            }
+            else
+            {
+                lessons.Add(savedLesson);
+            }
+
+            return Task.FromResult(savedLesson);
+        }
+
+        public Task<IReadOnlyList<LessonRecord>> ListForStudentMonthAsync(
+            string studentShortName,
+            DateOnly month,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<LessonRecord>>(
+                lessons
+                    .Where(lesson => lesson.StudentShortName == studentShortName)
+                    .Where(lesson => lesson.StartsAt.Year == month.Year && lesson.StartsAt.Month == month.Month)
+                    .ToArray());
+
+        public Task<IReadOnlyList<LessonRecord>> ListForWindowAsync(
+            DateOnly from,
+            DateOnly to,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<LessonRecord>>(
+                lessons
+                    .Where(lesson =>
+                    {
+                        var date = DateOnly.FromDateTime(lesson.StartsAt.DateTime);
+                        return date >= from && date <= to;
+                    })
+                    .ToArray());
+
+        public Task MarkInvoicedAsync(
+            IReadOnlyList<int> lessonIds,
+            InvoiceNumber invoiceNumber,
+            CancellationToken cancellationToken)
+        {
+            LockedLessonIds = lessonIds.ToArray();
+            LockedInvoiceNumber = invoiceNumber;
+
+            for (var index = 0; index < lessons.Count; index++)
+            {
+                if (lessonIds.Contains(lessons[index].Id))
+                {
+                    lessons[index] = lessons[index] with { InvoiceNumber = invoiceNumber };
+                }
+            }
+
+            return Task.CompletedTask;
+        }
+
+        public Task<LessonRecord?> UpdatePlanAsync(
+            int lessonId,
+            int planCatalogId,
+            string planName,
+            int durationMinutes,
+            CancellationToken cancellationToken)
+        {
+            var index = lessons.FindIndex(lesson => lesson.Id == lessonId);
+            if (index < 0 || lessons[index].InvoiceNumber is not null)
+            {
+                return Task.FromResult<LessonRecord?>(null);
+            }
+
+            lessons[index] = lessons[index] with
+            {
+                PlanCatalogId = planCatalogId,
+                PlanName = planName,
+                DurationMinutes = durationMinutes
+            };
+            return Task.FromResult<LessonRecord?>(lessons[index]);
+        }
+
+        public Task DeleteUninvoicedAsync(IReadOnlyList<int> lessonIds, CancellationToken cancellationToken)
+        {
+            DeletedLessonIds = lessonIds.ToArray();
+            lessons.RemoveAll(lesson => lessonIds.Contains(lesson.Id) && lesson.InvoiceNumber is null);
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class FakePlanCatalogRepository(IReadOnlyList<PlanCatalogItem> plans) : IPlanCatalogRepository
+    {
+        public Task<IReadOnlyList<PlanCatalogItem>> ListAllAsync(CancellationToken cancellationToken) =>
+            Task.FromResult(plans);
+
+        public Task<IReadOnlyList<PlanCatalogItem>> ListAssignableAsync(CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<PlanCatalogItem>>(plans.Where(plan => plan.CanBeAssigned).ToArray());
+
+        public Task<PlanCatalogItem?> GetAsync(int id, CancellationToken cancellationToken) =>
+            Task.FromResult(plans.FirstOrDefault(plan => plan.Id == id));
+
+        public Task<OperationResult<PlanCatalogItem>> SaveAsync(PlanCatalogItem plan, CancellationToken cancellationToken) =>
+            Task.FromResult(OperationResult<PlanCatalogItem>.Success(plan));
+
+        public Task<OperationResult<PlanCatalogItem>> RenameAsync(
+            int id,
+            string newName,
+            DateTimeOffset changedAt,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(OperationResult<PlanCatalogItem>.Success(
+                plans.First(plan => plan.Id == id) with { Name = newName }));
+
+        public Task<OperationResult<bool>> DeleteAsync(int id, CancellationToken cancellationToken) =>
+            Task.FromResult(OperationResult<bool>.Success(true));
     }
 
     private sealed class FakeCalendarGateway(IReadOnlyList<CalendarLesson> lessons) : IGoogleCalendarGateway

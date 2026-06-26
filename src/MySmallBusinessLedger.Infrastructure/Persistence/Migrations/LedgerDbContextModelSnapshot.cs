@@ -268,6 +268,55 @@ namespace MySmallBusinessLedger.Infrastructure.Persistence.Migrations
                     b.ToTable("IssuedInvoiceLines");
                 });
 
+            modelBuilder.Entity("MySmallBusinessLedger.Infrastructure.Persistence.LessonEntity", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("DurationMinutes")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("GoogleCalendarEventId")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("InvoiceNumber")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("PlanCatalogId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("PlanName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset>("StartsAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("StudentId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GoogleCalendarEventId")
+                        .IsUnique();
+
+                    b.HasIndex("PlanCatalogId");
+
+                    b.HasIndex("StartsAt");
+
+                    b.HasIndex("StudentId", "StartsAt");
+
+                    b.ToTable("Lessons");
+                });
+
             modelBuilder.Entity("MySmallBusinessLedger.Infrastructure.Persistence.PlanCatalogEntity", b =>
                 {
                     b.Property<int>("Id")
@@ -497,6 +546,25 @@ namespace MySmallBusinessLedger.Infrastructure.Persistence.Migrations
                     b.Navigation("Invoice");
                 });
 
+            modelBuilder.Entity("MySmallBusinessLedger.Infrastructure.Persistence.LessonEntity", b =>
+                {
+                    b.HasOne("MySmallBusinessLedger.Infrastructure.Persistence.PlanCatalogEntity", "PlanCatalog")
+                        .WithMany()
+                        .HasForeignKey("PlanCatalogId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("MySmallBusinessLedger.Infrastructure.Persistence.StudentEntity", "Student")
+                        .WithMany("Lessons")
+                        .HasForeignKey("StudentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("PlanCatalog");
+
+                    b.Navigation("Student");
+                });
+
             modelBuilder.Entity("MySmallBusinessLedger.Infrastructure.Persistence.PlanNameChangeEntity", b =>
                 {
                     b.HasOne("MySmallBusinessLedger.Infrastructure.Persistence.PlanCatalogEntity", "PlanCatalog")
@@ -545,6 +613,8 @@ namespace MySmallBusinessLedger.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("MySmallBusinessLedger.Infrastructure.Persistence.StudentEntity", b =>
                 {
+                    b.Navigation("Lessons");
+
                     b.Navigation("PlanPeriods");
 
                     b.Navigation("ScheduleEntries");

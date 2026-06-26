@@ -1,5 +1,6 @@
 using MySmallBusinessLedger.Core.Calendar;
 using MySmallBusinessLedger.Core.Common;
+using MySmallBusinessLedger.Core.Lessons;
 using MySmallBusinessLedger.Core.UseCases.Lessons;
 
 namespace MySmallBusinessLedger.App.Services;
@@ -25,5 +26,10 @@ public interface ILessonEditorService
     Task<OperationResult<IReadOnlyList<CalendarLesson>>> DeleteAsync(
         string lessonId,
         DateOnly refreshMonth,
+        CancellationToken cancellationToken);
+
+    Task<OperationResult<LessonRecord>> UpdatePlanAsync(
+        int lessonId,
+        int planCatalogId,
         CancellationToken cancellationToken);
 }

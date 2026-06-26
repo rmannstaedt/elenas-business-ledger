@@ -1,5 +1,6 @@
 using MySmallBusinessLedger.Core.Company;
 using MySmallBusinessLedger.Core.Invoices;
+using MySmallBusinessLedger.Core.Lessons;
 using MySmallBusinessLedger.Core.Money;
 using MySmallBusinessLedger.Core.Plans;
 using MySmallBusinessLedger.Core.Ports;
@@ -600,6 +601,50 @@ public sealed class SqlitePersistenceTests
         Assert.Equal(PaymentStatus.Paid, updated);
         Assert.Equal(PaymentStatus.Paid, summaries.Single().PaymentStatus);
         Assert.Equal(PaymentStatus.Paid, lessonStatuses.Single().PaymentStatus);
+    }
+
+    [Fact]
+    public async Task LessonsCanBeSavedAndLoadedForStudentMonth()
+    {
+        using var database = await TestDatabase.CreateAsync();
+        var students = new SqliteStudentRepository(database.CreateContext);
+        var plans = new SqlitePlanCatalogRepository(database.CreateContext);
+        var lessons = new SqliteLessonRepository(database.CreateContext);
+        var intro = await SaveCatalogPlanAsync(plans, "Prøvetime");
+        var standard = await SaveCatalogPlanAsync(plans, "Standard");
+        var student = await students.SaveAsync(
+            CreateStudentRecord("Anna", introPlanId: intro.Id, currentPlanId: standard.Id),
+            CancellationToken.None);
+        Assert.True(student.Succeeded);
+        var startsAt = new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.Zero);
+
+        var saved = await lessons.SaveAsync(
+            new LessonRecord(
+                Id: 0,
+                StudentId: student.Value!.Id,
+                StudentShortName: "Anna",
+                PlanCatalogId: standard.Id,
+                PlanName: "Standard",
+                StartsAt: startsAt,
+                DurationMinutes: 60,
+                State: LessonState.Planned,
+                GoogleCalendarEventId: "calendar-event-1",
+                InvoiceNumber: null),
+            CancellationToken.None);
+        var loaded = await lessons.ListForStudentMonthAsync("Anna", new DateOnly(2026, 6, 1), CancellationToken.None);
+
+        Assert.True(saved.Id > 0);
+        var lesson = Assert.Single(loaded);
+        Assert.Equal(saved.Id, lesson.Id);
+        Assert.Equal(student.Value.Id, lesson.StudentId);
+        Assert.Equal("Anna", lesson.StudentShortName);
+        Assert.Equal(standard.Id, lesson.PlanCatalogId);
+        Assert.Equal("Standard", lesson.PlanName);
+        Assert.Equal(startsAt, lesson.StartsAt);
+        Assert.Equal(60, lesson.DurationMinutes);
+        Assert.Equal(LessonState.Planned, lesson.State);
+        Assert.Equal("calendar-event-1", lesson.GoogleCalendarEventId);
+        Assert.Null(lesson.InvoiceNumber);
     }
 
     private static StudentRecord CreateStudentRecord(

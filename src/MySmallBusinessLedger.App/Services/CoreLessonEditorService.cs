@@ -1,5 +1,6 @@
 using MySmallBusinessLedger.Core.Calendar;
 using MySmallBusinessLedger.Core.Common;
+using MySmallBusinessLedger.Core.Lessons;
 using MySmallBusinessLedger.Core.UseCases.Lessons;
 
 namespace MySmallBusinessLedger.App.Services;
@@ -10,17 +11,20 @@ public sealed class CoreLessonEditorService : ILessonEditorService
     private readonly PopulateCalendarUseCase populateCalendarUseCase;
     private readonly EditLessonUseCase editLessonUseCase;
     private readonly DeleteLessonUseCase deleteLessonUseCase;
+    private readonly UpdateLessonPlanUseCase updateLessonPlanUseCase;
 
     public CoreLessonEditorService(
         AddLessonUseCase addLessonUseCase,
         EditLessonUseCase editLessonUseCase,
         DeleteLessonUseCase deleteLessonUseCase,
-        PopulateCalendarUseCase populateCalendarUseCase)
+        PopulateCalendarUseCase populateCalendarUseCase,
+        UpdateLessonPlanUseCase updateLessonPlanUseCase)
     {
         this.addLessonUseCase = addLessonUseCase;
         this.populateCalendarUseCase = populateCalendarUseCase;
         this.editLessonUseCase = editLessonUseCase;
         this.deleteLessonUseCase = deleteLessonUseCase;
+        this.updateLessonPlanUseCase = updateLessonPlanUseCase;
     }
 
     public Task<OperationResult<IReadOnlyList<CalendarLesson>>> AddAsync(
@@ -49,4 +53,10 @@ public sealed class CoreLessonEditorService : ILessonEditorService
         DateOnly refreshMonth,
         CancellationToken cancellationToken) =>
         deleteLessonUseCase.ExecuteAsync(lessonId, refreshMonth, cancellationToken);
+
+    public Task<OperationResult<LessonRecord>> UpdatePlanAsync(
+        int lessonId,
+        int planCatalogId,
+        CancellationToken cancellationToken) =>
+        updateLessonPlanUseCase.ExecuteAsync(lessonId, planCatalogId, cancellationToken);
 }

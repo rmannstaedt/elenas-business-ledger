@@ -8,12 +8,14 @@ public sealed class InvoiceLineDraft
         DateTimeOffset lessonDateTime,
         string planName,
         MoneyAmount priceWithoutVat,
-        int planCatalogId = 0)
+        int planCatalogId = 0,
+        int lessonId = 0)
     {
         LessonDateTime = lessonDateTime;
         PlanName = planName;
         PriceWithoutVat = priceWithoutVat;
         PlanCatalogId = planCatalogId;
+        LessonId = lessonId;
     }
 
     public DateTimeOffset LessonDateTime { get; }
@@ -23,4 +25,6 @@ public sealed class InvoiceLineDraft
     public MoneyAmount PriceWithoutVat { get; }
 
     public int PlanCatalogId { get; }
+
+    public int LessonId { get; }
 }

@@ -13,6 +13,7 @@ public sealed class IssueInvoiceUseCase
     private readonly IInvoicePdfWriter pdfWriter;
     private readonly IInvoicePrinter printer;
     private readonly IClock clock;
+    private readonly ILessonRepository? lessonRepository;
 
     public IssueInvoiceUseCase(
         ICompanyProfileRepository companyProfileRepository,
@@ -20,7 +21,8 @@ public sealed class IssueInvoiceUseCase
         IInvoiceFileStore fileStore,
         IInvoicePdfWriter pdfWriter,
         IInvoicePrinter printer,
-        IClock clock)
+        IClock clock,
+        ILessonRepository? lessonRepository = null)
     {
         this.companyProfileRepository = companyProfileRepository;
         this.invoiceRepository = invoiceRepository;
@@ -28,6 +30,7 @@ public sealed class IssueInvoiceUseCase
         this.pdfWriter = pdfWriter;
         this.printer = printer;
         this.clock = clock;
+        this.lessonRepository = lessonRepository;
     }
 
     public async Task<OperationResult<IssueInvoiceResult>> ExecuteAsync(
@@ -87,6 +90,16 @@ public sealed class IssueInvoiceUseCase
         if (!finalize.Succeeded)
         {
             return OperationResult<IssueInvoiceResult>.Failure(finalize.Errors.ToArray());
+        }
+
+        if (lessonRepository is not null)
+        {
+            var lessonIds = draft.Lines
+                .Select(line => line.LessonId)
+                .Where(lessonId => lessonId > 0)
+                .Distinct()
+                .ToArray();
+            await lessonRepository.MarkInvoicedAsync(lessonIds, invoiceNumber, cancellationToken);
         }
 
         var print = await printer.PrintAsync(
