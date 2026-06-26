@@ -1510,6 +1510,38 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task AddedDraftLessonAllowsPlanSelectionBeforeAutosaveCompletes()
+    {
+        var lessonEditor = new FakeLessonEditorService();
+        var viewModel = CreateViewModel(
+            dashboard: new FakeDashboardService
+            {
+                LessonState = LessonState.Planned,
+                LessonIsInvoiced = false,
+                LessonPaymentStatus = null,
+                PlanOptions =
+                [
+                    new DashboardPlanOption(42, "Standard"),
+                    new DashboardPlanOption(77, "Proevetime")
+                ]
+            },
+            lessonEditorService: lessonEditor);
+        await viewModel.LoadAsync();
+
+        await viewModel.AddLessonCommand.ExecuteAsync();
+        var draft = viewModel.SelectedLesson!;
+
+        Assert.True(draft.IsDraft);
+        Assert.True(draft.CanEditPlan);
+
+        draft.PlanCatalogId = 77;
+
+        Assert.Null(lessonEditor.LastPlanLessonId);
+        Assert.Null(lessonEditor.LastPlanCatalogId);
+        Assert.Equal(77, draft.PlanCatalogId);
+    }
+
+    [Fact]
     public async Task LessonRowsOfferTeachingDayTimeOptions()
     {
         var viewModel = CreateViewModel(
@@ -1552,6 +1584,7 @@ public sealed class MainWindowViewModelTests
         await viewModel.AddLessonCommand.ExecuteAsync();
         var draft = viewModel.SelectedLesson!;
 
+        draft.PlanCatalogId = 42;
         draft.StartsAtTimeText = "14:00";
         draft.StartsOnDate = new DateTime(2026, 6, 15);
 
@@ -1591,6 +1624,7 @@ public sealed class MainWindowViewModelTests
         await viewModel.AddLessonCommand.ExecuteAsync();
         var draft = viewModel.SelectedLesson!;
 
+        draft.PlanCatalogId = 42;
         draft.StartsOnDate = new DateTime(2026, 6, 15);
         draft.StartsAtTimeText = "14:00";
 
@@ -1601,6 +1635,118 @@ public sealed class MainWindowViewModelTests
         Assert.False(draft.IsDraft);
         await EventuallyAsync(() => viewModel.SelectedLesson?.Id == "new-lesson");
         Assert.True(viewModel.SelectedLesson!.CanEditPlan);
+    }
+
+    [Fact]
+    public async Task DateOnlyDraftLessonWaitsForPlanBeforeAutosaving()
+    {
+        var lessonEditor = new FakeLessonEditorService();
+        var viewModel = CreateViewModel(
+            dashboard: new FakeDashboardService { LessonState = LessonState.Planned, LessonIsInvoiced = false, LessonPaymentStatus = null },
+            lessonEditorService: lessonEditor,
+            lessonTimeZone: TimeZoneInfo.FindSystemTimeZoneById("Romance Standard Time"));
+        await viewModel.LoadAsync();
+        await viewModel.AddLessonCommand.ExecuteAsync();
+        var draft = viewModel.SelectedLesson!;
+
+        draft.StartsOnDate = new DateTime(2026, 6, 15);
+        await Task.Delay(350, TestContext.Current.CancellationToken);
+
+        Assert.False(lessonEditor.AddWasCalled);
+        Assert.True(draft.IsDraft);
+        Assert.False(viewModel.HasError);
+    }
+
+    [Fact]
+    public async Task PlanSelectedAfterDraftDateAutosavesLesson()
+    {
+        var lessonEditor = new FakeLessonEditorService();
+        var dashboard = new FakeDashboardService
+        {
+            LessonState = LessonState.Planned,
+            LessonIsInvoiced = false,
+            LessonPaymentStatus = null,
+            PlanOptions =
+            [
+                new DashboardPlanOption(42, "Standard")
+            ],
+            DashboardLessonsAfterFirstLoad =
+            [
+                new DashboardLesson(
+                    "new-lesson",
+                    "Anna",
+                    new DateTimeOffset(2026, 6, 15, 0, 0, 0, TimeSpan.FromHours(2)),
+                    LessonState.Planned,
+                    IsInvoiced: false,
+                    PaymentStatus: null,
+                    PlanCatalogId: 42,
+                    PlanName: "Standard",
+                    LocalLessonId: 19,
+                    HasKnownStartTime: false)
+            ]
+        };
+        var viewModel = CreateViewModel(
+            dashboard: dashboard,
+            lessonEditorService: lessonEditor,
+            lessonTimeZone: TimeZoneInfo.FindSystemTimeZoneById("Romance Standard Time"));
+        await viewModel.LoadAsync();
+        await viewModel.AddLessonCommand.ExecuteAsync();
+        var draft = viewModel.SelectedLesson!;
+
+        draft.StartsOnDate = new DateTime(2026, 6, 15);
+        draft.PlanCatalogId = 42;
+
+        await EventuallyAsync(() => lessonEditor.AddWasCalled);
+        Assert.Equal("Anna", lessonEditor.LastAddRequest?.StudentShortName);
+        Assert.Equal(new DateTimeOffset(2026, 6, 15, 0, 0, 0, TimeSpan.FromHours(2)), lessonEditor.LastAddRequest?.StartsAt);
+        Assert.True(lessonEditor.LastAddRequest?.HasKnownStartTime == false);
+        await EventuallyAsync(() => viewModel.SelectedLesson?.Id == "new-lesson");
+    }
+
+    [Fact]
+    public async Task PlanSelectedOnDraftLessonIsAppliedAfterDraftAutosaves()
+    {
+        var lessonEditor = new FakeLessonEditorService();
+        var dashboard = new FakeDashboardService
+        {
+            LessonState = LessonState.Planned,
+            LessonIsInvoiced = false,
+            LessonPaymentStatus = null,
+            PlanOptions =
+            [
+                new DashboardPlanOption(42, "Standard"),
+                new DashboardPlanOption(77, "Proevetime")
+            ],
+            DashboardLessonsAfterFirstLoad =
+            [
+                new DashboardLesson(
+                    "new-lesson",
+                    "Anna",
+                    new DateTimeOffset(2026, 6, 15, 0, 0, 0, TimeSpan.FromHours(2)),
+                    LessonState.Planned,
+                    IsInvoiced: false,
+                    PaymentStatus: null,
+                    PlanCatalogId: 42,
+                    PlanName: "Standard",
+                    LocalLessonId: 19,
+                    HasKnownStartTime: false)
+            ]
+        };
+        var viewModel = CreateViewModel(
+            dashboard: dashboard,
+            lessonEditorService: lessonEditor,
+            lessonTimeZone: TimeZoneInfo.FindSystemTimeZoneById("Romance Standard Time"));
+        await viewModel.LoadAsync();
+        await viewModel.AddLessonCommand.ExecuteAsync();
+        var draft = viewModel.SelectedLesson!;
+
+        draft.PlanCatalogId = 77;
+        draft.StartsOnDate = new DateTime(2026, 6, 15);
+
+        await EventuallyAsync(() => lessonEditor.LastPlanLessonId == 19);
+        Assert.Equal(77, lessonEditor.LastPlanCatalogId);
+        Assert.Equal("Proevetime", viewModel.SelectedLesson!.PlanName);
+        Assert.False(viewModel.HasError);
     }
 
     [Fact]
@@ -1633,6 +1779,7 @@ public sealed class MainWindowViewModelTests
         await viewModel.AddLessonCommand.ExecuteAsync();
         var draft = viewModel.SelectedLesson!;
 
+        draft.PlanCatalogId = 42;
         draft.StartsOnDate = new DateTime(2026, 6, 15);
 
         await EventuallyAsync(() => lessonEditor.AddWasCalled);
@@ -1660,6 +1807,7 @@ public sealed class MainWindowViewModelTests
         var availabilityChanged = false;
         viewModel.ToggleLessonStateCommand.CanExecuteChanged += (_, _) => availabilityChanged = true;
 
+        draft.PlanCatalogId = 42;
         draft.StartsOnDate = new DateTime(2026, 6, 15);
         draft.StartsAtTimeText = "14:00";
 
@@ -1790,6 +1938,7 @@ public sealed class MainWindowViewModelTests
         await viewModel.LoadAsync();
         await viewModel.AddLessonCommand.ExecuteAsync();
         var draft = Assert.Single(viewModel.Lessons, lesson => lesson.IsDraft);
+        draft.PlanCatalogId = 42;
         draft.StartsOnDate = new DateTime(2026, 1, 15);
         draft.StartsAtTimeText = "15:30";
 
@@ -1811,6 +1960,7 @@ public sealed class MainWindowViewModelTests
         await viewModel.LoadAsync();
         await viewModel.AddLessonCommand.ExecuteAsync();
         var draft = viewModel.Lessons[1];
+        draft.PlanCatalogId = 42;
         draft.StartsOnDate = new DateTime(2026, 6, 24);
         draft.StartsAtTimeText = "15:30";
 

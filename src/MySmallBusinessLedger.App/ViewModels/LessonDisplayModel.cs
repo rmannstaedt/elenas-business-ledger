@@ -160,7 +160,7 @@ public sealed class LessonDisplayModel : ViewModelBase
 
     public bool CanEdit => (IsDraft || State == LessonState.Planned) && !IsInvoiced;
 
-    public bool CanEditPlan => CanEdit && !IsDraft && LocalLessonId > 0;
+    public bool CanEditPlan => CanEdit && (IsDraft || LocalLessonId > 0);
 
     public bool CanToggleState => !IsDraft && !IsInvoiced;
 

@@ -555,6 +555,12 @@ public sealed class MainWindowViewModel : ViewModelBase
                 : 1;
         }
 
+        if (lesson.IsDraft && lesson.PlanCatalogId <= 0)
+        {
+            ErrorMessage = null;
+            return;
+        }
+
         if (!lesson.TryGetStartsAt(out var startsAt, out var hasKnownStartTime))
         {
             ErrorMessage = null;
@@ -590,6 +596,7 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     private async Task SaveDraftLessonAsync(LessonDisplayModel lesson, DateTimeOffset startsAt, bool hasKnownStartTime)
     {
+        var requestedPlanCatalogId = lesson.PlanCatalogId;
         var result = await lessonEditorService.AddAsync(
             new LessonAddRequest(lesson.StudentShortName, startsAt, hasKnownStartTime),
             DisplayMonth,
@@ -617,6 +624,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         ErrorMessage = null;
         RaiseCommandAvailabilityChanged();
         await RefreshAsync();
+        ApplyPendingDraftPlanSelection(lesson, requestedPlanCatalogId);
     }
 
     private async Task DeleteLessonAsync(LessonDisplayModel lesson)
@@ -1009,6 +1017,12 @@ public sealed class MainWindowViewModel : ViewModelBase
 
         if (e.PropertyName == nameof(LessonDisplayModel.PlanCatalogId))
         {
+            if (lesson.IsDraft)
+            {
+                TryAutoSaveCompleteDraftLesson(lesson);
+                return;
+            }
+
             TrySaveLessonPlanChange(lesson);
             return;
         }
@@ -1019,7 +1033,9 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     private void TrySaveLessonPlanChange(LessonDisplayModel lesson)
     {
-        if (!lesson.CanEditPlan ||
+        if (lesson.IsDraft ||
+            !lesson.CanEditPlan ||
+            lesson.LocalLessonId <= 0 ||
             lesson.PlanCatalogId <= 0 ||
             savingPlanLessons.Contains(lesson))
         {
@@ -1053,6 +1069,26 @@ public sealed class MainWindowViewModel : ViewModelBase
         }
     }
 
+    private void ApplyPendingDraftPlanSelection(LessonDisplayModel draftLesson, int requestedPlanCatalogId)
+    {
+        if (requestedPlanCatalogId <= 0)
+        {
+            return;
+        }
+
+        var createdLesson = Lessons.FirstOrDefault(lesson =>
+            string.Equals(lesson.Id, draftLesson.Id, StringComparison.OrdinalIgnoreCase)) ??
+            FindRefreshedLessonByDateTime(draftLesson);
+        if (createdLesson is null ||
+            !createdLesson.CanEditPlan ||
+            createdLesson.PlanCatalogId == requestedPlanCatalogId)
+        {
+            return;
+        }
+
+        createdLesson.PlanCatalogId = requestedPlanCatalogId;
+    }
+
     private void SortLessonsPreservingSelection(LessonDisplayModel? lessonToKeepSelected)
     {
         var selected = SelectedLesson ?? lessonToKeepSelected;
@@ -1078,6 +1114,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private void TryAutoSaveCompleteDraftLesson(LessonDisplayModel lesson)
     {
         if (!lesson.IsDraft ||
+            lesson.PlanCatalogId <= 0 ||
             !lesson.TryGetStartsAt(out _))
         {
             return;
