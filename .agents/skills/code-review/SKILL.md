@@ -80,6 +80,7 @@ Read the relevant subset of:
 - `.ai/standards/coding-standards.md`;
 - `.ai/standards/review-checklists.md`;
 - `.ai/standards/architecture-principles.md` when ownership or boundaries matter;
+- `.ai/standards/domain-data-integrity.md` when durable business entities, financial records, audit history, cross-record state, external-system synchronization, identity, lineage, references, or snapshots are involved;
 - `.ai/standards/security-and-boundaries.md` when trust, paths, external inputs, secrets, IPC, network, processes, installers, or privacy are involved;
 - `.ai/standards/persistence-and-artifacts.md` when files, JSON, JSONL, logs, reports, import/export, artifacts, or durable state are involved;
 - `.ai/standards/database-standards.md` when SQL, SQLite, EF Core, migrations, transactions, or database persistence are involved;
@@ -100,17 +101,42 @@ If the user provides a specific diff, file, or concern, focus there but follow c
 
 For very large solutions, prioritize high-risk paths first and clearly state what was not reviewed. Prefer depth on high-risk paths over shallow commentary on every file.
 
+## Domain Identity, Lineage, And Reference Integrity
+
+When reviewing durable business data, do an explicit identity pass.
+
+Trace important identifiers through:
+
+- UI/view models, commands, requests, and use-case inputs;
+- domain drafts, final/issued records, snapshots, and result models;
+- repositories, persistence entities, migrations, and query projections;
+- external API payloads and local mapping records;
+- generated PDFs, reports, exports, logs, and read models when they support later actions.
+
+Check whether:
+
+- each state change targets an exact durable entity;
+- IDs needed downstream are preserved rather than dropped because the immediate display does not need them;
+- financial, tax, invoice, payment, receipt, credit, audit, import/export, reconciliation, printed, completed, locked, or finalized state is never inferred from names, dates, times, titles, prices, filenames, formatted text, or other descriptive fields;
+- snapshots are used for historical display while stable references are used for ownership and state application;
+- natural keys are documented, validated, constrained, immutable enough for the domain, and tested against collision/edit cases;
+- missing, stale, deleted, or ambiguous references fail safe instead of falling back to broad matching;
+- database schema, EF entities, domain models, DTOs, and tests agree about required identities and null/default behavior;
+- tests include duplicate descriptive values such as same student/date/time/plan where state must remain distinct.
+
+Treat a lost or weak identity in financial, billing, payment, tax, issued-document, or audit code as a likely Critical finding. It is not enough that the current data set has no duplicate values; review against plausible domain data and future edits.
+
 ## Review Priorities
 
 Prioritize findings in this order:
 
-1. Data loss, corruption, false success, unsafe destructive behavior, or security/trust-boundary failures.
+1. Data loss, corruption, false success, unsafe destructive behavior, state attached to the wrong durable entity, or security/trust-boundary failures.
 2. Authorization, path traversal, external input, process execution, secret/privacy, tenant/user/workspace boundary risks.
 3. Verification correctness, proof, finalization, idempotency, and durable state truthfulness.
-4. Persistence, database, artifact, migration, queue, or cache consistency risks.
+4. Persistence, database, artifact, migration, queue, cache, identity, lineage, or durable-reference consistency risks.
 5. Cancellation, retry, timeout, resume, shutdown, and partial-failure recovery correctness.
 6. Runtime bugs, exceptions, races, deadlocks, resource leaks, and thread/UI-affinity problems.
-7. Contract correctness and interface soundness.
+7. Contract correctness, identity preservation, reference soundness, and interface soundness.
 8. Unbounded memory, CPU, I/O, database, network, rendering, or concurrency cost that can hurt realistic workloads.
 9. Layer boundaries and local ownership drift.
 10. SOLID/design-standard adherence.
@@ -127,7 +153,7 @@ Read `references/code-review-checks.md`. Apply only the sections relevant to the
 
 Classify findings as:
 
-- **Critical** — likely data loss, corruption, security issue, false success, destructive action without proper guard, broken build, or severe correctness failure.
+- **Critical** — likely data loss, corruption, security issue, false success, destructive action without proper guard, broken build, severe correctness failure, or financial/audit state being applied to the wrong durable entity.
 - **High** — likely runtime bug, serious safety/workflow/security bug, important contract flaw, major test gap around risky behavior, or significant local ownership/design drift.
 - **Medium** — plausible edge-case failure, maintainability issue, incomplete verification, unclear contract, SOLID/coding-standard concern, performance risk for realistic workloads, or missing tests that should be addressed soon.
 - **Low** — minor clarity, naming, style, or small cleanup issue worth fixing only if nearby.

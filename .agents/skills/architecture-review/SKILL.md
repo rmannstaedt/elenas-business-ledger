@@ -56,6 +56,7 @@ Read only the relevant subset of:
 - `.ai/context/architecture.md`, `.ai/context/decisions.md`, `.ai/context/progress.md`, and `.ai/context/HANDOFF.md`, if present;
 - `.ai/standards/architecture-principles.md`;
 - `.ai/standards/coding-standards.md` when coding standards affect structure;
+- `.ai/standards/domain-data-integrity.md` when durable business entities, financial records, audit history, cross-record state, external-system synchronization, or identity/lineage concerns are involved;
 - `.ai/standards/service-worker-and-job-design.md` when services, workers, schedulers, queues, jobs, IPC, or background processing are involved;
 - `.ai/standards/persistence-and-artifacts.md` when durable files, manifests, reports, logs, import/export, or artifact formats are involved;
 - `.ai/standards/database-standards.md` when SQL, SQLite, EF Core, transactions, migrations, or database-backed persistence are involved;
@@ -80,6 +81,7 @@ Inspect relevant:
 - composition roots and dependency-injection registration;
 - public interfaces, major abstractions, and ownership of interfaces;
 - Domain/Core, Application, Infrastructure, Presentation, host, and test boundaries;
+- durable business identities, references, snapshots, lineage, and authoritative state ownership;
 - CLI, service, worker, job, controller, handler, repository, adapter, database, and UI entry points;
 - runtime topology and communication boundaries;
 - workflow orchestration, state transitions, and policy ownership;
@@ -112,6 +114,7 @@ Check whether:
 - interfaces are placed in the layer that owns the policy or abstraction, not merely near one implementation;
 - dependency inversion protects policy from details rather than adding ceremony;
 - cross-cutting concerns such as logging, clocks, configuration, telemetry, retry, cancellation, and correlation are handled consistently;
+- durable business state is attached through stable identity/reference paths rather than inferred from mutable or non-unique descriptive fields;
 - tests exercise important seams rather than requiring fragile end-to-end coverage for every policy;
 - decomposition creates coherent components rather than a proliferation of overlapping miniature services;
 - runtime topology and communication boundaries are explicit, intentional, and safe, including which components may call, command, observe, or mutate which other components.
@@ -145,6 +148,32 @@ Examples of architecture drift include:
 - tests needing excessive setup because responsibilities are poorly separated;
 - repeated rule logic appearing in multiple layers;
 - host startup code becoming the only place a workflow can be understood.
+
+## Domain Identity, Lineage, And Reference Integrity
+
+For systems with durable business data, review the data model as part of architecture, not only as persistence detail.
+
+Identify the durable business entities and ask:
+
+- Which entity owns each important fact or state?
+- Which stable identifier points to that exact entity?
+- Which fields are live references, and which fields are issued-time or event-time snapshots?
+- Which external-system identifiers are scoped to an adapter boundary?
+- Which records may outlive current catalog, customer, student, account, schedule, or external-system state?
+- Which states are financial, audit, billing, tax, payment, import/export, reconciliation, printed, completed, or finalized states?
+
+Architectural risks to report include:
+
+- applying state by matching names, dates, times, titles, amounts, filenames, or formatted text instead of stable identities;
+- using a natural key without documented uniqueness, immutability, validation, and persistence constraints;
+- losing identity while moving from draft to issued/final records, domain models to persistence entities, external events to local records, or source rows to reports/PDFs;
+- confusing snapshots with references, so old invoices/reports depend on current mutable catalog or profile data;
+- allowing external-system edits to rewrite local audit/billing state after that local state should be locked;
+- treating a generated artifact, report row, or UI projection as the owner of business truth;
+- missing migration, recovery, or cleanup policy for identity/lineage changes;
+- lacking collision tests for same-name/same-date/same-time/same-plan or other plausible descriptive duplicates.
+
+For financial, tax, invoice, payment, receipt, credit, audit, or finalization paths, weak identity/reference design is normally a Critical architecture finding. The smallest safe correction is usually to introduce or preserve a stable source identity, keep required snapshots for display/history, and update queries/projections so state is applied only through that identity.
 
 ## Runtime Topology and Trust Checks
 
@@ -227,7 +256,7 @@ If documentation claims guarantees that code does not enforce, report that clear
 
 Use these severities:
 
-- **Critical** — architecture permits or causes likely data loss, corruption, false success, unsafe destructive behavior, serious security/trust-boundary failure, or severe dependency-direction failure that invalidates core guarantees.
+- **Critical** — architecture permits or causes likely data loss, corruption, false success, unsafe destructive behavior, serious security/trust-boundary failure, severe dependency-direction failure that invalidates core guarantees, or financial/audit state being attached to the wrong durable entity.
 - **High** — significant boundary violation, misplaced policy ownership, unsafe runtime topology, serious workflow/safety drift, or structural issue likely to block near-term change.
 - **Medium** — maintainability concern, unclear ownership, responsibility accumulation, weak abstraction, testability problem, or drift that should be planned before it becomes costly.
 - **Low** — minor naming, organization, documentation, or clarity issue that does not currently threaten correctness or change safety.

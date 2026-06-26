@@ -11,6 +11,7 @@ Block or escalate when the change can:
 - produce false success;
 - hide partial failure;
 - corrupt, lose, or silently discard user data or durable state;
+- apply invoiced, paid, completed, issued, printed, reconciled, finalized, deleted, tax, or audit state to the wrong durable entity;
 - bypass security, authorization, path, permission, or trust boundaries;
 - leak secrets or unnecessary sensitive data;
 - perform destructive operations without explicit intent and appropriate recovery/confirmation;
@@ -54,6 +55,8 @@ Treat as advisory: cosmetic preferences, style nits covered by formatting, low-v
 - Are JSON/JSONL/log/report formats appropriate and inspectable?
 - Is there a version field where migration is plausible?
 - Are serialization settings treated as part of the contract?
+- Are durable references represented by stable identities rather than display text, filenames, dates, names, or amounts?
+- Are snapshots and references both preserved when old output must stay historically accurate?
 - Can readers mistake incomplete files for complete files?
 - Are writes atomic/durable enough for the risk?
 - Are failure artifacts preserved?
@@ -64,6 +67,8 @@ Treat as advisory: cosmetic preferences, style nits covered by formatting, low-v
 
 - Is the project actually database-bound?
 - Is data access in the owning layer?
+- Are durable business relationships represented by stable IDs, foreign keys, unique constraints, or documented/enforced natural keys?
+- Can two plausible rows with the same descriptive values remain distinct through queries, migrations, and read models?
 - Are migrations reviewed and non-destructive unless approved?
 - Are transaction boundaries explicit?
 - Are queries parameterized?

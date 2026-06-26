@@ -98,6 +98,41 @@ Check whether:
 
 If a contract permits unsafe, ambiguous, misleading, or under-specified implementation, report it as a contract weakness even if the current implementation happens to work.
 
+## Domain Identity, Lineage, And Reference Integrity
+
+Apply when code touches durable business data, financial records, audit history, external-system synchronization, invoices, payments, imports, exports, reports, PDFs, database-backed state, or any workflow where one row's state must not be applied to another row.
+
+Check whether:
+
+- every durable business entity has a stable identity where later state or references depend on it;
+- names, titles, dates, times, prices, amounts, filenames, formatted strings, and other descriptive values are not used as identity unless the domain guarantees uniqueness and immutability;
+- natural keys have documented semantics, validation, persistence constraints, and tests for edit/collision cases;
+- state such as invoiced, paid, completed, printed, issued, finalized, reconciled, imported, exported, credited, refunded, voided, locked, or deleted is attached to the exact durable entity it belongs to;
+- financial, tax, billing, payment, issued-document, or audit state is never applied through fuzzy matching, "first match", same date/time, same display name, same amount, or same filename;
+- references and snapshots are both present when needed: references for ownership/lineage, snapshots for historical display;
+- identity survives every transformation: UI model -> command/request -> domain model -> draft/final record -> persistence entity -> query/read model -> report/export/PDF;
+- repository queries join/filter by stable identity rather than reconstructing relationships from display fields;
+- EF entities, domain models, DTOs, migrations, and generated artifacts agree on required identity fields;
+- default, null, empty, or zero IDs cannot silently become accepted finalized state;
+- missing, stale, deleted, or ambiguous references fail safe and visibly instead of falling back to broad matching;
+- external-system IDs are scoped to the external system boundary and mapped to local durable IDs when local audit/billing state matters;
+- later external edits cannot rewrite locked or already-issued local business state unless an explicit corrective workflow allows it;
+- generated reports, PDFs, logs, and exports preserve enough lineage to diagnose exactly which source rows were used;
+- migrations preserve identity/lineage when real durable history exists, or the breaking reset is explicit and approved;
+- tests include duplicate descriptive values, such as same student/date/time/plan or same customer/date/amount, where those duplicates are plausible in the domain;
+- tests prove newly created rows cannot inherit invoice/payment/completion/audit state from unrelated old rows.
+
+Failure scenarios to actively look for:
+
+- a draft carries an ID but the issued/final record drops it;
+- a repository projects status by date/time/name instead of source ID;
+- a UI read model treats a local cached display value as proof of issued/payment state;
+- a migration introduces a new identity field but leaves old rows indistinguishable without a documented reset/backfill policy;
+- a cleanup or reset removes parent rows while child rows keep stale status markers;
+- an external calendar/file/account item is deleted and recreated, causing local state to attach to the new item by description.
+
+Treat identity weakness as Critical when money, tax, invoice, payment, credit, receipt, audit, finalization, destructive action, or user/account ownership can attach to the wrong durable entity.
+
 ## Local Design and SOLID Checks
 
 This is not a full architecture review. It may report local architecture pressure, ownership drift, or dependency-direction problems, but should not propose broad architectural rewrites. Recommend `architecture-review` or `refactor-planning` when the issue is larger than local code review.
@@ -169,6 +204,9 @@ Apply only when relevant.
 Check whether:
 
 - transactions, concurrency tokens, unique constraints, ordering, idempotency, retries, and partial failure are handled correctly;
+- stable business references use explicit IDs or enforced natural keys rather than mutable descriptive fields;
+- queries that apply state join by the exact durable source identity and not by display names, formatted dates, amounts, filenames, or text;
+- finalized financial/audit rows contain the references needed to prove lineage plus snapshots needed for historical display;
 - migration code can lose data, mishandle existing rows, break rollback assumptions, or silently change durable meaning;
 - EF Core tracking/no-tracking, context lifetime, lazy loading, query composition, and transaction boundaries are intentional;
 - queries can cause N+1 roundtrips, unbounded result sets, client-side evaluation, missing indexes, or avoidable table scans in realistic workloads;
