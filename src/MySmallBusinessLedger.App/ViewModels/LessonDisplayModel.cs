@@ -222,6 +222,12 @@ public sealed class LessonDisplayModel : ViewModelBase
         savedHasKnownStartTime = HasKnownStartTime;
     }
 
+    public void AcceptSubmittedDraft()
+    {
+        AcceptDateTimeChange();
+        IsDraft = false;
+    }
+
     public void AcceptCreatedLesson(CalendarLesson lesson)
     {
         id = lesson.Id;

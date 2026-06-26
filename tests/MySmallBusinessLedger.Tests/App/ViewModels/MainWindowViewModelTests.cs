@@ -1704,6 +1704,65 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task UnmatchedCalendarAddRefreshReplacesDraftWithSingleSelectedPlanLesson()
+    {
+        var startsAt = new DateTimeOffset(2026, 6, 15, 0, 0, 0, TimeSpan.FromHours(2));
+        var lessonEditor = new FakeLessonEditorService
+        {
+            AddResult = OperationResult<IReadOnlyList<MySmallBusinessLedger.Core.Calendar.CalendarLesson>>.Success(
+            [
+                new MySmallBusinessLedger.Core.Calendar.CalendarLesson(
+                    "different-lesson",
+                    "Anna",
+                    startsAt.AddDays(1),
+                    HasKnownStartTime: false)
+            ])
+        };
+        var dashboard = new FakeDashboardService
+        {
+            LessonState = LessonState.Planned,
+            LessonIsInvoiced = false,
+            LessonPaymentStatus = null,
+            PlanOptions =
+            [
+                new DashboardPlanOption(42, "Standard"),
+                new DashboardPlanOption(77, "Proevetime")
+            ],
+            DashboardLessonsAfterFirstLoad =
+            [
+                new DashboardLesson(
+                    "new-lesson",
+                    "Anna",
+                    startsAt,
+                    LessonState.Planned,
+                    IsInvoiced: false,
+                    PaymentStatus: null,
+                    PlanCatalogId: 42,
+                    PlanName: "Standard",
+                    LocalLessonId: 19,
+                    HasKnownStartTime: false)
+            ]
+        };
+        var viewModel = CreateViewModel(
+            dashboard: dashboard,
+            lessonEditorService: lessonEditor,
+            lessonTimeZone: TimeZoneInfo.FindSystemTimeZoneById("Romance Standard Time"));
+        await viewModel.LoadAsync();
+        await viewModel.AddLessonCommand.ExecuteAsync();
+        var draft = viewModel.SelectedLesson!;
+
+        draft.StartsOnDate = startsAt.Date;
+        draft.PlanCatalogId = 77;
+
+        await EventuallyAsync(() => lessonEditor.LastPlanLessonId == 19);
+        var lesson = Assert.Single(viewModel.Lessons, lesson => lesson.Id == "new-lesson");
+        Assert.False(lesson.IsDraft);
+        Assert.Equal(77, lesson.PlanCatalogId);
+        Assert.Equal("Proevetime", lesson.PlanName);
+        Assert.Same(lesson, viewModel.SelectedLesson);
+    }
+
+    [Fact]
     public async Task PlanSelectedOnDraftLessonIsAppliedAfterDraftAutosaves()
     {
         var lessonEditor = new FakeLessonEditorService();
@@ -2630,6 +2689,8 @@ public sealed class MainWindowViewModelTests
 
         public Func<Task>? BeforeDeleteReturnAsync { get; set; }
 
+        public OperationResult<IReadOnlyList<MySmallBusinessLedger.Core.Calendar.CalendarLesson>>? AddResult { get; init; }
+
         public OperationResult<PopulateCalendarResult> PopulateResult { get; init; } =
             OperationResult<PopulateCalendarResult>.Success(new PopulateCalendarResult(2, 0, []));
 
@@ -2640,6 +2701,11 @@ public sealed class MainWindowViewModelTests
         {
             AddWasCalled = true;
             LastAddRequest = request;
+            if (AddResult is not null)
+            {
+                return Task.FromResult(AddResult);
+            }
+
             return Task.FromResult(OperationResult<IReadOnlyList<MySmallBusinessLedger.Core.Calendar.CalendarLesson>>.Success(
                 [new MySmallBusinessLedger.Core.Calendar.CalendarLesson(
                     "new-lesson",

@@ -618,7 +618,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         }
         else
         {
-            lesson.AcceptDateTimeChange();
+            lesson.AcceptSubmittedDraft();
         }
 
         ErrorMessage = null;
