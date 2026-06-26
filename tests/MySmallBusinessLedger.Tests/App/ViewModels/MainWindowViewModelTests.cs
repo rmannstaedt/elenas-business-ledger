@@ -636,6 +636,13 @@ public sealed class MainWindowViewModelTests
 
                 Assert.IsType<WpfDataGridTemplateColumn>(
                     lessonGrid.Columns.Single(column => column.Header?.ToString() == "Plan"));
+                var lessonPlanCombo = Assert.Single(
+                    FindVisualChildren<WpfComboBox>(lessonGrid),
+                    comboBox => AutomationProperties.GetName(comboBox) == "Lesson plan");
+                Assert.Equal(new Thickness(0), lessonPlanCombo.BorderThickness);
+                Assert.Equal(new Thickness(0), lessonPlanCombo.Margin);
+                Assert.Equal(VerticalAlignment.Stretch, lessonPlanCombo.VerticalAlignment);
+                Assert.True(double.IsNaN(lessonPlanCombo.Height));
 
                 var invoicedColumn = Assert.IsType<WpfDataGridTextColumn>(
                     lessonGrid.Columns.Single(column => column.Header?.ToString() == "Invoiced"));
