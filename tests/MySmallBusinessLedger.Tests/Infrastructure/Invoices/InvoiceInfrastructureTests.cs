@@ -142,6 +142,33 @@ public sealed class InvoiceInfrastructureTests
     }
 
     [Fact]
+    public void QuestPdfInvoiceWriterKeepsTenOrFewerIncludedLessonsInOneColumn()
+    {
+        var lessons = Enumerable.Range(1, 10)
+            .Select(day => $"{day:00}-07-2026 14:00")
+            .ToArray();
+
+        var columns = QuestPdfInvoicePdfWriter.CreateIncludedLessonColumns(lessons);
+
+        var column = Assert.Single(columns);
+        Assert.Equal(lessons, column);
+    }
+
+    [Fact]
+    public void QuestPdfInvoiceWriterSplitsMoreThanTenIncludedLessonsIntoTwoColumns()
+    {
+        var lessons = Enumerable.Range(1, 11)
+            .Select(day => $"{day:00}-07-2026 14:00")
+            .ToArray();
+
+        var columns = QuestPdfInvoicePdfWriter.CreateIncludedLessonColumns(lessons);
+
+        Assert.Equal(2, columns.Count);
+        Assert.Equal(lessons[..6], columns[0]);
+        Assert.Equal(lessons[6..], columns[1]);
+    }
+
+    [Fact]
     public void QuestPdfInvoiceWriterFormatsPaymentAccountLinesForInvoicePaymentBox()
     {
         var lines = QuestPdfInvoicePdfWriter.CreatePaymentBoxDetailLines(

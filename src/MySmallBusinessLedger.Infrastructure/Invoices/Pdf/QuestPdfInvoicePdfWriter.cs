@@ -233,19 +233,37 @@ public sealed class QuestPdfInvoicePdfWriter : IInvoicePdfWriter
 
     private static void ComposeLessonList(IContainer container, IReadOnlyList<string> lessons)
     {
-        if (lessons.Count <= 6)
+        var columns = CreateIncludedLessonColumns(lessons);
+        container.PaddingLeft(18).Element(list =>
         {
-            container.Element(list => ComposeLessonListColumn(list, lessons));
-            return;
+            if (columns.Count == 1)
+            {
+                ComposeLessonListColumn(list, columns[0]);
+                return;
+            }
+
+            list.Row(row =>
+            {
+                row.RelativeItem().Element(column => ComposeLessonListColumn(column, columns[0]));
+                row.ConstantItem(28);
+                row.RelativeItem().Element(column => ComposeLessonListColumn(column, columns[1]));
+            });
+        });
+    }
+
+    internal static IReadOnlyList<IReadOnlyList<string>> CreateIncludedLessonColumns(IReadOnlyList<string> lessons)
+    {
+        if (lessons.Count <= 10)
+        {
+            return [lessons.ToArray()];
         }
 
         var leftColumnCount = (int)Math.Ceiling(lessons.Count / 2m);
-        container.Row(row =>
-        {
-            row.RelativeItem().Element(list => ComposeLessonListColumn(list, lessons.Take(leftColumnCount)));
-            row.ConstantItem(28);
-            row.RelativeItem().Element(list => ComposeLessonListColumn(list, lessons.Skip(leftColumnCount)));
-        });
+        return
+        [
+            lessons.Take(leftColumnCount).ToArray(),
+            lessons.Skip(leftColumnCount).ToArray()
+        ];
     }
 
     private static void ComposeLessonListColumn(IContainer container, IEnumerable<string> lessons)

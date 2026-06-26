@@ -4,6 +4,8 @@
 
 Working name: My Small Business Ledger
 
+Current app version: 1.0
+
 Internal namespace/project prefix:
 MySmallBusinessLedger
 
@@ -34,7 +36,7 @@ Student plan periods: stored with a required catalog plan identity plus copied c
 Issued invoice lines: stored with catalog plan identity for lineage plus issued-time plan name and price snapshots for durable invoice display/PDF output; issued invoice company snapshots include the bank account, MobilePay account, and payment instructions used at issue time; old invoice display must use the stored invoice snapshot, not current catalog names or derived rename history
 Invoice PDFs: stored as files, not BLOBs
 Invoice number and PDF filename display: invoice numbers are formatted with at least three digits, and final PDF filenames use `Invoice <invoice number> <period> - <student full name>.pdf`, for example `Invoice 001 Juni 2026 - Mira Vale.pdf`
-Invoice PDF generation: QuestPDF; Danish invoice PDFs use a toner-light header with `studio.example.test`, show the invoice period/month, group lesson services by issued plan and price, list all included lessons in one clear list, keep the invoice to one page by flowing longer lesson lists into multiple columns in the middle lesson area, use `CVR` for the CVR label, include configured bank/MobilePay account lines and payment instructions when present, and add a plan cut-over note when a single invoice covers a mid-month plan change
+Invoice PDF generation: QuestPDF; Danish invoice PDFs use a toner-light header with `studio.example.test`, show the invoice period/month, group lesson services by issued plan and price, list all included lessons in a clear indented lesson area that stays in one column through 10 lessons and uses two columns above 10 lessons, use `CVR` for the CVR label, include configured bank/MobilePay account lines and payment instructions when present, keep the invoice to one page, and add a plan cut-over note when a single invoice covers a mid-month plan change
 Invoice VAT calculation: VAT applicability is based on the invoice period start date, not the invoice issue/print date
 Invoice PDF safety: reserve invoice metadata as `Issuing`, write to staging, verify PDF bytes, publish without overwriting, finalize the invoice as `Issued`, then request print; staging/write/verify/publish failures before final PDF publication must discard any staged PDF and release the reserved number so retries do not skip invoice numbers
 Invoice printer: configured from `Application > Settings`, stored in SQLite company profile data, selectable from installed Windows printers when enumeration is available, typeable, changeable, and clearable; if missing during first invoice print/reprint, the app opens the printer selection dialog directly and remembers the selected printer before continuing; `Printed` means the configured printer existed and the Windows print request was launched without exception, not that physical output or spooler completion was verified

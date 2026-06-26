@@ -218,7 +218,7 @@ The Invoice will contain VAT information, if currently relevant.
 VAT applicability is based on the invoice period start date, not the invoice issue/print date.
 The Invoice will contain price information.
 The Invoice will contain the configured bank registration/account number lines, MobilePay account line, and payment instructions, if any.
-The Invoice must fit on one PDF page. If the included lesson list is long, the lesson list should use multiple columns in the middle lesson area rather than pushing payment instructions, totals, or footer text to a second page.
+The Invoice must fit on one PDF page. The included lesson list is indented in the middle lesson area, stays in one column through 10 lessons, and uses two columns above 10 lessons so payment instructions, totals, and footer text are not pushed to a second page.
 Payment instructions are configured as one of:
 
 - `Betales ved modtagelse`
