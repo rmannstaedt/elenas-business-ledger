@@ -24,6 +24,11 @@ public interface IInvoiceRepository
         IReadOnlyList<int> lessonIds,
         CancellationToken cancellationToken);
 
+    Task<OperationResult<IssuedInvoice>> MarkInvoicePdfPublishedAsync(
+        InvoiceNumber invoiceNumber,
+        string pdfFilePath,
+        CancellationToken cancellationToken);
+
     Task ReleaseInvoiceReservationAsync(InvoiceNumber invoiceNumber, CancellationToken cancellationToken);
 
     Task<OperationResult<IssuedInvoice>> UpdatePrintStatusAsync(

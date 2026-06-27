@@ -1,3 +1,4 @@
+using System.Globalization;
 using MySmallBusinessLedger.Core.Invoices;
 using MySmallBusinessLedger.Core.Lessons;
 using MySmallBusinessLedger.Core.Ports;
@@ -55,9 +56,12 @@ public sealed class SqliteLessonRepository : ILessonRepository
         var firstDay = new DateOnly(month.Year, month.Month, 1);
         var from = firstDay.ToDateTime(TimeOnly.MinValue);
         var to = firstDay.AddMonths(1).ToDateTime(TimeOnly.MinValue);
+        var fromText = FormatSqliteDatePrefix(firstDay);
+        var toExclusiveText = FormatSqliteDatePrefix(firstDay.AddMonths(1));
 
         await using var context = createContext();
         var lessons = await context.Lessons
+            .FromSqlInterpolated($"""SELECT * FROM "Lessons" WHERE "StartsAt" >= {fromText} AND "StartsAt" < {toExclusiveText}""")
             .AsNoTracking()
             .Include(lesson => lesson.Student)
             .Where(lesson => lesson.Student.ShortName == studentShortName)
@@ -77,9 +81,12 @@ public sealed class SqliteLessonRepository : ILessonRepository
     {
         var fromDate = from.ToDateTime(TimeOnly.MinValue);
         var toExclusive = to.AddDays(1).ToDateTime(TimeOnly.MinValue);
+        var fromText = FormatSqliteDatePrefix(from);
+        var toExclusiveText = FormatSqliteDatePrefix(to.AddDays(1));
 
         await using var context = createContext();
         var lessons = await context.Lessons
+            .FromSqlInterpolated($"""SELECT * FROM "Lessons" WHERE "StartsAt" >= {fromText} AND "StartsAt" < {toExclusiveText}""")
             .AsNoTracking()
             .Include(lesson => lesson.Student)
             .ToArrayAsync(cancellationToken);
@@ -146,4 +153,7 @@ public sealed class SqliteLessonRepository : ILessonRepository
             entity.GoogleCalendarEventId,
             entity.InvoiceNumber is null ? null : new InvoiceNumber(entity.InvoiceNumber.Value),
             entity.HasKnownStartTime);
+
+    private static string FormatSqliteDatePrefix(DateOnly date) =>
+        date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 }

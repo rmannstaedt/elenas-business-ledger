@@ -16,10 +16,14 @@ internal sealed class ApplicationBootstrapper
         Directory.CreateDirectory(appPaths.AppDataFolderPath);
 
         var createContext = SqliteLedgerDbContextFactory.Create(appPaths.DatabasePath);
-        await new LedgerDatabaseMigrator(createContext).MigrateAsync(cancellationToken);
+        var migrationWarnings = await new LedgerDatabaseMigrator(createContext).MigrateAsync(cancellationToken);
 
         var services = ApplicationServiceGraph.Create(appPaths, createContext);
         var warnings = await RunStartupJobsAsync(services, cancellationToken);
+        warnings = migrationWarnings
+            .Select(warning => new ApplicationStartupWarning(warning.Title, warning.Message))
+            .Concat(warnings)
+            .ToList();
         var viewModel = CreateMainWindowViewModel(services);
 
         return new ApplicationStartupResult(new MainWindow(viewModel), warnings);

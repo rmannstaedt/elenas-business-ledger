@@ -69,7 +69,11 @@ public sealed class WindowsProtectedFileDataStore : IDataStore
 
     private string GetFilePath(string key)
     {
-        var safeFileName = Uri.EscapeDataString(key).Replace("%", "_", StringComparison.Ordinal);
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(key));
+        var safeFileName = Convert.ToBase64String(hash)
+            .TrimEnd('=')
+            .Replace('+', '-')
+            .Replace('/', '_');
         return Path.Combine(directoryPath, $"{safeFileName}.bin");
     }
 }

@@ -15,6 +15,43 @@ namespace MySmallBusinessLedger.Infrastructure.Persistence.Migrations
         {
             migrationBuilder.Sql(
                 """
+                CREATE TABLE IF NOT EXISTS "__LedgerMigrationWarnings" (
+                    "Id" INTEGER NOT NULL CONSTRAINT "PK___LedgerMigrationWarnings" PRIMARY KEY AUTOINCREMENT,
+                    "Title" TEXT NOT NULL,
+                    "Message" TEXT NOT NULL,
+                    "CreatedAtUtc" TEXT NOT NULL
+                );
+                """);
+
+            migrationBuilder.Sql(
+                """
+                INSERT INTO "__LedgerMigrationWarnings" (
+                    "Title",
+                    "Message",
+                    "CreatedAtUtc")
+                SELECT
+                    'Invoice history migration warning',
+                    'The database upgrade skipped ' || migration."SkippedLineCount" || ' old invoice line(s) because they could not be safely linked to a saved lesson. The invoice record was kept and the upgrade will continue. If you have not issued invoices in this app yet, no action is needed. If you expected old invoice details, please contact support before creating new invoices.',
+                    strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+                FROM (
+                    SELECT COUNT(*) AS "SkippedLineCount"
+                    FROM "IssuedInvoiceLines" line
+                    WHERE NOT (
+                        line."LessonId" > 0
+                        AND EXISTS (
+                            SELECT 1
+                            FROM "Lessons" lesson
+                            WHERE lesson."Id" = line."LessonId")
+                        AND line."Id" = (
+                            SELECT MIN(duplicate."Id")
+                            FROM "IssuedInvoiceLines" duplicate
+                            WHERE duplicate."LessonId" = line."LessonId"))
+                ) migration
+                WHERE migration."SkippedLineCount" > 0;
+                """);
+
+            migrationBuilder.Sql(
+                """
                 CREATE TABLE "IssuedInvoiceLines_new" (
                     "Id" INTEGER NOT NULL CONSTRAINT "PK_IssuedInvoiceLines" PRIMARY KEY AUTOINCREMENT,
                     "IssuedInvoiceEntityId" INTEGER NOT NULL,

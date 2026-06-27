@@ -46,14 +46,20 @@ public sealed class StartupDashboardQuery
         var students = await studentRepository.ListActiveStudentsAsync(cancellationToken);
         var calendarLessons = await calendarGateway.ListLessonsAsync(from, to, cancellationToken);
         var activeStudentShortNames = students
-            .Select(student => student.Student.ShortName)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            .GroupBy(student => student.Student.ShortName, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                group => group.Key,
+                group => group.First().Student.ShortName,
+                StringComparer.OrdinalIgnoreCase);
         var knownCalendarLessons = calendarLessons
-            .Where(lesson => activeStudentShortNames.Contains(lesson.StudentShortName))
+            .Select(lesson => activeStudentShortNames.TryGetValue(lesson.StudentShortName, out var canonicalShortName)
+                ? lesson with { StudentShortName = canonicalShortName }
+                : null)
+            .OfType<CalendarLesson>()
             .ToArray();
         var currentStudent = selectedStudentShortName is not null &&
-                             activeStudentShortNames.Contains(selectedStudentShortName)
-            ? selectedStudentShortName
+                             activeStudentShortNames.TryGetValue(selectedStudentShortName, out var canonicalSelectedStudent)
+            ? canonicalSelectedStudent
             : PickCurrentStudent(knownCalendarLessons, students);
 
         var lessonStatuses = await invoiceRepository.ListLessonStatusesAsync(from, to, cancellationToken);
@@ -70,7 +76,7 @@ public sealed class StartupDashboardQuery
         var representedLocalLessonIds = new HashSet<int>();
         foreach (var lesson in knownCalendarLessons.OrderBy(lesson => lesson.StartsAt))
         {
-            if (currentStudent is not null && lesson.StudentShortName != currentStudent)
+            if (!MatchesCurrentStudent(lesson.StudentShortName, currentStudent))
             {
                 continue;
             }
@@ -102,14 +108,14 @@ public sealed class StartupDashboardQuery
         foreach (var localLesson in localLessons
             .Where(lesson => statusByLessonId.ContainsKey(lesson.Id))
             .Where(lesson => !representedLocalLessonIds.Contains(lesson.Id))
-            .Where(lesson => currentStudent is null || lesson.StudentShortName == currentStudent))
+            .Where(lesson => MatchesCurrentStudent(lesson.StudentShortName, currentStudent)))
         {
             var invoiceStatus = statusByLessonId.GetValueOrDefault(localLesson.Id);
             dashboardLessons.Add(CreateDashboardLesson(localLesson, invoiceStatus));
         }
 
         var lessons = dashboardLessons
-            .Where(lesson => currentStudent is null || lesson.StudentShortName == currentStudent)
+            .Where(lesson => MatchesCurrentStudent(lesson.StudentShortName, currentStudent))
             .OrderBy(lesson => lesson.StartsAt)
             .ToArray();
 
@@ -293,6 +299,10 @@ public sealed class StartupDashboardQuery
         var date = DateOnly.FromDateTime(startsAt.DateTime);
         return date >= from && date <= to;
     }
+
+    private static bool MatchesCurrentStudent(string studentShortName, string? currentStudent) =>
+        currentStudent is null ||
+        string.Equals(studentShortName, currentStudent, StringComparison.OrdinalIgnoreCase);
 
     private IEnumerable<DateTimeOffset> CreateScheduledStarts(
         IReadOnlyList<MySmallBusinessLedger.Core.Students.StudentScheduleEntry> schedule,

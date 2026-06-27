@@ -382,6 +382,37 @@ public sealed class GoogleCalendarGatewayTests
     }
 
     [Fact]
+    public async Task WindowsProtectedFileDataStoreUsesDistinctFilesForDistinctKeysThatEscapeSimilarly()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var directory = Path.Combine(Path.GetTempPath(), "ElenaLedgerTokenTests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+
+        try
+        {
+            IDataStore store = new WindowsProtectedFileDataStore(directory);
+
+            await store.StoreAsync("a%b@example.com", new StoredToken("first-token"));
+            await store.StoreAsync("a_25b@example.com", new StoredToken("second-token"));
+
+            var first = await store.GetAsync<StoredToken>("a%b@example.com");
+            var second = await store.GetAsync<StoredToken>("a_25b@example.com");
+
+            Assert.Equal("first-token", first.AccessToken);
+            Assert.Equal("second-token", second.AccessToken);
+            Assert.Equal(2, Directory.GetFiles(directory).Length);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task WindowsProtectedFileDataStoreClearDeletesOnlyFilesInsideTokenFolder()
     {
         if (!OperatingSystem.IsWindows())

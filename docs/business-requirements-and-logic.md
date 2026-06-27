@@ -108,13 +108,15 @@ Google Calendar is the repository of truth for scheduling details of uninvoiced 
 Once a lesson is invoiced, the local lesson record is locked to that invoice and later Google Calendar edits or deletions are ignored for billing and audit purposes.
 Issued invoice lines remain immutable invoice-time snapshots for the printed invoice content.
 
-Google authorization requests the `https://www.googleapis.com/auth/calendar.events.owned` OAuth scope. This lets the app read, create, move, complete, and delete events on Google calendars owned by the signed-in account, including lesson appointments the user creates manually in Google Calendar. The configured calendar should therefore be owned by that account; the app does not request broader all-calendar event access merely to inspect shared calendars.
+Google authorization requests the `https://www.googleapis.com/auth/calendar.events.owned` OAuth scope. This lets the app read, create, move, complete, and delete events on Google calendars owned by the signed-in account, including lesson appointments the user creates manually in Google Calendar. The configured calendar should therefore be owned by that account; the app does not request broader all-calendar event access merely to inspect shared calendars. Stored OAuth token payloads must remain Windows user-protected and token file names must be collision-resistant for distinct token keys.
 
 Relevant Google Calendar entries are identified by their first line, which may be one of these:
   $ <student short name>
   $<student short name>
 
 Google Calendar entries that are *NOT* identified as relevant by their first line are *ALWAYS* ignored.
+
+Student short-name matching against saved active Students is case-insensitive. After a marker is matched, the application uses the stored Student short-name casing for dashboard filtering, local lesson reconciliation, and invoice-list lookups.
 
 The first line remains the ownership/matching marker. A completed uninvoiced lesson may additionally contain this later line in the Google Calendar entry:
   Status: Completed
@@ -124,6 +126,8 @@ If that later status line is absent, the lesson is treated as Planned.
 When an Invoice is issued, it is added to the Invoice table with its issued invoice lines, and the included local Lessons are linked to that Invoice number. Each issued invoice line also stores the local Lesson ID for the lesson it invoices. Those lesson links are the durable local record of which lessons were invoiced.
 
 Issued invoice lines are authoritative for invoice-to-lesson lineage. The lesson row may keep an invoice-number cache for locking and display, but that cache must be maintained by the invoice finalization transaction and must never replace the issued invoice line's exact local Lesson ID as the durable reference.
+
+During schema upgrades from older data, the application must not invent Lesson IDs for issued invoice lines. If an old invoice line cannot be safely linked to a saved local lesson, the migration skips that line, records a startup warning, and keeps the invoice header plus any safely linkable lines so the application can continue starting.
 
 Invoice, completion, and payment state must only be applied to a lesson through that lesson's durable local identity and invoice link. The application must never infer that a lesson is invoiced, completed, or paid merely because it has the same student, date, time, or plan as an issued invoice line; a separate lesson on the same date remains separate and uninvoiced until it is explicitly included in an invoice.
 
@@ -253,6 +257,7 @@ The "Print Invoice" button does the following:
   - Saves a PDF copy of the invoice in the company invoice folder path through a staging, verification, and publish flow.
     -- note: the final PDF file name uses the invoice number, invoice period, and Student full name, e.g. `Invoice 001 Juni 2026 - Mira Vale.pdf`.
     -- note: if PDF staging, writing, verification, or publish fails before the final PDF is published, any staged PDF is discarded and the reserved Invoice number is released; the Invoice is not shown as issued, later actions are *not* performed, and the user is notified of the failure. Retrying must reuse that Invoice number rather than skipping to the next one.
+    -- note: if the final PDF has been published but finalizing the Invoice data fails, the application keeps the in-progress `Issuing` reservation and published PDF path for retry/support recovery; the Invoice is not shown as issued, later actions are *not* performed, and the user is notified of the failure.
   - Finalizes the Invoice data in the Invoice table as issued.
   - Sends a print request to the configured invoice printer, if one is configured and available.
     -- note: a print failure does not undo the issued Invoice or delete the PDF; the Invoice remains issued and can be reprinted from the Invoice Viewer.

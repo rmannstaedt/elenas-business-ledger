@@ -69,7 +69,7 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
         await using var context = createContext();
         return await context.IssuedInvoices
             .AsNoTracking()
-            .Where(invoice => invoice.StudentShortName == studentShortName)
+            .Where(invoice => EF.Functions.Collate(invoice.StudentShortName, "NOCASE") == studentShortName)
             .Where(invoice => invoice.IssueStatus == InvoiceIssueStatus.Issued)
             .OrderBy(invoice => invoice.InvoiceNumber)
             .Select(invoice => new IssuedInvoiceSummary(
@@ -99,7 +99,7 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
             .AnyAsync(
                 invoice =>
                     invoice.IssueStatus == InvoiceIssueStatus.Issued &&
-                    invoice.StudentShortName == studentShortName &&
+                    EF.Functions.Collate(invoice.StudentShortName, "NOCASE") == studentShortName &&
                     invoice.PeriodFrom < nextMonth &&
                     invoice.PeriodTo >= firstDay,
                 cancellationToken);
@@ -121,7 +121,14 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
         InvoiceTotals totals,
         CancellationToken cancellationToken)
     {
+        var requestedLessonIds = GetDistinctPositiveLessonIds(draft.Lines.Select(line => line.LessonId));
         await using var context = createContext();
+        var existingReservation = await FindMatchingIssuingInvoiceAsync(context, requestedLessonIds, cancellationToken);
+        if (existingReservation is not null)
+        {
+            return OperationResult<IssuedInvoice>.Success(ToDomain(existingReservation));
+        }
+
         var highest = await context.IssuedInvoices
             .AsNoTracking()
             .Select(invoice => (int?)invoice.InvoiceNumber)
@@ -231,6 +238,41 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
         return OperationResult<IssuedInvoice>.Success(ToDomain(invoice));
     }
 
+    public async Task<OperationResult<IssuedInvoice>> MarkInvoicePdfPublishedAsync(
+        InvoiceNumber invoiceNumber,
+        string pdfFilePath,
+        CancellationToken cancellationToken)
+    {
+        await using var context = createContext();
+        var invoice = await context.IssuedInvoices
+            .Include(storedInvoice => storedInvoice.Lines)
+            .SingleOrDefaultAsync(
+                storedInvoice =>
+                    storedInvoice.InvoiceNumber == invoiceNumber.Value &&
+                    storedInvoice.IssueStatus == InvoiceIssueStatus.Issuing,
+                cancellationToken);
+
+        if (invoice is null)
+        {
+            return OperationResult<IssuedInvoice>.Failure(
+                new ValidationError("Invoice.NotFound", "The reserved invoice could not be found."));
+        }
+
+        if (!string.IsNullOrWhiteSpace(invoice.PdfFilePath) &&
+            !string.Equals(invoice.PdfFilePath, pdfFilePath, StringComparison.OrdinalIgnoreCase))
+        {
+            return OperationResult<IssuedInvoice>.Failure(
+                new ValidationError(
+                    "Invoice.PublishedPathConflict",
+                    "The reserved invoice already points to a different published PDF."));
+        }
+
+        invoice.PdfFilePath = pdfFilePath;
+        await context.SaveChangesAsync(cancellationToken);
+
+        return OperationResult<IssuedInvoice>.Success(ToDomain(invoice));
+    }
+
     public async Task ReleaseInvoiceReservationAsync(InvoiceNumber invoiceNumber, CancellationToken cancellationToken)
     {
         await using var context = createContext();
@@ -243,6 +285,11 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
                 cancellationToken);
 
         if (invoice is null)
+        {
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(invoice.PdfFilePath))
         {
             return;
         }
@@ -444,5 +491,37 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
     {
         var date = DateOnly.FromDateTime(startsAt.DateTime);
         return date >= from && date <= to;
+    }
+
+    private static int[] GetDistinctPositiveLessonIds(IEnumerable<int> lessonIds) =>
+        lessonIds
+            .Where(lessonId => lessonId > 0)
+            .Distinct()
+            .Order()
+            .ToArray();
+
+    private static async Task<IssuedInvoiceEntity?> FindMatchingIssuingInvoiceAsync(
+        LedgerDbContext context,
+        IReadOnlyList<int> requestedLessonIds,
+        CancellationToken cancellationToken)
+    {
+        if (requestedLessonIds.Count == 0)
+        {
+            return null;
+        }
+
+        var issuingInvoices = await context.IssuedInvoices
+            .Include(invoice => invoice.Lines)
+            .Where(invoice => invoice.IssueStatus == InvoiceIssueStatus.Issuing)
+            .OrderBy(invoice => invoice.InvoiceNumber)
+            .ToArrayAsync(cancellationToken);
+
+        return issuingInvoices.FirstOrDefault(invoice =>
+            invoice.Lines
+                .Select(line => line.LessonId)
+                .Where(lessonId => lessonId > 0)
+                .Distinct()
+                .Order()
+                .SequenceEqual(requestedLessonIds));
     }
 }

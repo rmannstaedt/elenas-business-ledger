@@ -122,6 +122,13 @@ public sealed class AppServiceTests
             Task.FromResult(OperationResult<IssuedInvoice>.Failure(
                 new ValidationError("Invoice.NotConfigured", "Invoice finalization is not configured.")));
 
+        public Task<OperationResult<IssuedInvoice>> MarkInvoicePdfPublishedAsync(
+            InvoiceNumber invoiceNumber,
+            string pdfFilePath,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(OperationResult<IssuedInvoice>.Failure(
+                new ValidationError("Invoice.NotConfigured", "Invoice PDF publication is not configured.")));
+
         public Task ReleaseInvoiceReservationAsync(InvoiceNumber invoiceNumber, CancellationToken cancellationToken) =>
             Task.CompletedTask;
 
