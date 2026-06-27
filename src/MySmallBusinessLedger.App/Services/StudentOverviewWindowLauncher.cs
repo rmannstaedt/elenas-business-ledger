@@ -43,6 +43,22 @@ public sealed class StudentOverviewWindowLauncher : IStudentOverviewLauncher
         {
             Owner = Application.Current?.MainWindow
         };
+        var detailsWindow = new StudentDetailsView(viewModel);
+        window.Loaded += (_, _) =>
+        {
+            if (!detailsWindow.IsVisible)
+            {
+                detailsWindow.Owner = window;
+                detailsWindow.Show();
+            }
+        };
+        window.Closing += (_, e) =>
+        {
+            if (!e.Cancel)
+            {
+                detailsWindow.CloseWithoutPrompt();
+            }
+        };
 
         viewModel.SelectedStudentChanged += OnSelectedStudentChanged;
         try

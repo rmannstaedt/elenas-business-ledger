@@ -122,6 +122,17 @@ public sealed class StudentOverviewViewModel : ViewModelBase
         return true;
     }
 
+    public async Task<bool> PrepareForDetailsWindowCloseAsync()
+    {
+        if (!await PrepareCurrentEditorForCancelAsync())
+        {
+            return false;
+        }
+
+        ResetSelectionAfterCancel();
+        return true;
+    }
+
     private void SetSelectedStudentCore(StudentOverviewStudentDisplayModel? student)
     {
         isSelectingStudent = true;
@@ -270,6 +281,11 @@ public sealed class StudentOverviewViewModel : ViewModelBase
             return;
         }
 
+        ResetSelectionAfterCancel();
+    }
+
+    private void ResetSelectionAfterCancel()
+    {
         var selectAfterCancel = SelectedStudent?.ShortName ?? selectedStudentBeforeAdd;
         selectedStudentBeforeAdd = null;
         SetSelectedStudentCore(selectAfterCancel is null

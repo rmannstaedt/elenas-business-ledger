@@ -2,7 +2,7 @@
 
 Status: Implemented; awaiting final user test
 Created: 2026-06-20
-Last updated: 2026-06-20
+Last updated: 2026-06-27
 Owner/context: Ruben and Codex; Ruben wants a comprehensive student management view similar in spirit to Manage Plans, with panes for students, selected student details, current plan, and invoices.
 
 ## Related Docs And Standards
@@ -54,7 +54,7 @@ Add `Student > Manage Students`, opening a WPF student overview window with:
 
 - `Student > Manage Students` opens a student overview window.
 - Selecting a student refreshes the details, current plan, and invoices.
-- Add/Edit actions use the embedded Manage Students editor.
+- Add/Edit actions use the Student Details window's shared editor state.
 - Deactivate/Reactivate actions update only the selected student's active flag and refresh the list while preserving selection where possible.
 - The overview window remembers size/position and relevant grid column widths.
 - Tests prove repository listing, view model selection/detail/invoice loading, activation toggles, invoice open command, menu wiring, and basic WPF surface construction.
@@ -73,6 +73,7 @@ Add `Student > Manage Students`, opening a WPF student overview window with:
 - Add all-students listing support in the student repository.
 - Add a student overview service/launcher/viewmodel/view.
 - Allow deactivation/reactivation from the student overview.
+- Split the Manage Students workflow into a student-list window and a separate student-details window that share the same selection state.
 
 ## Affected Files And Surfaces
 
@@ -155,6 +156,80 @@ dotnet build MySmallBusinessLedger.sln -nodeReuse:false
 dotnet test MySmallBusinessLedger.sln -nodeReuse:false
 ```
 
+### Stage 4: Split Student List And Details Windows
+
+Type: implementation / test / UI / documentation
+Status: Complete
+
+Goal:
+
+- Replace the embedded Manage Students layout with two coordinated WPF windows: a student list window and a selected-student details window.
+
+Affected files/classes/schemas/commands/UI surfaces:
+
+- `src/MySmallBusinessLedger.App/Views/StudentOverviewView.xaml`
+- `src/MySmallBusinessLedger.App/Views/StudentOverviewView.xaml.cs`
+- New `src/MySmallBusinessLedger.App/Views/StudentDetailsView.xaml`
+- New `src/MySmallBusinessLedger.App/Views/StudentDetailsView.xaml.cs`
+- `src/MySmallBusinessLedger.App/Services/StudentOverviewWindowLauncher.cs`
+- `tests/MySmallBusinessLedger.Tests/App/ViewModels/StudentOverviewViewModelTests.cs`
+- README/project-profile/docs references to embedded student management behavior.
+
+Concrete steps:
+
+- Move selected-student details, plan, schedule, invoice list, and invoice double-click behavior into `StudentDetailsView`.
+- Keep `StudentOverviewView` focused on the Students table, `+ Add student`, global error display, and Close.
+- Launch both windows from `StudentOverviewWindowLauncher` with one shared `StudentOverviewViewModel`.
+- Ensure list selection updates details immediately through existing `SelectedStudent` binding and `SelectStudentAsync` behavior.
+- Give the details window its own bottom-row center-aligned Close button.
+- Preserve unsaved-change prompts when closing either window; close the details window without a duplicate prompt when the list window has already confirmed close.
+
+Behavior that must remain unchanged:
+
+- Student selection still mirrors into the main window immediately and on close.
+- Student edits still use explicit Save/Cancel and existing validation/service behavior.
+- Unsaved changes still prompt before selection changes or window close.
+- Invoice double-click still opens the existing invoice viewer.
+- Plan periods, schedules, and issued invoices are not mutated unless edited student data is saved.
+
+Tests to add/update:
+
+- Update WPF construction/layout tests for separate list/details windows.
+- Add a WPF test proving both windows share the same viewmodel/selection state.
+- Keep existing ViewModel tests for save/cancel/selection/invoice behavior passing.
+
+Verification commands/manual checks:
+
+```powershell
+dotnet test MySmallBusinessLedger.sln --filter "FullyQualifiedName~StudentOverviewViewModelTests" -nodeReuse:false
+dotnet build MySmallBusinessLedger.sln -nodeReuse:false
+dotnet test MySmallBusinessLedger.sln -nodeReuse:false
+```
+
+Risks:
+
+- Closing both windows could duplicate unsaved-change prompts.
+- Two windows could accidentally diverge if a second ViewModel is introduced.
+- Detail window closure could leave the list open without visible details; acceptable for v1 of this redesign, because reopening Manage Students restores both windows.
+
+Rollback point:
+
+- Revert this stage's XAML/code-behind/launcher/test/docs changes to return to the embedded window.
+
+Stop/review criteria:
+
+- Stop if the existing selection prompt contract requires ViewModel changes beyond view composition.
+
+Documentation impact:
+
+- Update README/project profile/docs from "embedded editor" to "separate details window".
+
+Follow-on actions:
+
+- Run a UI review after implementation if time allows.
+
+Runner may continue automatically after this stage: yes.
+
 ## Final User Test Instructions
 
 Post-completion user test: mandatory.
@@ -169,6 +244,9 @@ Post-completion user test: mandatory.
 8. Reactivate that student and confirm the state changes back.
 9. Double-click one invoice and confirm the existing invoice viewer opens.
 10. Resize the window and grid columns, close/reopen, and confirm placement/column widths are remembered.
+11. Confirm Manage Students now opens a Students list window and a separate student details window.
+12. Click another student in the list, such as Ida Søndergaard, and confirm the details window changes to that student.
+13. Confirm the details window Close button is on the bottom row and centered.
 
 Expected result: Student overview supports list/detail/current-plan/invoices and safe activation state changes without mutating invoices or plan snapshots.
 
@@ -186,3 +264,25 @@ Expected result: Student overview supports list/detail/current-plan/invoices and
   - Summary: Added `Student > Manage Students` with all-student listing, selected student details, current assigned plan snapshot, invoice list with existing viewer double-click, add/edit through the existing Student editor, safe activate/deactivate, and remembered window/grid state.
   - Tests/verification run: `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~StudentOverview|FullyQualifiedName~StudentsCanBeListedIncludingInactiveStudents|FullyQualifiedName~ManageStudentsCommand" -nodeReuse:false`; `dotnet build MySmallBusinessLedger.sln -nodeReuse:false`; `dotnet test MySmallBusinessLedger.sln -nodeReuse:false`.
   - Results: Focused tests passed 7/7; full build passed with 0 warnings and 0 errors; full solution tests passed 168/168.
+- 2026-06-27:
+  - Stage: Stage 4 split-window redesign
+  - Files changed: Student overview/list window, new student details window, student overview launcher, student overview ViewModel close helper, focused WPF/ViewModel tests, README, project profile, business requirements, handoff, and this plan.
+  - Summary: Split Manage Students into a Students list window and a separate Student Details window sharing one `StudentOverviewViewModel`; selecting a student updates the details state, invoice double-click remains in the details window, and the details Close button is centered on its bottom row.
+  - Tests/verification run: `dotnet test MySmallBusinessLedger.sln --filter "FullyQualifiedName~StudentOverviewViewModelTests" -nodeReuse:false`; `dotnet build MySmallBusinessLedger.sln -nodeReuse:false`; `dotnet test MySmallBusinessLedger.sln -nodeReuse:false`.
+  - Results: Focused tests passed 18/18; full build passed with 0 warnings and 0 errors; full solution tests passed 346/346.
+  - Deviations: Details-window close discards unsaved shared editor changes explicitly when the list remains open, avoiding hidden unsaved state after a details-only close.
+  - Risks/open questions: Final visual/manual user test is still required.
+- 2026-06-27:
+  - Stage: Stage 4 placement fix
+  - Files changed: Student overview launcher and focused WPF/ViewModel tests.
+  - Summary: Made Student Details an independent top-level window rather than an owned child of Manage Students, so closing Manage Students first explicitly closes Student Details through its normal close path and preserves Student Details placement.
+  - Tests/verification run: `dotnet test MySmallBusinessLedger.sln --filter "FullyQualifiedName~StudentOverviewViewModelTests" -nodeReuse:false`; `dotnet build MySmallBusinessLedger.sln -nodeReuse:false`; `dotnet test MySmallBusinessLedger.sln -nodeReuse:false`.
+  - Results: Focused tests passed 18/18; full build passed with 0 warnings and 0 errors; full solution tests passed 346/346.
+  - Risks/open questions: Manual confirmation should close Manage Students first, reopen, and verify Student Details returns to its last position.
+- 2026-06-27:
+  - Stage: Stage 4 focus-order fix
+  - Files changed: Student overview launcher and this plan.
+  - Summary: After a Manage Students list selection propagates to the main window, the launcher reactivates Student Details so it stays visually foremost as the primary details surface.
+  - Tests/verification run: `dotnet test MySmallBusinessLedger.sln --filter "FullyQualifiedName~StudentOverviewViewModelTests" -nodeReuse:false`; `dotnet build MySmallBusinessLedger.sln -nodeReuse:false`; `dotnet test MySmallBusinessLedger.sln --filter "FullyQualifiedName~StudentOverviewViewModelTests.StudentOverviewAndDetailsWindowsShareSelectedStudent" -nodeReuse:false`; `dotnet test MySmallBusinessLedger.sln -nodeReuse:false`.
+  - Results: Focused student overview tests passed 18/18; build passed with 0 warnings and 0 errors; full test suite had one transient WPF XAML parse failure, the failing test passed in isolation, and the full rerun passed 346/346.
+  - Risks/open questions: Manual confirmation should click students in the list and verify Student Details returns to the top after the selection sync completes.
