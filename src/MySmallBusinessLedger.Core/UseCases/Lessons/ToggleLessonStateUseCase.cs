@@ -7,13 +7,17 @@ namespace MySmallBusinessLedger.Core.UseCases.Lessons;
 public sealed class ToggleLessonStateUseCase
 {
     private readonly IGoogleCalendarGateway calendarGateway;
+    private readonly ILessonRepository lessonRepository;
 
-    public ToggleLessonStateUseCase(IGoogleCalendarGateway calendarGateway)
+    public ToggleLessonStateUseCase(
+        IGoogleCalendarGateway calendarGateway,
+        ILessonRepository lessonRepository)
     {
         this.calendarGateway = calendarGateway;
+        this.lessonRepository = lessonRepository;
     }
 
-    public Task<OperationResult<LessonState>> ExecuteAsync(
+    public async Task<OperationResult<LessonState>> ExecuteAsync(
         string lessonId,
         LessonState currentState,
         bool confirmReturnToPlanned,
@@ -21,17 +25,46 @@ public sealed class ToggleLessonStateUseCase
     {
         if (currentState == LessonState.Completed && !confirmReturnToPlanned)
         {
-            return Task.FromResult(OperationResult<LessonState>.ConfirmationRequired(
+            return OperationResult<LessonState>.ConfirmationRequired(
                 currentState,
                 new ValidationError(
                     "LessonState.ReturnToPlannedRequiresConfirmation",
-                    "Returning a completed lesson to planned requires confirmation.")));
+                    "Returning a completed lesson to planned requires confirmation."));
         }
 
         var nextState = currentState == LessonState.Planned
             ? LessonState.Completed
             : LessonState.Planned;
 
-        return calendarGateway.UpdateLessonStateAsync(lessonId, nextState, cancellationToken);
+        var calendarResult = await calendarGateway.UpdateLessonStateAsync(lessonId, nextState, cancellationToken);
+        if (!calendarResult.Succeeded)
+        {
+            return calendarResult;
+        }
+
+        try
+        {
+            var updated = await lessonRepository.UpdateUninvoicedStateByGoogleCalendarEventIdAsync(
+                lessonId,
+                nextState,
+                cancellationToken);
+            if (updated is null)
+            {
+                return LocalLedgerFailure(currentState);
+            }
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return LocalLedgerFailure(currentState);
+        }
+
+        return calendarResult;
     }
+
+    private static OperationResult<LessonState> LocalLedgerFailure(LessonState currentState) =>
+        OperationResult<LessonState>.Failure(
+            currentState,
+            new ValidationError(
+                "Lesson.LocalStateUpdateFailed",
+                "The lesson status was updated in Google Calendar, but the local billing ledger could not be updated. Refresh Calendar and check the lesson list before invoicing."));
 }

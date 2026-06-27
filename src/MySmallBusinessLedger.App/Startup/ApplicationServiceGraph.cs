@@ -110,9 +110,9 @@ internal sealed class ApplicationServiceGraph
         var studentOverviewService = new CoreStudentOverviewService(studentRepository, invoiceRepository);
         var lessonEditorService = new CoreLessonEditorService(
             new AddLessonUseCase(calendarGateway, studentRepository, planCatalogRepository, lessonRepository),
-            new EditLessonUseCase(calendarGateway),
-            new DeleteLessonUseCase(calendarGateway),
-            new PopulateCalendarUseCase(studentRepository, calendarGateway, TimeZoneInfo.Local),
+            new EditLessonUseCase(calendarGateway, lessonRepository),
+            new DeleteLessonUseCase(calendarGateway, lessonRepository),
+            new PopulateCalendarUseCase(studentRepository, calendarGateway, TimeZoneInfo.Local, lessonRepository),
             new UpdateLessonPlanUseCase(lessonRepository, planCatalogRepository));
         var invoiceWorkflowService = new CoreInvoiceWorkflowService(
             new InvoiceCandidateSelectionUseCase(

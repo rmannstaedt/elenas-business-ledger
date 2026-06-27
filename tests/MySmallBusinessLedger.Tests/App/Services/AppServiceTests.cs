@@ -240,6 +240,24 @@ public sealed class AppServiceTests
             CancellationToken cancellationToken) =>
             Task.FromResult<LessonRecord?>(null);
 
+        public Task<LessonRecord?> UpdateUninvoicedTimingByGoogleCalendarEventIdAsync(
+            string googleCalendarEventId,
+            DateTimeOffset startsAt,
+            bool hasKnownStartTime,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<LessonRecord?>(null);
+
+        public Task<LessonRecord?> UpdateUninvoicedStateByGoogleCalendarEventIdAsync(
+            string googleCalendarEventId,
+            LessonState state,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<LessonRecord?>(null);
+
+        public Task<bool> DeleteUninvoicedByGoogleCalendarEventIdAsync(
+            string googleCalendarEventId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(false);
+
         public Task DeleteUninvoicedAsync(IReadOnlyList<int> lessonIds, CancellationToken cancellationToken) =>
             Task.CompletedTask;
     }

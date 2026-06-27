@@ -1009,6 +1009,92 @@ public sealed class SqlitePersistenceTests
     }
 
     [Fact]
+    public async Task LessonRepositoryUpdatesUninvoicedTimingByGoogleCalendarEventId()
+    {
+        using var database = await TestDatabase.CreateAsync();
+        var students = new SqliteStudentRepository(database.CreateContext);
+        var plans = new SqlitePlanCatalogRepository(database.CreateContext);
+        var lessons = new SqliteLessonRepository(database.CreateContext);
+        var plan = await SaveCatalogPlanAsync(plans, "Standard");
+        var student = await students.SaveAsync(CreateStudentRecord("Anna", currentPlanId: plan.Id), CancellationToken.None);
+        Assert.True(student.Succeeded);
+        await lessons.SaveAsync(
+            new LessonRecord(
+                Id: 0,
+                StudentId: student.Value!.Id,
+                StudentShortName: "Anna",
+                PlanCatalogId: plan.Id,
+                PlanName: "Standard",
+                StartsAt: new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.Zero),
+                DurationMinutes: 60,
+                State: LessonState.Planned,
+                GoogleCalendarEventId: "calendar-event-1",
+                InvoiceNumber: null),
+            CancellationToken.None);
+        var updatedStartsAt = new DateTimeOffset(2026, 7, 1, 0, 0, 0, TimeSpan.Zero);
+
+        var updated = await lessons.UpdateUninvoicedTimingByGoogleCalendarEventIdAsync(
+            "calendar-event-1",
+            updatedStartsAt,
+            hasKnownStartTime: false,
+            CancellationToken.None);
+
+        Assert.NotNull(updated);
+        Assert.Equal(updatedStartsAt, updated.StartsAt);
+        Assert.False(updated.HasKnownStartTime);
+        var julyLesson = Assert.Single(await lessons.ListForStudentMonthAsync("Anna", new DateOnly(2026, 7, 1), CancellationToken.None));
+        Assert.Equal(updatedStartsAt, julyLesson.StartsAt);
+        Assert.False(julyLesson.HasKnownStartTime);
+    }
+
+    [Fact]
+    public async Task LessonRepositoryUpdatesUninvoicedStateByGoogleCalendarEventId()
+    {
+        using var database = await TestDatabase.CreateAsync();
+        var plan = await SaveCatalogPlanAsync(new SqlitePlanCatalogRepository(database.CreateContext), "Standard");
+        await SaveLessonAsync(database, "Anna", plan, new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.Zero));
+        var lessons = new SqliteLessonRepository(database.CreateContext);
+        var existing = Assert.Single(await lessons.ListForStudentMonthAsync("Anna", new DateOnly(2026, 6, 1), CancellationToken.None));
+
+        var updated = await lessons.UpdateUninvoicedStateByGoogleCalendarEventIdAsync(
+            existing.GoogleCalendarEventId!,
+            LessonState.Completed,
+            CancellationToken.None);
+
+        Assert.NotNull(updated);
+        Assert.Equal(LessonState.Completed, updated.State);
+        Assert.Equal(LessonState.Completed, Assert.Single(await lessons.ListForStudentMonthAsync("Anna", new DateOnly(2026, 6, 1), CancellationToken.None)).State);
+    }
+
+    [Fact]
+    public async Task LessonRepositoryDeletesOnlyUninvoicedLessonByGoogleCalendarEventId()
+    {
+        using var database = await TestDatabase.CreateAsync();
+        var plan = await SaveCatalogPlanAsync(new SqlitePlanCatalogRepository(database.CreateContext), "Standard");
+        var uninvoiced = await SaveLessonAsync(database, "Anna", plan, new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.Zero));
+        var invoiced = await SaveLessonAsync(database, "Anna", plan, new DateTimeOffset(2026, 6, 23, 15, 0, 0, TimeSpan.Zero), new InvoiceNumber(7));
+        var lessons = new SqliteLessonRepository(database.CreateContext);
+
+        var deleted = await lessons.DeleteUninvoicedByGoogleCalendarEventIdAsync(
+            uninvoiced.GoogleCalendarEventId!,
+            CancellationToken.None);
+        var invoicedDelete = await lessons.DeleteUninvoicedByGoogleCalendarEventIdAsync(
+            invoiced.GoogleCalendarEventId!,
+            CancellationToken.None);
+        var invoicedUpdate = await lessons.UpdateUninvoicedStateByGoogleCalendarEventIdAsync(
+            invoiced.GoogleCalendarEventId!,
+            LessonState.Completed,
+            CancellationToken.None);
+
+        Assert.True(deleted);
+        Assert.False(invoicedDelete);
+        Assert.Null(invoicedUpdate);
+        var remaining = Assert.Single(await lessons.ListForStudentMonthAsync("Anna", new DateOnly(2026, 6, 1), CancellationToken.None));
+        Assert.Equal(invoiced.Id, remaining.Id);
+        Assert.Equal(new InvoiceNumber(7), remaining.InvoiceNumber);
+    }
+
+    [Fact]
     public async Task LessonRepositoryFiltersStudentMonthByStartsAtInSqlite()
     {
         using var database = await TestDatabase.CreateAsync();

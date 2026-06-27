@@ -23,5 +23,20 @@ public interface ILessonRepository
         int durationMinutes,
         CancellationToken cancellationToken);
 
+    Task<LessonRecord?> UpdateUninvoicedTimingByGoogleCalendarEventIdAsync(
+        string googleCalendarEventId,
+        DateTimeOffset startsAt,
+        bool hasKnownStartTime,
+        CancellationToken cancellationToken);
+
+    Task<LessonRecord?> UpdateUninvoicedStateByGoogleCalendarEventIdAsync(
+        string googleCalendarEventId,
+        LessonState state,
+        CancellationToken cancellationToken);
+
+    Task<bool> DeleteUninvoicedByGoogleCalendarEventIdAsync(
+        string googleCalendarEventId,
+        CancellationToken cancellationToken);
+
     Task DeleteUninvoicedAsync(IReadOnlyList<int> lessonIds, CancellationToken cancellationToken);
 }

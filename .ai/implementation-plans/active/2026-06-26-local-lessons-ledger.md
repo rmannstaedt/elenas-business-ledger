@@ -63,7 +63,7 @@ The app currently treats Google Calendar entries as the lesson source of truth a
   - nullable `InvoiceNumber`;
   - audit timestamps.
 - Uninvoiced lessons reconcile from Google Calendar on refresh.
-- App-created/edited/deleted uninvoiced lessons write through to Google Calendar.
+- App-created/edited/deleted uninvoiced lessons write through to Google Calendar and update the matching local SQLite lesson row before reporting success.
 - Invoiced lessons remain locked locally and ignore later Google Calendar edits/deletions.
 - Invoice preview and issue use local uninvoiced lessons, not raw Google Calendar events.
 - The main lesson grid shows columns: Date, Time, Plan, State, Invoiced, Paid.
@@ -396,6 +396,70 @@ Follow-on actions:
 
 Runner may continue automatically after this stage: no. Blocking action required: user acceptance/manual test.
 
+### Stage 6: Immediate Local Ledger Mutation Regression Fix
+
+Type: test + implementation + verification
+Status: In progress
+
+Goal: Ensure app-initiated lesson delete, edit, state toggle, and calendar population update the local SQLite lesson ledger before reporting success, so invoice preview and other consequential local readers cannot observe stale state immediately after a successful command.
+
+Affected files/classes/schemas/commands/UI surfaces:
+
+- `DeleteLessonUseCase`, `EditLessonUseCase`, `ToggleLessonStateUseCase`, and `PopulateCalendarUseCase`.
+- `ILessonRepository` and `SqliteLessonRepository` if additional exact local mutation methods are needed.
+- `UseCaseTests` and persistence tests for command-then-reader behavior.
+- Main lesson grid behavior, because it displays the command result immediately.
+
+Concrete steps:
+
+1. Add failing use-case tests proving that successful delete removes the matching uninvoiced local lesson, edit updates the matching uninvoiced local lesson date/time/known-time state, toggle updates the matching uninvoiced local lesson state, and populate creates local rows for newly created calendar lessons.
+2. Add failure-path tests proving Google Calendar success plus local persistence failure is reported as failure rather than success for the affected commands.
+3. Add or extend repository methods that mutate local lessons by exact Google Calendar event id while ignoring invoiced lessons.
+4. Wire the use cases so Calendar remains the operational schedule write target, but local SQLite is updated before success is returned.
+5. Keep startup/dashboard reconciliation as recovery for external changes, missed events, and older data, not as the only correctness path for ordinary app-initiated commands.
+
+Behavior that must remain unchanged:
+
+- Invoiced local lessons remain locked against later Calendar edits/deletes.
+- Google Calendar write failures remain immediate user-visible failures.
+- No schema migration unless existing repository operations cannot express the fix.
+- Existing add-lesson cleanup behavior remains intact.
+
+Tests to add/update:
+
+- Core use-case tests for immediate `mutate -> local reader` behavior.
+- Persistence tests only if new repository methods are added.
+- Existing main-window tests should remain green without relying on refresh-only repair.
+
+Verification commands/manual checks:
+
+- `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~UseCaseTests" -nodeReuse:false`
+- `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~SqlitePersistenceTests" -nodeReuse:false`
+- `dotnet test MySmallBusinessLedger.sln -nodeReuse:false`
+
+Risks:
+
+- Partial external/local failures can leave Calendar changed while local save fails; command results must not pretend success in that case.
+- Delete cleanup must not remove invoiced local lessons.
+
+Rollback point:
+
+- Revert Stage 6 use-case/repository/test changes while retaining the original local lesson ledger implementation.
+
+Stop/review criteria:
+
+- Stop if the existing repository shape cannot safely target exact uninvoiced lessons by Google Calendar event id without a schema change.
+
+Documentation impact:
+
+- Update README/project profile/context if user-visible failure semantics or populate durability wording changes.
+
+Follow-on actions:
+
+- Run code review focused on authoritative state and split-source consistency.
+
+Runner may continue automatically after this stage: yes.
+
 ## Verification Strategy
 
 - TDD for new persistence, reconciliation, invoice, and UI behavior.
@@ -417,6 +481,7 @@ Runner may continue automatically after this stage: no. Blocking action required
 - After Stage 2 if Google Calendar reconciliation cannot safely distinguish invoiced lessons.
 - After Stage 3 if invoice candidate behavior reveals hidden one-invoice-per-month assumptions.
 - Before Stage 5 completion for user manual acceptance.
+- After Stage 6 if a Calendar success plus local persistence failure cannot be surfaced without misleading UI state.
 
 ## Final User Test Instructions
 
@@ -436,12 +501,19 @@ Exact user actions or commands:
 5. Move/delete the matching Google Calendar event externally.
 6. Refresh the app.
 7. Add another lesson in the same month under a different plan and issue another invoice.
+8. Populate a test month, then immediately open invoice preview without a separate manual refresh.
+9. Delete one uninvoiced lesson from the main grid, then immediately open invoice preview.
+10. Edit one uninvoiced lesson into another month, then immediately open invoice preview for both affected months.
+11. Toggle one uninvoiced lesson between planned/completed and confirm the grid and local row agree after refresh.
 
 Expected successful result:
 
 - The invoiced `Prøvetime` lesson remains visible/locked locally despite external calendar edits/deletes.
 - The later same-month lesson remains editable until invoiced and can be invoiced separately.
 - Invoice PDF names remain unique because invoice number is included.
+- Deleted uninvoiced lessons do not reappear in invoice preview.
+- Edited uninvoiced lessons are billed in the edited month, not the stale old month.
+- Populated lessons are immediately visible to local invoice candidate/preview logic after the command succeeds.
 
 Expected failure/safety result, if relevant:
 
@@ -488,5 +560,13 @@ Cleanup/reset instructions:
   - Summary: Prevented calendar entries for unknown/inactive students from being selected or reconciled into local Lessons rows, avoiding invalid local `StudentId` persistence on startup.
   - Tests/verification run: `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~UseCaseTests.StartupDashboardIgnoresCalendarLessonsWithoutKnownActiveStudentWhenUsingLocalLessonLedger" -nodeReuse:false`; `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~UseCaseTests.StartupDashboard" -nodeReuse:false`
   - Results: passed
+  - Deviations: none
+  - Risks/open questions: none
+- 2026-06-27:
+  - Stage: Immediate local ledger mutation regression fix
+  - Files changed: lesson mutation use cases, `ILessonRepository`, `SqliteLessonRepository`, app composition, use-case/persistence tests, README, project profile, business requirements, handoff context, and this plan.
+  - Summary: Delete, edit, planned/completed toggle, and Populate Calendar now update exact uninvoiced local SQLite lesson rows before reporting success, so invoice preview no longer depends on a later refresh to observe app-driven lesson changes. Populate Calendar also preserves created event ids and saves local rows when Google Calendar creation succeeds but the post-create refresh fails.
+  - Tests/verification run: `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~UseCaseTests" -nodeReuse:false`; `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~SqlitePersistenceTests" -nodeReuse:false`; `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~GoogleCalendarGatewayTests" -nodeReuse:false`; `dotnet test MySmallBusinessLedger.sln -nodeReuse:false`; `dotnet build MySmallBusinessLedger.sln -nodeReuse:false`; `git diff --check`
+  - Results: use-case tests passed 71/71; SQLite persistence tests passed 38/38; Google Calendar gateway tests passed 22/22; solution tests passed 361/361; solution build passed with 0 warnings and 0 errors; diff check passed with only CRLF normalization warnings.
   - Deviations: none
   - Risks/open questions: none

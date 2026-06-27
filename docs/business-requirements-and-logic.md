@@ -185,7 +185,7 @@ The application also contains a button:
 The lesson toolbar contains a `Populate Calendar` action for the selected Student and displayed month. This action seeds Google Calendar immediately from the selected Student's saved standard schedule:
   * If the displayed month is the current month, the action creates scheduled lesson entries from today (inclusive) through the end of the month.
   * If the displayed month is a past or future month, the action creates scheduled lesson entries for the full month.
-  * The action writes the resulting lesson entries to Google Calendar immediately; there is no separate save operation.
+  * The action writes the resulting lesson entries to Google Calendar immediately and saves the created local billing lesson rows before reporting success; there is no separate save operation.
   * Exact duplicate lessons for the same Student at the same date/time are skipped.
   * Version 1 does not detect or handle other calendar conflicts. Conflicts must be resolved manually by the user in Google Calendar.
 
@@ -204,10 +204,13 @@ Adding a lesson creates a new empty planned row for the current student in the m
 
 Lesson date editing uses a date selector. Lesson date and lesson plan are required for a new lesson to be saved. Lesson time is optional: a lesson without a known time is saved as an all-day Google Calendar event, displays without a time in the lesson list, and prints without a time on invoices. Lesson time editing provides a no-time option plus a time selector from 08:00 through 20:00 in 15-minute increments while still allowing typed time input. Lesson cancellation uses an explicit delete action with a confirmation prompt.
 
-Schedule changes to the lessons in the lesson list are saved directly in Google Calendar.
+Schedule changes to the lessons in the lesson list are saved directly in Google Calendar and to the matching uninvoiced local lesson row before the operation reports success.
 If the update of Google Calendar fails, the user is notified immediately so they can take corrective action.
+If Google Calendar is updated but the matching local billing row cannot be created, updated, or removed, the operation reports failure rather than pretending the invoice source is already consistent. Refresh/reconciliation remains a recovery path, not the normal correctness mechanism for app-driven lesson changes.
 
 When adding a new lesson, Google Calendar event creation and local lesson persistence must preserve the exact plan selected by the user. If Google Calendar creates the event but the follow-up refresh fails, the local lesson must still be saved with the selected plan identity and created Google Calendar event id. If local persistence fails after the Google Calendar event was created, the application must attempt to remove that created Google Calendar event and report the local-save failure instead of leaving a calendar-only lesson that can later be reconstructed with the wrong default plan.
+
+When populating lessons from a saved schedule, if Google Calendar creates events but the follow-up refresh fails, the local lessons for those created event ids must still be saved before the refresh failure is reported.
 
 ### Write and Print an Invoice
 

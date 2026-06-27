@@ -123,6 +123,76 @@ public sealed class SqliteLessonRepository : ILessonRepository
         return ToDomain(lesson);
     }
 
+    public async Task<LessonRecord?> UpdateUninvoicedTimingByGoogleCalendarEventIdAsync(
+        string googleCalendarEventId,
+        DateTimeOffset startsAt,
+        bool hasKnownStartTime,
+        CancellationToken cancellationToken)
+    {
+        await using var context = createContext();
+        var lesson = await context.Lessons
+            .Include(storedLesson => storedLesson.Student)
+            .SingleOrDefaultAsync(
+                storedLesson => storedLesson.GoogleCalendarEventId == googleCalendarEventId &&
+                                storedLesson.InvoiceNumber == null,
+                cancellationToken);
+        if (lesson is null)
+        {
+            return null;
+        }
+
+        lesson.StartsAt = startsAt;
+        lesson.HasKnownStartTime = hasKnownStartTime;
+
+        await context.SaveChangesAsync(cancellationToken);
+
+        return ToDomain(lesson);
+    }
+
+    public async Task<LessonRecord?> UpdateUninvoicedStateByGoogleCalendarEventIdAsync(
+        string googleCalendarEventId,
+        LessonState state,
+        CancellationToken cancellationToken)
+    {
+        await using var context = createContext();
+        var lesson = await context.Lessons
+            .Include(storedLesson => storedLesson.Student)
+            .SingleOrDefaultAsync(
+                storedLesson => storedLesson.GoogleCalendarEventId == googleCalendarEventId &&
+                                storedLesson.InvoiceNumber == null,
+                cancellationToken);
+        if (lesson is null)
+        {
+            return null;
+        }
+
+        lesson.State = state;
+
+        await context.SaveChangesAsync(cancellationToken);
+
+        return ToDomain(lesson);
+    }
+
+    public async Task<bool> DeleteUninvoicedByGoogleCalendarEventIdAsync(
+        string googleCalendarEventId,
+        CancellationToken cancellationToken)
+    {
+        await using var context = createContext();
+        var lesson = await context.Lessons
+            .SingleOrDefaultAsync(
+                storedLesson => storedLesson.GoogleCalendarEventId == googleCalendarEventId &&
+                                storedLesson.InvoiceNumber == null,
+                cancellationToken);
+        if (lesson is null)
+        {
+            return false;
+        }
+
+        context.Lessons.Remove(lesson);
+        await context.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
     public async Task DeleteUninvoicedAsync(IReadOnlyList<int> lessonIds, CancellationToken cancellationToken)
     {
         if (lessonIds.Count == 0)

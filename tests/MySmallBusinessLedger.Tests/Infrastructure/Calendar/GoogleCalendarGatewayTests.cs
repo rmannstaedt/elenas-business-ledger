@@ -192,6 +192,29 @@ public sealed class GoogleCalendarGatewayTests
     }
 
     [Fact]
+    public async Task PopulateLessonsReturnsCreatedLessonFallbacksWhenRefreshFailsAfterCreate()
+    {
+        var client = new FakeGoogleCalendarEventClient
+        {
+            ListException = new InvalidOperationException("refresh failed")
+        };
+
+        var gateway = new GoogleCalendarGateway(client, CreateOptions(defaultLessonDuration: TimeSpan.FromMinutes(45)));
+        var result = await gateway.PopulateLessonsAsync(
+            [
+                new LessonAddRequest("Anna", new DateTimeOffset(2026, 6, 23, 15, 0, 0, TimeSpan.FromHours(2)), PlanCatalogId: 42),
+                new LessonAddRequest("Anna", new DateTimeOffset(2026, 6, 30, 15, 0, 0, TimeSpan.FromHours(2)), PlanCatalogId: 42)
+            ],
+            new DateOnly(2026, 6, 1),
+            CancellationToken.None);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Errors, error => error.Code == "Calendar.RefreshFailed");
+        Assert.Equal(["created", "created-2"], result.Value!.Select(lesson => lesson.Id));
+        Assert.Equal(2, client.CreatedEvents.Count);
+    }
+
+    [Fact]
     public async Task UpdateLessonMovesEventThenRefreshesMonth()
     {
         var client = new FakeGoogleCalendarEventClient
@@ -661,7 +684,10 @@ public sealed class GoogleCalendarGatewayTests
             CreatedHasKnownStartTime = hasKnownStartTime;
             CreatedDuration = duration;
             CreatedEvents.Add(new CreatedCalendarEvent(summary, startsAt, hasKnownStartTime, duration));
-            return Task.FromResult("created");
+            var id = CreatedEvents.Count == 1
+                ? "created"
+                : $"created-{CreatedEvents.Count}";
+            return Task.FromResult(id);
         }
 
         public Task MoveEventAsync(

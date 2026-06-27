@@ -112,17 +112,24 @@ public sealed class GoogleCalendarGateway : IGoogleCalendarGateway
         DateOnly refreshMonth,
         CancellationToken cancellationToken)
     {
+        var createdLessons = new List<CalendarLesson>();
         try
         {
             foreach (var request in requests)
             {
-                await eventClient.CreateLessonEventAsync(
+                var createdLessonId = await eventClient.CreateLessonEventAsync(
                     options.CalendarId,
                     $"$ {request.StudentShortName}",
                     request.StartsAt,
                     request.HasKnownStartTime,
                     options.DefaultLessonDuration,
                     cancellationToken);
+                createdLessons.Add(new CalendarLesson(
+                    createdLessonId,
+                    request.StudentShortName,
+                    request.StartsAt,
+                    LessonState.Planned,
+                    request.HasKnownStartTime));
             }
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -130,7 +137,7 @@ public sealed class GoogleCalendarGateway : IGoogleCalendarGateway
             return CalendarUpdateFailure();
         }
 
-        return await RefreshAfterSuccessfulWriteAsync(refreshMonth, cancellationToken);
+        return await RefreshAfterSuccessfulPopulateAsync(refreshMonth, createdLessons, cancellationToken);
     }
 
     public async Task<OperationResult<IReadOnlyList<CalendarLesson>>> UpdateLessonAsync(
@@ -218,6 +225,26 @@ public sealed class GoogleCalendarGateway : IGoogleCalendarGateway
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             return CalendarRefreshFailure();
+        }
+    }
+
+    private async Task<OperationResult<IReadOnlyList<CalendarLesson>>> RefreshAfterSuccessfulPopulateAsync(
+        DateOnly refreshMonth,
+        IReadOnlyList<CalendarLesson> createdLessons,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return OperationResult<IReadOnlyList<CalendarLesson>>.Success(
+                await ListRefreshMonthAsync(refreshMonth, cancellationToken));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return OperationResult<IReadOnlyList<CalendarLesson>>.Failure(
+                createdLessons,
+                new ValidationError(
+                    "Calendar.RefreshFailed",
+                    "Google Calendar was updated, but the lesson list could not be refreshed."));
         }
     }
 

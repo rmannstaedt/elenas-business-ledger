@@ -458,7 +458,11 @@ public sealed class UseCaseTests
     {
         var updatedLesson = new CalendarLesson("lesson-1", "Anna", new DateTimeOffset(2026, 6, 17, 15, 0, 0, TimeSpan.Zero));
         var calendar = new FakeCalendarGateway([updatedLesson]);
-        var useCase = new EditLessonUseCase(calendar);
+        var lessons = new FakeLessonRepository();
+        await lessons.SaveAsync(
+            CreateLessonRecord("Anna", new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.Zero), googleCalendarEventId: "lesson-1"),
+            CancellationToken.None);
+        var useCase = new EditLessonUseCase(calendar, lessons);
 
         var result = await useCase.ExecuteAsync(
             new LessonEditRequest(updatedLesson.Id, updatedLesson.StudentShortName, updatedLesson.StartsAt),
@@ -471,6 +475,52 @@ public sealed class UseCaseTests
     }
 
     [Fact]
+    public async Task EditingUninvoicedLessonUpdatesLocalLedgerBeforeReportingSuccess()
+    {
+        var originalStartsAt = new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.Zero);
+        var updatedStartsAt = new DateTimeOffset(2026, 7, 3, 0, 0, 0, TimeSpan.Zero);
+        var updatedLesson = new CalendarLesson("lesson-1", "Anna", updatedStartsAt, HasKnownStartTime: false);
+        var calendar = new FakeCalendarGateway([updatedLesson]);
+        var lessons = new FakeLessonRepository();
+        await lessons.SaveAsync(
+            CreateLessonRecord("Anna", originalStartsAt, googleCalendarEventId: "lesson-1"),
+            CancellationToken.None);
+        var useCase = new EditLessonUseCase(calendar, lessons);
+
+        var result = await useCase.ExecuteAsync(
+            new LessonEditRequest(updatedLesson.Id, updatedLesson.StudentShortName, updatedLesson.StartsAt, HasKnownStartTime: false),
+            new DateOnly(2026, 7, 1),
+            CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        var savedLesson = Assert.Single(lessons.SavedLessons);
+        Assert.Equal(updatedStartsAt, savedLesson.StartsAt);
+        Assert.False(savedLesson.HasKnownStartTime);
+    }
+
+    [Fact]
+    public async Task EditingUninvoicedLessonReportsFailureWhenLocalLedgerUpdateFailsAfterCalendarUpdate()
+    {
+        var updatedLesson = new CalendarLesson("lesson-1", "Anna", new DateTimeOffset(2026, 7, 3, 0, 0, 0, TimeSpan.Zero));
+        var calendar = new FakeCalendarGateway([updatedLesson]);
+        var lessons = new FakeLessonRepository();
+        await lessons.SaveAsync(
+            CreateLessonRecord("Anna", new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.Zero), googleCalendarEventId: "lesson-1"),
+            CancellationToken.None);
+        lessons.ThrowOnSave = true;
+        var useCase = new EditLessonUseCase(calendar, lessons);
+
+        var result = await useCase.ExecuteAsync(
+            new LessonEditRequest(updatedLesson.Id, updatedLesson.StudentShortName, updatedLesson.StartsAt),
+            new DateOnly(2026, 7, 1),
+            CancellationToken.None);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Errors, error => error.Code == "Lesson.LocalUpdateFailed");
+        Assert.Contains(result.Value!, lesson => lesson.Id == "lesson-1");
+    }
+
+    [Fact]
     public async Task EditingUninvoicedLessonReportsFailureWhenCalendarUpdateFails()
     {
         var calendar = new FakeCalendarGateway([])
@@ -478,7 +528,7 @@ public sealed class UseCaseTests
             UpdateResult = OperationResult<IReadOnlyList<CalendarLesson>>.Failure(
                 new ValidationError("Calendar.UpdateFailed", "Google Calendar rejected the update."))
         };
-        var useCase = new EditLessonUseCase(calendar);
+        var useCase = new EditLessonUseCase(calendar, new FakeLessonRepository());
 
         var result = await useCase.ExecuteAsync(
             new LessonEditRequest("lesson-1", "Anna", new DateTimeOffset(2026, 6, 17, 15, 0, 0, TimeSpan.Zero)),
@@ -578,7 +628,7 @@ public sealed class UseCaseTests
             new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.FromHours(2)));
         var students = new FakeStudentRepository([CreateStudentRecord("Anna")]);
         var calendar = new FakeCalendarGateway([existingDuplicate]);
-        var useCase = new PopulateCalendarUseCase(students, calendar, timeZone);
+        var useCase = new PopulateCalendarUseCase(students, calendar, timeZone, new FakeLessonRepository());
 
         var result = await useCase.ExecuteAsync(
             new PopulateCalendarRequest("Anna", new DateOnly(2026, 6, 1), new DateOnly(2026, 6, 16)),
@@ -596,12 +646,76 @@ public sealed class UseCaseTests
     }
 
     [Fact]
+    public async Task PopulateCalendarSavesCreatedLessonsToLocalLedgerBeforeReportingSuccess()
+    {
+        var timeZone = TimeZoneInfo.FindSystemTimeZoneById("Romance Standard Time");
+        var students = new FakeStudentRepository([CreateStudentRecord("Anna")]);
+        var calendar = new FakeCalendarGateway([]);
+        var lessons = new FakeLessonRepository();
+        var useCase = new PopulateCalendarUseCase(students, calendar, timeZone, lessons);
+
+        var result = await useCase.ExecuteAsync(
+            new PopulateCalendarRequest("Anna", new DateOnly(2026, 6, 1), new DateOnly(2026, 6, 16)),
+            CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(result.Value!.CreatedCount, lessons.SavedLessons.Count);
+        Assert.All(lessons.SavedLessons, lesson =>
+        {
+            Assert.Equal("Anna", lesson.StudentShortName);
+            Assert.Equal(42, lesson.PlanCatalogId);
+            Assert.Equal("Standard", lesson.PlanName);
+            Assert.False(string.IsNullOrWhiteSpace(lesson.GoogleCalendarEventId));
+        });
+    }
+
+    [Fact]
+    public async Task PopulateCalendarReportsFailureWhenLocalLedgerSaveFailsAfterCalendarUpdate()
+    {
+        var timeZone = TimeZoneInfo.FindSystemTimeZoneById("Romance Standard Time");
+        var students = new FakeStudentRepository([CreateStudentRecord("Anna")]);
+        var calendar = new FakeCalendarGateway([]);
+        var lessons = new FakeLessonRepository { ThrowOnSave = true };
+        var useCase = new PopulateCalendarUseCase(students, calendar, timeZone, lessons);
+
+        var result = await useCase.ExecuteAsync(
+            new PopulateCalendarRequest("Anna", new DateOnly(2026, 6, 1), new DateOnly(2026, 6, 16)),
+            CancellationToken.None);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Errors, error => error.Code == "Lesson.LocalSaveFailed");
+        Assert.Equal(result.Value!.CreatedCount, calendar.PopulatedRequests.Count);
+    }
+
+    [Fact]
+    public async Task PopulateCalendarSavesLocalLedgerRowsWhenCalendarRefreshFailsAfterCreate()
+    {
+        var timeZone = TimeZoneInfo.FindSystemTimeZoneById("Romance Standard Time");
+        var students = new FakeStudentRepository([CreateStudentRecord("Anna")]);
+        var calendar = new FakeCalendarGateway([])
+        {
+            FailPopulateRefreshAfterCreate = true
+        };
+        var lessons = new FakeLessonRepository();
+        var useCase = new PopulateCalendarUseCase(students, calendar, timeZone, lessons);
+
+        var result = await useCase.ExecuteAsync(
+            new PopulateCalendarRequest("Anna", new DateOnly(2026, 6, 1), new DateOnly(2026, 6, 16)),
+            CancellationToken.None);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Errors, error => error.Code == "Calendar.RefreshFailed");
+        Assert.Equal(result.Value!.CreatedCount, lessons.SavedLessons.Count);
+        Assert.All(lessons.SavedLessons, lesson => Assert.False(string.IsNullOrWhiteSpace(lesson.GoogleCalendarEventId)));
+    }
+
+    [Fact]
     public async Task PopulateCalendarFutureMonthSeedsWholeMonth()
     {
         var timeZone = TimeZoneInfo.FindSystemTimeZoneById("Romance Standard Time");
         var students = new FakeStudentRepository([CreateStudentRecord("Anna")]);
         var calendar = new FakeCalendarGateway([]);
-        var useCase = new PopulateCalendarUseCase(students, calendar, timeZone);
+        var useCase = new PopulateCalendarUseCase(students, calendar, timeZone, new FakeLessonRepository());
 
         var result = await useCase.ExecuteAsync(
             new PopulateCalendarRequest("Anna", new DateOnly(2026, 7, 1), new DateOnly(2026, 6, 16)),
@@ -625,7 +739,7 @@ public sealed class UseCaseTests
         var timeZone = TimeZoneInfo.FindSystemTimeZoneById("Romance Standard Time");
         var students = new FakeStudentRepository([CreateStudentRecord("Anna")]);
         var calendar = new FakeCalendarGateway([]);
-        var useCase = new PopulateCalendarUseCase(students, calendar, timeZone);
+        var useCase = new PopulateCalendarUseCase(students, calendar, timeZone, new FakeLessonRepository());
 
         var result = await useCase.ExecuteAsync(
             new PopulateCalendarRequest("Anna", new DateOnly(2026, 5, 1), new DateOnly(2026, 6, 16)),
@@ -649,7 +763,7 @@ public sealed class UseCaseTests
         var studentWithoutSchedule = CreateStudentRecord("Anna") with { Schedule = [] };
         var students = new FakeStudentRepository([studentWithoutSchedule]);
         var calendar = new FakeCalendarGateway([]);
-        var useCase = new PopulateCalendarUseCase(students, calendar, timeZone);
+        var useCase = new PopulateCalendarUseCase(students, calendar, timeZone, new FakeLessonRepository());
 
         var result = await useCase.ExecuteAsync(
             new PopulateCalendarRequest("Anna", new DateOnly(2026, 6, 1), new DateOnly(2026, 6, 16)),
@@ -670,7 +784,7 @@ public sealed class UseCaseTests
             UpdateResult = OperationResult<IReadOnlyList<CalendarLesson>>.Failure(
                 new ValidationError("Calendar.UpdateFailed", "Google Calendar could not be updated."))
         };
-        var useCase = new PopulateCalendarUseCase(students, calendar, timeZone);
+        var useCase = new PopulateCalendarUseCase(students, calendar, timeZone, new FakeLessonRepository());
 
         var result = await useCase.ExecuteAsync(
             new PopulateCalendarRequest("Anna", new DateOnly(2026, 6, 1), new DateOnly(2026, 6, 16)),
@@ -686,7 +800,11 @@ public sealed class UseCaseTests
     {
         var remainingLesson = new CalendarLesson("lesson-2", "Anna", new DateTimeOffset(2026, 6, 24, 15, 0, 0, TimeSpan.Zero));
         var calendar = new FakeCalendarGateway([remainingLesson]);
-        var useCase = new DeleteLessonUseCase(calendar);
+        var lessons = new FakeLessonRepository();
+        await lessons.SaveAsync(
+            CreateLessonRecord("Anna", new DateTimeOffset(2026, 6, 17, 15, 0, 0, TimeSpan.Zero), googleCalendarEventId: "lesson-1"),
+            CancellationToken.None);
+        var useCase = new DeleteLessonUseCase(calendar, lessons);
 
         var result = await useCase.ExecuteAsync("lesson-1", new DateOnly(2026, 6, 1), CancellationToken.None);
 
@@ -695,10 +813,51 @@ public sealed class UseCaseTests
     }
 
     [Fact]
+    public async Task DeletingUninvoicedLessonDeletesLocalLedgerRowBeforeReportingSuccess()
+    {
+        var deletedStartsAt = new DateTimeOffset(2026, 6, 17, 15, 0, 0, TimeSpan.Zero);
+        var remainingLesson = new CalendarLesson("lesson-2", "Anna", new DateTimeOffset(2026, 6, 24, 15, 0, 0, TimeSpan.Zero));
+        var calendar = new FakeCalendarGateway([remainingLesson]);
+        var lessons = new FakeLessonRepository();
+        await lessons.SaveAsync(
+            CreateLessonRecord("Anna", deletedStartsAt, googleCalendarEventId: "lesson-1"),
+            CancellationToken.None);
+        var useCase = new DeleteLessonUseCase(calendar, lessons);
+
+        var result = await useCase.ExecuteAsync("lesson-1", new DateOnly(2026, 6, 1), CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        Assert.Empty(await lessons.ListForStudentMonthAsync("Anna", new DateOnly(2026, 6, 1), CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task DeletingUninvoicedLessonReportsFailureWhenLocalLedgerDeleteFailsAfterCalendarUpdate()
+    {
+        var remainingLesson = new CalendarLesson("lesson-2", "Anna", new DateTimeOffset(2026, 6, 24, 15, 0, 0, TimeSpan.Zero));
+        var calendar = new FakeCalendarGateway([remainingLesson]);
+        var lessons = new FakeLessonRepository();
+        await lessons.SaveAsync(
+            CreateLessonRecord("Anna", new DateTimeOffset(2026, 6, 17, 15, 0, 0, TimeSpan.Zero), googleCalendarEventId: "lesson-1"),
+            CancellationToken.None);
+        lessons.ThrowOnSave = true;
+        var useCase = new DeleteLessonUseCase(calendar, lessons);
+
+        var result = await useCase.ExecuteAsync("lesson-1", new DateOnly(2026, 6, 1), CancellationToken.None);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Errors, error => error.Code == "Lesson.LocalDeleteFailed");
+        Assert.Contains(result.Value!, lesson => lesson.Id == "lesson-2");
+    }
+
+    [Fact]
     public async Task LessonStateToggleUpdatesCalendarAndRequiresConfirmationWhenReturningCompletedToPlanned()
     {
         var calendar = new FakeCalendarGateway([]);
-        var useCase = new ToggleLessonStateUseCase(calendar);
+        var lessons = new FakeLessonRepository();
+        await lessons.SaveAsync(
+            CreateLessonRecord("Anna", new DateTimeOffset(2026, 6, 17, 15, 0, 0, TimeSpan.Zero), googleCalendarEventId: "lesson-1"),
+            CancellationToken.None);
+        var useCase = new ToggleLessonStateUseCase(calendar, lessons);
 
         var completed = await useCase.ExecuteAsync(
             "lesson-1",
@@ -722,6 +881,50 @@ public sealed class UseCaseTests
         Assert.True(confirmedPlanned.Succeeded);
         Assert.Equal(LessonState.Planned, confirmedPlanned.Value);
         Assert.Equal([LessonState.Completed, LessonState.Planned], calendar.SavedLessonStates);
+    }
+
+    [Fact]
+    public async Task LessonStateToggleUpdatesLocalLedgerBeforeReportingSuccess()
+    {
+        var startsAt = new DateTimeOffset(2026, 6, 17, 15, 0, 0, TimeSpan.Zero);
+        var calendar = new FakeCalendarGateway([]);
+        var lessons = new FakeLessonRepository();
+        await lessons.SaveAsync(
+            CreateLessonRecord("Anna", startsAt, googleCalendarEventId: "lesson-1"),
+            CancellationToken.None);
+        var useCase = new ToggleLessonStateUseCase(calendar, lessons);
+
+        var result = await useCase.ExecuteAsync(
+            "lesson-1",
+            LessonState.Planned,
+            confirmReturnToPlanned: false,
+            CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(LessonState.Completed, Assert.Single(lessons.SavedLessons).State);
+    }
+
+    [Fact]
+    public async Task LessonStateToggleReportsFailureWhenLocalLedgerUpdateFailsAfterCalendarUpdate()
+    {
+        var startsAt = new DateTimeOffset(2026, 6, 17, 15, 0, 0, TimeSpan.Zero);
+        var calendar = new FakeCalendarGateway([]);
+        var lessons = new FakeLessonRepository();
+        await lessons.SaveAsync(
+            CreateLessonRecord("Anna", startsAt, googleCalendarEventId: "lesson-1"),
+            CancellationToken.None);
+        lessons.ThrowOnSave = true;
+        var useCase = new ToggleLessonStateUseCase(calendar, lessons);
+
+        var result = await useCase.ExecuteAsync(
+            "lesson-1",
+            LessonState.Planned,
+            confirmReturnToPlanned: false,
+            CancellationToken.None);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Errors, error => error.Code == "Lesson.LocalStateUpdateFailed");
+        Assert.Equal(LessonState.Planned, result.Value);
     }
 
     [Fact]
@@ -1513,7 +1716,7 @@ public sealed class UseCaseTests
 
         public IReadOnlyList<LessonRecord> SavedLessons => lessons;
 
-        public bool ThrowOnSave { get; init; }
+        public bool ThrowOnSave { get; set; }
 
         public IReadOnlyList<int> DeletedLessonIds { get; private set; } = [];
 
@@ -1585,6 +1788,68 @@ public sealed class UseCaseTests
             return Task.FromResult<LessonRecord?>(lessons[index]);
         }
 
+        public Task<LessonRecord?> UpdateUninvoicedTimingByGoogleCalendarEventIdAsync(
+            string googleCalendarEventId,
+            DateTimeOffset startsAt,
+            bool hasKnownStartTime,
+            CancellationToken cancellationToken)
+        {
+            if (ThrowOnSave)
+            {
+                throw new InvalidOperationException("Local lesson save failed.");
+            }
+
+            var index = lessons.FindIndex(lesson =>
+                string.Equals(lesson.GoogleCalendarEventId, googleCalendarEventId, StringComparison.OrdinalIgnoreCase));
+            if (index < 0 || lessons[index].InvoiceNumber is not null)
+            {
+                return Task.FromResult<LessonRecord?>(null);
+            }
+
+            lessons[index] = lessons[index] with
+            {
+                StartsAt = startsAt,
+                HasKnownStartTime = hasKnownStartTime
+            };
+            return Task.FromResult<LessonRecord?>(lessons[index]);
+        }
+
+        public Task<LessonRecord?> UpdateUninvoicedStateByGoogleCalendarEventIdAsync(
+            string googleCalendarEventId,
+            LessonState state,
+            CancellationToken cancellationToken)
+        {
+            if (ThrowOnSave)
+            {
+                throw new InvalidOperationException("Local lesson save failed.");
+            }
+
+            var index = lessons.FindIndex(lesson =>
+                string.Equals(lesson.GoogleCalendarEventId, googleCalendarEventId, StringComparison.OrdinalIgnoreCase));
+            if (index < 0 || lessons[index].InvoiceNumber is not null)
+            {
+                return Task.FromResult<LessonRecord?>(null);
+            }
+
+            lessons[index] = lessons[index] with { State = state };
+            return Task.FromResult<LessonRecord?>(lessons[index]);
+        }
+
+        public Task<bool> DeleteUninvoicedByGoogleCalendarEventIdAsync(
+            string googleCalendarEventId,
+            CancellationToken cancellationToken)
+        {
+            if (ThrowOnSave)
+            {
+                throw new InvalidOperationException("Local lesson save failed.");
+            }
+
+            var removed = lessons.RemoveAll(lesson =>
+                lesson.InvoiceNumber is null &&
+                string.Equals(lesson.GoogleCalendarEventId, googleCalendarEventId, StringComparison.OrdinalIgnoreCase));
+            return Task.FromResult(removed > 0);
+        }
+
         public Task DeleteUninvoicedAsync(IReadOnlyList<int> lessonIds, CancellationToken cancellationToken)
         {
             DeletedLessonIds = lessonIds.ToArray();
@@ -1631,6 +1896,8 @@ public sealed class UseCaseTests
         public List<LessonState> SavedLessonStates { get; } = [];
 
         public List<LessonAddRequest> PopulatedRequests { get; } = [];
+
+        public bool FailPopulateRefreshAfterCreate { get; init; }
 
         public string? DeletedLessonId { get; private set; }
 
@@ -1680,7 +1947,32 @@ public sealed class UseCaseTests
             CancellationToken cancellationToken)
         {
             PopulatedRequests.AddRange(requests);
-            return Task.FromResult(UpdateResult);
+            if (!UpdateResult.Succeeded)
+            {
+                return Task.FromResult(UpdateResult);
+            }
+
+            var createdLessons = requests
+                .Select((request, index) => new CalendarLesson(
+                    $"populated-{index + 1}",
+                    request.StudentShortName,
+                    request.StartsAt,
+                    LessonState.Planned,
+                    request.HasKnownStartTime))
+                .ToArray();
+            if (FailPopulateRefreshAfterCreate)
+            {
+                return Task.FromResult(OperationResult<IReadOnlyList<CalendarLesson>>.Failure(
+                    createdLessons,
+                    new ValidationError("Calendar.RefreshFailed", "Google Calendar was updated, but the lesson list could not be refreshed.")));
+            }
+
+            var refreshedLessons = UpdateResult.Value!
+                .Concat(createdLessons)
+                .OrderBy(lesson => lesson.StartsAt)
+                .ToArray();
+
+            return Task.FromResult(OperationResult<IReadOnlyList<CalendarLesson>>.Success(refreshedLessons));
         }
 
         public Task<OperationResult<IReadOnlyList<CalendarLesson>>> UpdateLessonAsync(LessonEditRequest request, DateOnly refreshMonth, CancellationToken cancellationToken)
