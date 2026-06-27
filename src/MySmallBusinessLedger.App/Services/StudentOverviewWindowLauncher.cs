@@ -36,20 +36,19 @@ public sealed class StudentOverviewWindowLauncher : IStudentOverviewLauncher
         {
             Owner = Application.Current?.MainWindow
         };
-        var detailsWindow = new StudentDetailsView(viewModel);
+        StudentDetailsView? detailsWindow = null;
+        var isOverviewClosing = false;
         window.Loaded += (_, _) =>
         {
-            if (!detailsWindow.IsVisible)
-            {
-                detailsWindow.Owner = window;
-                detailsWindow.Show();
-            }
+            ShowDetailsWindow();
         };
         window.Closing += (_, e) =>
         {
             if (!e.Cancel)
             {
-                detailsWindow.CloseWithoutPrompt();
+                isOverviewClosing = true;
+                detailsWindow?.CloseWithoutPrompt();
+                detailsWindow = null;
             }
         };
 
@@ -68,10 +67,41 @@ public sealed class StudentOverviewWindowLauncher : IStudentOverviewLauncher
         {
             try
             {
+                ShowDetailsWindow();
                 await selectedStudentChangedAsync(selectedShortName, cancellationToken);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
+            }
+        }
+
+        void ShowDetailsWindow()
+        {
+            if (isOverviewClosing)
+            {
+                return;
+            }
+
+            if (detailsWindow?.IsVisible == true)
+            {
+                detailsWindow.Activate();
+                return;
+            }
+
+            detailsWindow = new StudentDetailsView(viewModel)
+            {
+                Owner = window
+            };
+            detailsWindow.Closed += OnDetailsWindowClosed;
+            detailsWindow.Show();
+            detailsWindow.Activate();
+        }
+
+        void OnDetailsWindowClosed(object? sender, EventArgs e)
+        {
+            if (ReferenceEquals(detailsWindow, sender))
+            {
+                detailsWindow = null;
             }
         }
     }
