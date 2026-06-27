@@ -9,9 +9,12 @@ using MySmallBusinessLedger.Core.Students;
 using MySmallBusinessLedger.Core.UseCases.Plans;
 using MySmallBusinessLedger.Core.UseCases.Students;
 using System.Windows;
+using System.Windows.Automation;
 using WpfButton = System.Windows.Controls.Button;
 using WpfGrid = System.Windows.Controls.Grid;
 using WpfGridSplitter = System.Windows.Controls.GridSplitter;
+using WpfStackPanel = System.Windows.Controls.StackPanel;
+using WpfTextBlock = System.Windows.Controls.TextBlock;
 
 namespace MySmallBusinessLedger.Tests.App.ViewModels;
 
@@ -52,9 +55,82 @@ public sealed class StudentOverviewViewModelTests
             var window = new StudentOverviewView(viewModel);
 
             var closeButton = Assert.Single(FindChildren<WpfButton>(window), button => button.Content?.ToString() == "Close");
+            var closeButtonHost = Assert.IsType<WpfGrid>(closeButton.Parent);
 
             Assert.Equal(HorizontalAlignment.Right, closeButton.HorizontalAlignment);
             Assert.Equal(84, closeButton.MinWidth);
+            Assert.Equal("StudentListBottomActions", closeButtonHost.Name);
+            Assert.Equal(0, WpfGrid.GetColumn(closeButtonHost));
+            Assert.Equal(5, closeButtonHost.ColumnDefinitions.Count);
+            Assert.Equal(GridUnitType.Star, closeButtonHost.ColumnDefinitions[0].Width.GridUnitType);
+            Assert.Equal(18, closeButtonHost.ColumnDefinitions[1].Width.Value);
+            Assert.Equal(252, closeButtonHost.ColumnDefinitions[2].Width.Value);
+            Assert.Equal(18, closeButtonHost.ColumnDefinitions[3].Width.Value);
+            Assert.Equal(252, closeButtonHost.ColumnDefinitions[4].Width.Value);
+            Assert.Equal(0, WpfGrid.GetColumn(closeButton));
+
+            window.Close();
+        });
+    }
+
+    [Fact]
+    public void StudentOverviewHeadingsNamePaneContext()
+    {
+        RunOnStaThread(() =>
+        {
+            var viewModel = new StudentOverviewViewModel(
+                new FakeStudentOverviewService([CreateSnapshot("Anna", isActive: true)]),
+                new FakeStudentEditorService(),
+                new FakePlanCatalogService(),
+                new FakeInvoiceWorkflowLauncher(),
+                new FakeUiClock(new DateTimeOffset(2026, 6, 20, 12, 0, 0, TimeSpan.Zero)));
+            var window = new StudentOverviewView(viewModel);
+
+            var headings = FindChildren<WpfTextBlock>(window)
+                .Select(textBlock => textBlock.Text)
+                .ToArray();
+
+            Assert.Contains("Student Plan", headings);
+            Assert.Contains("Student Invoices", headings);
+            Assert.DoesNotContain("Current Plan", headings);
+            Assert.DoesNotContain("Invoices", headings);
+
+            window.Close();
+        });
+    }
+
+    [Fact]
+    public void StudentOverviewPlacesPaneActionsNearAffectedContent()
+    {
+        RunOnStaThread(() =>
+        {
+            var viewModel = new StudentOverviewViewModel(
+                new FakeStudentOverviewService([CreateSnapshot("Anna", isActive: true)]),
+                new FakeStudentEditorService(),
+                new FakePlanCatalogService(),
+                new FakeInvoiceWorkflowLauncher(),
+                new FakeUiClock(new DateTimeOffset(2026, 6, 20, 12, 0, 0, TimeSpan.Zero)));
+            var window = new StudentOverviewView(viewModel);
+
+            var addStudentButton = Assert.Single(FindChildren<WpfButton>(window), button => AutomationProperties.GetName(button) == "Add student");
+            var addStudentTexts = FindChildren<WpfTextBlock>(addStudentButton)
+                .Select(textBlock => textBlock.Text)
+                .ToArray();
+            var addStudentLabel = Assert.Single(FindChildren<WpfTextBlock>(addStudentButton), textBlock => textBlock.Text == "Add student");
+            var studentEditorActions = Assert.Single(FindChildren<WpfStackPanel>(window), panel => panel.Name == "StudentEditorActions");
+            var scheduleHeading = Assert.Single(FindChildren<WpfTextBlock>(window), textBlock => textBlock.Text == "Schedule");
+
+            Assert.Equal(HorizontalAlignment.Right, addStudentButton.HorizontalAlignment);
+            Assert.Contains("+", addStudentTexts);
+            Assert.Contains("Add student", addStudentTexts);
+            Assert.Equal(14, addStudentLabel.FontSize);
+            Assert.Equal(FontWeights.Bold, addStudentLabel.FontWeight);
+            Assert.Equal(new Thickness(0), addStudentButton.BorderThickness);
+            Assert.Equal(1, WpfGrid.GetColumn(addStudentButton));
+            Assert.Equal(0, WpfGrid.GetRow(addStudentButton));
+            Assert.Same(scheduleHeading.Parent, studentEditorActions.Parent);
+            Assert.Equal(WpfGrid.GetRow(scheduleHeading), WpfGrid.GetRow(studentEditorActions));
+            Assert.Equal(scheduleHeading.Margin.Top, studentEditorActions.Margin.Top);
 
             window.Close();
         });

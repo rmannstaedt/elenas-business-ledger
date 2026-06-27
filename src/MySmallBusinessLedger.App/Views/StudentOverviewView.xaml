@@ -86,7 +86,36 @@
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
 
-                <TextBlock Text="Students" Style="{StaticResource PaneHeaderStyle}" />
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Text="Students" Style="{StaticResource PaneHeaderStyle}" />
+                    <Button Grid.Column="1"
+                            Command="{Binding AddStudentCommand}"
+                            MinWidth="0"
+                            Height="28"
+                            Padding="6,0"
+                            HorizontalAlignment="Right"
+                            Margin="12,0,0,0"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Foreground="#1F5F9F"
+                            AutomationProperties.Name="Add student">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="+"
+                                       FontSize="16"
+                                       FontWeight="SemiBold"
+                                       VerticalAlignment="Center"
+                                       Margin="0,0,5,0" />
+                            <TextBlock Text="Add student"
+                                       FontSize="14"
+                                       FontWeight="Bold"
+                                       VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                </Grid>
                 <DataGrid x:Name="StudentsGrid"
                           Grid.Row="1"
                           ItemsSource="{Binding Students}"
@@ -136,7 +165,7 @@
 
                 <TextBlock Text="Student" Style="{StaticResource PaneHeaderStyle}" />
                 <TextBlock Grid.Column="2"
-                           Text="Current Plan"
+                           Text="Student Plan"
                            Style="{StaticResource PaneHeaderStyle}" />
                 <Border Grid.Row="1"
                         Grid.ColumnSpan="3"
@@ -153,13 +182,19 @@
                               Grid.ColumnSpan="3"
                               VerticalScrollBarVisibility="Auto">
                     <Grid DataContext="{Binding SelectedStudentEditor}">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="252" />
                             <ColumnDefinition Width="18" />
                             <ColumnDefinition Width="252" />
                         </Grid.ColumnDefinitions>
 
-                        <StackPanel Grid.Column="0">
+                        <StackPanel Grid.Row="0"
+                                    Grid.Column="0">
                             <TextBlock Text="Short name" Style="{StaticResource FieldLabelStyle}" />
                             <TextBox Text="{Binding ShortName, UpdateSourceTrigger=PropertyChanged}"
                                      Style="{StaticResource FieldInputStyle}" />
@@ -189,7 +224,24 @@
                                       Margin="0,4,0,0" />
                         </StackPanel>
 
-                        <StackPanel Grid.Column="2">
+                        <StackPanel x:Name="StudentEditorActions"
+                                    Grid.Row="1"
+                                    Grid.Column="0"
+                                    Orientation="Horizontal"
+                                    Margin="0,8,0,0">
+                            <Button Content="Save"
+                                    Command="{Binding DataContext.SaveStudentCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                    MinWidth="84"
+                                    Height="30"
+                                    Margin="0,0,8,0" />
+                            <Button Content="Cancel"
+                                    Command="{Binding DataContext.CancelStudentEditCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                    MinWidth="84"
+                                    Height="30" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Row="0"
+                                    Grid.Column="2">
                             <TextBlock Text="Active plan" Style="{StaticResource FieldLabelStyle}" />
                             <ComboBox ItemsSource="{Binding AssignablePlans}"
                                       SelectedItem="{Binding SelectedAssignablePlan, UpdateSourceTrigger=PropertyChanged}"
@@ -247,37 +299,41 @@
                                     </Style>
                                 </DatePicker.Resources>
                             </DatePicker>
-
-                            <TextBlock Text="Schedule"
-                                       FontSize="18"
-                                       FontWeight="SemiBold"
-                                       Margin="0,8,0,10" />
-                            <ItemsControl ItemsSource="{Binding SchedulePlacements}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <Grid Margin="0,0,0,8">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="54" />
-                                                <ColumnDefinition Width="112" />
-                                                <ColumnDefinition Width="8" />
-                                                <ColumnDefinition Width="70" />
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Text="{Binding Label}"
-                                                       VerticalAlignment="Center" />
-                                            <ComboBox Grid.Column="1"
-                                                      ItemsSource="{Binding WeekdayOptions}"
-                                                      DisplayMemberPath="Label"
-                                                      SelectedItem="{Binding SelectedWeekday}" />
-                                            <ComboBox Grid.Column="3"
-                                                      ItemsSource="{Binding TimeOptions}"
-                                                      Text="{Binding TimeText, UpdateSourceTrigger=PropertyChanged}"
-                                                      IsEditable="True"
-                                                      IsTextSearchEnabled="False" />
-                                        </Grid>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
                         </StackPanel>
+
+                        <TextBlock Grid.Row="1"
+                                   Grid.Column="2"
+                                   Text="Schedule"
+                                   FontSize="18"
+                                   FontWeight="SemiBold"
+                                   Margin="0,8,0,10" />
+                        <ItemsControl Grid.Row="2"
+                                      Grid.Column="2"
+                                      ItemsSource="{Binding SchedulePlacements}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="0,0,0,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="54" />
+                                            <ColumnDefinition Width="112" />
+                                            <ColumnDefinition Width="8" />
+                                            <ColumnDefinition Width="70" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{Binding Label}"
+                                                   VerticalAlignment="Center" />
+                                        <ComboBox Grid.Column="1"
+                                                  ItemsSource="{Binding WeekdayOptions}"
+                                                  DisplayMemberPath="Label"
+                                                  SelectedItem="{Binding SelectedWeekday}" />
+                                        <ComboBox Grid.Column="3"
+                                                  ItemsSource="{Binding TimeOptions}"
+                                                  Text="{Binding TimeText, UpdateSourceTrigger=PropertyChanged}"
+                                                  IsEditable="True"
+                                                  IsTextSearchEnabled="False" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
                     </Grid>
                 </ScrollViewer>
             </Grid>
@@ -300,7 +356,7 @@
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
 
-                <TextBlock Text="Invoices" Style="{StaticResource PaneHeaderStyle}" />
+                <TextBlock Text="Student Invoices" Style="{StaticResource PaneHeaderStyle}" />
                 <DataGrid x:Name="InvoicesGrid"
                           Grid.Row="1"
                           ItemsSource="{Binding Invoices}"
@@ -341,7 +397,8 @@
                 <ColumnDefinition Width="8" />
                 <ColumnDefinition Width="360" />
             </Grid.ColumnDefinitions>
-            <Grid Grid.Column="0">
+            <Grid x:Name="StudentListBottomActions"
+                  Grid.Column="0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="18" />
@@ -350,31 +407,12 @@
                     <ColumnDefinition Width="252" />
                 </Grid.ColumnDefinitions>
                 <Button Grid.Column="0"
-                        Content="Add Student"
-                        Command="{Binding AddStudentCommand}"
-                        MinWidth="96"
+                        Content="Close"
+                        MinWidth="84"
                         Height="30"
-                        HorizontalAlignment="Left" />
-                <StackPanel Grid.Column="2"
-                            Orientation="Horizontal"
-                            HorizontalAlignment="Left">
-                    <Button Content="Save"
-                            Command="{Binding SaveStudentCommand}"
-                            MinWidth="84"
-                            Height="30"
-                            Margin="0,0,8,0" />
-                    <Button Content="Cancel"
-                            Command="{Binding CancelStudentEditCommand}"
-                            MinWidth="84"
-                            Height="30" />
-                </StackPanel>
+                        HorizontalAlignment="Right"
+                        Click="OnClose" />
             </Grid>
-            <Button Grid.Column="2"
-                    Content="Close"
-                    MinWidth="84"
-                    Height="30"
-                    HorizontalAlignment="Right"
-                    Click="OnClose" />
         </Grid>
     </Grid>
 </Window>
