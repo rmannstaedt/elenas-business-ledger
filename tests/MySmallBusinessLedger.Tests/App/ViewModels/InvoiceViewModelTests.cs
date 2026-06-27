@@ -281,7 +281,9 @@ public sealed class InvoiceViewModelTests
                 .Select((amount, index) => new InvoiceLineDraft(
                     new DateTimeOffset(2026, 6, 16 + index, 15, 0, 0, TimeSpan.Zero),
                     "Standard",
-                    Money.Dkk(amount)))
+                    Money.Dkk(amount),
+                    planCatalogId: 7,
+                    lessonId: 100 + index))
                 .ToArray(),
             priceAdjustment: null);
 

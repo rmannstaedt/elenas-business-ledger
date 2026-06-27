@@ -1,5 +1,4 @@
 using MySmallBusinessLedger.Core.Lessons;
-using MySmallBusinessLedger.Core.Invoices;
 
 namespace MySmallBusinessLedger.Core.Ports;
 
@@ -15,11 +14,6 @@ public interface ILessonRepository
     Task<IReadOnlyList<LessonRecord>> ListForWindowAsync(
         DateOnly from,
         DateOnly to,
-        CancellationToken cancellationToken);
-
-    Task MarkInvoicedAsync(
-        IReadOnlyList<int> lessonIds,
-        InvoiceNumber invoiceNumber,
         CancellationToken cancellationToken);
 
     Task<LessonRecord?> UpdatePlanAsync(

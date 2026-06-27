@@ -91,29 +91,6 @@ public sealed class SqliteLessonRepository : ILessonRepository
             .ToArray();
     }
 
-    public async Task MarkInvoicedAsync(
-        IReadOnlyList<int> lessonIds,
-        InvoiceNumber invoiceNumber,
-        CancellationToken cancellationToken)
-    {
-        if (lessonIds.Count == 0)
-        {
-            return;
-        }
-
-        await using var context = createContext();
-        var lessons = await context.Lessons
-            .Where(lesson => lessonIds.Contains(lesson.Id))
-            .ToArrayAsync(cancellationToken);
-
-        foreach (var lesson in lessons)
-        {
-            lesson.InvoiceNumber = invoiceNumber.Value;
-        }
-
-        await context.SaveChangesAsync(cancellationToken);
-    }
-
     public async Task<LessonRecord?> UpdatePlanAsync(
         int lessonId,
         int planCatalogId,

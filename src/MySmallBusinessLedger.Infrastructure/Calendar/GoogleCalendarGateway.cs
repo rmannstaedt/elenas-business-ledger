@@ -52,12 +52,59 @@ public sealed class GoogleCalendarGateway : IGoogleCalendarGateway
             .ToArray();
     }
 
-    public async Task<OperationResult<IReadOnlyList<CalendarLesson>>> AddLessonAsync(
+    public async Task<OperationResult<LessonAddResult>> AddLessonAsync(
         LessonAddRequest request,
         DateOnly refreshMonth,
         CancellationToken cancellationToken)
     {
-        return await PopulateLessonsAsync([request], refreshMonth, cancellationToken);
+        string createdLessonId;
+        try
+        {
+            createdLessonId = await eventClient.CreateLessonEventAsync(
+                options.CalendarId,
+                $"$ {request.StudentShortName}",
+                request.StartsAt,
+                request.HasKnownStartTime,
+                options.DefaultLessonDuration,
+                cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return OperationResult<LessonAddResult>.Failure(
+                new ValidationError(
+                    "Calendar.UpdateFailed",
+                    "Google Calendar could not be updated. Refresh Calendar and try again."));
+        }
+
+        try
+        {
+            var lessons = await ListRefreshMonthAsync(refreshMonth, cancellationToken);
+            var createdLesson = lessons.FirstOrDefault(lesson =>
+                StringComparer.OrdinalIgnoreCase.Equals(lesson.Id, createdLessonId)) ??
+                new CalendarLesson(
+                    createdLessonId,
+                    request.StudentShortName,
+                    request.StartsAt,
+                    LessonState.Planned,
+                    request.HasKnownStartTime);
+
+            return OperationResult<LessonAddResult>.Success(new LessonAddResult(createdLesson, lessons));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return OperationResult<LessonAddResult>.Failure(
+                new LessonAddResult(
+                    new CalendarLesson(
+                        createdLessonId,
+                        request.StudentShortName,
+                        request.StartsAt,
+                        LessonState.Planned,
+                        request.HasKnownStartTime),
+                    []),
+                new ValidationError(
+                    "Calendar.RefreshFailed",
+                    "Google Calendar was updated, but the lesson list could not be refreshed."));
+        }
     }
 
     public async Task<OperationResult<IReadOnlyList<CalendarLesson>>> PopulateLessonsAsync(

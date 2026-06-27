@@ -34,14 +34,21 @@ public sealed class ConfiguredGoogleCalendarGateway : IGoogleCalendarGateway
         return await gateway.ListLessonsAsync(from, to, cancellationToken);
     }
 
-    public async Task<OperationResult<IReadOnlyList<CalendarLesson>>> AddLessonAsync(
+    public async Task<OperationResult<LessonAddResult>> AddLessonAsync(
         LessonAddRequest request,
         DateOnly refreshMonth,
         CancellationToken cancellationToken)
     {
         var gateway = await TryCreateGatewayAsync(cancellationToken);
         return gateway is null
-            ? CalendarNotConfigured<IReadOnlyList<CalendarLesson>>([])
+            ? CalendarNotConfigured(new LessonAddResult(
+                new CalendarLesson(
+                    string.Empty,
+                    request.StudentShortName,
+                    request.StartsAt,
+                    LessonState.Planned,
+                    request.HasKnownStartTime),
+                []))
             : await gateway.AddLessonAsync(request, refreshMonth, cancellationToken);
     }
 

@@ -12,6 +12,9 @@ public sealed class InvoiceLineDraft
         int lessonId = 0,
         bool hasKnownLessonTime = true)
     {
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(planCatalogId, 0);
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(lessonId, 0);
+
         LessonDateTime = lessonDateTime;
         HasKnownLessonTime = hasKnownLessonTime;
         PlanName = planName;

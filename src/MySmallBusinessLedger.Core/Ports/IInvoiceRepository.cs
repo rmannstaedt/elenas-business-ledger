@@ -13,16 +13,15 @@ public interface IInvoiceRepository
 
     Task<InvoiceNumber> GetNextInvoiceNumberAsync(CancellationToken cancellationToken);
 
-    Task<OperationResult<IssuedInvoice>> SaveIssuedInvoiceAsync(IssuedInvoice invoice, CancellationToken cancellationToken);
-
     Task<OperationResult<IssuedInvoice>> ReserveInvoiceAsync(
         InvoiceDraft draft,
         InvoiceTotals totals,
         CancellationToken cancellationToken);
 
-    Task<OperationResult<IssuedInvoice>> FinalizeIssuedInvoiceAsync(
+    Task<OperationResult<IssuedInvoice>> FinalizeIssuedInvoiceWithLessonLocksAsync(
         InvoiceNumber invoiceNumber,
         string pdfFilePath,
+        IReadOnlyList<int> lessonIds,
         CancellationToken cancellationToken);
 
     Task ReleaseInvoiceReservationAsync(InvoiceNumber invoiceNumber, CancellationToken cancellationToken);

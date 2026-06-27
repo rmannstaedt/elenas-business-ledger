@@ -74,7 +74,7 @@ public sealed class GoogleCalendarGatewayTests
 
         var gateway = new GoogleCalendarGateway(client, CreateOptions(defaultLessonDuration: TimeSpan.FromMinutes(45)));
         var result = await gateway.AddLessonAsync(
-            new LessonAddRequest("Anna", new DateTimeOffset(2026, 6, 20, 15, 0, 0, TimeSpan.FromHours(2))),
+            new LessonAddRequest("Anna", new DateTimeOffset(2026, 6, 20, 15, 0, 0, TimeSpan.FromHours(2)), PlanCatalogId: 42),
             new DateOnly(2026, 6, 1),
             CancellationToken.None);
 
@@ -82,7 +82,8 @@ public sealed class GoogleCalendarGatewayTests
         Assert.Equal("$ Anna", client.CreatedSummary);
         Assert.Equal(new DateTimeOffset(2026, 6, 20, 15, 0, 0, TimeSpan.FromHours(2)), client.CreatedStartsAt);
         Assert.Equal(TimeSpan.FromMinutes(45), client.CreatedDuration);
-        Assert.Contains(result.Value!, lesson => lesson.Id == "created");
+        Assert.Equal("created", result.Value!.CreatedLesson.Id);
+        Assert.Contains(result.Value.Lessons, lesson => lesson.Id == "created");
     }
 
     [Fact]
@@ -99,7 +100,7 @@ public sealed class GoogleCalendarGatewayTests
 
         var gateway = new GoogleCalendarGateway(client, CreateOptions(defaultLessonDuration: TimeSpan.FromMinutes(45)));
         var result = await gateway.AddLessonAsync(
-            new LessonAddRequest("Anna", startsAt, HasKnownStartTime: false),
+            new LessonAddRequest("Anna", startsAt, PlanCatalogId: 42, HasKnownStartTime: false),
             new DateOnly(2026, 6, 1),
             CancellationToken.None);
 
@@ -107,7 +108,9 @@ public sealed class GoogleCalendarGatewayTests
         Assert.Equal("$ Anna", client.CreatedSummary);
         Assert.Equal(startsAt, client.CreatedStartsAt);
         Assert.False(client.CreatedHasKnownStartTime);
-        Assert.Contains(result.Value!, lesson => lesson.Id == "created" && !lesson.HasKnownStartTime);
+        Assert.Equal("created", result.Value!.CreatedLesson.Id);
+        Assert.False(result.Value.CreatedLesson.HasKnownStartTime);
+        Assert.Contains(result.Value.Lessons, lesson => lesson.Id == "created" && !lesson.HasKnownStartTime);
     }
 
     [Fact]
@@ -125,8 +128,8 @@ public sealed class GoogleCalendarGatewayTests
         var gateway = new GoogleCalendarGateway(client, CreateOptions(defaultLessonDuration: TimeSpan.FromMinutes(45)));
         var result = await gateway.PopulateLessonsAsync(
             [
-                new LessonAddRequest("Anna", new DateTimeOffset(2026, 6, 23, 15, 0, 0, TimeSpan.FromHours(2))),
-                new LessonAddRequest("Anna", new DateTimeOffset(2026, 6, 30, 15, 0, 0, TimeSpan.FromHours(2)))
+                new LessonAddRequest("Anna", new DateTimeOffset(2026, 6, 23, 15, 0, 0, TimeSpan.FromHours(2)), PlanCatalogId: 42),
+                new LessonAddRequest("Anna", new DateTimeOffset(2026, 6, 30, 15, 0, 0, TimeSpan.FromHours(2)), PlanCatalogId: 42)
             ],
             new DateOnly(2026, 6, 1),
             CancellationToken.None);

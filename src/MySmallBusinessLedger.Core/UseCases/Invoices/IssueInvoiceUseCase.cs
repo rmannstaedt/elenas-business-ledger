@@ -13,7 +13,6 @@ public sealed class IssueInvoiceUseCase
     private readonly IInvoicePdfWriter pdfWriter;
     private readonly IInvoicePrinter printer;
     private readonly IClock clock;
-    private readonly ILessonRepository? lessonRepository;
 
     public IssueInvoiceUseCase(
         ICompanyProfileRepository companyProfileRepository,
@@ -21,8 +20,7 @@ public sealed class IssueInvoiceUseCase
         IInvoiceFileStore fileStore,
         IInvoicePdfWriter pdfWriter,
         IInvoicePrinter printer,
-        IClock clock,
-        ILessonRepository? lessonRepository = null)
+        IClock clock)
     {
         this.companyProfileRepository = companyProfileRepository;
         this.invoiceRepository = invoiceRepository;
@@ -30,13 +28,25 @@ public sealed class IssueInvoiceUseCase
         this.pdfWriter = pdfWriter;
         this.printer = printer;
         this.clock = clock;
-        this.lessonRepository = lessonRepository;
     }
 
     public async Task<OperationResult<IssueInvoiceResult>> ExecuteAsync(
         InvoiceDraft draft,
         CancellationToken cancellationToken)
     {
+        var lessonIds = draft.Lines
+            .Select(line => line.LessonId)
+            .ToArray();
+        if (lessonIds.Length != draft.Lines.Count ||
+            lessonIds.Any(lessonId => lessonId <= 0) ||
+            lessonIds.Distinct().Count() != lessonIds.Length)
+        {
+            return OperationResult<IssueInvoiceResult>.Failure(
+                new ValidationError(
+                    "Invoice.LessonIdentityMissing",
+                    "Every invoice line must reference one unique saved lesson."));
+        }
+
         var company = await companyProfileRepository.GetAsync(cancellationToken);
         var totals = draft.CalculateTotals(company);
         var reserve = await invoiceRepository.ReserveInvoiceAsync(draft, totals, cancellationToken);
@@ -83,23 +93,18 @@ public sealed class IssueInvoiceUseCase
                 cancellationToken);
         }
 
-        var finalize = await invoiceRepository.FinalizeIssuedInvoiceAsync(
+        var finalize = await invoiceRepository.FinalizeIssuedInvoiceWithLessonLocksAsync(
             invoiceNumber,
             publish.Value!,
+            lessonIds,
             cancellationToken);
         if (!finalize.Succeeded)
         {
-            return OperationResult<IssueInvoiceResult>.Failure(finalize.Errors.ToArray());
-        }
-
-        if (lessonRepository is not null)
-        {
-            var lessonIds = draft.Lines
-                .Select(line => line.LessonId)
-                .Where(lessonId => lessonId > 0)
-                .Distinct()
-                .ToArray();
-            await lessonRepository.MarkInvoicedAsync(lessonIds, invoiceNumber, cancellationToken);
+            return await DiscardPublishedReleaseReservationAndFailAsync(
+                invoiceNumber,
+                publish.Value!,
+                finalize.Errors.ToArray(),
+                cancellationToken);
         }
 
         var print = await printer.PrintAsync(
@@ -141,6 +146,23 @@ public sealed class IssueInvoiceUseCase
         CancellationToken cancellationToken)
     {
         var discard = await fileStore.DiscardStagingPathAsync(stagingPath, cancellationToken);
+        await invoiceRepository.ReleaseInvoiceReservationAsync(invoiceNumber, cancellationToken);
+
+        if (discard.Succeeded)
+        {
+            return OperationResult<IssueInvoiceResult>.Failure(errors.ToArray());
+        }
+
+        return OperationResult<IssueInvoiceResult>.Failure(errors.Concat(discard.Errors).ToArray());
+    }
+
+    private async Task<OperationResult<IssueInvoiceResult>> DiscardPublishedReleaseReservationAndFailAsync(
+        InvoiceNumber invoiceNumber,
+        string publishedPath,
+        IReadOnlyList<ValidationError> errors,
+        CancellationToken cancellationToken)
+    {
+        var discard = await fileStore.DiscardPublishedPathAsync(publishedPath, cancellationToken);
         await invoiceRepository.ReleaseInvoiceReservationAsync(invoiceNumber, cancellationToken);
 
         if (discard.Succeeded)

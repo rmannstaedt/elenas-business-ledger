@@ -94,5 +94,7 @@ public sealed class InvoicePdfDocumentModelTests
         new(
             new DateTimeOffset(year, month, day, 14, 0, 0, TimeSpan.FromHours(2)),
             planName,
-            Money.Dkk(350m));
+            Money.Dkk(350m),
+            planName.Contains('1', StringComparison.Ordinal) ? 1 : 2,
+            year * 10000 + month * 100 + day);
 }

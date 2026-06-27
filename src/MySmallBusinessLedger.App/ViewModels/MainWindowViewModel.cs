@@ -592,7 +592,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     {
         var requestedPlanCatalogId = lesson.PlanCatalogId;
         var result = await lessonEditorService.AddAsync(
-            new LessonAddRequest(lesson.StudentShortName, startsAt, hasKnownStartTime),
+            new LessonAddRequest(lesson.StudentShortName, startsAt, requestedPlanCatalogId, hasKnownStartTime),
             DisplayMonth,
             CancellationToken.None);
         if (!result.Succeeded)
@@ -618,7 +618,6 @@ public sealed class MainWindowViewModel : ViewModelBase
         ErrorMessage = null;
         RaiseCommandAvailabilityChanged();
         await RefreshAsync();
-        ApplyPendingDraftPlanSelection(lesson, requestedPlanCatalogId);
     }
 
     private async Task DeleteLessonAsync(LessonDisplayModel lesson)
@@ -1061,26 +1060,6 @@ public sealed class MainWindowViewModel : ViewModelBase
         {
             savingPlanLessons.Remove(lesson);
         }
-    }
-
-    private void ApplyPendingDraftPlanSelection(LessonDisplayModel draftLesson, int requestedPlanCatalogId)
-    {
-        if (requestedPlanCatalogId <= 0)
-        {
-            return;
-        }
-
-        var createdLesson = Lessons.FirstOrDefault(lesson =>
-            string.Equals(lesson.Id, draftLesson.Id, StringComparison.OrdinalIgnoreCase)) ??
-            FindRefreshedLessonByDateTime(draftLesson);
-        if (createdLesson is null ||
-            !createdLesson.CanEditPlan ||
-            createdLesson.PlanCatalogId == requestedPlanCatalogId)
-        {
-            return;
-        }
-
-        createdLesson.PlanCatalogId = requestedPlanCatalogId;
     }
 
     private void SortLessonsPreservingSelection(LessonDisplayModel? lessonToKeepSelected)

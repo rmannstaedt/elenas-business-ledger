@@ -109,7 +109,7 @@ internal sealed class ApplicationServiceGraph
         var studentEditorService = new CoreStudentEditorService(studentRepository);
         var studentOverviewService = new CoreStudentOverviewService(studentRepository, invoiceRepository);
         var lessonEditorService = new CoreLessonEditorService(
-            new AddLessonUseCase(calendarGateway),
+            new AddLessonUseCase(calendarGateway, studentRepository, planCatalogRepository, lessonRepository),
             new EditLessonUseCase(calendarGateway),
             new DeleteLessonUseCase(calendarGateway),
             new PopulateCalendarUseCase(studentRepository, calendarGateway, TimeZoneInfo.Local),
@@ -117,18 +117,14 @@ internal sealed class ApplicationServiceGraph
         var invoiceWorkflowService = new CoreInvoiceWorkflowService(
             new InvoiceCandidateSelectionUseCase(
                 studentRepository,
-                calendarGateway,
-                invoiceRepository,
-                lessonRepository: lessonRepository),
+                lessonRepository),
             new InvoicePreviewUseCase(
                 studentRepository,
                 companyProfileRepository,
-                calendarGateway,
                 lessonRepository,
                 planCatalogRepository),
             companyProfileRepository,
             invoiceRepository,
-            lessonRepository,
             new QuestPdfInvoicePdfWriter(),
             new SavedPdfPrinter(new ShellPrintProcessLauncher(), new WindowsPrinterCatalog()),
             systemClock);

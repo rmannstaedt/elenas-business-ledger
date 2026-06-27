@@ -155,11 +155,15 @@ public sealed class LedgerDbContext : DbContext
             entity.HasKey(line => line.Id);
             entity.HasIndex(line => line.LessonDateTime);
             entity.HasIndex(line => line.PlanCatalogId);
-            entity.HasIndex(line => line.LessonId);
+            entity.HasIndex(line => line.LessonId).IsUnique();
             entity.Property(line => line.LessonDateTime).HasMaxLength(40).IsRequired();
             entity.Property(line => line.HasKnownLessonTime).HasDefaultValue(true);
             entity.Property(line => line.PlanName).HasMaxLength(200).IsRequired();
             entity.Property(line => line.Currency).HasMaxLength(3).IsRequired();
+            entity.HasOne(line => line.Lesson)
+                .WithMany()
+                .HasForeignKey(line => line.LessonId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<LessonEntity>(entity =>

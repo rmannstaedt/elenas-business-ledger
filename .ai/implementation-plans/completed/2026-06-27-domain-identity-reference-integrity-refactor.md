@@ -1,6 +1,6 @@
 # Implementation Plan: Domain Identity And Reference Integrity Refactor
 
-Status: Active
+Status: Completed
 Created: 2026-06-27
 Last updated: 2026-06-27
 Owner/context: Ruben and Codex. Created after architecture review found that lesson creation and invoice state can still depend on weak lineage, post-refresh UI repair, and split persistence operations.
@@ -292,7 +292,7 @@ Recommended defaults are included so execution can proceed unless the user overr
 
 ### Stage 1: Characterize The Identity Failures
 
-Status: Not started
+Status: Completed 2026-06-27
 
 Goal:
 
@@ -332,13 +332,24 @@ Expected result:
 
 - New tests fail before implementation.
 
+Stage result:
+
+- Added MainWindowViewModel characterization assertions proving draft autosave must send the selected `PlanCatalogId` in `LessonAddRequest` for timed, date-only, and non-default-plan lesson creation.
+- Added SQLite model characterization tests proving `IssuedInvoiceLineEntity.LessonId` must be a required foreign key to `LessonEntity` with restrictive delete behavior and a unique one-line-per-lesson index.
+- Verification run:
+  - `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter FullyQualifiedName~MainWindowViewModelTests -nodeReuse:false`
+- Verification result:
+  - Failed as expected before implementation because `LessonAddRequest` does not yet expose `PlanCatalogId`.
+- No behavior changed in this stage.
+- No blocking user action.
+
 Review stop:
 
 - Stop if the failing tests cannot reproduce the observed issue. Do not proceed with structural changes until the failure is captured.
 
 ### Stage 2: Carry Plan Identity Through Lesson Creation
 
-Status: Not started
+Status: Completed 2026-06-27
 
 Goal:
 
@@ -373,9 +384,29 @@ Review stop:
 
 - Stop if a selected non-default plan can still be replaced by the student's default plan after refresh.
 
+Stage result:
+
+- Extended `LessonAddRequest` with selected `PlanCatalogId`.
+- Added `LessonAddResult` so the Google Calendar gateway returns the exact created event id plus the refreshed month list.
+- Updated `AddLessonUseCase` to validate student and selected plan, create the Google Calendar event, and immediately persist the local `LessonRecord` with the selected plan identity and created Google event id.
+- Updated the main-window autosave path to send `PlanCatalogId` as part of lesson creation.
+- Removed the normal post-refresh `ApplyPendingDraftPlanSelection` repair path.
+- Updated Populate Calendar to fill lesson add requests with the student's active plan explicitly.
+- Updated app composition, configured calendar wrapper, Google gateway tests, Core tests, and main-window tests for the new contract.
+- Verification run:
+  - `dotnet build MySmallBusinessLedger.sln -nodeReuse:false`
+  - `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter FullyQualifiedName~UseCaseTests -nodeReuse:false`
+  - `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter FullyQualifiedName~MainWindowViewModelTests -nodeReuse:false`
+  - `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter FullyQualifiedName~GoogleCalendarGatewayTests -nodeReuse:false`
+- Verification result:
+  - All Stage 2 focused verification passed.
+- Deviation:
+  - Kept the old modal `LessonEditorViewModel` compiling with a plan id of `0`; the normal main-window Add Lesson path owns date+plan creation now. This legacy launcher should be removed or updated if it is revived.
+- No blocking user action.
+
 ### Stage 3: Make Local Lesson Identity The Invoice Candidate Authority
 
-Status: Not started
+Status: Completed 2026-06-27
 
 Goal:
 
@@ -411,9 +442,30 @@ Review stop:
 
 - Stop if invoice preview can still be built without exact local lesson IDs.
 
+Completion notes:
+
+- `ILessonRepository` is now required by startup dashboard, invoice candidate selection, invoice preview, and invoice issue use cases.
+- Removed the normal calendar-only invoice candidate/preview path. Candidates and preview lines are now based on local `LessonRecord` rows only.
+- Removed the legacy descriptive invoice status lookup from startup dashboard state. Invoice/payment display state now comes from invoice line status matched by exact local lesson id.
+- Updated app composition and tests/fakes to supply the lesson repository explicitly.
+- Rewrote candidate/preview tests away from calendar-only/descriptive invoice assumptions and toward exact local lessons.
+- Verification run:
+
+```powershell
+dotnet build MySmallBusinessLedger.sln -nodeReuse:false
+dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter FullyQualifiedName~UseCaseTests -nodeReuse:false
+dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter FullyQualifiedName~AppServiceTests -nodeReuse:false
+```
+
+- Verification result:
+  - Build passed.
+  - `UseCaseTests` passed: 55/55.
+  - `AppServiceTests` passed: 3/3.
+  - Review stop satisfied: invoice preview construction requires local lesson repository + plan catalog repository and local lesson rows carry the `LessonId`.
+
 ### Stage 4: Finalize Invoice And Lock Lessons In One Database Unit
 
-Status: Not started
+Status: Completed 2026-06-27
 
 Goal:
 
@@ -450,9 +502,30 @@ Review stop:
 
 - Stop if an issued invoice can exist while its included lessons remain invoiceable.
 
+Completion notes:
+
+- Added `IInvoiceRepository.FinalizeIssuedInvoiceWithLessonLocksAsync(...)` as the single business persistence operation for invoice finalization plus lesson locking.
+- Implemented the SQLite method with a database transaction. It validates that invoice line lesson ids match the requested locks, that all lessons exist, and that no lesson is already locked to another invoice.
+- Updated `IssueInvoiceUseCase` to reject drafts with missing lesson ids and to call the atomic invoice repository method instead of finalizing first and then calling `ILessonRepository.MarkInvoicedAsync`.
+- Added published-PDF cleanup on post-publish DB finalization failure: the just-published file is deleted and the invoice reservation is released.
+- Added use-case and SQLite regression coverage for successful atomic lock, already-locked lesson rollback, and post-publish finalization failure cleanup.
+- Verification run:
+
+```powershell
+dotnet build MySmallBusinessLedger.sln -nodeReuse:false
+dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter FullyQualifiedName~UseCaseTests -nodeReuse:false
+dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter FullyQualifiedName~SqlitePersistenceTests -nodeReuse:false
+```
+
+- Verification result:
+  - Build passed.
+  - `UseCaseTests` passed: 56/56.
+  - `SqlitePersistenceTests` passed: 26/26.
+  - Review stop satisfied: the issue flow cannot produce an issued invoice through the normal path without atomically locking the exact local lesson ids.
+
 ### Stage 5: Enforce Database Reference Integrity
 
-Status: Not started
+Status: Completed 2026-06-27
 
 Goal:
 
@@ -491,9 +564,29 @@ Review stop:
 
 - Stop if the migration introduces nullable/default lesson IDs into finalized invoice lines.
 
+Completion notes:
+
+- Added an EF relationship from `IssuedInvoiceLineEntity.LessonId` to `LessonEntity.Id` with restrictive delete behavior.
+- Changed the `IssuedInvoiceLines.LessonId` index to unique, enforcing one issued invoice line per lesson.
+- Added migration `20260627170000_AddIssuedInvoiceLineLessonReference`.
+- Updated the model snapshot.
+- Per user direction, no compatibility backfill was added for old invoice data. Existing data can be reset; fresh data and current flows create valid lesson ids before invoicing.
+- Kept `LessonEntity.InvoiceNumber` as a cache for current UI/read-model convenience, but invoice truth now comes from `IssuedInvoiceLines.LessonId` and exact invoice line status lookups.
+- Verification run:
+
+```powershell
+dotnet build MySmallBusinessLedger.sln -nodeReuse:false
+dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter FullyQualifiedName~SqlitePersistenceTests -nodeReuse:false
+```
+
+- Verification result:
+  - Build passed.
+  - `SqlitePersistenceTests` passed: 26/26.
+  - Review stop satisfied: `LessonId` is required, has an FK to `Lessons`, and has a unique index.
+
 ### Stage 6: Clean Up Redundant Or Misleading State
 
-Status: Not started
+Status: Completed 2026-06-27
 
 Goal:
 
@@ -528,9 +621,35 @@ Review stop:
 
 - Stop if any UI status can be computed without an exact lesson id or invoice id source.
 
+Completion notes:
+
+- Audited invoice/payment/completion display paths for remaining weak descriptive matching.
+- Removed the obsolete `ILessonRepository.MarkInvoicedAsync` port and SQLite implementation. Lesson invoice-locking is now owned by `IInvoiceRepository.FinalizeIssuedInvoiceWithLessonLocksAsync(...)` only.
+- Kept `Lesson.InvoiceNumber` as the planned denormalized display/lock cache. Issued invoice lines remain authoritative, and the SQLite finalization transaction updates the cache only after validating exact invoice line lesson ids.
+- Added runtime SQLite constraint coverage proving:
+  - issued invoice lines cannot reference missing lessons;
+  - a lesson cannot be reused by a second issued invoice line;
+  - a referenced lesson cannot be deleted.
+- Replaced the add-foreign-key migration operation with a SQLite-safe table rebuild migration. The migration preserves valid referenced rows but does not invent local lesson identity for old invoice rows. This matches the accepted reset-friendly compatibility stance for this cycle.
+- Updated older persistence tests so issued/reserved invoice lines reference real local lesson rows instead of invented ids.
+- Verification run:
+
+```powershell
+dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter FullyQualifiedName~SqlitePersistenceTests -nodeReuse:false
+dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter FullyQualifiedName~UseCaseTests -nodeReuse:false
+dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter FullyQualifiedName~MainWindowViewModelTests -nodeReuse:false
+```
+
+- Verification result:
+  - `SqlitePersistenceTests` passed: 29/29.
+  - `UseCaseTests` passed: 56/56.
+  - `MainWindowViewModelTests` passed: 78/78.
+  - Review stop satisfied: no remaining status path found that applies invoice/payment state without an exact lesson id or invoice id source.
+  - No blocking user action.
+
 ### Stage 7: Documentation, Plan State, And Review Closure
 
-Status: Not started
+Status: Completed 2026-06-27
 
 Goal:
 
@@ -560,6 +679,33 @@ dotnet test MySmallBusinessLedger.sln -nodeReuse:false
 Review stop:
 
 - Stop if documentation still disagrees about whether time is required or whether invoice lines reference exact lessons.
+
+Completion notes:
+
+- Updated `README.md`, `.ai/project-profile.md`, `docs/business-requirements-and-logic.md`, and `.ai/context/HANDOFF.md` so they agree that lessons require date + plan, time is optional, and local `Lesson.Id` is the billing/audit identity.
+- Documented that issued invoice lines are authoritative for lesson-invoice lineage and that `Lesson.InvoiceNumber` is only a denormalized display/lock cache maintained by invoice finalization.
+- Preserved the reset-friendly stance for this migration: old invoice rows are not repaired with invented lesson identities. Fresh/reset data is the supported path for this cycle.
+- Ran code review focused on domain identity, lineage, exact references, failure compensation, and UI repair paths. No blocking findings remained after adding Google Calendar cleanup when local lesson persistence fails.
+- Ran architecture review focused on dependency direction, transaction ownership, local ledger authority, and legacy descriptive matching. No critical/high findings remained. Follow-up candidates remain:
+  - remove or update the stale modal lesson editor path before reviving it, because the main-window add path now owns date + plan creation;
+  - consider a later cleanup plan to remove the `Lesson.InvoiceNumber` cache once all read models join directly through issued invoice lines.
+- Verification run:
+
+```powershell
+dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter FullyQualifiedName~SqlitePersistenceTests -nodeReuse:false
+dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter FullyQualifiedName~UseCaseTests -nodeReuse:false
+dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter FullyQualifiedName~MainWindowViewModelTests -nodeReuse:false
+dotnet build MySmallBusinessLedger.sln -nodeReuse:false
+dotnet test MySmallBusinessLedger.sln -nodeReuse:false
+```
+
+- Verification result:
+  - `SqlitePersistenceTests` passed: 29/29.
+  - `UseCaseTests` passed: 57/57.
+  - `MainWindowViewModelTests` passed: 78/78.
+  - Solution build passed with 0 warnings and 0 errors.
+  - Full solution test passed: 312/312.
+  - Review stop satisfied: documentation and implementation now agree that time is optional, date + plan are required, and invoice lines reference exact local lessons.
 
 ## Verification Strategy
 
@@ -637,3 +783,4 @@ The final acceptance test should focus on the exact bug that triggered this plan
 ## Completion Log
 
 - 2026-06-27: Plan created from architecture-review findings and the observed fatal invoice/lesson identity bug. No source code changed.
+- 2026-06-27: Plan executed and completed. Exact local lesson identity now flows through lesson creation, Google Calendar creation, local persistence, invoice lines, invoice finalization, database constraints, and docs. Full solution build and 312-test run passed.

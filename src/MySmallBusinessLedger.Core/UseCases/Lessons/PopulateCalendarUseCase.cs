@@ -50,7 +50,18 @@ public sealed class PopulateCalendarUseCase
             .ToHashSet();
 
         var candidates = CreateScheduledStarts(student.Schedule, from, to)
-            .Select(startsAt => new LessonAddRequest(request.StudentShortName, startsAt))
+            .Select(startsAt => new
+            {
+                StartsAt = startsAt,
+                Plan = MySmallBusinessLedger.Core.Plans.StudentPlanPeriod.GetActivePlan(
+                    student.PlanPeriods,
+                    DateOnly.FromDateTime(startsAt.DateTime))
+            })
+            .Where(candidate => candidate.Plan is not null)
+            .Select(candidate => new LessonAddRequest(
+                request.StudentShortName,
+                candidate.StartsAt,
+                candidate.Plan!.PlanCatalogId))
             .ToArray();
         var requestsToCreate = candidates
             .Where(candidate => !existingStarts.Contains(candidate.StartsAt))

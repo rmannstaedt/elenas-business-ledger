@@ -22,7 +22,8 @@ public sealed class AppServiceTests
             new EmptyStudentRepository(),
             new ThrowingCalendarGateway("Google Calendar is not configured."),
             new EmptyInvoiceRepository(),
-            new FixedClock());
+            new FixedClock(),
+            new EmptyLessonRepository());
         var service = new CoreStartupDashboardService(query);
 
         var result = await service.LoadAsync(new DateOnly(2026, 6, 1), null, CancellationToken.None);
@@ -41,7 +42,7 @@ public sealed class AppServiceTests
             TimeSpan.FromHours(1));
 
         var result = await gateway.AddLessonAsync(
-            new LessonAddRequest("Anna", new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.Zero)),
+            new LessonAddRequest("Anna", new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.Zero), PlanCatalogId: 42),
             new DateOnly(2026, 6, 1),
             CancellationToken.None);
 
@@ -100,9 +101,6 @@ public sealed class AppServiceTests
         public Task<InvoiceNumber> GetNextInvoiceNumberAsync(CancellationToken cancellationToken) =>
             Task.FromResult(new InvoiceNumber(1));
 
-        public Task<OperationResult<IssuedInvoice>> SaveIssuedInvoiceAsync(IssuedInvoice invoice, CancellationToken cancellationToken) =>
-            Task.FromResult(OperationResult<IssuedInvoice>.Success(invoice));
-
         public Task<OperationResult<IssuedInvoice>> ReserveInvoiceAsync(
             InvoiceDraft draft,
             InvoiceTotals totals,
@@ -116,9 +114,10 @@ public sealed class AppServiceTests
                 printedAt: null,
                 lastPrintError: null)));
 
-        public Task<OperationResult<IssuedInvoice>> FinalizeIssuedInvoiceAsync(
+        public Task<OperationResult<IssuedInvoice>> FinalizeIssuedInvoiceWithLessonLocksAsync(
             InvoiceNumber invoiceNumber,
             string pdfFilePath,
+            IReadOnlyList<int> lessonIds,
             CancellationToken cancellationToken) =>
             Task.FromResult(OperationResult<IssuedInvoice>.Failure(
                 new ValidationError("Invoice.NotConfigured", "Invoice finalization is not configured.")));
@@ -148,13 +147,51 @@ public sealed class AppServiceTests
             Task.CompletedTask;
     }
 
+    private sealed class EmptyLessonRepository : ILessonRepository
+    {
+        public Task<LessonRecord> SaveAsync(LessonRecord lesson, CancellationToken cancellationToken) =>
+            Task.FromResult(lesson);
+
+        public Task<IReadOnlyList<LessonRecord>> ListForStudentMonthAsync(
+            string studentShortName,
+            DateOnly month,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<LessonRecord>>([]);
+
+        public Task<IReadOnlyList<LessonRecord>> ListForWindowAsync(
+            DateOnly from,
+            DateOnly to,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<LessonRecord>>([]);
+
+        public Task<LessonRecord?> UpdatePlanAsync(
+            int lessonId,
+            int planCatalogId,
+            string planName,
+            int durationMinutes,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<LessonRecord?>(null);
+
+        public Task DeleteUninvoicedAsync(IReadOnlyList<int> lessonIds, CancellationToken cancellationToken) =>
+            Task.CompletedTask;
+    }
+
     private sealed class ThrowingCalendarGateway(string message) : IGoogleCalendarGateway
     {
         public Task<IReadOnlyList<CalendarLesson>> ListLessonsAsync(DateOnly from, DateOnly to, CancellationToken cancellationToken) =>
             throw new InvalidOperationException(message);
 
-        public Task<OperationResult<IReadOnlyList<CalendarLesson>>> AddLessonAsync(LessonAddRequest request, DateOnly refreshMonth, CancellationToken cancellationToken) =>
-            Task.FromResult(OperationResult<IReadOnlyList<CalendarLesson>>.Failure(new ValidationError("Calendar.NotConfigured", message)));
+        public Task<OperationResult<LessonAddResult>> AddLessonAsync(LessonAddRequest request, DateOnly refreshMonth, CancellationToken cancellationToken) =>
+            Task.FromResult(OperationResult<LessonAddResult>.Failure(
+                new LessonAddResult(
+                    new CalendarLesson(
+                        string.Empty,
+                        request.StudentShortName,
+                        request.StartsAt,
+                        LessonState.Planned,
+                        request.HasKnownStartTime),
+                    []),
+                new ValidationError("Calendar.NotConfigured", message)));
 
         public Task<OperationResult<IReadOnlyList<CalendarLesson>>> PopulateLessonsAsync(
             IReadOnlyList<LessonAddRequest> requests,

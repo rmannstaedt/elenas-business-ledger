@@ -1,3 +1,4 @@
+using MySmallBusinessLedger.Core.Common;
 using MySmallBusinessLedger.Core.Company;
 using MySmallBusinessLedger.Core.Invoices;
 using MySmallBusinessLedger.Core.Lessons;
@@ -190,12 +191,14 @@ public sealed class SqlitePersistenceTests
         var catalogPlan = (await plans.SaveAsync(CreatePlanCatalogItem("Standard", PlanCatalogState.Active), CancellationToken.None)).Value!;
         var intro = await SaveCatalogPlanAsync(plans, "Intro");
         await students.SaveAsync(CreateStudentRecord("Anna", introPlanId: intro.Id, currentPlanId: catalogPlan.Id, currentPlanName: "Standard"), CancellationToken.None);
+        var lesson = await SaveLessonAsync(database, "Anna", catalogPlan, new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.Zero));
         var invoices = new SqliteInvoiceRepository(database.CreateContext);
-        await invoices.SaveIssuedInvoiceAsync(CreateIssuedInvoice(
+        await SaveIssuedInvoiceViaBusinessFlowAsync(invoices, CreateIssuedInvoice(
             "Anna",
             fullName: "Anna Andersen",
             planName: "Standard",
-            planCatalogId: catalogPlan.Id), CancellationToken.None);
+            planCatalogId: catalogPlan.Id,
+            lessonId: lesson.Id), CancellationToken.None);
 
         var renamed = await plans.RenameAsync(catalogPlan.Id, "Standard 2026", new DateTimeOffset(2026, 6, 20, 12, 0, 0, TimeSpan.Zero), CancellationToken.None);
 
@@ -412,10 +415,12 @@ public sealed class SqlitePersistenceTests
     {
         using var database = await TestDatabase.CreateAsync();
         var repository = new SqliteInvoiceRepository(database.CreateContext);
+        var plan = await SaveCatalogPlanAsync(new SqlitePlanCatalogRepository(database.CreateContext), "Standard");
         var lessonDateTime = new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.FromHours(2));
-        var invoice = CreateIssuedInvoice("Anna", fullName: "Anna Andersen", planName: "Standard", lessonDateTime, lessonId: 123);
+        var lesson = await SaveLessonAsync(database, "Anna", plan, lessonDateTime);
+        var invoice = CreateIssuedInvoice("Anna", fullName: "Anna Andersen", planName: "Standard", lessonDateTime, plan.Id, lessonId: lesson.Id);
 
-        await repository.SaveIssuedInvoiceAsync(invoice, CancellationToken.None);
+        await SaveIssuedInvoiceViaBusinessFlowAsync(repository, invoice, CancellationToken.None);
 
         var loaded = await repository.GetIssuedInvoiceAsync(new InvoiceNumber(1), CancellationToken.None);
         Assert.NotNull(loaded);
@@ -423,9 +428,9 @@ public sealed class SqlitePersistenceTests
         Assert.Equal("C:\\Invoices\\000001.pdf", loaded.PdfFilePath);
         Assert.Single(loaded.Lines);
         Assert.Equal(lessonDateTime, loaded.Lines[0].LessonDateTime);
-        Assert.Equal(7, loaded.Lines[0].PlanCatalogId);
+        Assert.Equal(plan.Id, loaded.Lines[0].PlanCatalogId);
         Assert.Equal("Standard", loaded.Lines[0].PlanName);
-        Assert.Equal(123, loaded.Lines[0].LessonId);
+        Assert.Equal(lesson.Id, loaded.Lines[0].LessonId);
         Assert.Equal(Money.Dkk(400m), loaded.Totals.Total);
     }
 
@@ -434,14 +439,19 @@ public sealed class SqlitePersistenceTests
     {
         using var database = await TestDatabase.CreateAsync();
         var repository = new SqliteInvoiceRepository(database.CreateContext);
+        var plan = await SaveCatalogPlanAsync(new SqlitePlanCatalogRepository(database.CreateContext), "Standard");
+        var lessonDateTime = new DateTimeOffset(2026, 7, 30, 15, 0, 0, TimeSpan.FromHours(2));
+        var lesson = await SaveLessonAsync(database, "Anna", plan, lessonDateTime);
         var invoice = CreateIssuedInvoice(
             "Anna",
             fullName: "Anna Andersen",
             planName: "Standard",
-            lessonDateTime: new DateTimeOffset(2026, 7, 30, 15, 0, 0, TimeSpan.FromHours(2)),
-            period: new InvoicePeriod(new DateOnly(2026, 8, 1), new DateOnly(2026, 8, 31)));
+            lessonDateTime: lessonDateTime,
+            planCatalogId: plan.Id,
+            period: new InvoicePeriod(new DateOnly(2026, 8, 1), new DateOnly(2026, 8, 31)),
+            lessonId: lesson.Id);
 
-        await repository.SaveIssuedInvoiceAsync(invoice, CancellationToken.None);
+        await SaveIssuedInvoiceViaBusinessFlowAsync(repository, invoice, CancellationToken.None);
 
         var summary = Assert.Single(await repository.ListInvoicesForStudentAsync("Anna", CancellationToken.None));
         Assert.Equal(new InvoicePeriod(new DateOnly(2026, 8, 1), new DateOnly(2026, 8, 31)), summary.Period);
@@ -452,14 +462,19 @@ public sealed class SqlitePersistenceTests
     {
         using var database = await TestDatabase.CreateAsync();
         var repository = new SqliteInvoiceRepository(database.CreateContext);
+        var plan = await SaveCatalogPlanAsync(new SqlitePlanCatalogRepository(database.CreateContext), "Standard");
+        var lessonDateTime = new DateTimeOffset(2026, 7, 30, 15, 0, 0, TimeSpan.FromHours(2));
+        var lesson = await SaveLessonAsync(database, "Anna", plan, lessonDateTime);
         var invoice = CreateIssuedInvoice(
             "Anna",
             fullName: "Anna Andersen",
             planName: "Standard",
-            lessonDateTime: new DateTimeOffset(2026, 7, 30, 15, 0, 0, TimeSpan.FromHours(2)),
-            period: new InvoicePeriod(new DateOnly(2026, 8, 1), new DateOnly(2026, 8, 31)));
+            lessonDateTime: lessonDateTime,
+            planCatalogId: plan.Id,
+            period: new InvoicePeriod(new DateOnly(2026, 8, 1), new DateOnly(2026, 8, 31)),
+            lessonId: lesson.Id);
 
-        await repository.SaveIssuedInvoiceAsync(invoice, CancellationToken.None);
+        await SaveIssuedInvoiceViaBusinessFlowAsync(repository, invoice, CancellationToken.None);
 
         Assert.False(await repository.HasInvoiceForStudentInMonthAsync("Anna", new DateOnly(2026, 7, 1), CancellationToken.None));
         Assert.True(await repository.HasInvoiceForStudentInMonthAsync("Anna", new DateOnly(2026, 8, 1), CancellationToken.None));
@@ -470,7 +485,10 @@ public sealed class SqlitePersistenceTests
     {
         using var database = await TestDatabase.CreateAsync();
         var repository = new SqliteInvoiceRepository(database.CreateContext);
-        var draft = CreateInvoiceDraft("Anna", "Anna Andersen", "Standard");
+        var plan = await SaveCatalogPlanAsync(new SqlitePlanCatalogRepository(database.CreateContext), "Standard");
+        var lessonDateTime = new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.Zero);
+        var lesson = await SaveLessonAsync(database, "Anna", plan, lessonDateTime);
+        var draft = CreateInvoiceDraft("Anna", "Anna Andersen", "Standard", lessonDateTime, plan.Id, lessonId: lesson.Id);
         var totals = new InvoiceTotals(Money.Dkk(400m), Money.Dkk(0m), Money.Dkk(400m));
 
         var reserved = await repository.ReserveInvoiceAsync(draft, totals, CancellationToken.None);
@@ -487,9 +505,10 @@ public sealed class SqlitePersistenceTests
         Assert.NotNull(issuing);
         Assert.Equal(InvoiceIssueStatus.Issuing, issuing.IssueStatus);
 
-        var finalized = await repository.FinalizeIssuedInvoiceAsync(
+        var finalized = await repository.FinalizeIssuedInvoiceWithLessonLocksAsync(
             new InvoiceNumber(1),
             "C:\\Invoices\\000001.pdf",
+            [lesson.Id],
             CancellationToken.None);
 
         Assert.True(finalized.Succeeded);
@@ -521,11 +540,103 @@ public sealed class SqlitePersistenceTests
     }
 
     [Fact]
+    public async Task InvoiceFinalizationWithLessonLocksIssuesInvoiceAndLocksLessonsTogether()
+    {
+        using var database = await TestDatabase.CreateAsync();
+        var students = new SqliteStudentRepository(database.CreateContext);
+        var plans = new SqlitePlanCatalogRepository(database.CreateContext);
+        var lessons = new SqliteLessonRepository(database.CreateContext);
+        var invoices = new SqliteInvoiceRepository(database.CreateContext);
+        var plan = await SaveCatalogPlanAsync(plans, "Standard");
+        var student = await students.SaveAsync(
+            CreateStudentRecord("Anna", currentPlanId: plan.Id),
+            CancellationToken.None);
+        Assert.True(student.Succeeded);
+        var startsAt = new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.Zero);
+        var lesson = await lessons.SaveAsync(
+            new LessonRecord(
+                Id: 0,
+                StudentId: student.Value!.Id,
+                StudentShortName: "Anna",
+                PlanCatalogId: plan.Id,
+                PlanName: "Standard",
+                StartsAt: startsAt,
+                DurationMinutes: 60,
+                State: LessonState.Completed,
+                GoogleCalendarEventId: "calendar-event-1",
+                InvoiceNumber: null),
+            CancellationToken.None);
+        var draft = CreateInvoiceDraft("Anna", "Anna Andersen", "Standard", startsAt, plan.Id, lessonId: lesson.Id);
+        var totals = new InvoiceTotals(Money.Dkk(400m), Money.Dkk(0m), Money.Dkk(400m));
+
+        var reserved = await invoices.ReserveInvoiceAsync(draft, totals, CancellationToken.None);
+        var finalized = await invoices.FinalizeIssuedInvoiceWithLessonLocksAsync(
+            reserved.Value!.InvoiceNumber,
+            "C:\\Invoices\\000001.pdf",
+            [lesson.Id],
+            CancellationToken.None);
+        var loadedLessons = await lessons.ListForStudentMonthAsync("Anna", new DateOnly(2026, 6, 1), CancellationToken.None);
+
+        Assert.True(finalized.Succeeded);
+        Assert.Equal(InvoiceIssueStatus.Issued, finalized.Value!.IssueStatus);
+        Assert.Equal(new InvoiceNumber(1), Assert.Single(loadedLessons).InvoiceNumber);
+        Assert.Null(await invoices.GetIssuingInvoiceAsync(new InvoiceNumber(1), CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task InvoiceFinalizationWithLessonLocksDoesNotIssueInvoiceWhenLessonAlreadyLocked()
+    {
+        using var database = await TestDatabase.CreateAsync();
+        var students = new SqliteStudentRepository(database.CreateContext);
+        var plans = new SqlitePlanCatalogRepository(database.CreateContext);
+        var lessons = new SqliteLessonRepository(database.CreateContext);
+        var invoices = new SqliteInvoiceRepository(database.CreateContext);
+        var plan = await SaveCatalogPlanAsync(plans, "Standard");
+        var student = await students.SaveAsync(
+            CreateStudentRecord("Anna", currentPlanId: plan.Id),
+            CancellationToken.None);
+        Assert.True(student.Succeeded);
+        var startsAt = new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.Zero);
+        var lesson = await lessons.SaveAsync(
+            new LessonRecord(
+                Id: 0,
+                StudentId: student.Value!.Id,
+                StudentShortName: "Anna",
+                PlanCatalogId: plan.Id,
+                PlanName: "Standard",
+                StartsAt: startsAt,
+                DurationMinutes: 60,
+                State: LessonState.Completed,
+                GoogleCalendarEventId: "calendar-event-1",
+                InvoiceNumber: new InvoiceNumber(99)),
+            CancellationToken.None);
+        var draft = CreateInvoiceDraft("Anna", "Anna Andersen", "Standard", startsAt, plan.Id, lessonId: lesson.Id);
+        var totals = new InvoiceTotals(Money.Dkk(400m), Money.Dkk(0m), Money.Dkk(400m));
+
+        var reserved = await invoices.ReserveInvoiceAsync(draft, totals, CancellationToken.None);
+        var finalized = await invoices.FinalizeIssuedInvoiceWithLessonLocksAsync(
+            reserved.Value!.InvoiceNumber,
+            "C:\\Invoices\\000001.pdf",
+            [lesson.Id],
+            CancellationToken.None);
+        var loadedLessons = await lessons.ListForStudentMonthAsync("Anna", new DateOnly(2026, 6, 1), CancellationToken.None);
+
+        Assert.False(finalized.Succeeded);
+        Assert.Contains(finalized.Errors, error => error.Code == "Invoice.LessonAlreadyInvoiced");
+        Assert.NotNull(await invoices.GetIssuingInvoiceAsync(new InvoiceNumber(1), CancellationToken.None));
+        Assert.Null(await invoices.GetIssuedInvoiceAsync(new InvoiceNumber(1), CancellationToken.None));
+        Assert.Equal(new InvoiceNumber(99), Assert.Single(loadedLessons).InvoiceNumber);
+    }
+
+    [Fact]
     public async Task ReleasedInvoiceReservationDoesNotConsumeInvoiceNumber()
     {
         using var database = await TestDatabase.CreateAsync();
         var repository = new SqliteInvoiceRepository(database.CreateContext);
-        var draft = CreateInvoiceDraft("Anna", "Anna Andersen", "Standard");
+        var plan = await SaveCatalogPlanAsync(new SqlitePlanCatalogRepository(database.CreateContext), "Standard");
+        var lessonDateTime = new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.Zero);
+        var lesson = await SaveLessonAsync(database, "Anna", plan, lessonDateTime);
+        var draft = CreateInvoiceDraft("Anna", "Anna Andersen", "Standard", lessonDateTime, plan.Id, lessonId: lesson.Id);
         var totals = new InvoiceTotals(Money.Dkk(400m), Money.Dkk(0m), Money.Dkk(400m));
 
         var reserved = await repository.ReserveInvoiceAsync(draft, totals, CancellationToken.None);
@@ -555,6 +666,126 @@ public sealed class SqlitePersistenceTests
     }
 
     [Fact]
+    public async Task IssuedInvoiceLineSchemaReferencesExactLesson()
+    {
+        using var database = await TestDatabase.CreateAsync();
+        await using var context = database.CreateContext();
+
+        var entityType = context.Model.FindEntityType(typeof(IssuedInvoiceLineEntity));
+        Assert.NotNull(entityType);
+        var lessonForeignKey = Assert.Single(
+            entityType.GetForeignKeys(),
+            foreignKey =>
+                foreignKey.PrincipalEntityType.ClrType == typeof(LessonEntity) &&
+                foreignKey.Properties.Select(property => property.Name).SequenceEqual(["LessonId"]));
+
+        Assert.False(lessonForeignKey.Properties.Single().IsNullable);
+        Assert.True(
+            lessonForeignKey.DeleteBehavior is DeleteBehavior.Restrict or DeleteBehavior.NoAction,
+            $"Expected restrictive delete behavior, but was {lessonForeignKey.DeleteBehavior}.");
+    }
+
+    [Fact]
+    public async Task IssuedInvoiceLineSchemaAllowsOneIssuedLinePerLesson()
+    {
+        using var database = await TestDatabase.CreateAsync();
+        await using var context = database.CreateContext();
+
+        var entityType = context.Model.FindEntityType(typeof(IssuedInvoiceLineEntity));
+        Assert.NotNull(entityType);
+
+        Assert.Contains(
+            entityType.GetIndexes(),
+            index =>
+                index.IsUnique &&
+                index.Properties.Select(property => property.Name).SequenceEqual(["LessonId"]));
+    }
+
+    [Fact]
+    public async Task IssuedInvoiceLineCannotReferenceMissingLesson()
+    {
+        using var database = await TestDatabase.CreateAsync();
+        var repository = new SqliteInvoiceRepository(database.CreateContext);
+        var invoice = CreateIssuedInvoice(
+            "Anna",
+            "Anna Andersen",
+            "Standard",
+            lessonId: 999);
+
+        await Assert.ThrowsAsync<DbUpdateException>(() =>
+            SaveIssuedInvoiceViaBusinessFlowAsync(repository, invoice, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task IssuedInvoiceLineCannotReuseLesson()
+    {
+        using var database = await TestDatabase.CreateAsync();
+        var students = new SqliteStudentRepository(database.CreateContext);
+        var plans = new SqlitePlanCatalogRepository(database.CreateContext);
+        var lessons = new SqliteLessonRepository(database.CreateContext);
+        var repository = new SqliteInvoiceRepository(database.CreateContext);
+        var plan = await SaveCatalogPlanAsync(plans, "Standard");
+        var student = await students.SaveAsync(CreateStudentRecord("Anna", currentPlanId: plan.Id), CancellationToken.None);
+        Assert.True(student.Succeeded);
+        var lesson = await lessons.SaveAsync(new LessonRecord(
+            Id: 0,
+            StudentId: student.Value!.Id,
+            StudentShortName: "Anna",
+            PlanCatalogId: plan.Id,
+            PlanName: "Standard",
+            StartsAt: new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.Zero),
+            DurationMinutes: 60,
+            State: LessonState.Completed,
+            GoogleCalendarEventId: "calendar-event-1",
+            InvoiceNumber: null),
+            CancellationToken.None);
+        var firstInvoice = CreateIssuedInvoice("Anna", "Anna Andersen", "Standard", lessonId: lesson.Id);
+        var secondInvoice = CreateIssuedInvoice("Anna", "Anna Andersen", "Standard", lessonId: lesson.Id, invoiceNumber: new InvoiceNumber(2));
+
+        var firstResult = await SaveIssuedInvoiceViaBusinessFlowAsync(repository, firstInvoice, CancellationToken.None);
+        Assert.True(firstResult.Succeeded);
+        await Assert.ThrowsAsync<DbUpdateException>(() =>
+            SaveIssuedInvoiceViaBusinessFlowAsync(repository, secondInvoice, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task IssuedInvoiceLinePreventsDeletingReferencedLesson()
+    {
+        using var database = await TestDatabase.CreateAsync();
+        var students = new SqliteStudentRepository(database.CreateContext);
+        var plans = new SqlitePlanCatalogRepository(database.CreateContext);
+        var lessons = new SqliteLessonRepository(database.CreateContext);
+        var repository = new SqliteInvoiceRepository(database.CreateContext);
+        var plan = await SaveCatalogPlanAsync(plans, "Standard");
+        var student = await students.SaveAsync(CreateStudentRecord("Anna", currentPlanId: plan.Id), CancellationToken.None);
+        Assert.True(student.Succeeded);
+        var lesson = await lessons.SaveAsync(new LessonRecord(
+            Id: 0,
+            StudentId: student.Value!.Id,
+            StudentShortName: "Anna",
+            PlanCatalogId: plan.Id,
+            PlanName: "Standard",
+            StartsAt: new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.Zero),
+            DurationMinutes: 60,
+            State: LessonState.Completed,
+            GoogleCalendarEventId: "calendar-event-1",
+            InvoiceNumber: null),
+            CancellationToken.None);
+        var invoice = CreateIssuedInvoice("Anna", "Anna Andersen", "Standard", lessonId: lesson.Id);
+        var result = await SaveIssuedInvoiceViaBusinessFlowAsync(repository, invoice, CancellationToken.None);
+        Assert.True(result.Succeeded);
+
+        await using var context = database.CreateContext();
+        var storedLesson = await context.Lessons.SingleAsync(
+            storedLesson => storedLesson.Id == lesson.Id,
+            TestContext.Current.CancellationToken);
+        context.Lessons.Remove(storedLesson);
+
+        await Assert.ThrowsAsync<DbUpdateException>(() =>
+            context.SaveChangesAsync(TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
     public async Task IssuedInvoiceSnapshotIsNotChangedByStudentOrPlanEdits()
     {
         using var database = await TestDatabase.CreateAsync();
@@ -566,11 +797,13 @@ public sealed class SqlitePersistenceTests
         var premium = await SaveCatalogPlanAsync(plans, "Premium");
 
         await students.SaveAsync(CreateStudentRecord("Anna", introPlanId: intro.Id, currentPlanId: standard.Id), CancellationToken.None);
-        await invoices.SaveIssuedInvoiceAsync(CreateIssuedInvoice(
+        var lesson = await SaveLessonAsync(database, "Anna", standard, new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.Zero));
+        await SaveIssuedInvoiceViaBusinessFlowAsync(invoices, CreateIssuedInvoice(
             "Anna",
             fullName: "Anna Andersen",
             planName: "Standard",
-            planCatalogId: standard.Id), CancellationToken.None);
+            planCatalogId: standard.Id,
+            lessonId: lesson.Id), CancellationToken.None);
         var loadedStudent = await students.GetByShortNameAsync("Anna", CancellationToken.None);
         Assert.NotNull(loadedStudent);
         var updatedStudent = CreateStudentRecord("Anna", fullName: "Anna Updated", introPlanId: intro.Id, currentPlanId: premium.Id, currentPlanName: "Premium") with
@@ -614,7 +847,8 @@ public sealed class SqlitePersistenceTests
                 GoogleCalendarEventId: "calendar-event-1",
                 InvoiceNumber: new InvoiceNumber(1)),
             CancellationToken.None);
-        await repository.SaveIssuedInvoiceAsync(
+        await SaveIssuedInvoiceViaBusinessFlowAsync(
+            repository,
             CreateIssuedInvoice("Anna", "Anna Andersen", "Standard", startsAt, standard.Id, lessonId: lesson.Id),
             CancellationToken.None);
 
@@ -736,14 +970,48 @@ public sealed class SqlitePersistenceTests
         DateTimeOffset? lessonDateTime = null,
         int planCatalogId = 7,
         InvoicePeriod? period = null,
-        int lessonId = 0)
+        int lessonId = 0,
+        InvoiceNumber? invoiceNumber = null)
     {
         var draft = CreateInvoiceDraft(studentShortName, fullName, planName, lessonDateTime, planCatalogId, period, lessonId);
 
         return draft.Issue(
-            new InvoiceNumber(1),
+            invoiceNumber ?? new InvoiceNumber(1),
             new InvoiceTotals(Money.Dkk(400m), Money.Dkk(0m), Money.Dkk(400m)),
             "C:\\Invoices\\000001.pdf");
+    }
+
+    private static async Task<OperationResult<IssuedInvoice>> SaveIssuedInvoiceViaBusinessFlowAsync(
+        SqliteInvoiceRepository repository,
+        IssuedInvoice invoice,
+        CancellationToken cancellationToken)
+    {
+        var draft = InvoiceDraft.Create(
+            invoice.InvoiceDate,
+            invoice.Company,
+            invoice.Student,
+            invoice.Lines
+                .Select(line => new InvoiceLineDraft(
+                    line.LessonDateTime,
+                    line.PlanName,
+                    line.PriceWithoutVat,
+                    line.PlanCatalogId,
+                    line.LessonId,
+                    line.HasKnownLessonTime))
+                .ToArray(),
+            priceAdjustment: null,
+            invoice.Period);
+        var reserved = await repository.ReserveInvoiceAsync(draft, invoice.Totals, cancellationToken);
+        if (!reserved.Succeeded)
+        {
+            return reserved;
+        }
+
+        return await repository.FinalizeIssuedInvoiceWithLessonLocksAsync(
+            reserved.Value!.InvoiceNumber,
+            invoice.PdfFilePath ?? "C:\\Invoices\\000001.pdf",
+            draft.Lines.Select(line => line.LessonId).ToArray(),
+            cancellationToken);
     }
 
     private static InvoiceDraft CreateInvoiceDraft(
@@ -788,6 +1056,40 @@ public sealed class SqlitePersistenceTests
         var result = await repository.SaveAsync(CreatePlanCatalogItem(name, PlanCatalogState.Active), CancellationToken.None);
         Assert.True(result.Succeeded);
         return result.Value!;
+    }
+
+    private static async Task<LessonRecord> SaveLessonAsync(
+        TestDatabase database,
+        string studentShortName,
+        PlanCatalogItem plan,
+        DateTimeOffset startsAt,
+        InvoiceNumber? invoiceNumber = null)
+    {
+        var students = new SqliteStudentRepository(database.CreateContext);
+        var lessons = new SqliteLessonRepository(database.CreateContext);
+        var student = await students.GetByShortNameAsync(studentShortName, CancellationToken.None);
+        if (student is null)
+        {
+            var savedStudent = await students.SaveAsync(
+                CreateStudentRecord(studentShortName, currentPlanId: plan.Id, currentPlanName: plan.Name),
+                CancellationToken.None);
+            Assert.True(savedStudent.Succeeded);
+            student = savedStudent.Value!;
+        }
+
+        return await lessons.SaveAsync(
+            new LessonRecord(
+                Id: 0,
+                StudentId: student.Id,
+                StudentShortName: studentShortName,
+                PlanCatalogId: plan.Id,
+                PlanName: plan.Name,
+                StartsAt: startsAt,
+                DurationMinutes: plan.DurationMinutes,
+                State: LessonState.Completed,
+                GoogleCalendarEventId: $"calendar-event-{Guid.NewGuid():N}",
+                InvoiceNumber: invoiceNumber),
+            CancellationToken.None);
     }
 
     private sealed class TestDatabase : IDisposable

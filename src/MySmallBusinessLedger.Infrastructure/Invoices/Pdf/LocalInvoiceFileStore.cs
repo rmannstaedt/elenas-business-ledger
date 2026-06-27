@@ -128,6 +128,34 @@ public sealed class LocalInvoiceFileStore : IInvoiceFileStore
         }
     }
 
+    public Task<OperationResult<string>> DiscardPublishedPathAsync(string publishedPath, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        try
+        {
+            var fullPublishedPath = Path.GetFullPath(publishedPath);
+            if (!IsInDirectory(fullPublishedPath, invoiceFolderPath) ||
+                IsInDirectory(fullPublishedPath, stagingFolderPath))
+            {
+                return Task.FromResult(Failure(
+                    "InvoicePdf.PublishedPathOutsideInvoiceDirectory",
+                    "The published invoice PDF path is outside the invoice folder."));
+            }
+
+            if (File.Exists(fullPublishedPath))
+            {
+                File.Delete(fullPublishedPath);
+            }
+
+            return Task.FromResult(OperationResult<string>.Success(fullPublishedPath));
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return Task.FromResult(Failure("InvoicePdf.PublishedDiscardFailed", "Could not delete the published invoice PDF."));
+        }
+    }
+
     private static string CreateFinalFileName(InvoiceDraft draft, InvoiceNumber invoiceNumber)
     {
         var period = SanitizeFileNamePart(FormatPeriod(draft.Period));

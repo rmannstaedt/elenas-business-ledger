@@ -10,20 +10,17 @@ public sealed class InvoicePreviewUseCase
 {
     private readonly IStudentRepository studentRepository;
     private readonly ICompanyProfileRepository companyProfileRepository;
-    private readonly IGoogleCalendarGateway calendarGateway;
-    private readonly ILessonRepository? lessonRepository;
-    private readonly IPlanCatalogRepository? planCatalogRepository;
+    private readonly ILessonRepository lessonRepository;
+    private readonly IPlanCatalogRepository planCatalogRepository;
 
     public InvoicePreviewUseCase(
         IStudentRepository studentRepository,
         ICompanyProfileRepository companyProfileRepository,
-        IGoogleCalendarGateway calendarGateway,
-        ILessonRepository? lessonRepository = null,
-        IPlanCatalogRepository? planCatalogRepository = null)
+        ILessonRepository lessonRepository,
+        IPlanCatalogRepository planCatalogRepository)
     {
         this.studentRepository = studentRepository;
         this.companyProfileRepository = companyProfileRepository;
-        this.calendarGateway = calendarGateway;
         this.lessonRepository = lessonRepository;
         this.planCatalogRepository = planCatalogRepository;
     }
@@ -44,65 +41,7 @@ public sealed class InvoicePreviewUseCase
         }
 
         var company = await companyProfileRepository.GetAsync(cancellationToken);
-        if (lessonRepository is not null && planCatalogRepository is not null)
-        {
-            return await CreateFromLocalLessonsAsync(student, company, invoiceDate, from, to, cancellationToken);
-        }
-
-        var lessons = await calendarGateway.ListLessonsAsync(from, to, cancellationToken);
-        var matchingLessons = lessons
-            .Where(lesson => lesson.StudentShortName == studentShortName)
-            .OrderBy(lesson => lesson.StartsAt)
-            .ToArray();
-        var errors = new List<ValidationError>();
-        var lines = new List<InvoiceLineDraft>();
-
-        foreach (var lesson in matchingLessons)
-        {
-            var plan = StudentPlanPeriod.GetActivePlan(student.PlanPeriods, DateOnly.FromDateTime(lesson.StartsAt.DateTime));
-            if (plan is null)
-            {
-                errors.Add(new ValidationError(
-                    "Invoice.NoActivePlanForLesson",
-                    $"No active plan was found for {studentShortName} on {lesson.StartsAt:yyyy-MM-dd}."));
-                continue;
-            }
-
-            lines.Add(new InvoiceLineDraft(
-                lesson.StartsAt,
-                plan.Name,
-                MoneyAmount.Dkk(plan.PriceWithoutVat),
-                plan.PlanCatalogId,
-                hasKnownLessonTime: lesson.HasKnownStartTime));
-        }
-
-        if (errors.Count > 0)
-        {
-            return OperationResult<InvoicePreviewResult>.Failure(errors.ToArray());
-        }
-
-        var draftResult = InvoiceDraft.TryCreate(
-            invoiceDate,
-            new CompanySnapshot(
-                company.Name,
-                company.Address,
-                company.Cvr,
-                company.PaymentInstructions,
-                company.BankRegistrationNumber,
-                company.BankAccountNumber,
-                company.MobilePayAccount),
-            new StudentSnapshot(student.Student.ShortName, student.Student.FullName, student.Student.Address),
-            lines.ToArray(),
-            priceAdjustment: null,
-            period: new InvoicePeriod(from, to));
-
-        if (!draftResult.Succeeded)
-        {
-            return OperationResult<InvoicePreviewResult>.Failure(draftResult.Errors.ToArray());
-        }
-
-        var draft = draftResult.Value!;
-        return OperationResult<InvoicePreviewResult>.Success(new InvoicePreviewResult(draft, draft.CalculateTotals(company)));
+        return await CreateFromLocalLessonsAsync(student, company, invoiceDate, from, to, cancellationToken);
     }
 
     private async Task<OperationResult<InvoicePreviewResult>> CreateFromLocalLessonsAsync(
@@ -114,7 +53,7 @@ public sealed class InvoicePreviewUseCase
         CancellationToken cancellationToken)
     {
         var month = new DateOnly(from.Year, from.Month, 1);
-        var lessons = await lessonRepository!.ListForStudentMonthAsync(student.Student.ShortName, month, cancellationToken);
+        var lessons = await lessonRepository.ListForStudentMonthAsync(student.Student.ShortName, month, cancellationToken);
         var matchingLessons = lessons
             .Where(lesson =>
             {
@@ -129,7 +68,7 @@ public sealed class InvoicePreviewUseCase
 
         foreach (var lesson in matchingLessons)
         {
-            var plan = await planCatalogRepository!.GetAsync(lesson.PlanCatalogId, cancellationToken);
+            var plan = await planCatalogRepository.GetAsync(lesson.PlanCatalogId, cancellationToken);
             if (plan?.PriceWithoutVat is null)
             {
                 errors.Add(new ValidationError(

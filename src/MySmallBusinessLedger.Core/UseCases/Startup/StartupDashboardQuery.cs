@@ -14,7 +14,7 @@ public sealed class StartupDashboardQuery
     private readonly IGoogleCalendarGateway calendarGateway;
     private readonly IInvoiceRepository invoiceRepository;
     private readonly IClock clock;
-    private readonly ILessonRepository? lessonRepository;
+    private readonly ILessonRepository lessonRepository;
     private readonly IPlanCatalogRepository? planCatalogRepository;
     private readonly TimeZoneInfo lessonTimeZone;
 
@@ -23,8 +23,8 @@ public sealed class StartupDashboardQuery
         IGoogleCalendarGateway calendarGateway,
         IInvoiceRepository invoiceRepository,
         IClock clock,
+        ILessonRepository lessonRepository,
         TimeZoneInfo? lessonTimeZone = null,
-        ILessonRepository? lessonRepository = null,
         IPlanCatalogRepository? planCatalogRepository = null)
     {
         this.studentRepository = studentRepository;
@@ -61,12 +61,7 @@ public sealed class StartupDashboardQuery
             .Where(status => status.LessonId > 0)
             .GroupBy(status => status.LessonId)
             .ToDictionary(group => group.Key, group => group.First());
-        var legacyStatusLookup = lessonStatuses.ToDictionary(
-            status => (status.StudentShortName, status.LessonDateTime),
-            status => status);
-        var localLessons = lessonRepository is null
-            ? []
-            : await lessonRepository.ListForWindowAsync(from, to, cancellationToken);
+        var localLessons = await lessonRepository.ListForWindowAsync(from, to, cancellationToken);
         var localByCalendarId = localLessons
             .Where(lesson => !string.IsNullOrWhiteSpace(lesson.GoogleCalendarEventId))
             .ToDictionary(lesson => lesson.GoogleCalendarEventId!, StringComparer.OrdinalIgnoreCase);
@@ -81,14 +76,10 @@ public sealed class StartupDashboardQuery
             }
 
             var localLesson = localByCalendarId.GetValueOrDefault(lesson.Id);
-            var invoiceStatus = lessonRepository is null
-                ? legacyStatusLookup.GetValueOrDefault((lesson.StudentShortName, lesson.StartsAt))
-                : localLesson is null
-                    ? null
-                    : statusByLessonId.GetValueOrDefault(localLesson.Id);
-            var dashboardLesson = lessonRepository is null
-                ? CreateLegacyDashboardLesson(lesson, invoiceStatus)
-                : await ReconcileCalendarLessonAsync(lesson, localLesson, invoiceStatus, students, cancellationToken);
+            var invoiceStatus = localLesson is null
+                ? null
+                : statusByLessonId.GetValueOrDefault(localLesson.Id);
+            var dashboardLesson = await ReconcileCalendarLessonAsync(lesson, localLesson, invoiceStatus, students, cancellationToken);
             dashboardLessons.Add(dashboardLesson);
 
             if (localLesson is not null)
@@ -97,27 +88,24 @@ public sealed class StartupDashboardQuery
             }
         }
 
-        if (lessonRepository is not null)
-        {
-            var currentCalendarLessonIds = knownCalendarLessons
-                .Select(lesson => lesson.Id)
-                .ToHashSet(StringComparer.OrdinalIgnoreCase);
-            var missingUninvoicedLocalLessonIds = localLessons
-                .Where(lesson => !statusByLessonId.ContainsKey(lesson.Id))
-                .Where(lesson => !string.IsNullOrWhiteSpace(lesson.GoogleCalendarEventId))
-                .Where(lesson => !currentCalendarLessonIds.Contains(lesson.GoogleCalendarEventId!))
-                .Select(lesson => lesson.Id)
-                .ToArray();
-            await lessonRepository.DeleteUninvoicedAsync(missingUninvoicedLocalLessonIds, cancellationToken);
+        var currentCalendarLessonIds = knownCalendarLessons
+            .Select(lesson => lesson.Id)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var missingUninvoicedLocalLessonIds = localLessons
+            .Where(lesson => !statusByLessonId.ContainsKey(lesson.Id))
+            .Where(lesson => !string.IsNullOrWhiteSpace(lesson.GoogleCalendarEventId))
+            .Where(lesson => !currentCalendarLessonIds.Contains(lesson.GoogleCalendarEventId!))
+            .Select(lesson => lesson.Id)
+            .ToArray();
+        await lessonRepository.DeleteUninvoicedAsync(missingUninvoicedLocalLessonIds, cancellationToken);
 
-            foreach (var localLesson in localLessons
-                .Where(lesson => statusByLessonId.ContainsKey(lesson.Id))
-                .Where(lesson => !representedLocalLessonIds.Contains(lesson.Id))
-                .Where(lesson => currentStudent is null || lesson.StudentShortName == currentStudent))
-            {
-                var invoiceStatus = statusByLessonId.GetValueOrDefault(localLesson.Id);
-                dashboardLessons.Add(CreateDashboardLesson(localLesson, invoiceStatus));
-            }
+        foreach (var localLesson in localLessons
+            .Where(lesson => statusByLessonId.ContainsKey(lesson.Id))
+            .Where(lesson => !representedLocalLessonIds.Contains(lesson.Id))
+            .Where(lesson => currentStudent is null || lesson.StudentShortName == currentStudent))
+        {
+            var invoiceStatus = statusByLessonId.GetValueOrDefault(localLesson.Id);
+            dashboardLessons.Add(CreateDashboardLesson(localLesson, invoiceStatus));
         }
 
         var lessons = dashboardLessons
@@ -147,33 +135,6 @@ public sealed class StartupDashboardQuery
                 planOptions));
     }
 
-    private static DashboardLesson CreateLegacyDashboardLesson(
-        CalendarLesson lesson,
-        InvoiceLessonStatus? invoiceStatus)
-    {
-        if (invoiceStatus is null)
-        {
-            return new DashboardLesson(
-                lesson.Id,
-                lesson.StudentShortName,
-                lesson.StartsAt,
-                lesson.State,
-                IsInvoiced: false,
-                PaymentStatus: null,
-                HasKnownStartTime: lesson.HasKnownStartTime);
-        }
-
-        return new DashboardLesson(
-            lesson.Id,
-            lesson.StudentShortName,
-            lesson.StartsAt,
-            LessonState.Completed,
-            IsInvoiced: true,
-            invoiceStatus.PaymentStatus,
-            invoiceStatus.InvoiceNumber,
-            HasKnownStartTime: lesson.HasKnownStartTime);
-    }
-
     private async Task<DashboardLesson> ReconcileCalendarLessonAsync(
         CalendarLesson calendarLesson,
         LessonRecord? localLesson,
@@ -193,7 +154,7 @@ public sealed class StartupDashboardQuery
                 }
                 : localLesson;
 
-        record = await lessonRepository!.SaveAsync(record, cancellationToken);
+        record = await lessonRepository.SaveAsync(record, cancellationToken);
 
         return CreateDashboardLesson(record, invoiceStatus);
     }

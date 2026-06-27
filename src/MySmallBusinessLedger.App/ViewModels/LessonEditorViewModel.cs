@@ -136,7 +136,7 @@ public sealed class LessonEditorViewModel : ViewModelBase
         try
         {
             var result = isNewLesson
-                ? await lessonEditorService.AddAsync(new LessonAddRequest(StudentShortName, startsAt), refreshMonth, CancellationToken.None)
+                ? await lessonEditorService.AddAsync(new LessonAddRequest(StudentShortName, startsAt, PlanCatalogId: 0), refreshMonth, CancellationToken.None)
                 : await lessonEditorService.EditAsync(new LessonEditRequest(lessonId!, StudentShortName, startsAt), refreshMonth, CancellationToken.None);
 
             if (!result.Succeeded)

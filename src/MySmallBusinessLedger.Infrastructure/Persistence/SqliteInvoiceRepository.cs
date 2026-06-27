@@ -116,27 +116,6 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
         return new InvoiceNumber((highest ?? 0) + 1);
     }
 
-    public async Task<OperationResult<IssuedInvoice>> SaveIssuedInvoiceAsync(
-        IssuedInvoice invoice,
-        CancellationToken cancellationToken)
-    {
-        await using var context = createContext();
-        var exists = await context.IssuedInvoices.AnyAsync(
-            storedInvoice => storedInvoice.InvoiceNumber == invoice.InvoiceNumber.Value,
-            cancellationToken);
-
-        if (exists)
-        {
-            return OperationResult<IssuedInvoice>.Failure(
-                invoice,
-                new ValidationError("Invoice.NumberAlreadyExists", "An issued invoice with this number already exists."));
-        }
-
-        context.IssuedInvoices.Add(ToEntity(invoice));
-        await context.SaveChangesAsync(cancellationToken);
-        return OperationResult<IssuedInvoice>.Success(invoice);
-    }
-
     public async Task<OperationResult<IssuedInvoice>> ReserveInvoiceAsync(
         InvoiceDraft draft,
         InvoiceTotals totals,
@@ -173,12 +152,20 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
         return OperationResult<IssuedInvoice>.Success(reservedInvoice);
     }
 
-    public async Task<OperationResult<IssuedInvoice>> FinalizeIssuedInvoiceAsync(
+    public async Task<OperationResult<IssuedInvoice>> FinalizeIssuedInvoiceWithLessonLocksAsync(
         InvoiceNumber invoiceNumber,
         string pdfFilePath,
+        IReadOnlyList<int> lessonIds,
         CancellationToken cancellationToken)
     {
+        var distinctLessonIds = lessonIds
+            .Where(lessonId => lessonId > 0)
+            .Distinct()
+            .Order()
+            .ToArray();
+
         await using var context = createContext();
+        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
         var invoice = await context.IssuedInvoices
             .Include(storedInvoice => storedInvoice.Lines)
             .SingleOrDefaultAsync(
@@ -193,9 +180,53 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
                 new ValidationError("Invoice.NotFound", "The reserved invoice could not be found."));
         }
 
+        var invoiceLineLessonIds = invoice.Lines
+            .Select(line => line.LessonId)
+            .Distinct()
+            .Order()
+            .ToArray();
+        if (invoiceLineLessonIds.Length == 0 ||
+            invoiceLineLessonIds.Any(lessonId => lessonId <= 0) ||
+            !invoiceLineLessonIds.SequenceEqual(distinctLessonIds))
+        {
+            return OperationResult<IssuedInvoice>.Failure(
+                new ValidationError(
+                    "Invoice.LessonIdentityMismatch",
+                    "The invoice lines do not match the lessons being locked."));
+        }
+
+        var lessons = await context.Lessons
+            .Where(lesson => distinctLessonIds.Contains(lesson.Id))
+            .ToArrayAsync(cancellationToken);
+        if (lessons.Length != distinctLessonIds.Length)
+        {
+            return OperationResult<IssuedInvoice>.Failure(
+                new ValidationError(
+                    "Invoice.LessonNotFound",
+                    "One or more invoice lessons could not be found."));
+        }
+
+        var alreadyLockedLesson = lessons.FirstOrDefault(lesson =>
+            lesson.InvoiceNumber is not null &&
+            lesson.InvoiceNumber != invoiceNumber.Value);
+        if (alreadyLockedLesson is not null)
+        {
+            return OperationResult<IssuedInvoice>.Failure(
+                new ValidationError(
+                    "Invoice.LessonAlreadyInvoiced",
+                    "One or more invoice lessons are already assigned to another invoice."));
+        }
+
         invoice.PdfFilePath = pdfFilePath;
         invoice.IssueStatus = InvoiceIssueStatus.Issued;
+        foreach (var lesson in lessons)
+        {
+            // Issued invoice lines are authoritative; this cache supports lock/display queries.
+            lesson.InvoiceNumber = invoiceNumber.Value;
+        }
+
         await context.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
 
         return OperationResult<IssuedInvoice>.Success(ToDomain(invoice));
     }

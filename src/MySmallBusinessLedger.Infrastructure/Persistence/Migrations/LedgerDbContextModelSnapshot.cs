@@ -271,7 +271,8 @@ namespace MySmallBusinessLedger.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("LessonDateTime");
 
-                    b.HasIndex("LessonId");
+                    b.HasIndex("LessonId")
+                        .IsUnique();
 
                     b.HasIndex("PlanCatalogId");
 
@@ -558,7 +559,15 @@ namespace MySmallBusinessLedger.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("MySmallBusinessLedger.Infrastructure.Persistence.LessonEntity", "Lesson")
+                        .WithMany()
+                        .HasForeignKey("LessonId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.Navigation("Invoice");
+
+                    b.Navigation("Lesson");
                 });
 
             modelBuilder.Entity("MySmallBusinessLedger.Infrastructure.Persistence.LessonEntity", b =>

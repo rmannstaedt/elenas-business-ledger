@@ -27,7 +27,9 @@ public sealed class InvoiceCalculationTests
                 new InvoiceLineDraft(
                     lessonDateTime: new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.Zero),
                     planName: "Tilbud 3",
-                    priceWithoutVat: Money.Dkk(400m))
+                    priceWithoutVat: Money.Dkk(400m),
+                    planCatalogId: 7,
+                    lessonId: 101)
             ],
             priceAdjustment: null);
 
@@ -59,7 +61,9 @@ public sealed class InvoiceCalculationTests
                 new InvoiceLineDraft(
                     lessonDateTime: new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.Zero),
                     planName: "Tilbud 3",
-                    priceWithoutVat: Money.Dkk(400m))
+                    priceWithoutVat: Money.Dkk(400m),
+                    planCatalogId: 7,
+                    lessonId: 101)
             ],
             priceAdjustment: null);
 
@@ -91,7 +95,9 @@ public sealed class InvoiceCalculationTests
                 new InvoiceLineDraft(
                     lessonDateTime: new DateTimeOffset(2026, 8, 3, 15, 0, 0, TimeSpan.Zero),
                     planName: "Tilbud 3",
-                    priceWithoutVat: Money.Dkk(400m))
+                    priceWithoutVat: Money.Dkk(400m),
+                    planCatalogId: 7,
+                    lessonId: 101)
             ],
             priceAdjustment: null,
             period: new InvoicePeriod(new DateOnly(2026, 8, 1), new DateOnly(2026, 8, 31)));

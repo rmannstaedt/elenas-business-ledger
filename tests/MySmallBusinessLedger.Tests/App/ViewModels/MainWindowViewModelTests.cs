@@ -1675,6 +1675,7 @@ public sealed class MainWindowViewModelTests
         await EventuallyAsync(() => lessonEditor.AddWasCalled);
         Assert.Equal("Anna", lessonEditor.LastAddRequest?.StudentShortName);
         Assert.Equal(new DateTimeOffset(2026, 6, 15, 14, 0, 0, TimeSpan.FromHours(2)), lessonEditor.LastAddRequest?.StartsAt);
+        Assert.Equal(42, lessonEditor.LastAddRequest?.PlanCatalogId);
         Assert.True(lessonEditor.LastAddRequest?.HasKnownStartTime == true);
         Assert.False(draft.IsDraft);
         await EventuallyAsync(() => viewModel.SelectedLesson?.Id == "new-lesson");
@@ -1743,6 +1744,7 @@ public sealed class MainWindowViewModelTests
         await EventuallyAsync(() => lessonEditor.AddWasCalled);
         Assert.Equal("Anna", lessonEditor.LastAddRequest?.StudentShortName);
         Assert.Equal(new DateTimeOffset(2026, 6, 15, 0, 0, 0, TimeSpan.FromHours(2)), lessonEditor.LastAddRequest?.StartsAt);
+        Assert.Equal(42, lessonEditor.LastAddRequest?.PlanCatalogId);
         Assert.True(lessonEditor.LastAddRequest?.HasKnownStartTime == false);
         await EventuallyAsync(() => viewModel.SelectedLesson?.Id == "new-lesson");
     }
@@ -1781,8 +1783,8 @@ public sealed class MainWindowViewModelTests
                     LessonState.Planned,
                     IsInvoiced: false,
                     PaymentStatus: null,
-                    PlanCatalogId: 42,
-                    PlanName: "Standard",
+                    PlanCatalogId: 77,
+                    PlanName: "Proevetime",
                     LocalLessonId: 19,
                     HasKnownStartTime: false)
             ]
@@ -1798,9 +1800,12 @@ public sealed class MainWindowViewModelTests
         draft.StartsOnDate = startsAt.Date;
         draft.PlanCatalogId = 77;
 
-        await EventuallyAsync(() => lessonEditor.LastPlanLessonId == 19);
+        await EventuallyAsync(() => lessonEditor.AddWasCalled);
         var lesson = Assert.Single(viewModel.Lessons, lesson => lesson.Id == "new-lesson");
         Assert.False(lesson.IsDraft);
+        Assert.Equal(77, lessonEditor.LastAddRequest?.PlanCatalogId);
+        Assert.Null(lessonEditor.LastPlanLessonId);
+        Assert.Null(lessonEditor.LastPlanCatalogId);
         Assert.Equal(77, lesson.PlanCatalogId);
         Assert.Equal("Proevetime", lesson.PlanName);
         Assert.Same(lesson, viewModel.SelectedLesson);
@@ -1829,8 +1834,8 @@ public sealed class MainWindowViewModelTests
                     LessonState.Planned,
                     IsInvoiced: false,
                     PaymentStatus: null,
-                    PlanCatalogId: 42,
-                    PlanName: "Standard",
+                    PlanCatalogId: 77,
+                    PlanName: "Proevetime",
                     LocalLessonId: 19,
                     HasKnownStartTime: false)
             ]
@@ -1846,8 +1851,10 @@ public sealed class MainWindowViewModelTests
         draft.PlanCatalogId = 77;
         draft.StartsOnDate = new DateTime(2026, 6, 15);
 
-        await EventuallyAsync(() => lessonEditor.LastPlanLessonId == 19);
-        Assert.Equal(77, lessonEditor.LastPlanCatalogId);
+        await EventuallyAsync(() => lessonEditor.AddWasCalled);
+        Assert.Equal(77, lessonEditor.LastAddRequest?.PlanCatalogId);
+        Assert.Null(lessonEditor.LastPlanLessonId);
+        Assert.Null(lessonEditor.LastPlanCatalogId);
         Assert.Equal("Proevetime", viewModel.SelectedLesson!.PlanName);
         Assert.False(viewModel.HasError);
     }
@@ -1888,6 +1895,7 @@ public sealed class MainWindowViewModelTests
         await EventuallyAsync(() => lessonEditor.AddWasCalled);
         Assert.Equal("Anna", lessonEditor.LastAddRequest?.StudentShortName);
         Assert.Equal(new DateTimeOffset(2026, 6, 15, 0, 0, 0, TimeSpan.FromHours(2)), lessonEditor.LastAddRequest?.StartsAt);
+        Assert.Equal(42, lessonEditor.LastAddRequest?.PlanCatalogId);
         Assert.True(lessonEditor.LastAddRequest?.HasKnownStartTime == false);
         await EventuallyAsync(() => viewModel.SelectedLesson?.Id == "new-lesson");
         var selectedLesson = viewModel.SelectedLesson!;

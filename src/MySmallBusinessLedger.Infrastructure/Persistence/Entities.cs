@@ -232,6 +232,8 @@ public sealed class IssuedInvoiceLineEntity
 
     public int LessonId { get; set; }
 
+    public LessonEntity Lesson { get; set; } = null!;
+
     public decimal PriceWithoutVatAmount { get; set; }
 
     public string Currency { get; set; } = "DKK";
