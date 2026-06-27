@@ -13,27 +13,39 @@ public sealed class EconomyOverviewQueryTests
     {
         var repository = new FakeInvoiceRepository
         {
-            OverviewRows =
-            [
-                new EconomyInvoiceRecord(
-                    new InvoiceNumber(2),
-                    new DateOnly(2027, 1, 5),
-                    new InvoicePeriod(new DateOnly(2026, 12, 1), new DateOnly(2026, 12, 31)),
-                    @"C:\Invoices\Invoice 002 December.pdf",
-                    new InvoiceTotals(MoneyAmount.Dkk(1000m), MoneyAmount.Dkk(250m), MoneyAmount.Dkk(1250m))),
-                new EconomyInvoiceRecord(
-                    new InvoiceNumber(1),
-                    new DateOnly(2026, 4, 30),
-                    new InvoicePeriod(new DateOnly(2026, 4, 1), new DateOnly(2026, 4, 30)),
-                    @"C:\Invoices\Invoice 001 April.pdf",
-                    new InvoiceTotals(MoneyAmount.Dkk(300m), MoneyAmount.Dkk(75m), MoneyAmount.Dkk(375m)))
-            ]
+            OverviewRowsByYear =
+            {
+                [2026] =
+                [
+                    new EconomyInvoiceRecord(
+                        new InvoiceNumber(2),
+                        new DateOnly(2027, 1, 5),
+                        new InvoicePeriod(new DateOnly(2026, 12, 1), new DateOnly(2026, 12, 31)),
+                        @"C:\Invoices\Invoice 002 December.pdf",
+                        new InvoiceTotals(MoneyAmount.Dkk(1000m), MoneyAmount.Dkk(250m), MoneyAmount.Dkk(1250m))),
+                    new EconomyInvoiceRecord(
+                        new InvoiceNumber(1),
+                        new DateOnly(2026, 4, 30),
+                        new InvoicePeriod(new DateOnly(2026, 4, 1), new DateOnly(2026, 4, 30)),
+                        @"C:\Invoices\Invoice 001 April.pdf",
+                        new InvoiceTotals(MoneyAmount.Dkk(300m), MoneyAmount.Dkk(75m), MoneyAmount.Dkk(375m)))
+                ],
+                [2025] =
+                [
+                    new EconomyInvoiceRecord(
+                        new InvoiceNumber(9),
+                        new DateOnly(2025, 6, 30),
+                        new InvoicePeriod(new DateOnly(2025, 6, 1), new DateOnly(2025, 6, 30)),
+                        @"C:\Invoices\Invoice 009 June.pdf",
+                        new InvoiceTotals(MoneyAmount.Dkk(2000m), MoneyAmount.Dkk(500m), MoneyAmount.Dkk(2500m)))
+                ]
+            }
         };
         var query = new EconomyOverviewQuery(repository);
 
         var overview = await query.LoadAsync(2026, CancellationToken.None);
 
-        Assert.Equal(2026, repository.RequestedYear);
+        Assert.Equal([2026, 2025, 2024, 2023, 2022], repository.RequestedYears);
         Assert.Equal(2026, overview.Year);
         Assert.Equal([1, 2], overview.Invoices.Select(invoice => invoice.InvoiceNumber.Value).ToArray());
         Assert.Equal("Invoice 002 December.pdf", overview.Invoices[1].PdfFileName);
@@ -77,20 +89,40 @@ public sealed class EconomyOverviewQueryTests
         Assert.Equal(MoneyAmount.Dkk(1300m), overview.YearToDate.Net);
         Assert.Equal(MoneyAmount.Dkk(325m), overview.YearToDate.Vat);
         Assert.Equal(MoneyAmount.Dkk(1625m), overview.YearToDate.Total);
+
+        Assert.Equal(5, overview.Years.Count);
+        Assert.Equal([2026, 2025, 2024, 2023, 2022], overview.Years.Select(year => year.Year).ToArray());
+        var currentYear = Assert.Single(overview.Years, year => year.Year == 2026);
+        Assert.True(currentYear.HasInvoices);
+        Assert.Equal(MoneyAmount.Dkk(1300m), currentYear.Net);
+        Assert.Equal(MoneyAmount.Dkk(325m), currentYear.Vat);
+        Assert.Equal(MoneyAmount.Dkk(1625m), currentYear.Total);
+
+        var previousYear = Assert.Single(overview.Years, year => year.Year == 2025);
+        Assert.True(previousYear.HasInvoices);
+        Assert.Equal(MoneyAmount.Dkk(2000m), previousYear.Net);
+        Assert.Equal(MoneyAmount.Dkk(500m), previousYear.Vat);
+        Assert.Equal(MoneyAmount.Dkk(2500m), previousYear.Total);
+
+        var emptyYear = Assert.Single(overview.Years, year => year.Year == 2024);
+        Assert.False(emptyYear.HasInvoices);
+        Assert.Null(emptyYear.Net);
+        Assert.Null(emptyYear.Vat);
+        Assert.Null(emptyYear.Total);
     }
 
     private sealed class FakeInvoiceRepository : IInvoiceRepository
     {
-        public IReadOnlyList<EconomyInvoiceRecord> OverviewRows { get; init; } = [];
+        public Dictionary<int, IReadOnlyList<EconomyInvoiceRecord>> OverviewRowsByYear { get; } = [];
 
-        public int? RequestedYear { get; private set; }
+        public List<int> RequestedYears { get; } = [];
 
         public Task<IReadOnlyList<EconomyInvoiceRecord>> ListIssuedInvoiceOverviewRowsAsync(
             int periodYear,
             CancellationToken cancellationToken)
         {
-            RequestedYear = periodYear;
-            return Task.FromResult(OverviewRows);
+            RequestedYears.Add(periodYear);
+            return Task.FromResult(OverviewRowsByYear.TryGetValue(periodYear, out var rows) ? rows : []);
         }
 
         public Task<IReadOnlyList<InvoiceLessonStatus>> ListLessonStatusesAsync(

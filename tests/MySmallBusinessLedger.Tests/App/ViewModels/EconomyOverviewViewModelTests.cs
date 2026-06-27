@@ -28,7 +28,10 @@ public sealed class EconomyOverviewViewModelTests
         Assert.Equal("1.000,00 DKK", viewModel.Invoices[0].NetText);
         Assert.Equal(12, viewModel.Months.Count);
         Assert.Equal(4, viewModel.Quarters.Count);
-        Assert.Equal("1.250,00 DKK", viewModel.YearToDateTotalText);
+        Assert.Equal(5, viewModel.Years.Count);
+        Assert.Equal(["2026", "2025", "2024", "2023", "2022"], viewModel.Years.Select(year => year.Label).ToArray());
+        Assert.Equal("1.250,00 DKK", viewModel.Years[0].TotalText);
+        Assert.Equal(string.Empty, viewModel.Years[4].TotalText);
     }
 
     [Fact]
@@ -114,7 +117,17 @@ public sealed class EconomyOverviewViewModelTests
             new EconomyOverviewYearToDateTotal(
                 MoneyAmount.Dkk(1000m),
                 MoneyAmount.Dkk(250m),
-                MoneyAmount.Dkk(1250m)));
+                MoneyAmount.Dkk(1250m)),
+            Enumerable.Range(0, 5)
+                .Select(offset => offset == 0
+                    ? new EconomyOverviewYearTotal(
+                        year - offset,
+                        HasInvoices: true,
+                        MoneyAmount.Dkk(1000m),
+                        MoneyAmount.Dkk(250m),
+                        MoneyAmount.Dkk(1250m))
+                    : new EconomyOverviewYearTotal(year - offset, HasInvoices: false, null, null, null))
+                .ToArray());
 
     private sealed class FakeEconomyOverviewService : IEconomyOverviewService
     {

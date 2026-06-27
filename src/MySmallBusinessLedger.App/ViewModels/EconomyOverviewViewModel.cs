@@ -55,6 +55,8 @@ public sealed class EconomyOverviewViewModel : ViewModelBase
 
     public ObservableCollection<EconomyOverviewPeriodTotalDisplayModel> Quarters { get; } = [];
 
+    public ObservableCollection<EconomyOverviewPeriodTotalDisplayModel> Years { get; } = [];
+
     public int Year
     {
         get => year;
@@ -212,6 +214,13 @@ public sealed class EconomyOverviewViewModel : ViewModelBase
                 quarter.Net,
                 quarter.Vat,
                 quarter.Total)).ToArray());
+        Replace(
+            Years,
+            overview.Years.Select(year => new EconomyOverviewPeriodTotalDisplayModel(
+                year.Year.ToString(CultureInfo.InvariantCulture),
+                year.Net,
+                year.Vat,
+                year.Total)).ToArray());
         YearToDateNetText = FormatMoney(overview.YearToDate.Net);
         YearToDateVatText = FormatMoney(overview.YearToDate.Vat);
         YearToDateTotalText = FormatMoney(overview.YearToDate.Total);

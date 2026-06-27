@@ -8,7 +8,8 @@ public sealed record EconomyOverview(
     IReadOnlyList<EconomyOverviewInvoiceRow> Invoices,
     IReadOnlyList<EconomyOverviewMonthTotal> Months,
     IReadOnlyList<EconomyOverviewQuarterTotal> Quarters,
-    EconomyOverviewYearToDateTotal YearToDate);
+    EconomyOverviewYearToDateTotal YearToDate,
+    IReadOnlyList<EconomyOverviewYearTotal> Years);
 
 public sealed record EconomyOverviewInvoiceRow(
     InvoiceNumber InvoiceNumber,
@@ -38,3 +39,10 @@ public sealed record EconomyOverviewYearToDateTotal(
     MoneyAmount Net,
     MoneyAmount Vat,
     MoneyAmount Total);
+
+public sealed record EconomyOverviewYearTotal(
+    int Year,
+    bool HasInvoices,
+    MoneyAmount? Net,
+    MoneyAmount? Vat,
+    MoneyAmount? Total);

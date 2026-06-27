@@ -15,11 +15,23 @@ public sealed class EconomyOverviewQuery
 
     public async Task<EconomyOverview> LoadAsync(int year, CancellationToken cancellationToken)
     {
-        var records = await invoiceRepository.ListIssuedInvoiceOverviewRowsAsync(year, cancellationToken);
-        var orderedRecords = records
-            .OrderBy(record => record.InvoiceNumber.Value)
-            .ToArray();
-        var invoices = orderedRecords
+        var years = new List<EconomyOverviewYearTotal>();
+        IReadOnlyList<EconomyInvoiceRecord> currentYearRecords = [];
+        for (var offset = 0; offset < 5; offset++)
+        {
+            var summaryYear = year - offset;
+            var records = await invoiceRepository.ListIssuedInvoiceOverviewRowsAsync(summaryYear, cancellationToken);
+            var orderedYearRecords = records
+                .OrderBy(record => record.InvoiceNumber.Value)
+                .ToArray();
+            years.Add(CreateYearTotal(summaryYear, orderedYearRecords));
+            if (offset == 0)
+            {
+                currentYearRecords = orderedYearRecords;
+            }
+        }
+
+        var invoices = currentYearRecords
             .Select(record => new EconomyOverviewInvoiceRow(
                 record.InvoiceNumber,
                 record.InvoiceDate,
@@ -33,16 +45,16 @@ public sealed class EconomyOverviewQuery
         var months = Enumerable.Range(1, 12)
             .Select(month => CreateMonthTotal(
                 month,
-                orderedRecords.Where(record => record.Period.From.Month == month).ToArray()))
+                currentYearRecords.Where(record => record.Period.From.Month == month).ToArray()))
             .ToArray();
         var quarters = Enumerable.Range(1, 4)
             .Select(quarter => CreateQuarterTotal(
                 quarter,
-                orderedRecords.Where(record => GetQuarter(record.Period.From.Month) == quarter).ToArray()))
+                currentYearRecords.Where(record => GetQuarter(record.Period.From.Month) == quarter).ToArray()))
             .ToArray();
-        var yearToDate = CreateYearToDateTotal(orderedRecords);
+        var yearToDate = CreateYearToDateTotal(currentYearRecords);
 
-        return new EconomyOverview(year, invoices, months, quarters, yearToDate);
+        return new EconomyOverview(year, invoices, months, quarters, yearToDate, years);
     }
 
     private static EconomyOverviewMonthTotal CreateMonthTotal(int month, IReadOnlyList<EconomyInvoiceRecord> records)
@@ -73,6 +85,17 @@ public sealed class EconomyOverviewQuery
         return totals is null
             ? new EconomyOverviewYearToDateTotal(MoneyAmount.Dkk(0m), MoneyAmount.Dkk(0m), MoneyAmount.Dkk(0m))
             : new EconomyOverviewYearToDateTotal(totals.Net, totals.Vat, totals.Total);
+    }
+
+    private static EconomyOverviewYearTotal CreateYearTotal(int year, IReadOnlyList<EconomyInvoiceRecord> records)
+    {
+        var totals = Sum(records);
+        return new EconomyOverviewYearTotal(
+            year,
+            records.Count > 0,
+            totals?.Net,
+            totals?.Vat,
+            totals?.Total);
     }
 
     private static EconomyOverviewYearToDateTotal? Sum(IReadOnlyList<EconomyInvoiceRecord> records)

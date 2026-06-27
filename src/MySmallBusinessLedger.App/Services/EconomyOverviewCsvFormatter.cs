@@ -47,17 +47,17 @@ public sealed class EconomyOverviewCsvFormatter
             FormatNullableMoney(quarter.Vat),
             FormatNullableMoney(quarter.Total)
         }));
-        rows.Add(new[]
+        rows.AddRange(overview.Years.Select(year => new[]
         {
-            "YearToDate",
-            overview.Year.ToString(CultureInfo.InvariantCulture),
-            "YTD",
+            "Year",
+            year.Year.ToString(CultureInfo.InvariantCulture),
+            year.Year.ToString(CultureInfo.InvariantCulture),
             string.Empty,
             string.Empty,
-            FormatMoney(overview.YearToDate.Net),
-            FormatMoney(overview.YearToDate.Vat),
-            FormatMoney(overview.YearToDate.Total)
-        });
+            FormatNullableMoney(year.Net),
+            FormatNullableMoney(year.Vat),
+            FormatNullableMoney(year.Total)
+        }));
 
         var builder = new StringBuilder();
         for (var index = 0; index < rows.Count; index++)

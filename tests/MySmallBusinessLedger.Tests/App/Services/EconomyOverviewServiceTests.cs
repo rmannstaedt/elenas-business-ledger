@@ -61,7 +61,19 @@ public sealed class EconomyOverviewServiceTests
             new EconomyOverviewYearToDateTotal(
                 MoneyAmount.Dkk(1234.5m),
                 MoneyAmount.Dkk(308.63m),
-                MoneyAmount.Dkk(1543.13m)));
+                MoneyAmount.Dkk(1543.13m)),
+            [
+                new EconomyOverviewYearTotal(
+                    2026,
+                    HasInvoices: true,
+                    MoneyAmount.Dkk(1234.5m),
+                    MoneyAmount.Dkk(308.63m),
+                    MoneyAmount.Dkk(1543.13m)),
+                new EconomyOverviewYearTotal(2025, HasInvoices: false, null, null, null),
+                new EconomyOverviewYearTotal(2024, HasInvoices: false, null, null, null),
+                new EconomyOverviewYearTotal(2023, HasInvoices: false, null, null, null),
+                new EconomyOverviewYearTotal(2022, HasInvoices: false, null, null, null)
+            ]);
 
         var csv = formatter.Format(overview);
 
@@ -87,7 +99,11 @@ public sealed class EconomyOverviewServiceTests
                     "Quarter,2026,Q2,,,1234.50,308.63,1543.13",
                     "Quarter,2026,Q3,,,,,",
                     "Quarter,2026,Q4,,,,,",
-                    "YearToDate,2026,YTD,,,1234.50,308.63,1543.13"
+                    "Year,2026,2026,,,1234.50,308.63,1543.13",
+                    "Year,2025,2025,,,,,",
+                    "Year,2024,2024,,,,,",
+                    "Year,2023,2023,,,,,",
+                    "Year,2022,2022,,,,,"
                 ]),
             csv);
     }
