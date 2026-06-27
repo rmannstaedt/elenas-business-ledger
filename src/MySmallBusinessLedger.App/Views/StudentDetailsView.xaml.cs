@@ -14,8 +14,7 @@ public partial class StudentDetailsView : Window
     {
         InitializeComponent();
         DataContext = viewModel;
-        WindowPlacementStore.Attach(this, nameof(StudentDetailsView));
-        DataGridColumnWidthStore.Attach(InvoicesGrid, nameof(StudentDetailsView) + ".InvoicesGrid");
+        WindowPlacementStore.Attach(this, nameof(StudentDetailsView), rememberSize: false);
         Closing += OnClosing;
     }
 

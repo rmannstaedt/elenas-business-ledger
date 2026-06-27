@@ -39,17 +39,17 @@ public sealed class StudentOverviewWindowLauncherTests
                 try
                 {
                     var overviewWindow = Assert.Single(VisibleWindows<StudentOverviewView>());
-                    var firstDetailsWindow = Assert.Single(VisibleWindows<StudentDetailsView>());
+                    var viewModel = Assert.IsType<StudentOverviewViewModel>(overviewWindow.DataContext);
+                    var firstDetailsWindow = Assert.Single(VisibleDetailsWindowsFor(viewModel));
 
                     firstDetailsWindow.Close();
                     await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
-                    Assert.Empty(VisibleWindows<StudentDetailsView>());
+                    Assert.Empty(VisibleDetailsWindowsFor(viewModel));
 
-                    var viewModel = Assert.IsType<StudentOverviewViewModel>(overviewWindow.DataContext);
                     await viewModel.SelectStudentAsync(viewModel.Students.Single(student => student.ShortName == "Bo"));
                     await Dispatcher.Yield(DispatcherPriority.ApplicationIdle);
 
-                    var reopenedDetailsWindow = Assert.Single(VisibleWindows<StudentDetailsView>());
+                    var reopenedDetailsWindow = Assert.Single(VisibleDetailsWindowsFor(viewModel));
                     Assert.NotSame(firstDetailsWindow, reopenedDetailsWindow);
                     Assert.Same(viewModel, reopenedDetailsWindow.DataContext);
                     Assert.Equal("Bo", viewModel.SelectedStudent?.ShortName);
@@ -81,12 +81,21 @@ public sealed class StudentOverviewWindowLauncherTests
     }
 
     private static IReadOnlyList<TWindow> VisibleWindows<TWindow>()
-        where TWindow : Window =>
-        PresentationSource.CurrentSources
+        where TWindow : Window
+    {
+        var dispatcher = Dispatcher.CurrentDispatcher;
+        return PresentationSource.CurrentSources
             .OfType<HwndSource>()
             .Select(source => source.RootVisual)
             .OfType<TWindow>()
+            .Where(window => ReferenceEquals(window.Dispatcher, dispatcher))
             .Where(window => window.IsVisible)
+            .ToArray();
+    }
+
+    private static IReadOnlyList<StudentDetailsView> VisibleDetailsWindowsFor(StudentOverviewViewModel viewModel) =>
+        VisibleWindows<StudentDetailsView>()
+            .Where(window => ReferenceEquals(window.DataContext, viewModel))
             .ToArray();
 
     private static StudentOverviewSnapshot CreateSnapshot(string shortName)

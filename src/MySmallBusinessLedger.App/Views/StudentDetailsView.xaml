@@ -3,10 +3,11 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:primitives="clr-namespace:System.Windows.Controls.Primitives;assembly=PresentationFramework"
         Title="Student Details"
-        Height="680"
-        Width="1030"
-        MinHeight="500"
-        MinWidth="850">
+        Height="735"
+        Width="1080"
+        MinHeight="735"
+        MinWidth="1080"
+        ResizeMode="CanMinimize">
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
         <Style x:Key="PaneHeaderStyle" TargetType="TextBlock">
@@ -21,13 +22,24 @@
             <Setter Property="Margin" Value="0,0,0,2" />
         </Style>
         <Style x:Key="FieldInputStyle" TargetType="Control">
+            <Setter Property="Height" Value="24" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
             <Setter Property="Margin" Value="0,3,0,8" />
         </Style>
         <Style x:Key="PlanDetailTextStyle" TargetType="TextBlock">
             <Setter Property="Visibility"
                     Value="{Binding HasSelectedPlan, Converter={StaticResource BooleanToVisibilityConverter}}" />
         </Style>
+        <Style x:Key="PlanDetailLabelStyle" TargetType="TextBlock" BasedOn="{StaticResource PlanDetailTextStyle}">
+            <Setter Property="Margin" Value="0,0,0,2" />
+        </Style>
+        <Style x:Key="PlanDetailValueTextStyle" TargetType="TextBlock" BasedOn="{StaticResource PlanDetailTextStyle}">
+            <Setter Property="LineHeight" Value="24" />
+            <Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
+            <Setter Property="Margin" Value="0,3,0,8" />
+        </Style>
         <Style x:Key="PlanDetailDatePickerStyle" TargetType="DatePicker">
+            <Setter Property="Height" Value="24" />
             <Setter Property="Visibility"
                     Value="{Binding HasSelectedPlan, Converter={StaticResource BooleanToVisibilityConverter}}" />
             <Setter Property="Margin" Value="0,3,0,8" />
@@ -41,11 +53,12 @@
         </Grid.RowDefinitions>
 
         <Grid x:Name="StudentDetailsOuterColumns"
-              Grid.Row="0">
+              Grid.Row="0"
+              HorizontalAlignment="Left">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="8" />
-                <ColumnDefinition Width="360" MinWidth="260" />
+                <ColumnDefinition Width="550" />
+                <ColumnDefinition Width="18" />
+                <ColumnDefinition Width="432" />
             </Grid.ColumnDefinitions>
 
             <Grid x:Name="StudentDetailsColumns"
@@ -54,7 +67,7 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="252" />
                     <ColumnDefinition Width="18" />
-                    <ColumnDefinition Width="252" />
+                    <ColumnDefinition Width="280" />
                 </Grid.ColumnDefinitions>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" />
@@ -80,8 +93,17 @@
                 <ScrollViewer Grid.Row="2"
                               Grid.ColumnSpan="3"
                               VerticalScrollBarVisibility="Auto">
-                    <Grid DataContext="{Binding SelectedStudentEditor}">
+                    <Grid x:Name="StudentDetailsFieldsGrid"
+                          DataContext="{Binding SelectedStudentEditor}">
                         <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
                             <RowDefinition Height="Auto" />
@@ -89,7 +111,7 @@
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="252" />
                             <ColumnDefinition Width="18" />
-                            <ColumnDefinition Width="252" />
+                            <ColumnDefinition Width="280" />
                         </Grid.ColumnDefinitions>
 
                         <StackPanel Grid.Row="0"
@@ -97,46 +119,55 @@
                             <TextBlock Text="Short name" Style="{StaticResource FieldLabelStyle}" />
                             <TextBox Text="{Binding ShortName, UpdateSourceTrigger=PropertyChanged}"
                                      Style="{StaticResource FieldInputStyle}" />
+                        </StackPanel>
+                        <StackPanel Grid.Row="1"
+                                    Grid.Column="0">
                             <TextBlock Text="Full name" Style="{StaticResource FieldLabelStyle}" />
                             <TextBox Text="{Binding FullName, UpdateSourceTrigger=PropertyChanged}"
                                      Style="{StaticResource FieldInputStyle}" />
+                        </StackPanel>
+                        <StackPanel Grid.Row="2"
+                                    Grid.Column="0">
                             <TextBlock Text="Address" Style="{StaticResource FieldLabelStyle}" />
                             <TextBox Text="{Binding Address, UpdateSourceTrigger=PropertyChanged}"
+                                     Style="{StaticResource FieldInputStyle}"
                                      Margin="0,3,0,4" />
+                        </StackPanel>
+                        <StackPanel Grid.Row="3"
+                                    Grid.Column="0">
                             <TextBox Text="{Binding AddressLine2, UpdateSourceTrigger=PropertyChanged}"
                                      Style="{StaticResource FieldInputStyle}" />
+                        </StackPanel>
+                        <StackPanel Grid.Row="4"
+                                    Grid.Column="0">
                             <TextBlock Text="Phone" Style="{StaticResource FieldLabelStyle}" />
                             <TextBox Text="{Binding Phone, UpdateSourceTrigger=PropertyChanged}"
                                      Style="{StaticResource FieldInputStyle}" />
+                        </StackPanel>
+                        <StackPanel Grid.Row="5"
+                                    Grid.Column="0">
                             <TextBlock Text="Email" Style="{StaticResource FieldLabelStyle}" />
                             <TextBox Text="{Binding Email, UpdateSourceTrigger=PropertyChanged}"
                                      Style="{StaticResource FieldInputStyle}" />
+                        </StackPanel>
+                        <StackPanel Grid.Row="6"
+                                    Grid.Column="0">
                             <TextBlock Text="Age bracket" Style="{StaticResource FieldLabelStyle}" />
                             <ComboBox ItemsSource="{Binding AgeBracketOptions}"
                                       SelectedItem="{Binding AgeBracket}"
                                       Style="{StaticResource FieldInputStyle}" />
+                        </StackPanel>
+                        <StackPanel Grid.Row="7"
+                                    Grid.Column="0">
                             <TextBlock Text="Birthdate" Style="{StaticResource FieldLabelStyle}" />
                             <DatePicker SelectedDate="{Binding BirthdateDate, UpdateSourceTrigger=PropertyChanged}"
                                         Style="{StaticResource FieldInputStyle}" />
+                        </StackPanel>
+                        <StackPanel Grid.Row="8"
+                                    Grid.Column="0">
                             <CheckBox Content="Active"
                                       IsChecked="{Binding IsActive}"
                                       Margin="0,4,0,0" />
-                        </StackPanel>
-
-                        <StackPanel x:Name="StudentEditorActions"
-                                    Grid.Row="1"
-                                    Grid.Column="0"
-                                    Orientation="Horizontal"
-                                    Margin="0,8,0,0">
-                            <Button Content="Save"
-                                    Command="{Binding DataContext.SaveStudentCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                    MinWidth="84"
-                                    Height="30"
-                                    Margin="0,0,8,0" />
-                            <Button Content="Cancel"
-                                    Command="{Binding DataContext.CancelStudentEditCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                    MinWidth="84"
-                                    Height="30" />
                         </StackPanel>
 
                         <StackPanel Grid.Row="0"
@@ -146,42 +177,69 @@
                                       SelectedItem="{Binding SelectedAssignablePlan, UpdateSourceTrigger=PropertyChanged}"
                                       DisplayMemberPath="Name"
                                       IsEnabled="{Binding HasAssignablePlans}"
+                                      Height="24"
+                                      VerticalContentAlignment="Center"
                                       Margin="0,3,0,12" />
                             <TextBlock Text="No active plans are available."
                                        Foreground="#555555"
                                        Margin="0,0,0,8"
                                        Visibility="{Binding HasNoAssignablePlans, Converter={StaticResource BooleanToVisibilityConverter}}" />
-
-                            <TextBlock Text="Price without VAT:" Style="{StaticResource PlanDetailTextStyle}" />
+                        </StackPanel>
+                        <StackPanel x:Name="PlanPriceWithoutVatGroup"
+                                    Grid.Row="1"
+                                    Grid.Column="2">
+                            <TextBlock Text="Price without VAT:" Style="{StaticResource PlanDetailLabelStyle}" />
                             <TextBlock Text="{Binding PlanPriceWithoutVatText}"
-                                       Margin="0,3,0,8"
-                                       Style="{StaticResource PlanDetailTextStyle}" />
-                            <TextBlock Text="Lessons:" Style="{StaticResource PlanDetailTextStyle}" />
+                                       Style="{StaticResource PlanDetailValueTextStyle}" />
+                        </StackPanel>
+                        <StackPanel x:Name="PlanLessonsGroup"
+                                    Grid.Row="2"
+                                    Grid.Column="2">
+                            <TextBlock Text="Lessons:" Style="{StaticResource PlanDetailLabelStyle}" />
                             <TextBlock Text="{Binding LessonsPerWeekText}"
-                                       Margin="0,3,0,8"
-                                       Style="{StaticResource PlanDetailTextStyle}" />
-                            <TextBlock Text="Duration:" Style="{StaticResource PlanDetailTextStyle}" />
+                                       Style="{StaticResource PlanDetailValueTextStyle}" />
+                        </StackPanel>
+                        <StackPanel x:Name="PlanDurationGroup"
+                                    Grid.Row="3"
+                                    Grid.Column="2">
+                            <TextBlock Text="Duration:" Style="{StaticResource PlanDetailLabelStyle}" />
                             <TextBlock Text="{Binding PlanDurationMinutesText}"
-                                       Margin="0,3,0,8"
-                                       Style="{StaticResource PlanDetailTextStyle}" />
-                            <TextBlock Text="Number of students:" Style="{StaticResource PlanDetailTextStyle}" />
+                                       Style="{StaticResource PlanDetailValueTextStyle}" />
+                        </StackPanel>
+                        <StackPanel x:Name="PlanNumberOfStudentsGroup"
+                                    Grid.Row="4"
+                                    Grid.Column="2">
+                            <TextBlock Text="Number of students:" Style="{StaticResource PlanDetailLabelStyle}" />
                             <TextBlock Text="{Binding PlanNumberOfStudentsText}"
-                                       Margin="0,3,0,8"
-                                       Style="{StaticResource PlanDetailTextStyle}" />
-                            <TextBlock Text="Flexibility:" Style="{StaticResource PlanDetailTextStyle}" />
+                                       Style="{StaticResource PlanDetailValueTextStyle}" />
+                        </StackPanel>
+                        <StackPanel x:Name="PlanFlexibilityGroup"
+                                    Grid.Row="5"
+                                    Grid.Column="2">
+                            <TextBlock Text="Flexibility:" Style="{StaticResource PlanDetailLabelStyle}" />
                             <TextBlock Text="{Binding PlanFlexibilityText}"
-                                       Margin="0,3,0,8"
-                                       Style="{StaticResource PlanDetailTextStyle}" />
-                            <TextBlock Text="Payment terms:" Style="{StaticResource PlanDetailTextStyle}" />
+                                       Style="{StaticResource PlanDetailValueTextStyle}" />
+                        </StackPanel>
+                        <StackPanel x:Name="PlanPaymentTermsGroup"
+                                    Grid.Row="6"
+                                    Grid.Column="2">
+                            <TextBlock Text="Payment terms:" Style="{StaticResource PlanDetailLabelStyle}" />
                             <TextBlock Text="{Binding PlanPaymentTerms}"
-                                       Margin="0,3,0,8"
-                                       Style="{StaticResource PlanDetailTextStyle}" />
-                            <TextBlock Text="Starts on" Style="{StaticResource PlanDetailTextStyle}" />
+                                       Style="{StaticResource PlanDetailValueTextStyle}" />
+                        </StackPanel>
+                        <StackPanel x:Name="PlanStartsOnGroup"
+                                    Grid.Row="7"
+                                    Grid.Column="2">
+                            <TextBlock Text="Starts on" Style="{StaticResource PlanDetailLabelStyle}" />
                             <DatePicker SelectedDate="{Binding PlanStartsOnDate, UpdateSourceTrigger=PropertyChanged}"
                                         Width="132"
                                         HorizontalAlignment="Left"
                                         Style="{StaticResource PlanDetailDatePickerStyle}" />
-                            <TextBlock Text="Ends on" Style="{StaticResource PlanDetailTextStyle}" />
+                        </StackPanel>
+                        <StackPanel x:Name="PlanEndsOnGroup"
+                                    Grid.Row="8"
+                                    Grid.Column="2">
+                            <TextBlock Text="Ends on" Style="{StaticResource PlanDetailLabelStyle}" />
                             <DatePicker SelectedDate="{Binding PlanEndsOnDate, UpdateSourceTrigger=PropertyChanged}"
                                         Width="132"
                                         HorizontalAlignment="Left"
@@ -200,13 +258,14 @@
                             </DatePicker>
                         </StackPanel>
 
-                        <TextBlock Grid.Row="1"
+                        <TextBlock x:Name="ScheduleHeader"
+                                   Grid.Row="9"
                                    Grid.Column="2"
                                    Text="Schedule"
-                                   FontSize="18"
+                                   FontSize="16"
                                    FontWeight="SemiBold"
                                    Margin="0,8,0,10" />
-                        <ItemsControl Grid.Row="2"
+                        <ItemsControl Grid.Row="10"
                                       Grid.Column="2"
                                       ItemsSource="{Binding SchedulePlacements}">
                             <ItemsControl.ItemTemplate>
@@ -223,10 +282,14 @@
                                         <ComboBox Grid.Column="1"
                                                   ItemsSource="{Binding WeekdayOptions}"
                                                   DisplayMemberPath="Label"
+                                                  Height="24"
+                                                  VerticalContentAlignment="Center"
                                                   SelectedItem="{Binding SelectedWeekday}" />
                                         <ComboBox Grid.Column="3"
                                                   ItemsSource="{Binding TimeOptions}"
                                                   Text="{Binding TimeText, UpdateSourceTrigger=PropertyChanged}"
+                                                  Height="24"
+                                                  VerticalContentAlignment="Center"
                                                   IsEditable="True"
                                                   IsTextSearchEnabled="False" />
                                     </Grid>
@@ -236,17 +299,6 @@
                     </Grid>
                 </ScrollViewer>
             </Grid>
-
-            <GridSplitter x:Name="InvoicesPaneSplitter"
-                          Grid.Column="1"
-                          Width="8"
-                          HorizontalAlignment="Stretch"
-                          VerticalAlignment="Stretch"
-                          Background="Transparent"
-                          ShowsPreview="True"
-                          ResizeDirection="Columns"
-                          ResizeBehavior="PreviousAndNext"
-                          AutomationProperties.Name="Resize invoices pane" />
 
             <Grid Grid.Column="2">
                 <Grid.RowDefinitions>
@@ -261,6 +313,7 @@
                           AutoGenerateColumns="False"
                           CanUserAddRows="False"
                           CanUserDeleteRows="False"
+                          CanUserResizeColumns="False"
                           CanUserResizeRows="False"
                           IsReadOnly="True"
                           HeadersVisibility="Column"
@@ -271,30 +324,38 @@
                     <DataGrid.Columns>
                         <DataGridTextColumn Header="Invoice"
                                             Binding="{Binding InvoiceNumberText}"
-                                            Width="90" />
+                                            Width="75" />
                         <DataGridTextColumn Header="Date"
                                             Binding="{Binding InvoiceDateText}"
-                                            Width="95" />
+                                            Width="90" />
                         <DataGridTextColumn Header="Period"
                                             Binding="{Binding PeriodText}"
-                                            Width="105" />
+                                            Width="90" />
                         <DataGridTextColumn Header="Print"
                                             Binding="{Binding PrintStatusText}"
-                                            Width="90" />
+                                            Width="80" />
                         <DataGridTextColumn Header="Status"
                                             Binding="{Binding PaymentStatusText}"
-                                            Width="*" />
+                                            Width="95" />
                     </DataGrid.Columns>
                 </DataGrid>
             </Grid>
         </Grid>
 
-        <Button Grid.Row="1"
-                Content="Close"
-                MinWidth="84"
-                Height="30"
-                HorizontalAlignment="Center"
-                Margin="0,14,0,0"
-                Click="OnClose" />
+        <StackPanel x:Name="StudentDetailsBottomActions"
+                    Grid.Row="1"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Left"
+                    Margin="0">
+            <Button Content="Save"
+                    Command="{Binding SaveStudentCommand}"
+                    MinWidth="84"
+                    Height="30"
+                    Margin="0,0,8,0" />
+            <Button Content="Close"
+                    MinWidth="84"
+                    Height="30"
+                    Click="OnClose" />
+        </StackPanel>
     </Grid>
 </Window>

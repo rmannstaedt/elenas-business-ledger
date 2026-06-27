@@ -7,9 +7,13 @@ namespace MySmallBusinessLedger.App.Services;
 public static class DataGridColumnWidthStore
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
-    private static readonly string StorePath = Path.Combine(
+    private static readonly string DefaultStorePath = Path.Combine(
         AppPaths.CreateDefault().AppDataFolderPath,
         "grid-column-widths.json");
+
+    internal static string? StorePathOverride { get; set; }
+
+    private static string StorePath => StorePathOverride ?? DefaultStorePath;
 
     public static void Attach(DataGrid grid, string key)
     {
@@ -53,8 +57,17 @@ public static class DataGridColumnWidthStore
 
         var widthsByKey = LoadWidths();
         widthsByKey[key] = widths;
-        Directory.CreateDirectory(Path.GetDirectoryName(StorePath)!);
-        File.WriteAllText(StorePath, JsonSerializer.Serialize(widthsByKey, JsonOptions));
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(StorePath)!);
+            File.WriteAllText(StorePath, JsonSerializer.Serialize(widthsByKey, JsonOptions));
+        }
+        catch (IOException)
+        {
+        }
+        catch (UnauthorizedAccessException)
+        {
+        }
     }
 
     private static Dictionary<string, double[]> LoadWidths()
