@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Runtime.ExceptionServices;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Media;
 using MySmallBusinessLedger.App.Services;
@@ -11,12 +12,36 @@ using MySmallBusinessLedger.Core.Invoices;
 using MySmallBusinessLedger.Core.UseCases.Economy;
 using WpfDataGrid = System.Windows.Controls.DataGrid;
 using WpfDataGridLengthUnitType = System.Windows.Controls.DataGridLengthUnitType;
+using WpfPath = System.Windows.Shapes.Path;
 using MoneyAmount = MySmallBusinessLedger.Core.Money.Money;
 
 namespace MySmallBusinessLedger.Tests.App.Views;
 
 public sealed class EconomyOverviewViewTests
 {
+    [Fact]
+    public void ToolbarUsesQuietArrowIconsAndRightAlignedExport()
+    {
+        RunOnStaThread(() =>
+        {
+            var view = new EconomyOverviewView(CreateViewModel());
+            var buttons = FindChildren<Button>(view);
+
+            var previousYearButton = Assert.Single(buttons, button =>
+                AutomationProperties.GetName(button) == "Previous year");
+            var nextYearButton = Assert.Single(buttons, button =>
+                AutomationProperties.GetName(button) == "Next year");
+            Assert.IsType<WpfPath>(previousYearButton.Content);
+            Assert.IsType<WpfPath>(nextYearButton.Content);
+            Assert.Equal(Brushes.Transparent, previousYearButton.Background);
+            Assert.Equal(Brushes.Transparent, nextYearButton.Background);
+
+            var exportButton = Assert.Single(buttons, button => button.Content?.ToString() == "Export CSV");
+            Assert.Equal(2, Grid.GetColumn(exportButton));
+            Assert.Equal(HorizontalAlignment.Right, exportButton.HorizontalAlignment);
+        });
+    }
+
     [Fact]
     public void EconomyTablesDoNotExposeResizableOrDoubleBorderChrome()
     {

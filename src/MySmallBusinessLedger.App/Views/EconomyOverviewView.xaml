@@ -12,6 +12,42 @@
                          Color="#202020" />
         <SolidColorBrush x:Key="EconomyTableGridLineBrush"
                          Color="#C8C8C8" />
+        <Style x:Key="EconomyHeaderArrowButtonStyle" TargetType="{x:Type Button}">
+            <Setter Property="Width" Value="30" />
+            <Setter Property="Height" Value="28" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Foreground" Value="#5B6472" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="{x:Type Button}">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="3">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="#EEF3F8" />
+                                <Setter Property="BorderBrush" Value="#A9B7C7" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter Property="BorderBrush" Value="#7AA7D9" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Foreground" Value="#B5BAC2" />
+                                <Setter Property="Cursor" Value="Arrow" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
         <Style x:Key="EconomyTableStyle" TargetType="{x:Type DataGrid}">
             <Setter Property="AutoGenerateColumns" Value="False" />
             <Setter Property="CanUserAddRows" Value="False" />
@@ -30,30 +66,52 @@
         </Style>
     </Window.Resources>
     <DockPanel Margin="20" LastChildFill="True">
-        <StackPanel DockPanel.Dock="Top"
-                    Orientation="Horizontal"
-                    Margin="0,0,0,16">
-            <Button Command="{Binding PreviousYearCommand}"
-                    Width="34"
-                    Height="28"
-                    Content="&lt;"
-                    AutomationProperties.Name="Previous year" />
-            <TextBlock Text="{Binding YearText}"
-                       FontSize="22"
-                       FontWeight="SemiBold"
-                       Margin="12,0"
-                       VerticalAlignment="Center" />
-            <Button Command="{Binding NextYearCommand}"
-                    Width="34"
-                    Height="28"
-                    Content="&gt;"
-                    AutomationProperties.Name="Next year" />
+        <Grid DockPanel.Dock="Top"
+              Margin="0,0,0,16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Orientation="Horizontal"
+                        VerticalAlignment="Center">
+                <Button Command="{Binding PreviousYearCommand}"
+                        Style="{StaticResource EconomyHeaderArrowButtonStyle}"
+                        ToolTip="Previous year"
+                        AutomationProperties.Name="Previous year">
+                    <Path Data="M 6,3 L 2,7 L 6,11"
+                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                          StrokeThickness="1.5"
+                          StrokeStartLineCap="Round"
+                          StrokeEndLineCap="Round"
+                          StrokeLineJoin="Round" />
+                </Button>
+                <TextBlock Text="{Binding YearText}"
+                           FontSize="22"
+                           FontWeight="SemiBold"
+                           Margin="12,0"
+                           VerticalAlignment="Center" />
+                <Button Command="{Binding NextYearCommand}"
+                        Style="{StaticResource EconomyHeaderArrowButtonStyle}"
+                        ToolTip="Next year"
+                        AutomationProperties.Name="Next year">
+                    <Path Data="M 2,3 L 6,7 L 2,11"
+                          Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                          StrokeThickness="1.5"
+                          StrokeStartLineCap="Round"
+                          StrokeEndLineCap="Round"
+                          StrokeLineJoin="Round" />
+                </Button>
+            </StackPanel>
+
             <Button Command="{Binding ExportCsvCommand}"
+                    Grid.Column="2"
                     Content="Export CSV"
                     Width="100"
                     Height="30"
-                    Margin="24,0,0,0" />
-        </StackPanel>
+                    HorizontalAlignment="Right" />
+        </Grid>
 
         <StackPanel DockPanel.Dock="Bottom"
                     Orientation="Horizontal"

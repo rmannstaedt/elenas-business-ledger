@@ -79,5 +79,6 @@ internal sealed class ApplicationBootstrapper
                 new EconomyOverviewCsvFileService(new EconomyOverviewCsvFormatter()),
                 new ShellInvoicePdfLauncher(),
                 services.SystemClock),
+            new AboutDialogLauncher(),
             services.SystemClock);
 }

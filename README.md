@@ -2,7 +2,7 @@
 
 This repository contains a small local-first ledger application for independent piano teachers.
 
-Current app version: 1.10.
+Current app version: 1.20.
 
 Primary goal:
 
@@ -68,8 +68,8 @@ The main window can populate Google Calendar from the selected student's saved s
 
 ## Current key assumptions
 
-- Under-30 teaching support remains in the data model because future students may require it (but out of scope for version 1.10).
-- Lønsumsafgift is out of scope for version 1.10.
+- Under-30 teaching support remains in the data model because future students may require it (but out of scope for version 1.20).
+- Lønsumsafgift is out of scope for version 1.20.
 - Google Calendar is the operational schedule surface for uninvoiced lessons; local SQLite Lessons records are the durable billing ledger and invoiced lessons ignore later calendar edits/deletions.
 - Google Calendar integration uses the official Google Calendar API client, external browser OAuth for explicit Settings connection, and Windows-protected local token storage with hashed token-key filenames. Startup refreshes use saved local credentials non-interactively and do not launch browser OAuth. The app requests the narrower `https://www.googleapis.com/auth/calendar.events.owned` OAuth scope so it can read, create, move, complete, and delete lesson events on calendars owned by the signed-in Google account; entries still must match the documented `$` student marker before the app treats them as lessons.
 - The Google OAuth app identity is publisher-owned and supplied from `Configuration\google-oauth-client.json`, not selected by each user in Settings.
@@ -77,6 +77,7 @@ The main window can populate Google Calendar from the selected student's saved s
 - Runtime data is stored under `%APPDATA%\visualtech.dk\MySmallBusinessLedger`.
 - The WPF app now uses real SQLite/Core/Calendar-backed services; if Google Calendar is not configured or authorization is missing, the dashboard reports that instead of showing sample lesson rows or opening browser OAuth unexpectedly.
 - Company and Google Calendar account setup, connection, and authorization reset are available from `Application > Settings`.
+- The app version is visible from `Application > About My Small Business Ledger`.
 - Plan catalog management is available from `Plan > Manage Plans`; only Active catalog plans are assignable to students.
 - Student overview management is available from `Student > Manage Students`; it opens coordinated Students and Student Details windows, supports selected-student/plan/schedule editing with Save in the details window and an unsaved-change prompt on Close, mirrors student selection into the main window immediately and on close, and preserves copied plan commercial-term snapshots and issued invoices unless edited student data is saved. The main window `Student Details` button opens the same details window for the currently displayed student.
 - Economy overview reporting is available from `Economy > Overview`; it uses issued SQLite invoice totals by invoice period year, not PDF parsing, and exports one sectioned CSV with invoice, month, quarter, and year rows.

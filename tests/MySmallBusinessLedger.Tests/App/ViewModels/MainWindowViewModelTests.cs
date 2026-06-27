@@ -48,6 +48,28 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public void ApplicationMenuShowsSettingsAndAbout()
+    {
+        RunOnStaThread(() =>
+        {
+            var viewModel = CreateViewModel();
+            var window = new AppMainWindow(viewModel);
+
+            var applicationMenu = Assert.Single(FindChildren<WpfMenuItem>(window), item => item.Header?.ToString() == "_Application");
+            var applicationActions = applicationMenu.Items
+                .OfType<WpfMenuItem>()
+                .Select(item => item.Header?.ToString())
+                .Where(header => header is not null)
+                .Cast<string>()
+                .ToArray();
+
+            Assert.Equal(["_Settings", "About My Small Business Ledger"], applicationActions);
+
+            window.Close();
+        });
+    }
+
+    [Fact]
     public void StudentMenuOnlyShowsManageStudents()
     {
         RunOnStaThread(() =>
@@ -1458,6 +1480,25 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task AboutCommandShowsAboutDialog()
+    {
+        var aboutDialog = new FakeAboutDialogLauncher();
+        var viewModel = CreateViewModel(aboutDialogLauncher: aboutDialog);
+
+        await viewModel.OpenAboutCommand.ExecuteAsync();
+
+        Assert.True(aboutDialog.WasShown);
+    }
+
+    [Fact]
+    public void ApplicationInfoUsesAppAssemblyVersion()
+    {
+        Assert.Equal("1.20", ApplicationInfo.Version);
+        Assert.Contains("My Small Business Ledger", ApplicationInfo.AboutText);
+        Assert.Contains("Version 1.20", ApplicationInfo.AboutText);
+    }
+
+    [Fact]
     public async Task ManageStudentsCommandRefreshesDashboardWithSelectedOverviewStudent()
     {
         var dashboard = new FakeDashboardService { StudentShortNames = ["Anna", "Bo"] };
@@ -2304,6 +2345,7 @@ public sealed class MainWindowViewModelTests
             new FakeSettingsLauncher(),
             new FakePlanCatalogLauncher(),
             new FakeEconomyOverviewLauncher(),
+            new FakeAboutDialogLauncher(),
             new FakeUiClock(new DateTimeOffset(2026, 6, 16, 12, 0, 0, TimeSpan.Zero)));
         await viewModel.LoadAsync();
 
@@ -2456,6 +2498,7 @@ public sealed class MainWindowViewModelTests
         FakeSettingsLauncher? settingsLauncher = null,
         FakePlanCatalogLauncher? planCatalogLauncher = null,
         FakeEconomyOverviewLauncher? economyOverviewLauncher = null,
+        FakeAboutDialogLauncher? aboutDialogLauncher = null,
         FakeUiClock? clock = null,
         TimeZoneInfo? lessonTimeZone = null) =>
         new(
@@ -2472,6 +2515,7 @@ public sealed class MainWindowViewModelTests
             settingsLauncher ?? new FakeSettingsLauncher(),
             planCatalogLauncher ?? new FakePlanCatalogLauncher(),
             economyOverviewLauncher ?? new FakeEconomyOverviewLauncher(),
+            aboutDialogLauncher ?? new FakeAboutDialogLauncher(),
             clock ?? new FakeUiClock(new DateTimeOffset(2026, 6, 16, 12, 0, 0, TimeSpan.Zero)),
             lessonTimeZone);
 
@@ -3112,6 +3156,17 @@ public sealed class MainWindowViewModelTests
         public bool WasShown { get; private set; }
 
         public Task ShowEconomyOverviewAsync(CancellationToken cancellationToken)
+        {
+            WasShown = true;
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class FakeAboutDialogLauncher : IAboutDialogLauncher
+    {
+        public bool WasShown { get; private set; }
+
+        public Task ShowAboutAsync(CancellationToken cancellationToken)
         {
             WasShown = true;
             return Task.CompletedTask;

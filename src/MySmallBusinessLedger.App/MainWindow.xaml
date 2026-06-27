@@ -253,6 +253,8 @@
             <MenuItem Header="_Application">
                 <MenuItem Header="_Settings"
                           Command="{Binding OpenSettingsCommand}" />
+                <MenuItem Header="About My Small Business Ledger"
+                          Command="{Binding OpenAboutCommand}" />
             </MenuItem>
             <MenuItem Header="_Student">
                 <MenuItem Header="_Manage Students"

@@ -4,7 +4,7 @@
 
 Working name: My Small Business Ledger
 
-Current app version: 1.10
+Current app version: 1.20
 
 Internal namespace/project prefix:
 MySmallBusinessLedger
@@ -50,7 +50,7 @@ Publisher Google OAuth Desktop client configuration: local/release file `src\MyS
 Google OAuth protected token folder: `%APPDATA%\visualtech.dk\MySmallBusinessLedger\GoogleTokens`
 Window placement file path: `%APPDATA%\visualtech.dk\MySmallBusinessLedger\window-placement.json`
 Grid column width file path: `%APPDATA%\visualtech.dk\MySmallBusinessLedger\grid-column-widths.json`
-Backup: no automated backup in version 1.10; keep persistence design compatible with later manual backup/export
+Backup: no automated backup in version 1.20; keep persistence design compatible with later manual backup/export
 
 ## External integrations
 
@@ -72,7 +72,7 @@ WPF + MVVM
 No business logic in code-behind
 Danish user-facing invoice text
 My-facing UI must stay simple
-Company profile, two-line company address entry, bank/MobilePay accounts, invoice folder with typed or folder-picker selection, invoice printer with remembered selector/typed value/clear action, invoice payment instructions selected from `Betales ved modtagelse`, `8 dage fra fakturadato`, `30 dage fra fakturadato`, or custom text, Google calendar/account label, Google sign-in app status, local Google authorization status, connect/reconnect controls, and read-only app data/database paths are configured or shown from `Application > Settings`; the Google calendar defaults to `primary`
+Company profile, two-line company address entry, bank/MobilePay accounts, invoice folder with typed or folder-picker selection, invoice printer with remembered selector/typed value/clear action, invoice payment instructions selected from `Betales ved modtagelse`, `8 dage fra fakturadato`, `30 dage fra fakturadato`, or custom text, Google calendar/account label, Google sign-in app status, local Google authorization status, connect/reconnect controls, and read-only app data/database paths are configured or shown from `Application > Settings`; the Google calendar defaults to `primary`; `Application > About My Small Business Ledger` shows the app name and current version from assembly metadata
 Student editor uses two stacked address fields and stores them as one multiline student address value.
 Student management is available from `Student > Manage Students`; it opens a Students list window plus a separate Student Details window that share the same selected-student state. The main window `Student Details` button opens the same details window for the currently displayed student. The list window shows active and inactive students and `Add student`; the fixed-size details window shows selected-student fields, current assigned plan, plan assignment, schedule, and invoices. Selecting a student in the list updates the details window immediately, Save remains in the details window, Close prompts to save/discard/cancel when unsaved edits exist, invoice double-click opens the existing viewer, selection mirrors into the main window immediately and on close, and `Student.IsActive` changes persist only when the details editor is saved.
 Main-window `Add Lesson` creates an editable draft row only when at least one Active plan is available; otherwise it shows `Create or publish an active plan first.` In non-current displayed months it defaults to the first day of that displayed month. Date and plan are required; time is optional. When date and plan are valid the draft autosaves to Google Calendar with the selected plan identity preserved. Rows without a known time are written as all-day Google Calendar events. Incomplete draft rows must survive automatic refreshes. Main lesson row time selectors offer a no-time option plus 08:00 through 20:00 in 15-minute increments while still allowing typed time input. Reconciled uninvoiced lesson rows show an editable Plan dropdown; rapid plan changes preserve the final selected plan, and invoiced lesson plans are locked.
