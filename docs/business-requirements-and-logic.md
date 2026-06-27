@@ -87,7 +87,7 @@ Plans are managed independently from Students from the Plan menu. When an Active
 
 An Active Plan's `Retire on` date is equivalent to choosing Retire on that date. When the application starts, due Active Plans are moved to Retired so they no longer appear for new student assignment. Existing Student plan periods keep their copied Plan data until the Student is explicitly moved to another Active Plan.
 
-When adding another Plan from Manage Plans, changed Draft fields are saved before the new Draft is created. If the selected Active Plan has an unsaved `Retire on` change, the user is asked whether to save or discard that change before adding the new Draft.
+When adding another Plan from Manage Plans, changed Draft fields are saved before the new Draft is created. If the selected Active Plan has an unsaved `Retire on` change, the user is asked whether to save or discard that change before adding the new Draft. When closing Manage Plans with unsaved editable changes, the user is asked whether to save, discard, or cancel the close.
 
 Students may be moved to a different Active Plan by creating a new assigned student plan period.
 
@@ -171,7 +171,7 @@ Manage Students lists all known Students, including inactive Students. Selecting
 The application contains a Plan menu with:
   * Manage Plans
 
-Manage Plans lists Draft, Active, and Retired catalog Plans. Draft Plans can be edited, deleted, and published. Active Plans are read-only except for `Retire on`, and can be retired. Retired Plans are read-only and can be reactivated. Only Active Plans appear in the Student editor assignment selector.
+Manage Plans lists Draft, Active, and Retired catalog Plans. Draft Plans can be edited, deleted, and published. Active Plans are read-only except for `Retire on`, and can be retired. Retired Plans are read-only and can be reactivated. Closing the window with unsaved editable changes prompts the user to save, discard, or cancel. Only Active Plans appear in the Student editor assignment selector.
 
 The application window also displays a pane with Student Invoices.
 Each Invoice in the list has a flag: Paid / Outstanding
@@ -200,7 +200,7 @@ The planned and invoiced:no entries in the lesson list may be edited directly in
   * lesson may be cancelled (deleted)
   * new lesson may be added
 
-Adding a lesson creates a new empty planned row for the current student in the main lesson list. If the displayed month is not the current month, the new row starts on the first day of the displayed month. The user fills in the date and plan, and may optionally fill in a time, directly in that row. There is no explicit Save operation in this interface: once a draft lesson has both a date and a plan, it is saved immediately, and later edits to date, time, plan, or state are also saved immediately.
+Adding a lesson creates a new empty planned row for the current student in the main lesson list when at least one Active plan exists. If no Active plan is available, the application shows `Create or publish an active plan first.` and does not create an unsaveable draft row. If the displayed month is not the current month, the new row starts on the first day of the displayed month. The user fills in the date and plan, and may optionally fill in a time, directly in that row. There is no explicit Save operation in this interface: once a draft lesson has both a date and a plan, it is saved immediately, and later edits to date, time, plan, or state are also saved immediately. Rapid changes to an editable lesson's plan must preserve and save the final selected plan.
 
 Lesson date editing uses a date selector. Lesson date and lesson plan are required for a new lesson to be saved. Lesson time is optional: a lesson without a known time is saved as an all-day Google Calendar event, displays without a time in the lesson list, and prints without a time on invoices. Lesson time editing provides a no-time option plus a time selector from 08:00 through 20:00 in 15-minute increments while still allowing typed time input. Lesson cancellation uses an explicit delete action with a confirmation prompt.
 
@@ -248,8 +248,8 @@ The user may edit the list of lessons.
 The user may add a price adjustment and reason.
 The Invoice VAT and price information will reflect user changes.
 
-The user may Cancel the edit at any time.
-If the user Cancels, the invoice is not saved and no data are updated in the system.
+The user may Cancel the edit before pressing "Print Invoice".
+If the user Cancels before printing starts, the invoice is not saved and no data are updated in the system.
 
 Once the invoice has been edited, the user may press the "Print Invoice" button on the Invoice form.
 The "Print Invoice" button does the following:
@@ -261,6 +261,7 @@ The "Print Invoice" button does the following:
   - Finalizes the Invoice data in the Invoice table as issued.
   - Sends a print request to the configured invoice printer, if one is configured and available.
     -- note: a print failure does not undo the issued Invoice or delete the PDF; the Invoice remains issued and can be reprinted from the Invoice Viewer.
+    -- note: while writing/printing is in progress, the Invoice form stays open and Cancel/window close do not hide the in-progress result; if the operation takes longer than expected, the user is asked whether to keep waiting.
   - Closes the Invoice form and returns to the main view only when the Invoice was issued and the print request was launched successfully.
   - Keeps the Invoice form open with an error message if the Invoice was issued but the print request failed.
   - When an Invoice is issued and returning to the main view, the displayed data in the main view are updated with any changes.

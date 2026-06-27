@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using MySmallBusinessLedger.App.Commands;
 using MySmallBusinessLedger.App.Services;
+using MySmallBusinessLedger.Core.Common;
 using MySmallBusinessLedger.Core.Invoices;
 using MySmallBusinessLedger.Core.Money;
 using MySmallBusinessLedger.Core.UseCases.Invoices;
@@ -10,8 +11,12 @@ namespace MySmallBusinessLedger.App.ViewModels;
 
 public sealed class InvoicePreviewViewModel : ViewModelBase
 {
+    private static readonly TimeSpan DefaultExtendedIssueWaitPromptDelay = TimeSpan.FromSeconds(7);
+
     private readonly IInvoiceWorkflowService invoiceWorkflowService;
     private readonly Func<CancellationToken, Task<bool>>? ensureInvoicePrinterConfiguredAsync;
+    private readonly Func<CancellationToken, Task<bool>> confirmContinueWaitingAsync;
+    private readonly TimeSpan extendedIssueWaitPromptDelay;
     private readonly InvoicePreviewResult preview;
     private string priceAdjustmentAmountText = string.Empty;
     private string priceAdjustmentReason = string.Empty;
@@ -22,10 +27,14 @@ public sealed class InvoicePreviewViewModel : ViewModelBase
     public InvoicePreviewViewModel(
         IInvoiceWorkflowService invoiceWorkflowService,
         InvoicePreviewResult preview,
-        Func<CancellationToken, Task<bool>>? ensureInvoicePrinterConfiguredAsync = null)
+        Func<CancellationToken, Task<bool>>? ensureInvoicePrinterConfiguredAsync = null,
+        Func<CancellationToken, Task<bool>>? confirmContinueWaitingAsync = null,
+        TimeSpan? extendedIssueWaitPromptDelay = null)
     {
         this.invoiceWorkflowService = invoiceWorkflowService;
         this.ensureInvoicePrinterConfiguredAsync = ensureInvoicePrinterConfiguredAsync;
+        this.confirmContinueWaitingAsync = confirmContinueWaitingAsync ?? (_ => Task.FromResult(true));
+        this.extendedIssueWaitPromptDelay = extendedIssueWaitPromptDelay ?? DefaultExtendedIssueWaitPromptDelay;
         this.preview = preview;
         totals = preview.Totals;
 
@@ -95,6 +104,14 @@ public sealed class InvoicePreviewViewModel : ViewModelBase
 
     public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
 
+    public bool CanDismiss => !IsBusy;
+
+    public string BusyStatusText => IsBusy
+        ? "Writing and printing invoice. Please keep this window open until it finishes."
+        : string.Empty;
+
+    public bool HasBusyStatus => IsBusy;
+
     public bool IsBusy
     {
         get => isBusy;
@@ -102,6 +119,9 @@ public sealed class InvoicePreviewViewModel : ViewModelBase
         {
             if (SetProperty(ref isBusy, value))
             {
+                OnPropertyChanged(nameof(CanDismiss));
+                OnPropertyChanged(nameof(BusyStatusText));
+                OnPropertyChanged(nameof(HasBusyStatus));
                 PrintInvoiceCommand.RaiseCanExecuteChanged();
             }
         }
@@ -112,6 +132,17 @@ public sealed class InvoicePreviewViewModel : ViewModelBase
     public AsyncRelayCommand PrintInvoiceCommand { get; }
 
     public event EventHandler<bool?>? CloseRequested;
+
+    public Task<bool> RequestDismissAsync()
+    {
+        if (CanDismiss)
+        {
+            return Task.FromResult(true);
+        }
+
+        ErrorMessage = "The invoice is still being written and printed. Please keep this window open until it finishes.";
+        return Task.FromResult(false);
+    }
 
     public async Task RefreshTotalsAsync()
     {
@@ -151,7 +182,7 @@ public sealed class InvoicePreviewViewModel : ViewModelBase
                 return;
             }
 
-            var issue = await invoiceWorkflowService.IssueAsync(draft, CancellationToken.None);
+            var issue = await IssueWithExtendedWaitPromptAsync(draft);
             if (!issue.Succeeded)
             {
                 ErrorMessage = issue.Errors.FirstOrDefault()?.Message ?? "Could not write the invoice.";
@@ -172,6 +203,28 @@ public sealed class InvoicePreviewViewModel : ViewModelBase
         finally
         {
             IsBusy = false;
+        }
+    }
+
+    private async Task<OperationResult<IssueInvoiceResult>> IssueWithExtendedWaitPromptAsync(InvoiceDraft draft)
+    {
+        var issueTask = invoiceWorkflowService.IssueAsync(draft, CancellationToken.None);
+        while (true)
+        {
+            var completedTask = await Task.WhenAny(
+                issueTask,
+                Task.Delay(extendedIssueWaitPromptDelay));
+            if (ReferenceEquals(completedTask, issueTask))
+            {
+                return await issueTask;
+            }
+
+            var keepWaiting = await confirmContinueWaitingAsync(CancellationToken.None);
+            if (!keepWaiting)
+            {
+                ErrorMessage =
+                    "The invoice is still being written and printed. It cannot be safely cancelled from this window.";
+            }
         }
     }
 

@@ -32,6 +32,8 @@ public sealed class InvoiceLineDisplayModel : ViewModelBase
 
     public string PlanName => Line.PlanName;
 
+    public string IncludeAutomationName => $"Include lesson {LessonDateTimeText} {PlanName}";
+
     public string PriceWithoutVatText =>
         string.Create(CultureInfo.GetCultureInfo("da-DK"), $"{Line.PriceWithoutVat.Amount:N2} {Line.PriceWithoutVat.Currency}");
 

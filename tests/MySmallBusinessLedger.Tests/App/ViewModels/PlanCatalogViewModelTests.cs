@@ -167,6 +167,62 @@ public sealed class PlanCatalogViewModelTests
     }
 
     [Fact]
+    public async Task PrepareForCloseCanCancelWhenDraftHasUnsavedChanges()
+    {
+        var service = new FakePlanCatalogService();
+        service.Seed(CreatePlan("Draft", PlanCatalogState.Draft));
+        var interactions = new FakePlanCatalogInteractionService { NextClosePlanChoice = PlanCatalogAddPlanChoice.Cancel };
+        var viewModel = new PlanCatalogViewModel(service, interactions);
+        await viewModel.LoadAsync();
+        viewModel.Name = "Unsaved draft";
+
+        var canClose = await viewModel.PrepareForCloseAsync();
+
+        Assert.False(canClose);
+        Assert.Equal(1, interactions.PromptClosePlanSaveChangesCount);
+        Assert.Null(service.UpdatedDraftInput);
+        Assert.Equal("Draft", viewModel.SelectedPlan?.Name);
+    }
+
+    [Fact]
+    public async Task PrepareForCloseSavesChangedDraftWhenRequested()
+    {
+        var service = new FakePlanCatalogService();
+        var draft = service.Seed(CreatePlan("Draft", PlanCatalogState.Draft));
+        var interactions = new FakePlanCatalogInteractionService { NextClosePlanChoice = PlanCatalogAddPlanChoice.Save };
+        var viewModel = new PlanCatalogViewModel(service, interactions);
+        await viewModel.LoadAsync();
+        viewModel.Name = "Saved draft";
+
+        var canClose = await viewModel.PrepareForCloseAsync();
+
+        Assert.True(canClose);
+        Assert.Equal(1, interactions.PromptClosePlanSaveChangesCount);
+        Assert.Equal(draft.Id, service.UpdatedPlanId);
+        Assert.Equal("Saved draft", service.UpdatedDraftInput?.Name);
+    }
+
+    [Fact]
+    public async Task PrepareForClosePromptsBeforeSavingChangedActivePlan()
+    {
+        var service = new FakePlanCatalogService();
+        var active = service.Seed(CreatePlan("Active", PlanCatalogState.Active));
+        var interactions = new FakePlanCatalogInteractionService { NextClosePlanChoice = PlanCatalogAddPlanChoice.Save };
+        var viewModel = new PlanCatalogViewModel(service, interactions);
+        await viewModel.LoadAsync();
+        viewModel.Name = "Active close rename";
+        viewModel.RetireOnDate = new DateTime(2026, 10, 1);
+
+        var canClose = await viewModel.PrepareForCloseAsync();
+
+        Assert.True(canClose);
+        Assert.Equal(1, interactions.PromptClosePlanSaveChangesCount);
+        Assert.Equal(active.Id, service.RenamedPlanId);
+        Assert.Equal("Active close rename", service.RenamedPlanName);
+        Assert.Equal(active.Id, service.UpdatedRetireOnPlanId);
+    }
+
+    [Fact]
     public async Task DeleteDraftRemovesSelectedDraft()
     {
         var service = new FakePlanCatalogService();
@@ -471,12 +527,22 @@ public sealed class PlanCatalogViewModelTests
     {
         public PlanCatalogAddPlanChoice NextAddPlanChoice { get; init; } = PlanCatalogAddPlanChoice.Discard;
 
+        public PlanCatalogAddPlanChoice NextClosePlanChoice { get; set; } = PlanCatalogAddPlanChoice.Discard;
+
         public int PromptAddPlanSaveChangesCount { get; private set; }
+
+        public int PromptClosePlanSaveChangesCount { get; private set; }
 
         public Task<PlanCatalogAddPlanChoice> PromptAddPlanSaveChangesAsync(CancellationToken cancellationToken)
         {
             PromptAddPlanSaveChangesCount++;
             return Task.FromResult(NextAddPlanChoice);
+        }
+
+        public Task<PlanCatalogAddPlanChoice> PromptClosePlanSaveChangesAsync(CancellationToken cancellationToken)
+        {
+            PromptClosePlanSaveChangesCount++;
+            return Task.FromResult(NextClosePlanChoice);
         }
     }
 

@@ -38,6 +38,17 @@
                        TextWrapping="Wrap" />
         </Border>
 
+        <Border DockPanel.Dock="Top"
+                Background="#E8F1FB"
+                BorderBrush="#6C8FB3"
+                BorderThickness="1"
+                Padding="10"
+                Margin="0,0,0,12"
+                Visibility="{Binding HasBusyStatus, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <TextBlock Text="{Binding BusyStatusText}"
+                       TextWrapping="Wrap" />
+        </Border>
+
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
@@ -90,6 +101,7 @@
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
                                 <CheckBox IsChecked="{Binding IsIncluded, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                          AutomationProperties.Name="{Binding IncludeAutomationName}"
                                           HorizontalAlignment="Center"
                                           VerticalAlignment="Center"
                                           PreviewMouseLeftButtonDown="OnIncludeLinePreviewMouseLeftButtonDown" />

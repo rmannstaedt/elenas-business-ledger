@@ -1554,6 +1554,25 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task AddLessonWithoutActivePlanShowsClearPrerequisiteMessage()
+    {
+        var viewModel = CreateViewModel(
+            dashboard: new FakeDashboardService
+            {
+                LessonState = LessonState.Planned,
+                LessonIsInvoiced = false,
+                LessonPaymentStatus = null,
+                PlanOptions = []
+            });
+        await viewModel.LoadAsync();
+
+        await viewModel.AddLessonCommand.ExecuteAsync();
+
+        Assert.DoesNotContain(viewModel.Lessons, lesson => lesson.IsDraft);
+        Assert.Equal("Create or publish an active plan first.", viewModel.ErrorMessage);
+    }
+
+    [Fact]
     public async Task AddedDraftLessonAllowsPlanSelectionBeforeAutosaveCompletes()
     {
         var lessonEditor = new FakeLessonEditorService();
@@ -2129,6 +2148,66 @@ public sealed class MainWindowViewModelTests
         await EventuallyAsync(() => lessonEditor.LastPlanLessonId == 9);
         Assert.Equal(77, lessonEditor.LastPlanCatalogId);
         Assert.Equal("Proevetime", viewModel.Lessons[0].PlanName);
+        Assert.False(viewModel.HasError);
+    }
+
+    [Fact]
+    public async Task RapidLessonPlanChangesPersistLatestSelection()
+    {
+        var firstSaveStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseFirstSave = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var lessonEditor = new FakeLessonEditorService
+        {
+            UpdatePlanAsyncFunc = async (lessonId, planCatalogId) =>
+            {
+                if (planCatalogId == 77)
+                {
+                    firstSaveStarted.SetResult();
+                    await releaseFirstSave.Task;
+                }
+
+                return CreateLessonRecord(lessonId, planCatalogId);
+            }
+        };
+        var viewModel = CreateViewModel(
+            dashboard: new FakeDashboardService
+            {
+                LessonState = LessonState.Planned,
+                LessonIsInvoiced = false,
+                LessonPaymentStatus = null,
+                DashboardLessons =
+                [
+                    new DashboardLesson(
+                        "lesson-1",
+                        "Anna",
+                        new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.FromHours(2)),
+                        LessonState.Planned,
+                        IsInvoiced: false,
+                        PaymentStatus: null,
+                        PlanCatalogId: 42,
+                        PlanName: "Standard",
+                        LocalLessonId: 9)
+                ],
+                PlanOptions =
+                [
+                    new DashboardPlanOption(42, "Standard"),
+                    new DashboardPlanOption(77, "Proevetime"),
+                    new DashboardPlanOption(88, "Premium")
+                ]
+            },
+            lessonEditorService: lessonEditor);
+        await viewModel.LoadAsync();
+
+        viewModel.Lessons[0].PlanCatalogId = 77;
+        await firstSaveStarted.Task;
+        viewModel.Lessons[0].PlanCatalogId = 88;
+        releaseFirstSave.SetResult();
+
+        await EventuallyAsync(() => lessonEditor.PlanCatalogIds.Count >= 2);
+
+        Assert.Equal([77, 88], lessonEditor.PlanCatalogIds);
+        Assert.Equal(88, viewModel.Lessons[0].PlanCatalogId);
+        Assert.Equal("Premium", viewModel.Lessons[0].PlanName);
         Assert.False(viewModel.HasError);
     }
 
@@ -2747,6 +2826,10 @@ public sealed class MainWindowViewModelTests
 
         public int? LastPlanCatalogId { get; private set; }
 
+        public List<int> PlanCatalogIds { get; } = [];
+
+        public Func<int, int, Task<LessonRecord>>? UpdatePlanAsyncFunc { get; init; }
+
         public Func<Task>? BeforeDeleteReturnAsync { get; set; }
 
         public OperationResult<IReadOnlyList<MySmallBusinessLedger.Core.Calendar.CalendarLesson>>? AddResult { get; init; }
@@ -2810,26 +2893,40 @@ public sealed class MainWindowViewModelTests
             return OperationResult<IReadOnlyList<MySmallBusinessLedger.Core.Calendar.CalendarLesson>>.Success([]);
         }
 
-        public Task<OperationResult<LessonRecord>> UpdatePlanAsync(
+        public async Task<OperationResult<LessonRecord>> UpdatePlanAsync(
             int lessonId,
             int planCatalogId,
             CancellationToken cancellationToken)
         {
             LastPlanLessonId = lessonId;
             LastPlanCatalogId = planCatalogId;
-            return Task.FromResult(OperationResult<LessonRecord>.Success(new LessonRecord(
-                lessonId,
-                StudentId: 1,
-                StudentShortName: "Anna",
-                PlanCatalogId: planCatalogId,
-                PlanName: planCatalogId == 77 ? "Proevetime" : "Standard",
-                StartsAt: new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.FromHours(2)),
-                DurationMinutes: 60,
-                State: LessonState.Planned,
-                GoogleCalendarEventId: "lesson-1",
-                InvoiceNumber: null)));
+            PlanCatalogIds.Add(planCatalogId);
+            if (UpdatePlanAsyncFunc is not null)
+            {
+                return OperationResult<LessonRecord>.Success(await UpdatePlanAsyncFunc(lessonId, planCatalogId));
+            }
+
+            return OperationResult<LessonRecord>.Success(CreateLessonRecord(lessonId, planCatalogId));
         }
     }
+
+    private static LessonRecord CreateLessonRecord(int lessonId, int planCatalogId) =>
+        new(
+            lessonId,
+            StudentId: 1,
+            StudentShortName: "Anna",
+            PlanCatalogId: planCatalogId,
+            PlanName: planCatalogId switch
+            {
+                77 => "Proevetime",
+                88 => "Premium",
+                _ => "Standard"
+            },
+            StartsAt: new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.FromHours(2)),
+            DurationMinutes: 60,
+            State: LessonState.Planned,
+            GoogleCalendarEventId: "lesson-1",
+            InvoiceNumber: null);
 
     private sealed class FakeLessonStateService : ILessonStateService
     {

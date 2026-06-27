@@ -30,6 +30,8 @@ public sealed class MainWindowViewModel : ViewModelBase
     private readonly Dictionary<LessonDisplayModel, int> autoSaveDraftVersions = [];
     private readonly HashSet<LessonDisplayModel> savingDraftLessons = [];
     private readonly HashSet<LessonDisplayModel> savingPlanLessons = [];
+    private readonly Dictionary<LessonDisplayModel, int> pendingPlanCatalogIds = [];
+    private readonly HashSet<LessonDisplayModel> acceptingPlanChangeLessons = [];
     private long studentOverviewSelectionVersion;
     private DateTimeOffset? lastRefreshAt;
     private string? currentStudentShortName;
@@ -482,6 +484,12 @@ public sealed class MainWindowViewModel : ViewModelBase
     {
         if (CurrentStudentShortName is null)
         {
+            return Task.CompletedTask;
+        }
+
+        if (PlanOptions.Count == 0)
+        {
+            ErrorMessage = "Create or publish an active plan first.";
             return Task.CompletedTask;
         }
 
@@ -1010,6 +1018,11 @@ public sealed class MainWindowViewModel : ViewModelBase
 
         if (e.PropertyName == nameof(LessonDisplayModel.PlanCatalogId))
         {
+            if (acceptingPlanChangeLessons.Contains(lesson))
+            {
+                return;
+            }
+
             if (lesson.IsDraft)
             {
                 TryAutoSaveCompleteDraftLesson(lesson);
@@ -1029,8 +1042,13 @@ public sealed class MainWindowViewModel : ViewModelBase
         if (lesson.IsDraft ||
             !lesson.CanEditPlan ||
             lesson.LocalLessonId <= 0 ||
-            lesson.PlanCatalogId <= 0 ||
-            savingPlanLessons.Contains(lesson))
+            lesson.PlanCatalogId <= 0)
+        {
+            return;
+        }
+
+        pendingPlanCatalogIds[lesson] = lesson.PlanCatalogId;
+        if (savingPlanLessons.Contains(lesson))
         {
             return;
         }
@@ -1043,18 +1061,40 @@ public sealed class MainWindowViewModel : ViewModelBase
     {
         try
         {
-            var result = await lessonEditorService.UpdatePlanAsync(
-                lesson.LocalLessonId,
-                lesson.PlanCatalogId,
-                CancellationToken.None);
-            if (!result.Succeeded)
+            while (pendingPlanCatalogIds.Remove(lesson, out var requestedPlanCatalogId))
             {
-                ErrorMessage = result.Errors.FirstOrDefault()?.Message ?? "Could not update lesson plan.";
-                return;
-            }
+                var result = await lessonEditorService.UpdatePlanAsync(
+                    lesson.LocalLessonId,
+                    requestedPlanCatalogId,
+                    CancellationToken.None);
+                if (!result.Succeeded)
+                {
+                    if (lesson.PlanCatalogId == requestedPlanCatalogId)
+                    {
+                        ErrorMessage = result.Errors.FirstOrDefault()?.Message ?? "Could not update lesson plan.";
+                        return;
+                    }
 
-            lesson.AcceptPlanChange(result.Value!);
-            ErrorMessage = null;
+                    continue;
+                }
+
+                if (lesson.PlanCatalogId != requestedPlanCatalogId)
+                {
+                    continue;
+                }
+
+                acceptingPlanChangeLessons.Add(lesson);
+                try
+                {
+                    lesson.AcceptPlanChange(result.Value!);
+                }
+                finally
+                {
+                    acceptingPlanChangeLessons.Remove(lesson);
+                }
+
+                ErrorMessage = null;
+            }
         }
         finally
         {

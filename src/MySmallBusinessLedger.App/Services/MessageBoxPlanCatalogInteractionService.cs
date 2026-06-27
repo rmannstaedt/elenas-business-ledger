@@ -24,4 +24,25 @@ public sealed class MessageBoxPlanCatalogInteractionService : IPlanCatalogIntera
 
         return Task.FromResult(choice);
     }
+
+    public Task<PlanCatalogAddPlanChoice> PromptClosePlanSaveChangesAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var result = MessageBox.Show(
+            "Save changes to the selected plan before closing Manage Plans?",
+            "Save plan changes",
+            MessageBoxButton.YesNoCancel,
+            MessageBoxImage.Question,
+            MessageBoxResult.Cancel);
+
+        var choice = result switch
+        {
+            MessageBoxResult.Yes => PlanCatalogAddPlanChoice.Save,
+            MessageBoxResult.No => PlanCatalogAddPlanChoice.Discard,
+            _ => PlanCatalogAddPlanChoice.Cancel
+        };
+
+        return Task.FromResult(choice);
+    }
 }
