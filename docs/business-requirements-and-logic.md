@@ -203,6 +203,8 @@ Lesson date editing uses a date selector. Lesson date and lesson plan are requir
 Schedule changes to the lessons in the lesson list are saved directly in Google Calendar.
 If the update of Google Calendar fails, the user is notified immediately so they can take corrective action.
 
+When adding a new lesson, Google Calendar event creation and local lesson persistence must preserve the exact plan selected by the user. If Google Calendar creates the event but the follow-up refresh fails, the local lesson must still be saved with the selected plan identity and created Google Calendar event id. If local persistence fails after the Google Calendar event was created, the application must attempt to remove that created Google Calendar event and report the local-save failure instead of leaving a calendar-only lesson that can later be reconstructed with the wrong default plan.
+
 ### Write and Print an Invoice
 
 Invoices are written by the press of a button in the main application window: "Write Invoice"

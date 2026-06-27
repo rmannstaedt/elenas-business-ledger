@@ -107,6 +107,7 @@ Use fake Google Calendar client for calendar integration tests
 - Preserve the first-line Google Calendar marker when adding/removing app-owned lesson status lines.
 - Convert Windows time zone IDs to Google/IANA time zone IDs before writing Google Calendar event start/end payloads.
 - Notify the user immediately when a Google Calendar lesson update fails.
+- If Google Calendar creates a lesson event but the post-create refresh fails, preserve the user-selected plan identity by saving the local lesson with the created event id; if that local save fails, attempt to remove the created Google Calendar event before reporting failure.
 - Automatic refresh must not discard incomplete main-window lesson drafts.
 - Do not silently create duplicate Google Calendar lessons for the same student at the same date/time when using Populate Calendar.
 - Do not imply Populate Calendar detects all conflicts; v1 skips exact duplicates only.
