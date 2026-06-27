@@ -262,6 +262,10 @@
                 <MenuItem Header="_Manage Plans"
                           Command="{Binding OpenManagePlansCommand}" />
             </MenuItem>
+            <MenuItem Header="_Economy">
+                <MenuItem Header="_Overview"
+                          Command="{Binding OpenEconomyOverviewCommand}" />
+            </MenuItem>
         </Menu>
 
         <Grid x:Name="RootGrid"

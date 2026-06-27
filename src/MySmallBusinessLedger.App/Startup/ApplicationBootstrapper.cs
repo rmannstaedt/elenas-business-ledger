@@ -73,5 +73,11 @@ internal sealed class ApplicationBootstrapper
             new ShellInvoicePdfLauncher(),
             new SettingsWindowLauncher(services.SettingsService),
             new PlanCatalogWindowLauncher(services.PlanCatalogService),
+            new EconomyOverviewWindowLauncher(
+                services.EconomyOverviewService,
+                new WindowsEconomyOverviewExportDialog(),
+                new EconomyOverviewCsvFileService(new EconomyOverviewCsvFormatter()),
+                new ShellInvoicePdfLauncher(),
+                services.SystemClock),
             services.SystemClock);
 }

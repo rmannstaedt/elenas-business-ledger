@@ -2040,6 +2040,11 @@ public sealed class UseCaseTests
             return Task.FromResult(StudentInvoices);
         }
 
+        public Task<IReadOnlyList<EconomyInvoiceRecord>> ListIssuedInvoiceOverviewRowsAsync(
+            int periodYear,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<EconomyInvoiceRecord>>([]);
+
         public Task<bool> HasInvoiceForStudentInMonthAsync(string studentShortName, DateOnly month, CancellationToken cancellationToken) =>
             Task.FromResult(StudentsWithInvoiceThisMonth.Contains(studentShortName));
 

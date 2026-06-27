@@ -70,6 +70,28 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public void EconomyMenuShowsOverview()
+    {
+        RunOnStaThread(() =>
+        {
+            var viewModel = CreateViewModel();
+            var window = new AppMainWindow(viewModel);
+
+            var economyMenu = Assert.Single(FindChildren<WpfMenuItem>(window), item => item.Header?.ToString() == "_Economy");
+            var economyActions = economyMenu.Items
+                .OfType<WpfMenuItem>()
+                .Select(item => item.Header?.ToString())
+                .Where(header => header is not null)
+                .Cast<string>()
+                .ToArray();
+
+            Assert.Equal(["_Overview"], economyActions);
+
+            window.Close();
+        });
+    }
+
+    [Fact]
     public void MainWindowStudentDetailsButtonOpensDetailsForCurrentStudent()
     {
         RunOnStaThread(() =>
@@ -1425,6 +1447,17 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task EconomyOverviewCommandOpensEconomyOverview()
+    {
+        var economyOverview = new FakeEconomyOverviewLauncher();
+        var viewModel = CreateViewModel(economyOverviewLauncher: economyOverview);
+
+        await viewModel.OpenEconomyOverviewCommand.ExecuteAsync();
+
+        Assert.True(economyOverview.WasShown);
+    }
+
+    [Fact]
     public async Task ManageStudentsCommandRefreshesDashboardWithSelectedOverviewStudent()
     {
         var dashboard = new FakeDashboardService { StudentShortNames = ["Anna", "Bo"] };
@@ -2270,6 +2303,7 @@ public sealed class MainWindowViewModelTests
             new FakeInvoicePdfLauncher(),
             new FakeSettingsLauncher(),
             new FakePlanCatalogLauncher(),
+            new FakeEconomyOverviewLauncher(),
             new FakeUiClock(new DateTimeOffset(2026, 6, 16, 12, 0, 0, TimeSpan.Zero)));
         await viewModel.LoadAsync();
 
@@ -2421,6 +2455,7 @@ public sealed class MainWindowViewModelTests
         FakeInvoicePdfLauncher? invoicePdfLauncher = null,
         FakeSettingsLauncher? settingsLauncher = null,
         FakePlanCatalogLauncher? planCatalogLauncher = null,
+        FakeEconomyOverviewLauncher? economyOverviewLauncher = null,
         FakeUiClock? clock = null,
         TimeZoneInfo? lessonTimeZone = null) =>
         new(
@@ -2436,6 +2471,7 @@ public sealed class MainWindowViewModelTests
             invoicePdfLauncher ?? new FakeInvoicePdfLauncher(),
             settingsLauncher ?? new FakeSettingsLauncher(),
             planCatalogLauncher ?? new FakePlanCatalogLauncher(),
+            economyOverviewLauncher ?? new FakeEconomyOverviewLauncher(),
             clock ?? new FakeUiClock(new DateTimeOffset(2026, 6, 16, 12, 0, 0, TimeSpan.Zero)),
             lessonTimeZone);
 
@@ -3065,6 +3101,17 @@ public sealed class MainWindowViewModelTests
         public bool WasShown { get; private set; }
 
         public Task ShowPlanCatalogAsync(CancellationToken cancellationToken)
+        {
+            WasShown = true;
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class FakeEconomyOverviewLauncher : IEconomyOverviewLauncher
+    {
+        public bool WasShown { get; private set; }
+
+        public Task ShowEconomyOverviewAsync(CancellationToken cancellationToken)
         {
             WasShown = true;
             return Task.CompletedTask;

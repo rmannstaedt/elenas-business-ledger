@@ -25,6 +25,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private readonly IInvoicePdfLauncher invoicePdfLauncher;
     private readonly ISettingsLauncher settingsLauncher;
     private readonly IPlanCatalogLauncher planCatalogLauncher;
+    private readonly IEconomyOverviewLauncher economyOverviewLauncher;
     private readonly IUiClock clock;
     private readonly TimeZoneInfo lessonTimeZone;
     private readonly Dictionary<LessonDisplayModel, int> autoSaveDraftVersions = [];
@@ -61,6 +62,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         IInvoicePdfLauncher invoicePdfLauncher,
         ISettingsLauncher settingsLauncher,
         IPlanCatalogLauncher planCatalogLauncher,
+        IEconomyOverviewLauncher economyOverviewLauncher,
         IUiClock clock,
         TimeZoneInfo? lessonTimeZone = null)
     {
@@ -76,6 +78,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         this.invoicePdfLauncher = invoicePdfLauncher;
         this.settingsLauncher = settingsLauncher;
         this.planCatalogLauncher = planCatalogLauncher;
+        this.economyOverviewLauncher = economyOverviewLauncher;
         this.clock = clock;
         this.lessonTimeZone = lessonTimeZone ?? TimeZoneInfo.Local;
         displayMonth = new DateOnly(clock.Now.Year, clock.Now.Month, 1);
@@ -110,6 +113,7 @@ public sealed class MainWindowViewModel : ViewModelBase
             () => !IsBusy && CurrentStudentShortName is not null);
         OpenSettingsCommand = new AsyncRelayCommand(OpenSettingsAsync, () => !IsBusy);
         OpenManagePlansCommand = new AsyncRelayCommand(OpenManagePlansAsync, () => !IsBusy);
+        OpenEconomyOverviewCommand = new AsyncRelayCommand(OpenEconomyOverviewAsync, () => !IsBusy);
         AddLessonCommand = new AsyncRelayCommand(AddLessonAsync, () => !IsBusy && CurrentStudentShortName is not null);
         PopulateCalendarCommand = new AsyncRelayCommand(PopulateCalendarAsync, CanPopulateCalendar);
         SaveLessonCommand = new AsyncRelayCommand(
@@ -223,6 +227,8 @@ public sealed class MainWindowViewModel : ViewModelBase
     public AsyncRelayCommand OpenSettingsCommand { get; }
 
     public AsyncRelayCommand OpenManagePlansCommand { get; }
+
+    public AsyncRelayCommand OpenEconomyOverviewCommand { get; }
 
     public AsyncRelayCommand AddLessonCommand { get; }
 
@@ -441,6 +447,9 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     private Task OpenManagePlansAsync() =>
         planCatalogLauncher.ShowPlanCatalogAsync(CancellationToken.None);
+
+    private Task OpenEconomyOverviewAsync() =>
+        economyOverviewLauncher.ShowEconomyOverviewAsync(CancellationToken.None);
 
     private async Task WriteInvoiceAsync()
     {
@@ -1225,6 +1234,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         OpenStudentDetailsCommand.RaiseCanExecuteChanged();
         OpenSettingsCommand.RaiseCanExecuteChanged();
         OpenManagePlansCommand.RaiseCanExecuteChanged();
+        OpenEconomyOverviewCommand.RaiseCanExecuteChanged();
         AddLessonCommand.RaiseCanExecuteChanged();
         PopulateCalendarCommand.RaiseCanExecuteChanged();
         SaveLessonCommand.RaiseCanExecuteChanged();

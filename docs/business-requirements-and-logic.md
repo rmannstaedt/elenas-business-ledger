@@ -173,6 +173,11 @@ The application contains a Plan menu with:
 
 Manage Plans lists Draft, Active, and Retired catalog Plans. Draft Plans can be edited, deleted, and published. Active Plans are read-only except for `Retire on`, and can be retired. Retired Plans are read-only and can be reactivated. Closing the window with unsaved editable changes prompts the user to save, discard, or cancel. Only Active Plans appear in the Student editor assignment selector.
 
+The application contains an Economy menu with:
+  * Overview
+
+Economy Overview displays issued invoice reporting for the selected invoice-period year. It defaults to the current calendar year and has previous/next year controls. It reads from the local SQLite issued invoice rows and stored issued totals, not from stored PDF files. Only issued invoices are included; in-progress `Issuing` reservations are hidden. Invoices are grouped by the invoice period start date: Jan-Mar is Q1, Apr-Jun is Q2, Jul-Sep is Q3, and Oct-Dec is Q4. The window shows invoice number, PDF filename only, net amount, VAT amount, and total amount; month and quarter rows with no invoices stay visible with blank amount cells. Double-clicking an invoice opens the stored PDF. The displayed data can be exported to one CSV file with `Section`, `Year`, `Label`, `InvoiceNumber`, `Filename`, `Net`, `VAT`, and `Total` columns; amount fields use machine-friendly invariant decimals such as `1234.50`.
+
 The application window also displays a pane with Student Invoices.
 Each Invoice in the list has a flag: Paid / Outstanding
 Clicking on an 'Outstanding' flag toggles it to 'Paid'.
@@ -279,7 +284,7 @@ The invoice printer is selected from Application Settings during setup. If no in
 ### Version 1.10
 
   * VAT exemptions for individual students are outside the current scope.
-  * No VAT reporting.
+  * No formal VAT return or bookkeeping-system VAT report; Economy Overview summarizes issued invoice net/VAT totals only.
   * No automated payment reminders or due-date workflow.
   * No support for credit notes/correction invoices.
   * No integration with MobilePay/Bank for payment registration.

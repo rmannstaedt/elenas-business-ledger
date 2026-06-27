@@ -86,6 +86,30 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
             .ToArrayAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<EconomyInvoiceRecord>> ListIssuedInvoiceOverviewRowsAsync(
+        int periodYear,
+        CancellationToken cancellationToken)
+    {
+        await using var context = createContext();
+        var yearStart = new DateOnly(periodYear, 1, 1);
+        var nextYearStart = yearStart.AddYears(1);
+        return await context.IssuedInvoices
+            .AsNoTracking()
+            .Where(invoice => invoice.IssueStatus == InvoiceIssueStatus.Issued)
+            .Where(invoice => invoice.PeriodFrom >= yearStart && invoice.PeriodFrom < nextYearStart)
+            .OrderBy(invoice => invoice.InvoiceNumber)
+            .Select(invoice => new EconomyInvoiceRecord(
+                new InvoiceNumber(invoice.InvoiceNumber),
+                invoice.InvoiceDate,
+                new InvoicePeriod(invoice.PeriodFrom, invoice.PeriodTo),
+                invoice.PdfFilePath,
+                new InvoiceTotals(
+                    new MoneyAmount(invoice.TotalWithoutVatAmount, invoice.Currency),
+                    new MoneyAmount(invoice.VatAmount, invoice.Currency),
+                    new MoneyAmount(invoice.TotalAmount, invoice.Currency))))
+            .ToArrayAsync(cancellationToken);
+    }
+
     public async Task<bool> HasInvoiceForStudentInMonthAsync(
         string studentShortName,
         DateOnly month,

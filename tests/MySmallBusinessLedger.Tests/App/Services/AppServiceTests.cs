@@ -156,6 +156,11 @@ public sealed class AppServiceTests
         public Task<IReadOnlyList<IssuedInvoiceSummary>> ListInvoicesForStudentAsync(string studentShortName, CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<IssuedInvoiceSummary>>([]);
 
+        public Task<IReadOnlyList<EconomyInvoiceRecord>> ListIssuedInvoiceOverviewRowsAsync(
+            int periodYear,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<EconomyInvoiceRecord>>([]);
+
         public Task<bool> HasInvoiceForStudentInMonthAsync(string studentShortName, DateOnly month, CancellationToken cancellationToken) =>
             Task.FromResult(false);
 

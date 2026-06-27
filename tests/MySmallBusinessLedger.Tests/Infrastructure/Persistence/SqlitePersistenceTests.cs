@@ -482,6 +482,72 @@ public sealed class SqlitePersistenceTests
     }
 
     [Fact]
+    public async Task EconomyOverviewRowsUsePeriodYearAndExcludeIssuingReservations()
+    {
+        using var database = await TestDatabase.CreateAsync();
+        var repository = new SqliteInvoiceRepository(database.CreateContext);
+        var plan = await SaveCatalogPlanAsync(new SqlitePlanCatalogRepository(database.CreateContext), "Standard");
+        var includedLesson = await SaveLessonAsync(database, "Anna", plan, new DateTimeOffset(2026, 5, 4, 14, 0, 0, TimeSpan.Zero));
+        var previousYearLesson = await SaveLessonAsync(database, "Anna", plan, new DateTimeOffset(2025, 12, 15, 14, 0, 0, TimeSpan.Zero));
+        var issuingLesson = await SaveLessonAsync(database, "Anna", plan, new DateTimeOffset(2026, 6, 1, 14, 0, 0, TimeSpan.Zero));
+
+        await SaveIssuedInvoiceViaBusinessFlowAsync(
+            repository,
+            CreateIssuedInvoice(
+                "Anna",
+                "Anna Andersen",
+                "Standard",
+                includedLesson.StartsAt,
+                plan.Id,
+                new InvoicePeriod(new DateOnly(2026, 5, 1), new DateOnly(2026, 5, 31)),
+                includedLesson.Id,
+                invoiceDate: new DateOnly(2027, 1, 5),
+                totals: new InvoiceTotals(Money.Dkk(800m), Money.Dkk(200m), Money.Dkk(1000m)),
+                pdfFilePath: @"C:\Invoices\Invoice 001 Maj.pdf"),
+            CancellationToken.None);
+        await SaveIssuedInvoiceViaBusinessFlowAsync(
+            repository,
+            CreateIssuedInvoice(
+                "Anna",
+                "Anna Andersen",
+                "Standard",
+                previousYearLesson.StartsAt,
+                plan.Id,
+                new InvoicePeriod(new DateOnly(2025, 12, 1), new DateOnly(2025, 12, 31)),
+                previousYearLesson.Id,
+                invoiceDate: new DateOnly(2026, 1, 5),
+                totals: new InvoiceTotals(Money.Dkk(400m), Money.Dkk(100m), Money.Dkk(500m)),
+                pdfFilePath: @"C:\Invoices\Invoice 002 December.pdf"),
+            CancellationToken.None);
+
+        var issuingDraft = CreateInvoiceDraft(
+            "Anna",
+            "Anna Andersen",
+            "Standard",
+            issuingLesson.StartsAt,
+            plan.Id,
+            new InvoicePeriod(new DateOnly(2026, 6, 1), new DateOnly(2026, 6, 30)),
+            issuingLesson.Id,
+            invoiceDate: new DateOnly(2026, 6, 30));
+        var reserved = await repository.ReserveInvoiceAsync(
+            issuingDraft,
+            new InvoiceTotals(Money.Dkk(400m), Money.Dkk(100m), Money.Dkk(500m)),
+            CancellationToken.None);
+        Assert.True(reserved.Succeeded);
+
+        var rows = await repository.ListIssuedInvoiceOverviewRowsAsync(2026, CancellationToken.None);
+
+        var row = Assert.Single(rows);
+        Assert.Equal(new InvoiceNumber(1), row.InvoiceNumber);
+        Assert.Equal(new DateOnly(2027, 1, 5), row.InvoiceDate);
+        Assert.Equal(new InvoicePeriod(new DateOnly(2026, 5, 1), new DateOnly(2026, 5, 31)), row.Period);
+        Assert.Equal(@"C:\Invoices\Invoice 001 Maj.pdf", row.PdfFilePath);
+        Assert.Equal(Money.Dkk(800m), row.Totals.TotalWithoutVat);
+        Assert.Equal(Money.Dkk(200m), row.Totals.VatAmount);
+        Assert.Equal(Money.Dkk(1000m), row.Totals.Total);
+    }
+
+    [Fact]
     public async Task HasInvoiceForStudentInMonthUsesStoredInvoicePeriod()
     {
         using var database = await TestDatabase.CreateAsync();
@@ -1198,14 +1264,17 @@ public sealed class SqlitePersistenceTests
         int planCatalogId = 7,
         InvoicePeriod? period = null,
         int lessonId = 0,
-        InvoiceNumber? invoiceNumber = null)
+        InvoiceNumber? invoiceNumber = null,
+        DateOnly? invoiceDate = null,
+        InvoiceTotals? totals = null,
+        string? pdfFilePath = null)
     {
-        var draft = CreateInvoiceDraft(studentShortName, fullName, planName, lessonDateTime, planCatalogId, period, lessonId);
+        var draft = CreateInvoiceDraft(studentShortName, fullName, planName, lessonDateTime, planCatalogId, period, lessonId, invoiceDate);
 
         return draft.Issue(
             invoiceNumber ?? new InvoiceNumber(1),
-            new InvoiceTotals(Money.Dkk(400m), Money.Dkk(0m), Money.Dkk(400m)),
-            "C:\\Invoices\\000001.pdf");
+            totals ?? new InvoiceTotals(Money.Dkk(400m), Money.Dkk(0m), Money.Dkk(400m)),
+            pdfFilePath ?? "C:\\Invoices\\000001.pdf");
     }
 
     private static async Task<OperationResult<IssuedInvoice>> SaveIssuedInvoiceViaBusinessFlowAsync(
@@ -1248,9 +1317,10 @@ public sealed class SqlitePersistenceTests
         DateTimeOffset? lessonDateTime = null,
         int planCatalogId = 7,
         InvoicePeriod? period = null,
-        int lessonId = 0) =>
+        int lessonId = 0,
+        DateOnly? invoiceDate = null) =>
         InvoiceDraft.Create(
-            new DateOnly(2026, 6, 16),
+            invoiceDate ?? new DateOnly(2026, 6, 16),
             new CompanySnapshot("Maple Key Studio", "Musikvej 1", null),
             new StudentSnapshot(studentShortName, fullName, "Testvej 1"),
             [

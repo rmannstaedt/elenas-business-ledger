@@ -1,5 +1,6 @@
 using MySmallBusinessLedger.App.Services;
 using MySmallBusinessLedger.Core.Ports;
+using MySmallBusinessLedger.Core.UseCases.Economy;
 using MySmallBusinessLedger.Core.UseCases.Invoices;
 using MySmallBusinessLedger.Core.UseCases.Lessons;
 using MySmallBusinessLedger.Core.UseCases.Startup;
@@ -26,6 +27,7 @@ internal sealed class ApplicationServiceGraph
         IPlanCatalogService planCatalogService,
         IStudentEditorService studentEditorService,
         IStudentOverviewService studentOverviewService,
+        IEconomyOverviewService economyOverviewService,
         ILessonEditorService lessonEditorService,
         IInvoiceWorkflowService invoiceWorkflowService,
         IInvoiceWorkflowLauncher invoiceWorkflowLauncher,
@@ -43,6 +45,7 @@ internal sealed class ApplicationServiceGraph
         PlanCatalogService = planCatalogService;
         StudentEditorService = studentEditorService;
         StudentOverviewService = studentOverviewService;
+        EconomyOverviewService = economyOverviewService;
         LessonEditorService = lessonEditorService;
         InvoiceWorkflowService = invoiceWorkflowService;
         InvoiceWorkflowLauncher = invoiceWorkflowLauncher;
@@ -70,6 +73,8 @@ internal sealed class ApplicationServiceGraph
     public IStudentEditorService StudentEditorService { get; }
 
     public IStudentOverviewService StudentOverviewService { get; }
+
+    public IEconomyOverviewService EconomyOverviewService { get; }
 
     public ILessonEditorService LessonEditorService { get; }
 
@@ -108,6 +113,7 @@ internal sealed class ApplicationServiceGraph
             DefaultLessonDuration);
         var studentEditorService = new CoreStudentEditorService(studentRepository);
         var studentOverviewService = new CoreStudentOverviewService(studentRepository, invoiceRepository);
+        var economyOverviewService = new CoreEconomyOverviewService(new EconomyOverviewQuery(invoiceRepository));
         var lessonEditorService = new CoreLessonEditorService(
             new AddLessonUseCase(calendarGateway, studentRepository, planCatalogRepository, lessonRepository),
             new EditLessonUseCase(calendarGateway, lessonRepository),
@@ -153,6 +159,7 @@ internal sealed class ApplicationServiceGraph
             planCatalogService,
             studentEditorService,
             studentOverviewService,
+            economyOverviewService,
             lessonEditorService,
             invoiceWorkflowService,
             invoiceWorkflowLauncher,

@@ -1,0 +1,44 @@
+using System.Windows;
+using MySmallBusinessLedger.App.ViewModels;
+using MySmallBusinessLedger.App.Views;
+
+namespace MySmallBusinessLedger.App.Services;
+
+public sealed class EconomyOverviewWindowLauncher : IEconomyOverviewLauncher
+{
+    private readonly IEconomyOverviewService economyOverviewService;
+    private readonly IEconomyOverviewExportDialog exportDialog;
+    private readonly IEconomyOverviewCsvFileService csvFileService;
+    private readonly IInvoicePdfLauncher invoicePdfLauncher;
+    private readonly IUiClock clock;
+
+    public EconomyOverviewWindowLauncher(
+        IEconomyOverviewService economyOverviewService,
+        IEconomyOverviewExportDialog exportDialog,
+        IEconomyOverviewCsvFileService csvFileService,
+        IInvoicePdfLauncher invoicePdfLauncher,
+        IUiClock clock)
+    {
+        this.economyOverviewService = economyOverviewService;
+        this.exportDialog = exportDialog;
+        this.csvFileService = csvFileService;
+        this.invoicePdfLauncher = invoicePdfLauncher;
+        this.clock = clock;
+    }
+
+    public async Task ShowEconomyOverviewAsync(CancellationToken cancellationToken)
+    {
+        var viewModel = new EconomyOverviewViewModel(
+            economyOverviewService,
+            exportDialog,
+            csvFileService,
+            invoicePdfLauncher,
+            clock);
+        await viewModel.LoadAsync(cancellationToken);
+        var window = new EconomyOverviewView(viewModel)
+        {
+            Owner = Application.Current?.MainWindow
+        };
+        window.ShowDialog();
+    }
+}

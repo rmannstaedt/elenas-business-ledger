@@ -9,6 +9,10 @@ public interface IInvoiceRepository
 
     Task<IReadOnlyList<IssuedInvoiceSummary>> ListInvoicesForStudentAsync(string studentShortName, CancellationToken cancellationToken);
 
+    Task<IReadOnlyList<EconomyInvoiceRecord>> ListIssuedInvoiceOverviewRowsAsync(
+        int periodYear,
+        CancellationToken cancellationToken);
+
     Task<bool> HasInvoiceForStudentInMonthAsync(string studentShortName, DateOnly month, CancellationToken cancellationToken);
 
     Task<InvoiceNumber> GetNextInvoiceNumberAsync(CancellationToken cancellationToken);
