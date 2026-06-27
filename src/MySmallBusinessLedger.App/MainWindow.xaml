@@ -379,6 +379,12 @@
                 <StackPanel Grid.Column="1"
                             Orientation="Horizontal"
                             VerticalAlignment="Center">
+                    <Button Content="Student Details"
+                            Command="{Binding OpenStudentDetailsCommand}"
+                            MinWidth="124"
+                            Height="34"
+                            Margin="0,0,8,0"
+                            AutomationProperties.Name="Open student details" />
                     <Button Content="Open Calendar"
                             Command="{Binding OpenCalendarCommand}"
                             MinWidth="112"

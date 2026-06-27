@@ -70,6 +70,32 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public void MainWindowStudentDetailsButtonOpensDetailsForCurrentStudent()
+    {
+        RunOnStaThread(() =>
+        {
+            var studentOverview = new FakeStudentOverviewLauncher();
+            var viewModel = CreateViewModel(studentOverviewLauncher: studentOverview);
+            var window = new AppMainWindow(viewModel);
+            try
+            {
+                window.Show();
+                PumpUntil(() => !viewModel.IsBusy && viewModel.CurrentStudentShortName == "Anna");
+
+                var detailsButton = FindButton(window, "Open student details");
+                InvokeButton(detailsButton);
+                PumpUntil(() => studentOverview.DetailsWereShown);
+
+                Assert.Equal("Anna", studentOverview.InitialDetailsSelectedStudentShortName);
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
+    [Fact]
     public void MainWindowAlignsLessonAndInvoiceTablesAndExposesPaneSplitter()
     {
         RunOnStaThread(() =>
@@ -1416,6 +1442,22 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task StudentDetailsCommandRefreshesDashboardForCurrentStudentAfterClose()
+    {
+        var dashboard = new FakeDashboardService { StudentShortNames = ["Anna", "Bo"] };
+        var studentOverview = new FakeStudentOverviewLauncher();
+        var viewModel = CreateViewModel(dashboard: dashboard, studentOverviewLauncher: studentOverview);
+        await viewModel.LoadAsync();
+
+        await viewModel.OpenStudentDetailsCommand.ExecuteAsync();
+
+        Assert.True(studentOverview.DetailsWereShown);
+        Assert.Equal("Anna", studentOverview.InitialDetailsSelectedStudentShortName);
+        Assert.Equal("Anna", dashboard.LastSelectedStudentShortName);
+        Assert.Equal(2, dashboard.LoadCount);
+    }
+
+    [Fact]
     public async Task ManageStudentsSelectionImmediatelyRefreshesDashboard()
     {
         var dashboard = new FakeDashboardService { StudentShortNames = ["Anna", "Erik"] };
@@ -2728,7 +2770,11 @@ public sealed class MainWindowViewModelTests
     {
         public bool WasShown { get; private set; }
 
+        public bool DetailsWereShown { get; private set; }
+
         public string? InitialSelectedStudentShortName { get; private set; }
+
+        public string? InitialDetailsSelectedStudentShortName { get; private set; }
 
         public string? SelectedStudentShortName { get; init; }
 
@@ -2775,6 +2821,15 @@ public sealed class MainWindowViewModelTests
             }
 
             return SelectedStudentShortName;
+        }
+
+        public Task<string?> ShowStudentDetailsAsync(
+            string? selectedStudentShortName,
+            CancellationToken cancellationToken)
+        {
+            DetailsWereShown = true;
+            InitialDetailsSelectedStudentShortName = selectedStudentShortName;
+            return Task.FromResult(SelectedStudentShortName ?? selectedStudentShortName);
         }
     }
 

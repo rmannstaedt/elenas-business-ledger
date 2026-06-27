@@ -6,4 +6,8 @@ public interface IStudentOverviewLauncher
         string? selectedStudentShortName,
         Func<string?, CancellationToken, Task> selectedStudentChangedAsync,
         CancellationToken cancellationToken);
+
+    Task<string?> ShowStudentDetailsAsync(
+        string? selectedStudentShortName,
+        CancellationToken cancellationToken);
 }

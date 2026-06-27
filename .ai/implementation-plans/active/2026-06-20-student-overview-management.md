@@ -53,6 +53,7 @@ Add `Student > Manage Students`, opening a WPF student overview window with:
 ## Desired End State
 
 - `Student > Manage Students` opens a student overview window.
+- The main-window `Student Details` button opens the same Student Details surface for the currently displayed student.
 - Selecting a student refreshes the details, current plan, and invoices.
 - Add/Edit actions use the Student Details window's shared editor state.
 - Deactivate/Reactivate actions update only the selected student's active flag and refresh the list while preserving selection where possible.
@@ -70,6 +71,7 @@ Add `Student > Manage Students`, opening a WPF student overview window with:
 ## Intentional Behavior Changes
 
 - Add `Student > Manage Students`.
+- Add a main-window `Student Details` shortcut for the currently displayed student.
 - Add all-students listing support in the student repository.
 - Add a student overview service/launcher/viewmodel/view.
 - Allow deactivation/reactivation from the student overview.
@@ -80,6 +82,7 @@ Add `Student > Manage Students`, opening a WPF student overview window with:
 - `src/MySmallBusinessLedger.Core/Ports/IStudentRepository.cs`
 - `src/MySmallBusinessLedger.Infrastructure/Persistence/SqliteStudentRepository.cs`
 - New App service interfaces/classes for student overview and launcher.
+- `src/MySmallBusinessLedger.App/Services/IStudentOverviewLauncher.cs`
 - New App display models and ViewModel.
 - New WPF view/code-behind.
 - `src/MySmallBusinessLedger.App/MainWindow.xaml`
@@ -230,6 +233,41 @@ Follow-on actions:
 
 Runner may continue automatically after this stage: yes.
 
+### Stage 5: Main-Window Student Details Shortcut
+
+Type: implementation / test / UI / documentation
+Status: Complete
+
+Goal:
+
+- Add a main-window `Student Details` button that opens the existing `StudentDetailsView` for the currently displayed dashboard student.
+
+Affected files/classes/schemas/commands/UI surfaces:
+
+- `src/MySmallBusinessLedger.App/MainWindow.xaml`
+- `src/MySmallBusinessLedger.App/ViewModels/MainWindowViewModel.cs`
+- `src/MySmallBusinessLedger.App/Services/IStudentOverviewLauncher.cs`
+- `src/MySmallBusinessLedger.App/Services/StudentOverviewWindowLauncher.cs`
+- `tests/MySmallBusinessLedger.Tests/App/ViewModels/MainWindowViewModelTests.cs`
+
+Concrete steps:
+
+- Add `OpenStudentDetailsCommand` to the main-window ViewModel.
+- Add `IStudentOverviewLauncher.ShowStudentDetailsAsync`.
+- Reuse `StudentDetailsView` and the existing `StudentOverviewViewModel` setup for the standalone details-only path.
+- Refresh the dashboard around the returned selected student after the details window closes.
+- Add the `Student Details` button to the main-window top action row.
+
+Verification:
+
+```powershell
+dotnet test MySmallBusinessLedger.sln --filter "FullyQualifiedName~MainWindowViewModelTests" -nodeReuse:false
+dotnet build MySmallBusinessLedger.sln -nodeReuse:false
+dotnet test MySmallBusinessLedger.sln -nodeReuse:false
+```
+
+Runner may continue automatically after this stage: yes.
+
 ## Final User Test Instructions
 
 Post-completion user test: mandatory.
@@ -247,6 +285,7 @@ Post-completion user test: mandatory.
 11. Confirm Manage Students now opens a Students list window and a separate student details window.
 12. Click another student in the list, such as Ida Søndergaard, and confirm the details window changes to that student.
 13. Confirm the details window Close button is on the bottom row and centered.
+14. From the main window, click `Student Details` and confirm it opens the same Student Details window for the currently displayed student.
 
 Expected result: Student overview supports list/detail/current-plan/invoices and safe activation state changes without mutating invoices or plan snapshots.
 
@@ -275,14 +314,21 @@ Expected result: Student overview supports list/detail/current-plan/invoices and
 - 2026-06-27:
   - Stage: Stage 4 placement fix
   - Files changed: Student overview launcher and focused WPF/ViewModel tests.
-  - Summary: Made Student Details an independent top-level window rather than an owned child of Manage Students, so closing Manage Students first explicitly closes Student Details through its normal close path and preserves Student Details placement.
+  - Summary: Made Manage Students explicitly close Student Details through its normal close path after a confirmed list-window close, preserving Student Details placement.
   - Tests/verification run: `dotnet test MySmallBusinessLedger.sln --filter "FullyQualifiedName~StudentOverviewViewModelTests" -nodeReuse:false`; `dotnet build MySmallBusinessLedger.sln -nodeReuse:false`; `dotnet test MySmallBusinessLedger.sln -nodeReuse:false`.
   - Results: Focused tests passed 18/18; full build passed with 0 warnings and 0 errors; full solution tests passed 346/346.
   - Risks/open questions: Manual confirmation should close Manage Students first, reopen, and verify Student Details returns to its last position.
 - 2026-06-27:
   - Stage: Stage 4 focus-order fix
   - Files changed: Student overview launcher and this plan.
-  - Summary: After a Manage Students list selection propagates to the main window, the launcher reactivates Student Details so it stays visually foremost as the primary details surface.
+  - Summary: Made Student Details an owned window of Manage Students once Manage Students is shown, so Windows keeps the details window above its list owner without delayed reactivation or visible z-order shuffling.
   - Tests/verification run: `dotnet test MySmallBusinessLedger.sln --filter "FullyQualifiedName~StudentOverviewViewModelTests" -nodeReuse:false`; `dotnet build MySmallBusinessLedger.sln -nodeReuse:false`; `dotnet test MySmallBusinessLedger.sln --filter "FullyQualifiedName~StudentOverviewViewModelTests.StudentOverviewAndDetailsWindowsShareSelectedStudent" -nodeReuse:false`; `dotnet test MySmallBusinessLedger.sln -nodeReuse:false`.
   - Results: Focused student overview tests passed 18/18; build passed with 0 warnings and 0 errors; full test suite had one transient WPF XAML parse failure, the failing test passed in isolation, and the full rerun passed 346/346.
-  - Risks/open questions: Manual confirmation should click students in the list and verify Student Details returns to the top after the selection sync completes.
+  - Risks/open questions: Manual confirmation should click students in the list and verify Student Details stays naturally above Manage Students without a visible yank.
+- 2026-06-27:
+  - Stage: Stage 5 main-window Student Details shortcut
+  - Files changed: Main window XAML, main-window ViewModel, student overview launcher/interface, focused WPF/ViewModel tests, README, project profile, business requirements, handoff, and this plan.
+  - Summary: Added a main-window `Student Details` button that opens the existing `StudentDetailsView` for the currently displayed student, reusing the same student overview/details ViewModel setup and refreshing the dashboard around the final selected student after close.
+  - Tests/verification run: `dotnet test MySmallBusinessLedger.sln --filter "FullyQualifiedName~MainWindowViewModelTests" -nodeReuse:false`; `dotnet build MySmallBusinessLedger.sln -nodeReuse:false`; `dotnet test MySmallBusinessLedger.sln -nodeReuse:false`.
+  - Results: Focused main-window tests passed 82/82; full build passed with 0 warnings and 0 errors; full solution tests passed 348/348.
+  - Risks/open questions: Manual confirmation should click the new main-window `Student Details` button and verify it opens the expected student.

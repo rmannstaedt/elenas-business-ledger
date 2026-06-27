@@ -31,14 +31,7 @@ public sealed class StudentOverviewWindowLauncher : IStudentOverviewLauncher
         Func<string?, CancellationToken, Task> selectedStudentChangedAsync,
         CancellationToken cancellationToken)
     {
-        var viewModel = new StudentOverviewViewModel(
-            studentOverviewService,
-            studentEditorService,
-            planCatalogService,
-            invoiceWorkflowLauncher,
-            clock,
-            new MessageBoxStudentOverviewInteractionService());
-        await viewModel.LoadAsync(selectedStudentShortName);
+        var viewModel = await CreateViewModelAsync(selectedStudentShortName);
         var window = new StudentOverviewView(viewModel)
         {
             Owner = Application.Current?.MainWindow
@@ -81,5 +74,32 @@ public sealed class StudentOverviewWindowLauncher : IStudentOverviewLauncher
             {
             }
         }
+    }
+
+    public async Task<string?> ShowStudentDetailsAsync(
+        string? selectedStudentShortName,
+        CancellationToken cancellationToken)
+    {
+        var viewModel = await CreateViewModelAsync(selectedStudentShortName);
+        var window = new StudentDetailsView(viewModel)
+        {
+            Owner = Application.Current?.MainWindow
+        };
+
+        window.ShowDialog();
+        return viewModel.SelectedStudent?.ShortName;
+    }
+
+    private async Task<StudentOverviewViewModel> CreateViewModelAsync(string? selectedStudentShortName)
+    {
+        var viewModel = new StudentOverviewViewModel(
+            studentOverviewService,
+            studentEditorService,
+            planCatalogService,
+            invoiceWorkflowLauncher,
+            clock,
+            new MessageBoxStudentOverviewInteractionService());
+        await viewModel.LoadAsync(selectedStudentShortName);
+        return viewModel;
     }
 }

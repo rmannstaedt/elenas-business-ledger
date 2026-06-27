@@ -105,6 +105,9 @@ public sealed class MainWindowViewModel : ViewModelBase
             parameter => OpenInvoicePdfAsync((InvoiceDisplayModel)parameter!),
             parameter => parameter is InvoiceDisplayModel && !IsBusy);
         OpenManageStudentsCommand = new AsyncRelayCommand(OpenManageStudentsAsync, () => !IsBusy);
+        OpenStudentDetailsCommand = new AsyncRelayCommand(
+            OpenStudentDetailsAsync,
+            () => !IsBusy && CurrentStudentShortName is not null);
         OpenSettingsCommand = new AsyncRelayCommand(OpenSettingsAsync, () => !IsBusy);
         OpenManagePlansCommand = new AsyncRelayCommand(OpenManagePlansAsync, () => !IsBusy);
         AddLessonCommand = new AsyncRelayCommand(AddLessonAsync, () => !IsBusy && CurrentStudentShortName is not null);
@@ -214,6 +217,8 @@ public sealed class MainWindowViewModel : ViewModelBase
     public AsyncRelayCommand OpenInvoicePdfCommand { get; }
 
     public AsyncRelayCommand OpenManageStudentsCommand { get; }
+
+    public AsyncRelayCommand OpenStudentDetailsCommand { get; }
 
     public AsyncRelayCommand OpenSettingsCommand { get; }
 
@@ -401,6 +406,14 @@ public sealed class MainWindowViewModel : ViewModelBase
         var selectedStudentShortName = await studentOverviewLauncher.ShowStudentOverviewAsync(
             CurrentStudentShortName,
             ApplyStudentOverviewSelectionAsync,
+            CancellationToken.None);
+        await ApplyStudentOverviewSelectionAsync(selectedStudentShortName, CancellationToken.None);
+    }
+
+    private async Task OpenStudentDetailsAsync()
+    {
+        var selectedStudentShortName = await studentOverviewLauncher.ShowStudentDetailsAsync(
+            CurrentStudentShortName,
             CancellationToken.None);
         await ApplyStudentOverviewSelectionAsync(selectedStudentShortName, CancellationToken.None);
     }
@@ -1209,6 +1222,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         OpenInvoiceCommand.RaiseCanExecuteChanged();
         OpenInvoicePdfCommand.RaiseCanExecuteChanged();
         OpenManageStudentsCommand.RaiseCanExecuteChanged();
+        OpenStudentDetailsCommand.RaiseCanExecuteChanged();
         OpenSettingsCommand.RaiseCanExecuteChanged();
         OpenManagePlansCommand.RaiseCanExecuteChanged();
         AddLessonCommand.RaiseCanExecuteChanged();
