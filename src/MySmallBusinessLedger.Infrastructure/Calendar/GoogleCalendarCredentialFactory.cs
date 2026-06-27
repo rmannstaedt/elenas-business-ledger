@@ -1,5 +1,7 @@
 using Google.Apis.Auth.OAuth2;
+using Google.Apis.Auth.OAuth2.Flows;
 using Google.Apis.Calendar.v3;
+using Google.Apis.Http;
 using Google.Apis.Services;
 using Google.Apis.Util.Store;
 
@@ -31,11 +33,37 @@ public sealed class GoogleCalendarCredentialFactory
             cancellationToken,
             tokenStore);
 
-        return new CalendarService(
+        return CreateCalendarService(credential);
+    }
+
+    public async Task<CalendarService?> TryCreateCalendarServiceFromSavedCredentialAsync(
+        string userId,
+        CancellationToken cancellationToken)
+    {
+        var flow = CreateAuthorizationCodeFlow();
+        var token = await flow.LoadTokenAsync(userId, cancellationToken);
+        if (token is null)
+        {
+            return null;
+        }
+
+        return CreateCalendarService(new UserCredential(flow, userId, token));
+    }
+
+    private GoogleAuthorizationCodeFlow CreateAuthorizationCodeFlow() =>
+        new(
+            new GoogleAuthorizationCodeFlow.Initializer
+            {
+                ClientSecrets = clientSecrets,
+                Scopes = RequestedScopes,
+                DataStore = tokenStore
+            });
+
+    private CalendarService CreateCalendarService(IConfigurableHttpClientInitializer credential) =>
+        new(
             new BaseClientService.Initializer
             {
                 HttpClientInitializer = credential,
                 ApplicationName = applicationName
             });
-    }
 }

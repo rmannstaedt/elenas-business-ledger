@@ -123,5 +123,5 @@ public sealed class ConfiguredGoogleCalendarGateway : IGoogleCalendarGateway
             new ValidationError("Calendar.NotConfigured", NotConfiguredMessage));
 
     private const string NotConfiguredMessage =
-        "Google Calendar is not configured. Configure a Google account and calendar before using lesson sync.";
+        "Google Calendar is not configured or authorization is missing. Open Application > Settings and use Connect Google Calendar before using lesson sync.";
 }

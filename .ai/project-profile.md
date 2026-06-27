@@ -40,7 +40,7 @@ Invoice PDF generation: QuestPDF; Danish invoice PDFs use a toner-light header w
 Invoice VAT calculation: VAT applicability is based on the invoice period start date, not the invoice issue/print date
 Invoice PDF safety: reserve invoice metadata as `Issuing`, write to staging, verify PDF bytes, publish without overwriting, record the published path on the `Issuing` row, finalize the invoice as `Issued`, then request print; staging/write/verify/publish failures before final PDF publication must discard any staged PDF and release the reserved number so retries do not skip invoice numbers; after final PDF publication, finalization failure must preserve the `Issuing` reservation and published path for retry/support recovery, leave normal invoice lists hidden from the in-progress invoice, and avoid printing
 Invoice printer: configured from `Application > Settings`, stored in SQLite company profile data, selectable from installed Windows printers when enumeration is available, typeable, changeable, and clearable; if missing during first invoice print/reprint, the app opens the printer selection dialog directly and remembers the selected printer before continuing; the invoice preview stays open during issue/print, blocks Cancel/window close from hiding an in-progress result, and prompts after an extended wait to confirm the user still wants to wait; `Printed` means the configured printer existed and the Windows print request was launched without exception, not that physical output or spooler completion was verified
-Google Calendar account tokens: stored locally with Windows user data protection under collision-resistant hashed token-key filenames, never in SQLite or plaintext config
+Google Calendar account tokens: stored locally with Windows user data protection under collision-resistant hashed token-key filenames, never in SQLite or plaintext config; legacy escaped token filenames are read and migrated to hashed filenames on successful lookup
 Google Calendar selected calendar/account label: stored in SQLite app settings; the main-window browser launcher uses the configured account email as a Google Calendar account hint
 Runtime app data folder: `%APPDATA%\visualtech.dk\MySmallBusinessLedger`
 Runtime SQLite database path: `%APPDATA%\visualtech.dk\MySmallBusinessLedger\ledger.db`
@@ -54,7 +54,7 @@ Backup: no automated backup in version 1.0; keep persistence design compatible w
 ## External integrations
 
 Google Calendar API: official Google Calendar .NET client
-Google authentication: external browser OAuth
+Google authentication: external browser OAuth only for explicit Settings connection/reconnection; startup and automatic dashboard refresh use saved local credentials non-interactively and do not launch browser consent
 Google OAuth app identity: publisher-owned Desktop OAuth client; users authorize their own Google account at runtime
 Google OAuth Calendar scope: request `https://www.googleapis.com/auth/calendar.events.owned`, not broader all-calendar event scopes; the configured calendar should be owned by the signed-in Google account, and app-level lesson matching still ignores events whose first summary line does not match the `$` student marker
 Google Calendar event time zones: write payloads must use Google/IANA time zone IDs; convert Windows local time zone IDs such as `Romance Standard Time` before creating or moving events
@@ -117,6 +117,7 @@ Use fake Google Calendar client for calendar integration tests
 - Do not use Google Calendar as the billing/tax audit source for invoiced lessons; use the locked local Lessons row and issued invoice snapshots.
 - Do not infer invoiced, completed, or paid state from descriptive student/date/time/plan/month matches; apply that state only through the exact local lesson id linked from an issued invoice line.
 - Do not persist OAuth access or refresh tokens in plaintext; token file names must not collide for distinct token keys.
+- Do not launch interactive Google OAuth from startup or automatic refresh; use `Application > Settings > Connect Google Calendar` for deliberate browser authorization.
 - Do not allow Draft or Retired catalog plans to be assigned to students.
 - Do not mutate existing student plan period commercial-term snapshots or issued invoices when a catalog plan is edited as Draft, published, retired, reactivated, or renamed; plan renames may update catalog display names and plan-name history while student periods keep referring to the same catalog plan identity.
 - Deactivating or reactivating a student must not mutate that student's plan periods, schedule, or issued invoices.

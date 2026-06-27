@@ -107,7 +107,7 @@ public sealed class CoreAppSettingsService : IAppSettingsService
 
         try
         {
-            var configuredClient = await googleCalendarClientFactory.CreateAsync(calendarSettings, cancellationToken);
+            var configuredClient = await googleCalendarClientFactory.CreateForConnectionAsync(calendarSettings, cancellationToken);
             if (configuredClient is null)
             {
                 return OperationResult<bool>.Failure(
@@ -159,7 +159,7 @@ public sealed class CoreAppSettingsService : IAppSettingsService
             appPaths.AppDataFolderPath,
             appPaths.DatabasePath,
             appPaths.GoogleTokenFolderPath,
-            HasGoogleAuthorizationTokens(),
+            HasGoogleAuthorizationTokens(calendarSettings),
             availablePrinterNames ?? []);
 
     private async Task<IReadOnlyList<string>> LoadPrinterNamesAsync(CancellationToken cancellationToken)
@@ -174,13 +174,16 @@ public sealed class CoreAppSettingsService : IAppSettingsService
         }
     }
 
-    private bool HasGoogleAuthorizationTokens()
+    private bool HasGoogleAuthorizationTokens(CalendarSettings? calendarSettings)
     {
-        if (!Directory.Exists(appPaths.GoogleTokenFolderPath))
+        if (calendarSettings is null ||
+            string.IsNullOrWhiteSpace(calendarSettings.GoogleAccountEmail) ||
+            !Directory.Exists(appPaths.GoogleTokenFolderPath))
         {
             return false;
         }
 
-        return Directory.EnumerateFiles(appPaths.GoogleTokenFolderPath).Any();
+        var tokenStore = new Infrastructure.Calendar.WindowsProtectedFileDataStore(appPaths.GoogleTokenFolderPath);
+        return tokenStore.ContainsKey(calendarSettings.GoogleAccountEmail);
     }
 }

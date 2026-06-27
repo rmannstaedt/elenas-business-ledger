@@ -2,6 +2,8 @@ using MySmallBusinessLedger.Core.Common;
 using MySmallBusinessLedger.Core.Lessons;
 using MySmallBusinessLedger.Core.UseCases.Lessons;
 using MySmallBusinessLedger.Infrastructure.Calendar;
+using Google.Apis.Auth.OAuth2;
+using Google.Apis.Auth.OAuth2.Responses;
 using Google.Apis.Calendar.v3;
 using Google.Apis.Calendar.v3.Data;
 using Google.Apis.Util.Store;
@@ -16,6 +18,47 @@ public sealed class GoogleCalendarGatewayTests
         Assert.Equal(
             [CalendarService.Scope.CalendarEventsOwned],
             GoogleCalendarCredentialFactory.RequestedScopes);
+    }
+
+    [Fact]
+    public async Task CredentialFactoryCreatesCalendarServiceFromSavedCredentialWithoutWebAuthorization()
+    {
+        var tokenStore = new InMemoryDataStore();
+        await tokenStore.StoreAsync(
+            "elena@example.test",
+            new TokenResponse
+            {
+                AccessToken = "saved-access-token",
+                RefreshToken = "saved-refresh-token",
+                ExpiresInSeconds = 3600,
+                IssuedUtc = DateTime.UtcNow
+            });
+        var factory = new GoogleCalendarCredentialFactory(
+            new ClientSecrets { ClientId = "client-id", ClientSecret = "client-secret" },
+            tokenStore,
+            "My Small Business Ledger");
+
+        var service = await factory.TryCreateCalendarServiceFromSavedCredentialAsync(
+            "elena@example.test",
+            CancellationToken.None);
+
+        Assert.NotNull(service);
+        Assert.IsType<UserCredential>(service.HttpClientInitializer);
+    }
+
+    [Fact]
+    public async Task CredentialFactoryReturnsNullWhenSavedCredentialIsMissing()
+    {
+        var factory = new GoogleCalendarCredentialFactory(
+            new ClientSecrets { ClientId = "client-id", ClientSecret = "client-secret" },
+            new InMemoryDataStore(),
+            "My Small Business Ledger");
+
+        var service = await factory.TryCreateCalendarServiceFromSavedCredentialAsync(
+            "elena@example.test",
+            CancellationToken.None);
+
+        Assert.Null(service);
     }
 
     [Fact]
@@ -413,6 +456,70 @@ public sealed class GoogleCalendarGatewayTests
     }
 
     [Fact]
+    public async Task WindowsProtectedFileDataStoreReadsAndMigratesLegacyEscapedTokenFile()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var directory = Path.Combine(Path.GetTempPath(), "ElenaLedgerTokenTests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+
+        try
+        {
+            IDataStore writer = new WindowsProtectedFileDataStore(directory);
+            await writer.StoreAsync("a%b@example.com", new StoredToken("legacy-token"));
+            var hashedFile = Assert.Single(Directory.GetFiles(directory));
+            var legacyFile = Path.Combine(directory, LegacyEscapedFileName("a%b@example.com"));
+            File.Move(hashedFile, legacyFile);
+
+            var store = new WindowsProtectedFileDataStore(directory);
+            var loaded = await store.GetAsync<StoredToken>("a%b@example.com");
+
+            Assert.Equal("legacy-token", loaded.AccessToken);
+            Assert.True(File.Exists(hashedFile));
+            Assert.False(File.Exists(legacyFile));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task WindowsProtectedFileDataStoreReportsCurrentAndLegacyTokenFilesForKey()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var directory = Path.Combine(Path.GetTempPath(), "ElenaLedgerTokenTests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+
+        try
+        {
+            var store = new WindowsProtectedFileDataStore(directory);
+
+            Assert.False(store.ContainsKey("elena@example.test"));
+
+            await store.StoreAsync("elena@example.test", new StoredToken("current-token"));
+            Assert.True(store.ContainsKey("elena@example.test"));
+
+            var hashedFile = Assert.Single(Directory.GetFiles(directory));
+            var legacyFile = Path.Combine(directory, LegacyEscapedFileName("elena@example.test"));
+            File.Move(hashedFile, legacyFile);
+
+            Assert.True(store.ContainsKey("elena@example.test"));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task WindowsProtectedFileDataStoreClearDeletesOnlyFilesInsideTokenFolder()
     {
         if (!OperatingSystem.IsWindows())
@@ -449,6 +556,39 @@ public sealed class GoogleCalendarGatewayTests
             DefaultLessonDuration: defaultLessonDuration ?? TimeSpan.FromHours(1));
 
     private sealed record StoredToken(string AccessToken);
+
+    private static string LegacyEscapedFileName(string key) =>
+        $"{Uri.EscapeDataString(key).Replace("%", "_")}.bin";
+
+    private sealed class InMemoryDataStore : IDataStore
+    {
+        private readonly Dictionary<string, object?> values = [];
+
+        public Task StoreAsync<T>(string key, T value)
+        {
+            values[key] = value;
+            return Task.CompletedTask;
+        }
+
+        public Task DeleteAsync<T>(string key)
+        {
+            values.Remove(key);
+            return Task.CompletedTask;
+        }
+
+        public Task<T> GetAsync<T>(string key)
+        {
+            return Task.FromResult(values.TryGetValue(key, out var value)
+                ? (T)value!
+                : default!);
+        }
+
+        public Task ClearAsync()
+        {
+            values.Clear();
+            return Task.CompletedTask;
+        }
+    }
 
     private sealed class FakeGoogleCalendarEventClient : IGoogleCalendarEventClient
     {

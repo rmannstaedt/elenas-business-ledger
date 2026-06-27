@@ -8,6 +8,7 @@ using MySmallBusinessLedger.Core.Ports;
 using MySmallBusinessLedger.Core.Time;
 using MySmallBusinessLedger.Core.UseCases.Lessons;
 using MySmallBusinessLedger.Core.UseCases.Startup;
+using MySmallBusinessLedger.Infrastructure.Calendar;
 using MySmallBusinessLedger.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -51,7 +52,7 @@ public sealed class AppServiceTests
     }
 
     [Fact]
-    public async Task AppSettingsServiceReportsSavedGoogleAuthorizationWhenTokenFolderContainsFiles()
+    public async Task AppSettingsServiceDoesNotReportSavedGoogleAuthorizationWhenOnlyUnrelatedTokenFilesExist()
     {
         using var database = await TestDatabase.CreateAsync();
         using var appData = new TemporaryDirectory();
@@ -64,6 +65,66 @@ public sealed class AppServiceTests
         var service = new CoreAppSettingsService(
             new SqliteCompanyProfileRepository(database.CreateContext),
             new SqliteCalendarSettingsRepository(database.CreateContext),
+            appPaths,
+            new GoogleOAuthClientConfigurationProvider(Path.Combine(appData.Path, "missing-google-oauth-client.json")));
+
+        var snapshot = await service.LoadAsync(CancellationToken.None);
+
+        Assert.False(snapshot.HasGoogleAuthorizationTokens);
+    }
+
+    [Fact]
+    public async Task AppSettingsServiceReportsSavedGoogleAuthorizationForConfiguredAccountToken()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        using var database = await TestDatabase.CreateAsync();
+        using var appData = new TemporaryDirectory();
+        var appPaths = AppPaths.FromAppDataFolder(appData.Path);
+        var calendarSettingsRepository = new SqliteCalendarSettingsRepository(database.CreateContext);
+        await calendarSettingsRepository.SaveAsync(
+            new CalendarSettings("primary", "elena@example.test"),
+            CancellationToken.None);
+        var tokenStore = new WindowsProtectedFileDataStore(appPaths.GoogleTokenFolderPath);
+        await tokenStore.StoreAsync("elena@example.test", new StoredToken("saved-token"));
+        var service = new CoreAppSettingsService(
+            new SqliteCompanyProfileRepository(database.CreateContext),
+            calendarSettingsRepository,
+            appPaths,
+            new GoogleOAuthClientConfigurationProvider(Path.Combine(appData.Path, "missing-google-oauth-client.json")));
+
+        var snapshot = await service.LoadAsync(CancellationToken.None);
+
+        Assert.True(snapshot.HasGoogleAuthorizationTokens);
+    }
+
+    [Fact]
+    public async Task AppSettingsServiceReportsSavedGoogleAuthorizationForConfiguredAccountLegacyToken()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        using var database = await TestDatabase.CreateAsync();
+        using var appData = new TemporaryDirectory();
+        var appPaths = AppPaths.FromAppDataFolder(appData.Path);
+        var calendarSettingsRepository = new SqliteCalendarSettingsRepository(database.CreateContext);
+        await calendarSettingsRepository.SaveAsync(
+            new CalendarSettings("primary", "elena@example.test"),
+            CancellationToken.None);
+        var tokenStore = new WindowsProtectedFileDataStore(appPaths.GoogleTokenFolderPath);
+        await tokenStore.StoreAsync("elena@example.test", new StoredToken("saved-token"));
+        var hashedFile = Assert.Single(Directory.GetFiles(appPaths.GoogleTokenFolderPath));
+        File.Move(
+            hashedFile,
+            Path.Combine(appPaths.GoogleTokenFolderPath, LegacyEscapedFileName("elena@example.test")));
+        var service = new CoreAppSettingsService(
+            new SqliteCompanyProfileRepository(database.CreateContext),
+            calendarSettingsRepository,
             appPaths,
             new GoogleOAuthClientConfigurationProvider(Path.Combine(appData.Path, "missing-google-oauth-client.json")));
 
@@ -267,4 +328,9 @@ public sealed class AppServiceTests
             Directory.Delete(Path, recursive: true);
         }
     }
+
+    private sealed record StoredToken(string AccessToken);
+
+    private static string LegacyEscapedFileName(string key) =>
+        $"{Uri.EscapeDataString(key).Replace("%", "_")}.bin";
 }
