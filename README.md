@@ -2,7 +2,7 @@
 
 This repository contains a small local-first ledger application for independent piano teachers.
 
-Current app version: 1.0.
+Current app version: 1.10.
 
 Primary goal:
 
@@ -66,8 +66,8 @@ The main window can populate Google Calendar from the selected student's saved s
 
 ## Current key assumptions
 
-- Under-30 teaching support remains in the data model because future students may require it (but out of scope for version 1.0).
-- Lønsumsafgift is out of scope for version 1.0.
+- Under-30 teaching support remains in the data model because future students may require it (but out of scope for version 1.10).
+- Lønsumsafgift is out of scope for version 1.10.
 - Google Calendar is the operational schedule surface for uninvoiced lessons; local SQLite Lessons records are the durable billing ledger and invoiced lessons ignore later calendar edits/deletions.
 - Google Calendar integration uses the official Google Calendar API client, external browser OAuth for explicit Settings connection, and Windows-protected local token storage with hashed token-key filenames. Startup refreshes use saved local credentials non-interactively and do not launch browser OAuth. The app requests the narrower `https://www.googleapis.com/auth/calendar.events.owned` OAuth scope so it can read, create, move, complete, and delete lesson events on calendars owned by the signed-in Google account; entries still must match the documented `$` student marker before the app treats them as lessons.
 - The Google OAuth app identity is publisher-owned and supplied from `Configuration\google-oauth-client.json`, not selected by each user in Settings.

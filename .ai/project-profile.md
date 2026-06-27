@@ -4,7 +4,7 @@
 
 Working name: My Small Business Ledger
 
-Current app version: 1.0
+Current app version: 1.10
 
 Internal namespace/project prefix:
 MySmallBusinessLedger
@@ -49,7 +49,7 @@ Publisher Google OAuth Desktop client configuration: local/release file `src\MyS
 Google OAuth protected token folder: `%APPDATA%\visualtech.dk\MySmallBusinessLedger\GoogleTokens`
 Window placement file path: `%APPDATA%\visualtech.dk\MySmallBusinessLedger\window-placement.json`
 Grid column width file path: `%APPDATA%\visualtech.dk\MySmallBusinessLedger\grid-column-widths.json`
-Backup: no automated backup in version 1.0; keep persistence design compatible with later manual backup/export
+Backup: no automated backup in version 1.10; keep persistence design compatible with later manual backup/export
 
 ## External integrations
 

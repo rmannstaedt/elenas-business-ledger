@@ -276,7 +276,7 @@ The invoice printer is selected from Application Settings during setup. If no in
 
 ## Limitations
 
-### Version 1.0
+### Version 1.10
 
   * VAT exemptions for individual students are outside the current scope.
   * No VAT reporting.

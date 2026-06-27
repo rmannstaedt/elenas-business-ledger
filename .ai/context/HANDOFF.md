@@ -6,7 +6,7 @@ Date: 2026-06-27
 
 - Active implementation plans include prior OAuth/plan/student follow-up plans plus `.ai/implementation-plans/active/2026-06-22-invoice-issue-finalization-and-print-status.md`; several older active plans are implementation-complete and still need plan-folder cleanup. The EF migrations/startup bootstrapper cleanup is completed under `.ai/implementation-plans/completed/2026-06-22-ef-migrations-and-startup-bootstrapper.md`, and the invoice finalization plan has been refreshed to target EF Core migrations rather than the removed manual schema initializer.
 - The app is now a real WPF/Core/Infrastructure local-first pilot build, not sample-backed.
-- Current app version is 1.0.
+- Current app version is 1.10.
 - User-facing product name, internal namespace, project prefix, and app-data folder are `My Small Business Ledger` / `MySmallBusinessLedger`.
 - Runtime composition uses SQLite under `%APPDATA%\visualtech.dk\MySmallBusinessLedger`, Google Calendar through the official API client, QuestPDF invoice generation, staged PDF storage, invoice metadata persistence, and OS print request after PDF save.
 - SQLite schema evolution now uses EF Core migrations. The WPF startup bootstrapper applies pending migrations before repositories are used; the old manual `SqliteSchemaInitializer` has been removed. Legacy invoice-line rows that cannot be tied to exact local `Lessons.Id` are skipped on upgrade with a one-time startup warning instead of blocking startup or inventing lineage.
