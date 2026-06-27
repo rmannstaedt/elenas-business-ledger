@@ -21,6 +21,7 @@ Catch issues such as:
 - incorrect edge-case handling;
 - unsafe filesystem, database, network, external process, or UI behavior;
 - weak verification or false success conditions;
+- mismatches between the state a command mutates and the source later used by billing, reporting, audit, permissions, previews, exports, synchronization, destructive actions, or UI refresh;
 - overly loose, misleading, or under-specified contracts;
 - cancellation, retry, timeout, resume, idempotency, shutdown, or partial-failure bugs;
 - missing failure recording or poor error reporting;
@@ -99,6 +100,8 @@ Default to a whole-solution impact review when the user asks for a general code 
 
 If the user provides a specific diff, file, or concern, focus there but follow consequences through callers, implementations, tests, contracts, DTOs, persistence/artifact paths, DI registrations, UI/CLI entry points, database queries/migrations, service/job paths, verification/finalization paths, and error-reporting paths when relevant.
 
+When code mutates state that is also represented in a UI projection, cache, external system, local database, generated artifact, queue, report, or read model, trace both the mutation path and the next consequential read path. Consequential readers include billing/previews, reports, exports, audits, permissions, finalization, cleanup, synchronization, destructive actions, and any UI that claims the operation succeeded.
+
 For very large solutions, prioritize high-risk paths first and clearly state what was not reviewed. Prefer depth on high-risk paths over shallow commentary on every file.
 
 ## Domain Identity, Lineage, And Reference Integrity
@@ -116,13 +119,23 @@ Trace important identifiers through:
 Check whether:
 
 - each state change targets an exact durable entity;
+- each successful state-changing command updates the source that later consequential readers actually query before it reports success;
 - IDs needed downstream are preserved rather than dropped because the immediate display does not need them;
 - financial, tax, invoice, payment, receipt, credit, audit, import/export, reconciliation, printed, completed, locked, or finalized state is never inferred from names, dates, times, titles, prices, filenames, formatted text, or other descriptive fields;
 - snapshots are used for historical display while stable references are used for ownership and state application;
 - natural keys are documented, validated, constrained, immutable enough for the domain, and tested against collision/edit cases;
 - missing, stale, deleted, or ambiguous references fail safe instead of falling back to broad matching;
+- cleanup, refresh, reconciliation, cache invalidation, startup repair, or background work is a recovery fallback and not the only path that makes a just-completed user action safe;
 - database schema, EF entities, domain models, DTOs, and tests agree about required identities and null/default behavior;
-- tests include duplicate descriptive values such as same student/date/time/plan where state must remain distinct.
+- tests include duplicate descriptive values such as same name/date/time/category/amount where state must remain distinct.
+
+When a workflow spans multiple state representations, make a small mutation/read matrix: command, source(s) mutated, UI/read-model state changed, source queried by the next consequential workflow, recovery/cleanup path, and failure window between them. Report gaps where a just-completed command can be followed immediately by a stale consequential read.
+
+Failure scenarios to actively look for:
+
+- a command removes or changes one representation and updates visible state, but a later billing/report/export/audit/permission/destructive workflow still reads a stale row, cache entry, queue item, artifact, or projection;
+- a command writes local durable state and shows success, but the external item, generated artifact, queue message, cache, search index, or read model used by later workflows was not created or updated;
+- tests cover the mutation and downstream reader independently but not the immediate sequence `mutate -> downstream read`.
 
 Treat a lost or weak identity in financial, billing, payment, tax, issued-document, or audit code as a likely Critical finding. It is not enough that the current data set has no duplicate values; review against plausible domain data and future edits.
 
@@ -130,7 +143,7 @@ Treat a lost or weak identity in financial, billing, payment, tax, issued-docume
 
 Prioritize findings in this order:
 
-1. Data loss, corruption, false success, unsafe destructive behavior, state attached to the wrong durable entity, or security/trust-boundary failures.
+1. Data loss, corruption, false success, unsafe destructive behavior, stale split-source state reaching a consequential reader, state attached to the wrong durable entity, or security/trust-boundary failures.
 2. Authorization, path traversal, external input, process execution, secret/privacy, tenant/user/workspace boundary risks.
 3. Verification correctness, proof, finalization, idempotency, and durable state truthfulness.
 4. Persistence, database, artifact, migration, queue, cache, identity, lineage, or durable-reference consistency risks.
@@ -153,7 +166,7 @@ Read `references/code-review-checks.md`. Apply only the sections relevant to the
 
 Classify findings as:
 
-- **Critical** — likely data loss, corruption, security issue, false success, destructive action without proper guard, broken build, severe correctness failure, or financial/audit state being applied to the wrong durable entity.
+- **Critical** — likely data loss, corruption, security issue, false success, destructive action without proper guard, broken build, severe correctness failure, stale split-source state reaching a financial/audit/destructive/permission reader, or financial/audit state being applied to the wrong durable entity.
 - **High** — likely runtime bug, serious safety/workflow/security bug, important contract flaw, major test gap around risky behavior, or significant local ownership/design drift.
 - **Medium** — plausible edge-case failure, maintainability issue, incomplete verification, unclear contract, SOLID/coding-standard concern, performance risk for realistic workloads, or missing tests that should be addressed soon.
 - **Low** — minor clarity, naming, style, or small cleanup issue worth fixing only if nearby.
@@ -199,6 +212,7 @@ Then include:
 - important areas not inspected, if any;
 - verification status;
 - remaining test gaps;
+- mutation/read-source gaps in split-source workflows, when relevant;
 - whether documentation refresh is warranted;
 - whether architecture review is warranted;
 - whether refactor planning is warranted;

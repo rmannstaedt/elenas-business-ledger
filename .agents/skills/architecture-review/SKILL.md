@@ -21,6 +21,7 @@ Answer questions such as:
 - Are infrastructure, framework, database, filesystem, Windows, UI, transport, or serialization details leaking upward?
 - Are runtime roles and trust boundaries clear?
 - Are safety, verification, finalization, retry, resume, cancellation, and recovery guarantees owned by the correct components?
+- When state is visible in UI/read models but later decisions read another source, are successful mutations written to the later authoritative source before success is reported?
 - Are abstractions helping, or are they hiding important guarantees behind indirection?
 - Has the design become either too broad or falsely decomposed into too many overlapping small parts?
 - Does the documented architecture still match the code?
@@ -82,6 +83,7 @@ Inspect relevant:
 - public interfaces, major abstractions, and ownership of interfaces;
 - Domain/Core, Application, Infrastructure, Presentation, host, and test boundaries;
 - durable business identities, references, snapshots, lineage, and authoritative state ownership;
+- authoritative read/write paths for stateful workflows, including UI projections, external systems, caches, local stores, generated artifacts, and later reporting/billing/audit readers;
 - CLI, service, worker, job, controller, handler, repository, adapter, database, and UI entry points;
 - runtime topology and communication boundaries;
 - workflow orchestration, state transitions, and policy ownership;
@@ -115,6 +117,7 @@ Check whether:
 - dependency inversion protects policy from details rather than adding ceremony;
 - cross-cutting concerns such as logging, clocks, configuration, telemetry, retry, cancellation, and correlation are handled consistently;
 - durable business state is attached through stable identity/reference paths rather than inferred from mutable or non-unique descriptive fields;
+- user-visible successful mutations update the source that downstream workflows actually read, not only a UI projection, external system, cache, or cleanup/reconciliation path;
 - tests exercise important seams rather than requiring fragile end-to-end coverage for every policy;
 - decomposition creates coherent components rather than a proliferation of overlapping miniature services;
 - runtime topology and communication boundaries are explicit, intentional, and safe, including which components may call, command, observe, or mutate which other components.
@@ -159,7 +162,7 @@ Identify the durable business entities and ask:
 - Which stable identifier points to that exact entity?
 - Which fields are live references, and which fields are issued-time or event-time snapshots?
 - Which external-system identifiers are scoped to an adapter boundary?
-- Which records may outlive current catalog, customer, student, account, schedule, or external-system state?
+- Which records may outlive current catalog, customer, account, schedule, profile, or external-system state?
 - Which states are financial, audit, billing, tax, payment, import/export, reconciliation, printed, completed, or finalized states?
 
 Architectural risks to report include:
@@ -167,13 +170,38 @@ Architectural risks to report include:
 - applying state by matching names, dates, times, titles, amounts, filenames, or formatted text instead of stable identities;
 - using a natural key without documented uniqueness, immutability, validation, and persistence constraints;
 - losing identity while moving from draft to issued/final records, domain models to persistence entities, external events to local records, or source rows to reports/PDFs;
-- confusing snapshots with references, so old invoices/reports depend on current mutable catalog or profile data;
+- confusing snapshots with references, so old issued documents or reports depend on current mutable catalog or profile data;
 - allowing external-system edits to rewrite local audit/billing state after that local state should be locked;
 - treating a generated artifact, report row, or UI projection as the owner of business truth;
 - missing migration, recovery, or cleanup policy for identity/lineage changes;
-- lacking collision tests for same-name/same-date/same-time/same-plan or other plausible descriptive duplicates.
+- lacking collision tests for same-name/same-date/same-time/same-category/same-amount or other plausible descriptive duplicates.
 
 For financial, tax, invoice, payment, receipt, credit, audit, or finalization paths, weak identity/reference design is normally a Critical architecture finding. The smallest safe correction is usually to introduce or preserve a stable source identity, keep required snapshots for display/history, and update queries/projections so state is applied only through that identity.
+
+## Authoritative State, Projections, And Split-Source Consistency
+
+For systems where the same business concept appears in more than one place, review source-of-truth ownership explicitly. Examples include UI grids, read models, external SaaS records, local databases, caches, search indexes, queues, generated files, reports, exports, previews, and audit logs.
+
+Create a mutation/read matrix for each high-risk workflow:
+
+- operation or command;
+- state shown to the user before and after the operation;
+- external systems, databases, caches, read models, artifacts, or queues mutated by the operation;
+- source later used by consequential readers such as billing, reporting, deletion, finalization, synchronization, export, audit, permissions, or destructive workflows;
+- cleanup, reconciliation, retry, or recovery paths;
+- failure points between mutation, durable write, UI update, and later read.
+
+Report architectural risks when:
+
+- UI or read-model state can say work is gone, saved, completed, issued, deleted, printed, synced, exported, or verified while a later authoritative reader still sees the old state;
+- a command mutates an external system but not the local durable state that downstream workflows use;
+- a command mutates local state but leaves an external or generated artifact as the apparent user-facing truth;
+- eventual reconciliation, refresh, cache invalidation, or startup cleanup is the only mechanism making immediately user-visible actions safe;
+- generated previews, billing documents, reports, exports, permissions, or destructive actions read from a different source than the one just mutated;
+- stale rows, orphaned records, deleted external IDs, recreated external items, or cache entries can reappear in later workflows;
+- tests cover the command and the reader separately but not the sequence `mutate -> immediately read through downstream workflow`.
+
+For financial, audit, permission, destructive, or externally visible workflows, this is normally a Critical or High architecture finding. The smallest safe correction is usually to declare the authoritative source for each state, update it in the same application workflow before reporting success, make projections/cleanup recovery-only, and add scenario tests for immediate downstream reads after mutation.
 
 ## Runtime Topology and Trust Checks
 
@@ -202,10 +230,12 @@ For staged, durable, long-running, destructive, or safety-sensitive workflows, c
 - no component can skip required safety stages;
 - success cannot be reported without sufficient proof;
 - finalization cannot happen before required checks complete;
+- later consequential reads cannot observe stale state after a user-visible successful mutation;
 - partial failure is represented truthfully;
 - cancellation and interruption leave the system recoverable and honest;
 - retry and resume behavior is owned by the correct layer;
 - safety rules are enforced by code, not only documented;
+- reconciliation, refresh, cache cleanup, startup repair, or background recovery is a fallback and not the only correctness path for immediately user-triggered state changes;
 - destructive actions require intended authorization, confirmation, or policy approval;
 - durable artifacts reflect actual outcomes rather than desired outcomes.
 
@@ -300,9 +330,10 @@ Report:
 3. Findings grouped by severity.
 4. For each finding: severity, location, problem, evidence, architectural impact, smallest safe change, and whether this should be documented only, code-reviewed, refactor-planned, or fixed immediately.
 5. Affected files, projects, layers, runtime areas, or durable formats.
-6. Documentation/code mismatches, if any.
-7. Verification performed or still recommended.
-8. Whether `code-review`, `refactor-planning`, or `documentation-refresh` is warranted.
-9. Open questions.
+6. Authoritative source / mutation-read matrix for high-risk split-source workflows, when relevant.
+7. Documentation/code mismatches, if any.
+8. Verification performed or still recommended.
+9. Whether `code-review`, `refactor-planning`, or `documentation-refresh` is warranted.
+10. Open questions.
 
 Do not rewrite architecture as part of the review unless explicitly asked.

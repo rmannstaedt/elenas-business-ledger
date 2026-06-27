@@ -11,6 +11,7 @@ Check for:
 - null handling, invalid-input behavior, missing guards, and incorrect default handling;
 - mismatches between names, contracts, return values, docs, tests, and actual behavior;
 - unclear preconditions, postconditions, invariants, ownership, or lifetime expectations;
+- mismatches between the source a command mutates and the source later used by billing, reporting, audit, permissions, previews, exports, synchronization, destructive actions, or UI refresh;
 - off-by-one, empty collection, duplicate, missing, already-exists, permission-denied, locked, unavailable, malformed, unsupported, unknown, and future-value cases;
 - incorrect state transitions, missing state validation, invalid repeated execution, and hidden lifecycle ordering requirements;
 - idempotency problems where work may be retried, resumed, repeated, cancelled, timed out, crashed, or partially completed;
@@ -117,10 +118,12 @@ Check whether:
 - missing, stale, deleted, or ambiguous references fail safe and visibly instead of falling back to broad matching;
 - external-system IDs are scoped to the external system boundary and mapped to local durable IDs when local audit/billing state matters;
 - later external edits cannot rewrite locked or already-issued local business state unless an explicit corrective workflow allows it;
+- user-visible successful mutations update the durable/source-of-truth records that later consequential workflows actually read;
+- refresh, reconciliation, cache invalidation, startup repair, cleanup jobs, or background sync are recovery fallbacks and not the sole correctness mechanism for immediately user-triggered mutations;
 - generated reports, PDFs, logs, and exports preserve enough lineage to diagnose exactly which source rows were used;
 - migrations preserve identity/lineage when real durable history exists, or the breaking reset is explicit and approved;
-- tests include duplicate descriptive values, such as same student/date/time/plan or same customer/date/amount, where those duplicates are plausible in the domain;
-- tests prove newly created rows cannot inherit invoice/payment/completion/audit state from unrelated old rows.
+- tests include duplicate descriptive values, such as same name/date/time/category/amount or same customer/date/amount, where those duplicates are plausible in the domain;
+- tests prove newly created rows cannot inherit billing/payment/completion/audit state from unrelated old rows.
 
 Failure scenarios to actively look for:
 
@@ -129,9 +132,38 @@ Failure scenarios to actively look for:
 - a UI read model treats a local cached display value as proof of issued/payment state;
 - a migration introduces a new identity field but leaves old rows indistinguishable without a documented reset/backfill policy;
 - a cleanup or reset removes parent rows while child rows keep stale status markers;
-- an external calendar/file/account item is deleted and recreated, causing local state to attach to the new item by description.
+- an external file/account/item is deleted and recreated, causing local state to attach to the new item by description.
+- a command updates visible/UI/read-model state and one backing source, but the next billing/report/export/audit/permission/destructive workflow reads a different stale backing source;
+- an external item, generated artifact, queue message, cache entry, search index, or read model is treated as updated merely because local state or UI state changed;
+- tests cover the mutating command and downstream reader independently but not the sequence `mutate -> immediately read through downstream workflow`.
 
 Treat identity weakness as Critical when money, tax, invoice, payment, credit, receipt, audit, finalization, destructive action, or user/account ownership can attach to the wrong durable entity.
+
+## Authoritative Read/Write And Projection Consistency
+
+Apply when the same logical entity or workflow state exists in more than one representation: UI state, read models, caches, external systems, databases, queues, generated artifacts, search indexes, reports, exports, previews, or logs.
+
+Build a small matrix for high-risk paths:
+
+- command or operation;
+- source(s) it mutates;
+- UI/read-model state it changes;
+- source used by the next consequential reader;
+- cleanup, refresh, reconciliation, retry, or recovery path;
+- failure window between mutation, durable write, visible success, and downstream read.
+
+Check whether:
+
+- a successful command updates the source that downstream workflows actually query before returning success;
+- a UI row disappearing, status label changing, toast appearing, or command returning success is not used as proof that durable state changed;
+- later preview/report/export/billing/audit/permission/destructive/sync workflows cannot immediately observe stale state after the command;
+- cache/read-model/search-index invalidation is either synchronous enough for the next consequential read or the stale read is blocked/marked stale;
+- generated artifacts and previews are built from the same authoritative source that the mutation updated, or stale artifacts are invalidated;
+- external-system mutation failures and local persistence failures cannot leave the UI claiming success while later local readers use old state;
+- reconciliation and cleanup are retained as recovery paths but are not required for ordinary immediate correctness;
+- tests exercise command-then-reader scenarios, including partial failure between sources.
+
+Treat split-source drift as Critical when money, audit, permissions, destructive action, legal/tax output, or finalized artifacts can use stale or contradictory state. Treat it as High when user-visible state can contradict durable state in ways likely to cause wrong decisions.
 
 ## Local Design and SOLID Checks
 
@@ -206,6 +238,7 @@ Check whether:
 - transactions, concurrency tokens, unique constraints, ordering, idempotency, retries, and partial failure are handled correctly;
 - stable business references use explicit IDs or enforced natural keys rather than mutable descriptive fields;
 - queries that apply state join by the exact durable source identity and not by display names, formatted dates, amounts, filenames, or text;
+- write paths and read paths agree on which table, projection, cache, artifact, or queue owns the current state used by consequential workflows;
 - finalized financial/audit rows contain the references needed to prove lineage plus snapshots needed for historical display;
 - migration code can lose data, mishandle existing rows, break rollback assumptions, or silently change durable meaning;
 - EF Core tracking/no-tracking, context lifetime, lazy loading, query composition, and transaction boundaries are intentional;
