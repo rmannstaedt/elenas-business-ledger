@@ -13,6 +13,10 @@ public sealed class LedgerDbContext : DbContext
 
     public DbSet<CalendarSettingsEntity> CalendarSettings => Set<CalendarSettingsEntity>();
 
+    public DbSet<EconomySettingsEntity> EconomySettings => Set<EconomySettingsEntity>();
+
+    public DbSet<EconomyManualMonthOverrideEntity> EconomyManualMonthOverrides => Set<EconomyManualMonthOverrideEntity>();
+
     public DbSet<PlanCatalogEntity> PlanCatalog => Set<PlanCatalogEntity>();
 
     public DbSet<StudentEntity> Students => Set<StudentEntity>();
@@ -53,6 +57,17 @@ public sealed class LedgerDbContext : DbContext
             entity.HasKey(settings => settings.Id);
             entity.Property(settings => settings.SelectedCalendarId).HasMaxLength(500).IsRequired();
             entity.Property(settings => settings.GoogleAccountEmail).HasMaxLength(200).IsRequired();
+        });
+
+        modelBuilder.Entity<EconomySettingsEntity>(entity =>
+        {
+            entity.HasKey(settings => settings.Id);
+        });
+
+        modelBuilder.Entity<EconomyManualMonthOverrideEntity>(entity =>
+        {
+            entity.HasKey(manual => manual.Id);
+            entity.HasIndex(manual => new { manual.Year, manual.Month }).IsUnique();
         });
 
         modelBuilder.Entity<PlanCatalogEntity>(entity =>

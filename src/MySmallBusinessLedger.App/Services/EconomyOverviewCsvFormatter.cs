@@ -11,7 +11,7 @@ public sealed class EconomyOverviewCsvFormatter
     {
         var rows = new List<string[]>
         {
-            new[] { "Section", "Year", "Label", "InvoiceNumber", "Filename", "Net", "VAT", "Total" }
+            new[] { "Section", "Year", "Label", "InvoiceNumber", "Filename", "Net", "VAT", "Total", "Source" }
         };
 
         rows.AddRange(overview.Invoices.Select(invoice => new[]
@@ -23,7 +23,8 @@ public sealed class EconomyOverviewCsvFormatter
             invoice.PdfFileName,
             FormatMoney(invoice.Net),
             FormatMoney(invoice.Vat),
-            FormatMoney(invoice.Total)
+            FormatMoney(invoice.Total),
+            "IssuedInvoice"
         }));
         rows.AddRange(overview.Months.Select(month => new[]
         {
@@ -34,7 +35,8 @@ public sealed class EconomyOverviewCsvFormatter
             string.Empty,
             FormatNullableMoney(month.Net),
             FormatNullableMoney(month.Vat),
-            FormatNullableMoney(month.Total)
+            FormatNullableMoney(month.Total),
+            FormatMonthSource(month)
         }));
         rows.AddRange(overview.Quarters.Select(quarter => new[]
         {
@@ -45,7 +47,8 @@ public sealed class EconomyOverviewCsvFormatter
             string.Empty,
             FormatNullableMoney(quarter.Net),
             FormatNullableMoney(quarter.Vat),
-            FormatNullableMoney(quarter.Total)
+            FormatNullableMoney(quarter.Total),
+            FormatAggregateSource(quarter.Net, quarter.Vat, quarter.Total)
         }));
         rows.AddRange(overview.Years.Select(year => new[]
         {
@@ -56,7 +59,8 @@ public sealed class EconomyOverviewCsvFormatter
             string.Empty,
             FormatNullableMoney(year.Net),
             FormatNullableMoney(year.Vat),
-            FormatNullableMoney(year.Total)
+            FormatNullableMoney(year.Total),
+            FormatAggregateSource(year.Net, year.Vat, year.Total)
         }));
 
         var builder = new StringBuilder();
@@ -78,6 +82,18 @@ public sealed class EconomyOverviewCsvFormatter
 
     private static string FormatMoney(Money money) =>
         money.Amount.ToString("0.00", CultureInfo.InvariantCulture);
+
+    private static string FormatMonthSource(EconomyOverviewMonthTotal month) =>
+        month.Source switch
+        {
+            EconomyOverviewMonthSource.ManualOverride => "ManualOverride",
+            EconomyOverviewMonthSource.IssuedInvoices => "IssuedInvoices",
+            _ when month.HasInvoices => "IssuedInvoices",
+            _ => string.Empty
+        };
+
+    private static string FormatAggregateSource(Money? net, Money? vat, Money? total) =>
+        net is null && vat is null && total is null ? string.Empty : "DisplayedTotals";
 
     private static string Escape(string value)
     {

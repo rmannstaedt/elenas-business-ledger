@@ -48,7 +48,7 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
-    public void ApplicationMenuShowsSettingsAndAbout()
+    public void ApplicationMenuShowsSettingsAdminModeAndAbout()
     {
         RunOnStaThread(() =>
         {
@@ -63,7 +63,12 @@ public sealed class MainWindowViewModelTests
                 .Cast<string>()
                 .ToArray();
 
-            Assert.Equal(["_Settings", "About My Small Business Ledger"], applicationActions);
+            Assert.Equal(["_Settings", "_Admin Mode", "About My Small Business Ledger"], applicationActions);
+            var adminModeItem = Assert.Single(
+                applicationMenu.Items.OfType<WpfMenuItem>(),
+                item => item.Header?.ToString() == "_Admin Mode");
+            Assert.True(adminModeItem.IsCheckable);
+            Assert.False(adminModeItem.IsChecked);
 
             window.Close();
         });
@@ -1477,6 +1482,12 @@ public sealed class MainWindowViewModelTests
         await viewModel.OpenEconomyOverviewCommand.ExecuteAsync();
 
         Assert.True(economyOverview.WasShown);
+        Assert.False(economyOverview.LastAdminMode);
+        viewModel.IsAdminMode = true;
+
+        await viewModel.OpenEconomyOverviewCommand.ExecuteAsync();
+
+        Assert.True(economyOverview.LastAdminMode);
     }
 
     [Fact]
@@ -3155,9 +3166,12 @@ public sealed class MainWindowViewModelTests
     {
         public bool WasShown { get; private set; }
 
-        public Task ShowEconomyOverviewAsync(CancellationToken cancellationToken)
+        public bool LastAdminMode { get; private set; }
+
+        public Task ShowEconomyOverviewAsync(bool isAdminMode, CancellationToken cancellationToken)
         {
             WasShown = true;
+            LastAdminMode = isAdminMode;
             return Task.CompletedTask;
         }
     }

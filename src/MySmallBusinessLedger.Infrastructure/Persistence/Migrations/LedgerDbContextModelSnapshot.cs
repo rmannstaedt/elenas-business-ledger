@@ -111,6 +111,52 @@ namespace MySmallBusinessLedger.Infrastructure.Persistence.Migrations
                     b.ToTable("CompanyProfiles");
                 });
 
+            modelBuilder.Entity("MySmallBusinessLedger.Infrastructure.Persistence.EconomyManualMonthOverrideEntity", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Month")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal>("NetAmount")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("VatAmount")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Year")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Year", "Month")
+                        .IsUnique();
+
+                    b.ToTable("EconomyManualMonthOverrides");
+                });
+
+            modelBuilder.Entity("MySmallBusinessLedger.Infrastructure.Persistence.EconomySettingsEntity", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateOnly>("FirstApplicationInvoiceMonth")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("EconomySettings");
+                });
+
             modelBuilder.Entity("MySmallBusinessLedger.Infrastructure.Persistence.IssuedInvoiceEntity", b =>
                 {
                     b.Property<int>("Id")

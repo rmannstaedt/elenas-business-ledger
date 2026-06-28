@@ -48,6 +48,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private int activationRefreshSuspendCount;
     private LessonDisplayModel? selectedLesson;
     private InvoiceDisplayModel? selectedInvoice;
+    private bool isAdminMode;
     private string? errorMessage;
 
     public MainWindowViewModel(
@@ -201,6 +202,12 @@ public sealed class MainWindowViewModel : ViewModelBase
     }
 
     public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
+
+    public bool IsAdminMode
+    {
+        get => isAdminMode;
+        set => SetProperty(ref isAdminMode, value);
+    }
 
     public AsyncRelayCommand RefreshCommand { get; }
 
@@ -455,7 +462,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         planCatalogLauncher.ShowPlanCatalogAsync(CancellationToken.None);
 
     private Task OpenEconomyOverviewAsync() =>
-        economyOverviewLauncher.ShowEconomyOverviewAsync(CancellationToken.None);
+        economyOverviewLauncher.ShowEconomyOverviewAsync(IsAdminMode, CancellationToken.None);
 
     private Task OpenAboutAsync() =>
         aboutDialogLauncher.ShowAboutAsync(CancellationToken.None);

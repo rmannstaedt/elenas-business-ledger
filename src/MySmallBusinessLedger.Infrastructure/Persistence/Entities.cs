@@ -46,6 +46,30 @@ public sealed class CalendarSettingsEntity
     public string GoogleAccountEmail { get; set; } = string.Empty;
 }
 
+public sealed class EconomySettingsEntity
+{
+    public int Id { get; set; }
+
+    public DateOnly FirstApplicationInvoiceMonth { get; set; }
+}
+
+public sealed class EconomyManualMonthOverrideEntity
+{
+    public int Id { get; set; }
+
+    public int Year { get; set; }
+
+    public int Month { get; set; }
+
+    public decimal NetAmount { get; set; }
+
+    public decimal VatAmount { get; set; }
+
+    public DateTimeOffset CreatedAt { get; set; }
+
+    public DateTimeOffset UpdatedAt { get; set; }
+}
+
 public sealed class PlanCatalogEntity
 {
     public int Id { get; set; }

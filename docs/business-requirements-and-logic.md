@@ -176,7 +176,15 @@ Manage Plans lists Draft, Active, and Retired catalog Plans. Draft Plans can be 
 The application contains an Economy menu with:
   * Overview
 
-Economy Overview displays issued invoice reporting for the selected invoice-period year. It defaults to the current calendar year and has previous/next year controls. It reads from the local SQLite issued invoice rows and stored issued totals, not from stored PDF files. Only issued invoices are included; in-progress `Issuing` reservations are hidden. Invoices are grouped by the invoice period start date: Jan-Mar is Q1, Apr-Jun is Q2, Jul-Sep is Q3, and Oct-Dec is Q4. The window shows invoice number, PDF filename only, net amount, VAT amount, and total amount; month and quarter rows with no invoices stay visible with blank amount cells. The Years table shows the selected invoice-period year and previous four years, with blank amounts for years without issued invoices. Double-clicking an invoice opens the stored PDF. The displayed data can be exported to one CSV file with `Section`, `Year`, `Label`, `InvoiceNumber`, `Filename`, `Net`, `VAT`, and `Total` columns; amount fields use machine-friendly invariant decimals such as `1234.50`.
+Economy Overview displays financial reporting for the selected invoice-period year. It defaults to the current calendar year and has previous/next year controls. It reads from the local SQLite issued invoice rows, stored issued totals, a stored first application-backed invoice month, and explicit manual month overrides; it does not read from stored PDF files. Only issued invoices are shown in the invoice list; in-progress `Issuing` reservations are hidden, and manual legacy month totals are not shown as invoices.
+
+The first application-backed invoice month is a cut-over point. If no cut-over month is stored, all months are treated as application-backed and read-only. Months before the cut-over may use manual legacy values. Months on or after the cut-over use application-issued invoice totals. A month must not silently combine manual and application-backed totals; if persisted data violates the cut-over rule, the overview reports an error instead of choosing one source or hiding data.
+
+Manual month values are DKK replacement totals for that month, not additive adjustments. The user enters net amount and VAT amount; total is derived as net plus VAT. Blank or zero manual net/VAT values remove the manual override. Manual month values do not create invoice rows, invoice numbers, invoice PDFs, local lesson rows, or Google Calendar events.
+
+Manual editing is available only when `Application > Admin Mode` is checked. Admin Mode is session-only and starts unchecked each time the application starts. In Admin Mode, Economy Overview allows editing the cut-over month and the net/VAT values for legacy months before the cut-over. Non-admin mode and application-backed months remain read-only.
+
+Invoices and displayed month totals are grouped by the invoice period start date: Jan-Mar is Q1, Apr-Jun is Q2, Jul-Sep is Q3, and Oct-Dec is Q4. The window shows invoice number, PDF filename only, net amount, VAT amount, and total amount; month and quarter rows with no displayed total stay visible with blank amount cells. The Years table shows the selected invoice-period year and previous four years, with blank amounts for years without displayed totals. Double-clicking an invoice opens the stored PDF. The displayed data can be exported to one CSV file with `Section`, `Year`, `Label`, `InvoiceNumber`, `Filename`, `Net`, `VAT`, `Total`, and `Source` columns; amount fields use machine-friendly invariant decimals such as `1234.50`.
 
 The application window also displays a pane with Student Invoices.
 Each Invoice in the list has a flag: Paid / Outstanding
@@ -284,7 +292,7 @@ The invoice printer is selected from Application Settings during setup. If no in
 ### Version 1.20
 
   * VAT exemptions for individual students are outside the current scope.
-  * No formal VAT return or bookkeeping-system VAT report; Economy Overview summarizes issued invoice net/VAT totals only.
+  * No formal VAT return or bookkeeping-system VAT report; Economy Overview summarizes issued invoice net/VAT totals plus explicit manual legacy month overrides only.
   * No automated payment reminders or due-date workflow.
   * No support for credit notes/correction invoices.
   * No integration with MobilePay/Bank for payment registration.

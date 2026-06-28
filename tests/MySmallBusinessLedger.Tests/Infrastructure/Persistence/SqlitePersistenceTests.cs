@@ -59,6 +59,79 @@ public sealed class SqlitePersistenceTests
     }
 
     [Fact]
+    public async Task EconomySettingsAndManualMonthOverridesCanBeSavedLoadedUpdatedAndCleared()
+    {
+        using var database = await TestDatabase.CreateAsync();
+        var repository = new SqliteEconomyRepository(database.CreateContext);
+
+        Assert.Null(await repository.GetSettingsAsync(CancellationToken.None));
+
+        await repository.SaveSettingsAsync(
+            new EconomySettings(new DateOnly(2026, 7, 15)),
+            CancellationToken.None);
+        await repository.SaveManualMonthOverridesAsync(
+            [
+                new EconomyManualMonthOverride(2025, 12, Money.Dkk(1200.125m), Money.Dkk(300.125m)),
+                new EconomyManualMonthOverride(2026, 5, Money.Dkk(1000m), Money.Dkk(250m)),
+                new EconomyManualMonthOverride(2026, 7, Money.Dkk(900m), Money.Dkk(225m))
+            ],
+            CancellationToken.None);
+
+        var initialOverrides = await repository.ListManualMonthOverridesAsync(2025, 2026, CancellationToken.None);
+        Assert.Equal(2, initialOverrides.Count);
+        Assert.DoesNotContain(initialOverrides, manual => manual.Year == 2026 && manual.Month == 7);
+
+        await repository.SaveManualMonthOverridesAsync(
+            [
+                new EconomyManualMonthOverride(2026, 5, Money.Dkk(1100m), Money.Dkk(275m))
+            ],
+            CancellationToken.None);
+        await repository.SaveManualMonthOverridesAsync(
+            [
+                new EconomyManualMonthOverride(2025, 12, Money.Dkk(0m), Money.Dkk(0m))
+            ],
+            CancellationToken.None);
+
+        var settings = await repository.GetSettingsAsync(CancellationToken.None);
+        var loaded = await repository.ListManualMonthOverridesAsync(2025, 2026, CancellationToken.None);
+        await using var context = database.CreateContext();
+        var storedRows = await context.EconomyManualMonthOverrides.AsNoTracking().ToArrayAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(new DateOnly(2026, 7, 1), settings?.FirstApplicationInvoiceMonth);
+        var overrideRow = Assert.Single(loaded);
+        Assert.Equal(2026, overrideRow.Year);
+        Assert.Equal(5, overrideRow.Month);
+        Assert.Equal(Money.Dkk(1100m), overrideRow.Net);
+        Assert.Equal(Money.Dkk(275m), overrideRow.Vat);
+        Assert.Single(storedRows);
+
+        await repository.SaveSettingsAsync(
+            new EconomySettings(new DateOnly(2026, 5, 1)),
+            CancellationToken.None);
+
+        var pruned = await repository.ListManualMonthOverridesAsync(2025, 2026, CancellationToken.None);
+        Assert.Empty(pruned);
+    }
+
+    [Fact]
+    public async Task ManualMonthOverridesRequireSavedCutOver()
+    {
+        using var database = await TestDatabase.CreateAsync();
+        var repository = new SqliteEconomyRepository(database.CreateContext);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            repository.SaveManualMonthOverridesAsync(
+                [
+                    new EconomyManualMonthOverride(2026, 5, Money.Dkk(1000m), Money.Dkk(250m))
+                ],
+                CancellationToken.None));
+        var loaded = await repository.ListManualMonthOverridesAsync(2026, 2026, CancellationToken.None);
+
+        Assert.Contains("cut-over", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(loaded);
+    }
+
+    [Fact]
     public async Task StudentWithPlanHistoryCanBeSavedAndLoaded()
     {
         using var database = await TestDatabase.CreateAsync();
@@ -265,6 +338,8 @@ public sealed class SqlitePersistenceTests
         Assert.Contains("PlanCatalog", tableNames);
         Assert.Contains("StudentPlanPeriods", tableNames);
         Assert.Contains("IssuedInvoiceLines", tableNames);
+        Assert.Contains("EconomySettings", tableNames);
+        Assert.Contains("EconomyManualMonthOverrides", tableNames);
         Assert.True(result.Succeeded);
         Assert.Single(plans);
     }

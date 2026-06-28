@@ -8,6 +8,7 @@
         MinHeight="720"
         WindowStartupLocation="CenterOwner">
     <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
         <SolidColorBrush x:Key="EconomyTableBorderBrush"
                          Color="#202020" />
         <SolidColorBrush x:Key="EconomyTableGridLineBrush"
@@ -111,6 +112,35 @@
                     Width="100"
                     Height="30"
                     HorizontalAlignment="Right" />
+
+            <StackPanel Grid.Column="1"
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Center"
+                        Visibility="{Binding ShowAdminControls, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <TextBlock Text="First application month"
+                           VerticalAlignment="Center"
+                           Margin="0,0,6,0" />
+                <DatePicker SelectedDate="{Binding FirstApplicationInvoiceMonthDate, UpdateSourceTrigger=PropertyChanged}"
+                            Width="130"
+                            Height="28"
+                            VerticalContentAlignment="Center"
+                            AutomationProperties.Name="First application-backed invoice month" />
+                <Button Command="{Binding SaveManualMonthsCommand}"
+                        Content="Save"
+                        Width="72"
+                        Height="28"
+                        Margin="10,0,0,0" />
+                <Button Command="{Binding CancelManualMonthsCommand}"
+                        Content="Cancel"
+                        Width="72"
+                        Height="28"
+                        Margin="6,0,0,0" />
+                <TextBlock Text="{Binding ManualEditStatusText}"
+                           Foreground="#5B6472"
+                           VerticalAlignment="Center"
+                           Margin="10,0,0,0" />
+            </StackPanel>
         </Grid>
 
         <StackPanel DockPanel.Dock="Bottom"
@@ -187,6 +217,7 @@
                 <DataGrid Grid.Row="1"
                           Style="{StaticResource EconomyTableStyle}"
                           ItemsSource="{Binding Months}"
+                          IsReadOnly="False"
                           Height="254"
                           RowHeight="19"
                           ColumnHeaderHeight="24"
@@ -196,14 +227,85 @@
                         <DataGridTextColumn Header="Month"
                                             Binding="{Binding Label}"
                                             Width="80" />
-                        <DataGridTextColumn Header="Net"
-                                            Binding="{Binding NetText}"
-                                            Width="100" />
-                        <DataGridTextColumn Header="VAT"
-                                            Binding="{Binding VatText}"
-                                            Width="90" />
+                        <DataGridTemplateColumn Header="Net"
+                                                Width="100">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Grid>
+                                        <TextBlock Text="{Binding NetText}"
+                                                   Padding="4,0"
+                                                   VerticalAlignment="Center">
+                                            <TextBlock.Style>
+                                                <Style TargetType="{x:Type TextBlock}">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding CanEditManualTotals}" Value="True">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                        <TextBox Text="{Binding NetText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                 BorderThickness="0"
+                                                 Padding="4,0"
+                                                 VerticalContentAlignment="Center">
+                                            <TextBox.Style>
+                                                <Style TargetType="{x:Type TextBox}">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding CanEditManualTotals}" Value="True">
+                                                            <Setter Property="Visibility" Value="Visible" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBox.Style>
+                                        </TextBox>
+                                    </Grid>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
+                        <DataGridTemplateColumn Header="VAT"
+                                                Width="90">
+                            <DataGridTemplateColumn.CellTemplate>
+                                <DataTemplate>
+                                    <Grid>
+                                        <TextBlock Text="{Binding VatText}"
+                                                   Padding="4,0"
+                                                   VerticalAlignment="Center">
+                                            <TextBlock.Style>
+                                                <Style TargetType="{x:Type TextBlock}">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding CanEditManualTotals}" Value="True">
+                                                            <Setter Property="Visibility" Value="Collapsed" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                        <TextBox Text="{Binding VatText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                 BorderThickness="0"
+                                                 Padding="4,0"
+                                                 VerticalContentAlignment="Center">
+                                            <TextBox.Style>
+                                                <Style TargetType="{x:Type TextBox}">
+                                                    <Setter Property="Visibility" Value="Collapsed" />
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding CanEditManualTotals}" Value="True">
+                                                            <Setter Property="Visibility" Value="Visible" />
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBox.Style>
+                                        </TextBox>
+                                    </Grid>
+                                </DataTemplate>
+                            </DataGridTemplateColumn.CellTemplate>
+                        </DataGridTemplateColumn>
                         <DataGridTextColumn Header="Total"
                                             Binding="{Binding TotalText}"
+                                            IsReadOnly="True"
                                             Width="100" />
                     </DataGrid.Columns>
                 </DataGrid>

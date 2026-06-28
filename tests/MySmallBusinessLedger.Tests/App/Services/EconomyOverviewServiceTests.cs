@@ -81,31 +81,76 @@ public sealed class EconomyOverviewServiceTests
             string.Join(
                 Environment.NewLine,
                 [
-                    "Section,Year,Label,InvoiceNumber,Filename,Net,VAT,Total",
-                    "Invoice,2026,,001,\"Invoice 001, \"\"Maj\"\".pdf\",1234.50,308.63,1543.13",
-                    "Month,2026,2026-01,,,,,",
-                    "Month,2026,2026-02,,,,,",
-                    "Month,2026,2026-03,,,,,",
-                    "Month,2026,2026-04,,,,,",
-                    "Month,2026,2026-05,,,1234.50,308.63,1543.13",
-                    "Month,2026,2026-06,,,,,",
-                    "Month,2026,2026-07,,,,,",
-                    "Month,2026,2026-08,,,,,",
-                    "Month,2026,2026-09,,,,,",
-                    "Month,2026,2026-10,,,,,",
-                    "Month,2026,2026-11,,,,,",
-                    "Month,2026,2026-12,,,,,",
-                    "Quarter,2026,Q1,,,,,",
-                    "Quarter,2026,Q2,,,1234.50,308.63,1543.13",
-                    "Quarter,2026,Q3,,,,,",
-                    "Quarter,2026,Q4,,,,,",
-                    "Year,2026,2026,,,1234.50,308.63,1543.13",
-                    "Year,2025,2025,,,,,",
-                    "Year,2024,2024,,,,,",
-                    "Year,2023,2023,,,,,",
-                    "Year,2022,2022,,,,,"
+                    "Section,Year,Label,InvoiceNumber,Filename,Net,VAT,Total,Source",
+                    "Invoice,2026,,001,\"Invoice 001, \"\"Maj\"\".pdf\",1234.50,308.63,1543.13,IssuedInvoice",
+                    "Month,2026,2026-01,,,,,,",
+                    "Month,2026,2026-02,,,,,,",
+                    "Month,2026,2026-03,,,,,,",
+                    "Month,2026,2026-04,,,,,,",
+                    "Month,2026,2026-05,,,1234.50,308.63,1543.13,IssuedInvoices",
+                    "Month,2026,2026-06,,,,,,",
+                    "Month,2026,2026-07,,,,,,",
+                    "Month,2026,2026-08,,,,,,",
+                    "Month,2026,2026-09,,,,,,",
+                    "Month,2026,2026-10,,,,,,",
+                    "Month,2026,2026-11,,,,,,",
+                    "Month,2026,2026-12,,,,,,",
+                    "Quarter,2026,Q1,,,,,,",
+                    "Quarter,2026,Q2,,,1234.50,308.63,1543.13,DisplayedTotals",
+                    "Quarter,2026,Q3,,,,,,",
+                    "Quarter,2026,Q4,,,,,,",
+                    "Year,2026,2026,,,1234.50,308.63,1543.13,DisplayedTotals",
+                    "Year,2025,2025,,,,,,",
+                    "Year,2024,2024,,,,,,",
+                    "Year,2023,2023,,,,,,",
+                    "Year,2022,2022,,,,,,"
                 ]),
             csv);
+    }
+
+    [Fact]
+    public void CsvFormatterMarksManualMonthOverrideRows()
+    {
+        var formatter = new EconomyOverviewCsvFormatter();
+        var overview = new EconomyOverview(
+            2026,
+            [],
+            Enumerable.Range(1, 12)
+                .Select(month => month == 1
+                    ? new EconomyOverviewMonthTotal(
+                        month,
+                        HasInvoices: false,
+                        MoneyAmount.Dkk(100m),
+                        MoneyAmount.Dkk(25m),
+                        MoneyAmount.Dkk(125m),
+                        EconomyOverviewMonthSource.ManualOverride,
+                        IsLegacyManualMonth: true)
+                    : new EconomyOverviewMonthTotal(month, HasInvoices: false, null, null, null))
+                .ToArray(),
+            [
+                new EconomyOverviewQuarterTotal(1, HasInvoices: false, MoneyAmount.Dkk(100m), MoneyAmount.Dkk(25m), MoneyAmount.Dkk(125m)),
+                new EconomyOverviewQuarterTotal(2, HasInvoices: false, null, null, null),
+                new EconomyOverviewQuarterTotal(3, HasInvoices: false, null, null, null),
+                new EconomyOverviewQuarterTotal(4, HasInvoices: false, null, null, null)
+            ],
+            new EconomyOverviewYearToDateTotal(
+                MoneyAmount.Dkk(100m),
+                MoneyAmount.Dkk(25m),
+                MoneyAmount.Dkk(125m)),
+            [
+                new EconomyOverviewYearTotal(2026, HasInvoices: false, MoneyAmount.Dkk(100m), MoneyAmount.Dkk(25m), MoneyAmount.Dkk(125m)),
+                new EconomyOverviewYearTotal(2025, HasInvoices: false, null, null, null),
+                new EconomyOverviewYearTotal(2024, HasInvoices: false, null, null, null),
+                new EconomyOverviewYearTotal(2023, HasInvoices: false, null, null, null),
+                new EconomyOverviewYearTotal(2022, HasInvoices: false, null, null, null)
+            ],
+            new DateOnly(2026, 2, 1));
+
+        var csv = formatter.Format(overview);
+
+        Assert.Contains("Month,2026,2026-01,,,100.00,25.00,125.00,ManualOverride", csv);
+        Assert.Contains("Quarter,2026,Q1,,,100.00,25.00,125.00,DisplayedTotals", csv);
+        Assert.Contains("Year,2026,2026,,,100.00,25.00,125.00,DisplayedTotals", csv);
     }
 
     private sealed class ThrowingInvoiceRepository : IInvoiceRepository

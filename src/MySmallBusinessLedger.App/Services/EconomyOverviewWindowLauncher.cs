@@ -26,14 +26,15 @@ public sealed class EconomyOverviewWindowLauncher : IEconomyOverviewLauncher
         this.clock = clock;
     }
 
-    public async Task ShowEconomyOverviewAsync(CancellationToken cancellationToken)
+    public async Task ShowEconomyOverviewAsync(bool isAdminMode, CancellationToken cancellationToken)
     {
         var viewModel = new EconomyOverviewViewModel(
             economyOverviewService,
             exportDialog,
             csvFileService,
             invoicePdfLauncher,
-            clock);
+            clock,
+            isAdminMode);
         await viewModel.LoadAsync(cancellationToken);
         var window = new EconomyOverviewView(viewModel)
         {

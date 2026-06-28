@@ -9,7 +9,8 @@ public sealed record EconomyOverview(
     IReadOnlyList<EconomyOverviewMonthTotal> Months,
     IReadOnlyList<EconomyOverviewQuarterTotal> Quarters,
     EconomyOverviewYearToDateTotal YearToDate,
-    IReadOnlyList<EconomyOverviewYearTotal> Years);
+    IReadOnlyList<EconomyOverviewYearTotal> Years,
+    DateOnly? FirstApplicationInvoiceMonth = null);
 
 public sealed record EconomyOverviewInvoiceRow(
     InvoiceNumber InvoiceNumber,
@@ -26,7 +27,9 @@ public sealed record EconomyOverviewMonthTotal(
     bool HasInvoices,
     MoneyAmount? Net,
     MoneyAmount? Vat,
-    MoneyAmount? Total);
+    MoneyAmount? Total,
+    EconomyOverviewMonthSource Source = EconomyOverviewMonthSource.None,
+    bool IsLegacyManualMonth = false);
 
 public sealed record EconomyOverviewQuarterTotal(
     int Quarter,
@@ -46,3 +49,10 @@ public sealed record EconomyOverviewYearTotal(
     MoneyAmount? Net,
     MoneyAmount? Vat,
     MoneyAmount? Total);
+
+public enum EconomyOverviewMonthSource
+{
+    None,
+    IssuedInvoices,
+    ManualOverride
+}

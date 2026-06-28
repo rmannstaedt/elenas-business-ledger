@@ -4,6 +4,7 @@ using MySmallBusinessLedger.App.Commands;
 using MySmallBusinessLedger.App.Services;
 using MySmallBusinessLedger.Core.Invoices;
 using MySmallBusinessLedger.Core.Money;
+using MySmallBusinessLedger.Core.Ports;
 using MySmallBusinessLedger.Core.UseCases.Economy;
 
 namespace MySmallBusinessLedger.App.ViewModels;
@@ -19,6 +20,8 @@ public sealed class EconomyOverviewViewModel : ViewModelBase
     private int year;
     private bool isBusy;
     private string? errorMessage;
+    private DateTime? firstApplicationInvoiceMonthDate;
+    private string manualEditStatusText = string.Empty;
     private string yearToDateNetText = string.Empty;
     private string yearToDateVatText = string.Empty;
     private string yearToDateTotalText = string.Empty;
@@ -28,17 +31,21 @@ public sealed class EconomyOverviewViewModel : ViewModelBase
         IEconomyOverviewExportDialog exportDialog,
         IEconomyOverviewCsvFileService csvFileService,
         IInvoicePdfLauncher invoicePdfLauncher,
-        IUiClock clock)
+        IUiClock clock,
+        bool isAdminMode = false)
     {
         this.service = service;
         this.exportDialog = exportDialog;
         this.csvFileService = csvFileService;
         this.invoicePdfLauncher = invoicePdfLauncher;
+        IsAdminMode = isAdminMode;
         year = clock.Now.Year;
 
         PreviousYearCommand = new AsyncRelayCommand(() => ChangeYearAsync(-1), () => !IsBusy);
         NextYearCommand = new AsyncRelayCommand(() => ChangeYearAsync(1), () => !IsBusy);
         ExportCsvCommand = new AsyncRelayCommand(ExportCsvAsync, () => !IsBusy && currentOverview is not null);
+        SaveManualMonthsCommand = new AsyncRelayCommand(SaveManualMonthsAsync, () => IsAdminMode && !IsBusy && currentOverview is not null);
+        CancelManualMonthsCommand = new AsyncRelayCommand(CancelManualMonthsAsync, () => IsAdminMode && !IsBusy && currentOverview is not null);
         OpenInvoicePdfCommand = new AsyncRelayCommand(
             parameter => OpenInvoicePdfAsync((EconomyOverviewInvoiceDisplayModel)parameter!),
             parameter => parameter is EconomyOverviewInvoiceDisplayModel && !IsBusy);
@@ -51,7 +58,7 @@ public sealed class EconomyOverviewViewModel : ViewModelBase
 
     public ObservableCollection<EconomyOverviewInvoiceDisplayModel> Invoices { get; } = [];
 
-    public ObservableCollection<EconomyOverviewPeriodTotalDisplayModel> Months { get; } = [];
+    public ObservableCollection<EconomyOverviewMonthDisplayModel> Months { get; } = [];
 
     public ObservableCollection<EconomyOverviewPeriodTotalDisplayModel> Quarters { get; } = [];
 
@@ -97,6 +104,29 @@ public sealed class EconomyOverviewViewModel : ViewModelBase
 
     public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
 
+    public bool IsAdminMode { get; }
+
+    public bool ShowAdminControls => IsAdminMode;
+
+    public DateTime? FirstApplicationInvoiceMonthDate
+    {
+        get => firstApplicationInvoiceMonthDate;
+        set
+        {
+            if (SetProperty(ref firstApplicationInvoiceMonthDate, value))
+            {
+                RefreshMonthEditability();
+                RaiseCommandAvailabilityChanged();
+            }
+        }
+    }
+
+    public string ManualEditStatusText
+    {
+        get => manualEditStatusText;
+        private set => SetProperty(ref manualEditStatusText, value);
+    }
+
     public string YearToDateNetText
     {
         get => yearToDateNetText;
@@ -120,6 +150,10 @@ public sealed class EconomyOverviewViewModel : ViewModelBase
     public AsyncRelayCommand NextYearCommand { get; }
 
     public AsyncRelayCommand ExportCsvCommand { get; }
+
+    public AsyncRelayCommand SaveManualMonthsCommand { get; }
+
+    public AsyncRelayCommand CancelManualMonthsCommand { get; }
 
     public AsyncRelayCommand OpenInvoicePdfCommand { get; }
 
@@ -180,6 +214,72 @@ public sealed class EconomyOverviewViewModel : ViewModelBase
         }
     }
 
+    private async Task SaveManualMonthsAsync()
+    {
+        if (currentOverview is null)
+        {
+            return;
+        }
+
+        if (FirstApplicationInvoiceMonthDate is null)
+        {
+            ErrorMessage = "First application-backed invoice month is required before saving manual month totals.";
+            return;
+        }
+
+        var firstApplicationInvoiceMonth = NormalizeMonth(DateOnly.FromDateTime(FirstApplicationInvoiceMonthDate.Value));
+        var overrides = new List<EconomyManualMonthOverride>();
+        foreach (var month in Months)
+        {
+            if (new DateOnly(Year, month.Month, 1) >= firstApplicationInvoiceMonth)
+            {
+                continue;
+            }
+
+            if (!TryCreateManualOverride(month, out var manualOverride, out var errorMessage))
+            {
+                ErrorMessage = errorMessage;
+                return;
+            }
+
+            overrides.Add(manualOverride);
+        }
+
+        IsBusy = true;
+        try
+        {
+            var result = await service.SaveManualMonthOverridesAsync(
+                Year,
+                new EconomySettings(firstApplicationInvoiceMonth),
+                overrides,
+                CancellationToken.None);
+            if (!result.Succeeded || result.Value is null)
+            {
+                ErrorMessage = result.Errors.FirstOrDefault()?.Message ?? "Could not save manual month totals.";
+                return;
+            }
+
+            ApplyOverview(result.Value);
+            ManualEditStatusText = "Manual month totals saved.";
+            ErrorMessage = null;
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    private Task CancelManualMonthsAsync()
+    {
+        if (currentOverview is not null)
+        {
+            ApplyOverview(currentOverview);
+            ManualEditStatusText = "Manual month edits discarded.";
+        }
+
+        return Task.CompletedTask;
+    }
+
     private async Task OpenInvoicePdfAsync(EconomyOverviewInvoiceDisplayModel invoice)
     {
         try
@@ -206,7 +306,16 @@ public sealed class EconomyOverviewViewModel : ViewModelBase
                 new DateOnly(overview.Year, month.Month, 1).ToString("MMMM", DanishCulture),
                 month.Net,
                 month.Vat,
-                month.Total)).ToArray());
+                month.Total)).Select((period, index) => new EconomyOverviewMonthDisplayModel(
+                    overview.Year,
+                    index + 1,
+                    period.Label,
+                    period.NetText,
+                    period.VatText,
+                    period.TotalText,
+                    overview.Months[index].Source,
+                    IsAdminMode,
+                    overview.FirstApplicationInvoiceMonth)).ToArray());
         Replace(
             Quarters,
             overview.Quarters.Select(quarter => new EconomyOverviewPeriodTotalDisplayModel(
@@ -224,6 +333,10 @@ public sealed class EconomyOverviewViewModel : ViewModelBase
         YearToDateNetText = FormatMoney(overview.YearToDate.Net);
         YearToDateVatText = FormatMoney(overview.YearToDate.Vat);
         YearToDateTotalText = FormatMoney(overview.YearToDate.Total);
+        FirstApplicationInvoiceMonthDate = overview.FirstApplicationInvoiceMonth?.ToDateTime(TimeOnly.MinValue);
+        ManualEditStatusText = IsAdminMode && overview.FirstApplicationInvoiceMonth is null
+            ? "Set the first application-backed invoice month before editing manual month totals."
+            : string.Empty;
     }
 
     private static void Replace<T>(ObservableCollection<T> target, IReadOnlyList<T> items)
@@ -240,7 +353,20 @@ public sealed class EconomyOverviewViewModel : ViewModelBase
         PreviousYearCommand.RaiseCanExecuteChanged();
         NextYearCommand.RaiseCanExecuteChanged();
         ExportCsvCommand.RaiseCanExecuteChanged();
+        SaveManualMonthsCommand.RaiseCanExecuteChanged();
+        CancelManualMonthsCommand.RaiseCanExecuteChanged();
         OpenInvoicePdfCommand.RaiseCanExecuteChanged();
+    }
+
+    private void RefreshMonthEditability()
+    {
+        DateOnly? firstApplicationInvoiceMonth = FirstApplicationInvoiceMonthDate is null
+            ? null
+            : NormalizeMonth(DateOnly.FromDateTime(FirstApplicationInvoiceMonthDate.Value));
+        foreach (var month in Months)
+        {
+            month.SetAdminEditability(IsAdminMode, firstApplicationInvoiceMonth);
+        }
     }
 
     private static string FormatNullableMoney(Money? money) =>
@@ -248,6 +374,64 @@ public sealed class EconomyOverviewViewModel : ViewModelBase
 
     private static string FormatMoney(Money money) =>
         string.Create(DanishCulture, $"{money.Amount:N2} {money.Currency}");
+
+    private static string FormatEditableMoney(Money money) =>
+        string.Create(DanishCulture, $"{money.Amount:N2} {money.Currency}");
+
+    private static DateOnly NormalizeMonth(DateOnly month) =>
+        new(month.Year, month.Month, 1);
+
+    private static bool TryCreateManualOverride(
+        EconomyOverviewMonthDisplayModel month,
+        out EconomyManualMonthOverride manualOverride,
+        out string errorMessage)
+    {
+        manualOverride = new EconomyManualMonthOverride(month.Year, month.Month, Money.Dkk(0m), Money.Dkk(0m));
+        errorMessage = string.Empty;
+        if (!TryParseEditableMoney(month.NetText, out var net))
+        {
+            errorMessage = $"Net amount for {month.Label} is not valid.";
+            return false;
+        }
+
+        if (!TryParseEditableMoney(month.VatText, out var vat))
+        {
+            errorMessage = $"VAT amount for {month.Label} is not valid.";
+            return false;
+        }
+
+        manualOverride = new EconomyManualMonthOverride(
+            month.Year,
+            month.Month,
+            net ?? Money.Dkk(0m),
+            vat ?? Money.Dkk(0m));
+        return true;
+    }
+
+    private static bool TryParseEditableMoney(string? text, out Money? money)
+    {
+        money = null;
+        var trimmed = text?.Trim() ?? string.Empty;
+        if (trimmed.Length == 0)
+        {
+            return true;
+        }
+
+        trimmed = trimmed.Replace("DKK", string.Empty, StringComparison.OrdinalIgnoreCase).Trim();
+        if (!decimal.TryParse(trimmed, NumberStyles.Number, DanishCulture, out var amount) &&
+            !decimal.TryParse(trimmed, NumberStyles.Number, CultureInfo.InvariantCulture, out amount))
+        {
+            return false;
+        }
+
+        if (amount < 0m)
+        {
+            return false;
+        }
+
+        money = Money.Dkk(amount);
+        return true;
+    }
 
     public sealed class EconomyOverviewInvoiceDisplayModel
     {
@@ -294,5 +478,113 @@ public sealed class EconomyOverviewViewModel : ViewModelBase
         public string VatText { get; }
 
         public string TotalText { get; }
+    }
+
+    public sealed class EconomyOverviewMonthDisplayModel : ViewModelBase
+    {
+        private string netText;
+        private string vatText;
+        private string totalText;
+        private bool canEditManualTotals;
+
+        public EconomyOverviewMonthDisplayModel(
+            int year,
+            int month,
+            string label,
+            string netText,
+            string vatText,
+            string totalText,
+            EconomyOverviewMonthSource source,
+            bool isAdminMode,
+            DateOnly? firstApplicationInvoiceMonth)
+        {
+            Year = year;
+            Month = month;
+            Label = label;
+            this.netText = ToEditableMoneyText(netText);
+            this.vatText = ToEditableMoneyText(vatText);
+            this.totalText = ToEditableMoneyText(totalText);
+            Source = source;
+            SetAdminEditability(isAdminMode, firstApplicationInvoiceMonth);
+        }
+
+        public int Year { get; }
+
+        public int Month { get; }
+
+        public string Label { get; }
+
+        public EconomyOverviewMonthSource Source { get; }
+
+        public string NetText
+        {
+            get => netText;
+            set
+            {
+                if (SetProperty(ref netText, value))
+                {
+                    RecalculateTotalText();
+                }
+            }
+        }
+
+        public string VatText
+        {
+            get => vatText;
+            set
+            {
+                if (SetProperty(ref vatText, value))
+                {
+                    RecalculateTotalText();
+                }
+            }
+        }
+
+        public string TotalText
+        {
+            get => totalText;
+            private set => SetProperty(ref totalText, value);
+        }
+
+        public bool CanEditManualTotals
+        {
+            get => canEditManualTotals;
+            private set => SetProperty(ref canEditManualTotals, value);
+        }
+
+        public void SetAdminEditability(bool isAdminMode, DateOnly? firstApplicationInvoiceMonth)
+        {
+            var isLegacyManualMonth = firstApplicationInvoiceMonth is not null &&
+                new DateOnly(Year, Month, 1) < firstApplicationInvoiceMonth.Value;
+            CanEditManualTotals = isAdminMode && isLegacyManualMonth;
+        }
+
+        private void RecalculateTotalText()
+        {
+            if (!TryParseEditableMoney(NetText, out var net) ||
+                !TryParseEditableMoney(VatText, out var vat))
+            {
+                TotalText = string.Empty;
+                return;
+            }
+
+            if (net is null && vat is null)
+            {
+                TotalText = string.Empty;
+                return;
+            }
+
+            TotalText = FormatEditableMoney((net ?? Money.Dkk(0m)) + (vat ?? Money.Dkk(0m)));
+        }
+
+        private static string ToEditableMoneyText(string value)
+        {
+            if (!TryParseEditableMoney(value, out var money) || money is null)
+            {
+                return string.Empty;
+            }
+
+            return FormatEditableMoney(money.Value);
+        }
     }
 }

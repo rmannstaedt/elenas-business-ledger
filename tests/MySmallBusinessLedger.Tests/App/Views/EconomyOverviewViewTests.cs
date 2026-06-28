@@ -4,11 +4,13 @@ using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Threading;
 using MySmallBusinessLedger.App.Services;
 using MySmallBusinessLedger.App.ViewModels;
 using MySmallBusinessLedger.App.Views;
 using MySmallBusinessLedger.Core.Common;
 using MySmallBusinessLedger.Core.Invoices;
+using MySmallBusinessLedger.Core.Ports;
 using MySmallBusinessLedger.Core.UseCases.Economy;
 using WpfDataGrid = System.Windows.Controls.DataGrid;
 using WpfDataGridLengthUnitType = System.Windows.Controls.DataGridLengthUnitType;
@@ -86,13 +88,41 @@ public sealed class EconomyOverviewViewTests
         });
     }
 
-    private static EconomyOverviewViewModel CreateViewModel() =>
+    [Fact]
+    public void AdminModeShowsManualControlsAndEditableMonthColumns()
+    {
+        RunOnStaThread(() =>
+        {
+            var normalView = new EconomyOverviewView(CreateViewModel());
+            ProcessDataBindings(normalView);
+            var normalCutOverPicker = Assert.Single(FindChildren<DatePicker>(normalView), picker =>
+                AutomationProperties.GetName(picker) == "First application-backed invoice month");
+            Assert.Equal(Visibility.Collapsed, Assert.IsAssignableFrom<FrameworkElement>(normalCutOverPicker.Parent).Visibility);
+
+            var adminView = new EconomyOverviewView(CreateViewModel(isAdminMode: true));
+            ProcessDataBindings(adminView);
+            var adminCutOverPicker = Assert.Single(FindChildren<DatePicker>(adminView), picker =>
+                AutomationProperties.GetName(picker) == "First application-backed invoice month");
+            Assert.Equal(Visibility.Visible, Assert.IsAssignableFrom<FrameworkElement>(adminCutOverPicker.Parent).Visibility);
+
+            var monthsGrid = FindChildren<WpfDataGrid>(adminView)
+                .Single(grid => grid.Columns.Count > 0 &&
+                    Convert.ToString(grid.Columns[0].Header, CultureInfo.InvariantCulture) == "Month");
+            Assert.False(monthsGrid.IsReadOnly);
+            Assert.IsType<DataGridTemplateColumn>(monthsGrid.Columns[1]);
+            Assert.IsType<DataGridTemplateColumn>(monthsGrid.Columns[2]);
+            Assert.True(monthsGrid.Columns[3].IsReadOnly);
+        });
+    }
+
+    private static EconomyOverviewViewModel CreateViewModel(bool isAdminMode = false) =>
         new(
             new FakeEconomyOverviewService(),
             new FakeEconomyOverviewExportDialog(),
             new FakeEconomyOverviewCsvFileService(),
             new FakeInvoicePdfLauncher(),
-            new FakeUiClock(new DateTimeOffset(2026, 6, 27, 12, 0, 0, TimeSpan.Zero)));
+            new FakeUiClock(new DateTimeOffset(2026, 6, 27, 12, 0, 0, TimeSpan.Zero)),
+            isAdminMode);
 
     private static EconomyOverview CreateOverview(int year) =>
         new(
@@ -153,6 +183,12 @@ public sealed class EconomyOverviewViewTests
         return matches;
     }
 
+    private static void ProcessDataBindings(Window window)
+    {
+        window.Dispatcher.Invoke(() => { }, DispatcherPriority.DataBind);
+        window.UpdateLayout();
+    }
+
     private static void RunOnStaThread(Action action)
     {
         ExceptionDispatchInfo? capturedException = null;
@@ -178,6 +214,13 @@ public sealed class EconomyOverviewViewTests
     {
         public Task<OperationResult<EconomyOverview>> LoadAsync(int year, CancellationToken cancellationToken) =>
             Task.FromResult(OperationResult<EconomyOverview>.Success(CreateOverview(year)));
+
+        public Task<OperationResult<EconomyOverview>> SaveManualMonthOverridesAsync(
+            int overviewYear,
+            EconomySettings settings,
+            IReadOnlyList<EconomyManualMonthOverride> overrides,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(OperationResult<EconomyOverview>.Success(CreateOverview(overviewYear)));
     }
 
     private sealed class FakeEconomyOverviewExportDialog : IEconomyOverviewExportDialog

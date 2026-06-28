@@ -21,6 +21,7 @@ internal sealed class ApplicationServiceGraph
         IStudentRepository studentRepository,
         ILessonRepository lessonRepository,
         IInvoiceRepository invoiceRepository,
+        IEconomyRepository economyRepository,
         ICompanyProfileRepository companyProfileRepository,
         SqliteCalendarSettingsRepository calendarSettingsRepository,
         IPlanCatalogRepository planCatalogRepository,
@@ -39,6 +40,7 @@ internal sealed class ApplicationServiceGraph
         StudentRepository = studentRepository;
         LessonRepository = lessonRepository;
         InvoiceRepository = invoiceRepository;
+        EconomyRepository = economyRepository;
         CompanyProfileRepository = companyProfileRepository;
         CalendarSettingsRepository = calendarSettingsRepository;
         PlanCatalogRepository = planCatalogRepository;
@@ -61,6 +63,8 @@ internal sealed class ApplicationServiceGraph
     public ILessonRepository LessonRepository { get; }
 
     public IInvoiceRepository InvoiceRepository { get; }
+
+    public IEconomyRepository EconomyRepository { get; }
 
     public ICompanyProfileRepository CompanyProfileRepository { get; }
 
@@ -93,6 +97,7 @@ internal sealed class ApplicationServiceGraph
         var studentRepository = new SqliteStudentRepository(createContext);
         var lessonRepository = new SqliteLessonRepository(createContext);
         var invoiceRepository = new SqliteInvoiceRepository(createContext);
+        var economyRepository = new SqliteEconomyRepository(createContext);
         var companyProfileRepository = new SqliteCompanyProfileRepository(createContext);
         var calendarSettingsRepository = new SqliteCalendarSettingsRepository(createContext);
         var planCatalogRepository = new SqlitePlanCatalogRepository(createContext);
@@ -113,7 +118,9 @@ internal sealed class ApplicationServiceGraph
             DefaultLessonDuration);
         var studentEditorService = new CoreStudentEditorService(studentRepository);
         var studentOverviewService = new CoreStudentOverviewService(studentRepository, invoiceRepository);
-        var economyOverviewService = new CoreEconomyOverviewService(new EconomyOverviewQuery(invoiceRepository));
+        var economyOverviewService = new CoreEconomyOverviewService(
+            new EconomyOverviewQuery(invoiceRepository, economyRepository),
+            economyRepository);
         var lessonEditorService = new CoreLessonEditorService(
             new AddLessonUseCase(calendarGateway, studentRepository, planCatalogRepository, lessonRepository),
             new EditLessonUseCase(calendarGateway, lessonRepository),
@@ -153,6 +160,7 @@ internal sealed class ApplicationServiceGraph
             studentRepository,
             lessonRepository,
             invoiceRepository,
+            economyRepository,
             companyProfileRepository,
             calendarSettingsRepository,
             planCatalogRepository,
