@@ -451,9 +451,10 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     private async Task OpenSettingsAsync()
     {
-        var saved = await settingsLauncher.ShowSettingsAsync(CancellationToken.None);
-        if (saved)
+        var result = await settingsLauncher.ShowSettingsAsync(IsAdminMode, CancellationToken.None);
+        if (result.WasSaved)
         {
+            IsAdminMode = result.IsAdminMode;
             await RefreshAsync();
         }
     }

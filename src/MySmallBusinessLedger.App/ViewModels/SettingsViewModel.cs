@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using MySmallBusinessLedger.App.Commands;
 using MySmallBusinessLedger.App.Services;
 using MySmallBusinessLedger.Core.Company;
+using MySmallBusinessLedger.Core.Ports;
 using MySmallBusinessLedger.Infrastructure.Persistence;
 
 namespace MySmallBusinessLedger.App.ViewModels;
@@ -31,11 +32,14 @@ public sealed class SettingsViewModel : ViewModelBase
     private string googleAuthorizationStatusText = "Google authorization: Not connected";
     private string appDataFolderPath = string.Empty;
     private string databasePath = string.Empty;
+    private bool isAdminMode;
+    private DateTime? firstApplicationInvoiceMonthDate;
     private string? errorMessage;
 
-    public SettingsViewModel(IAppSettingsService settingsService)
+    public SettingsViewModel(IAppSettingsService settingsService, bool isAdminMode = false)
     {
         this.settingsService = settingsService;
+        this.isAdminMode = isAdminMode;
         SaveCommand = new AsyncRelayCommand(SaveAsync);
         ClearInvoicePrinterCommand = new AsyncRelayCommand(ClearInvoicePrinterAsync);
         ConnectGoogleCalendarCommand = new AsyncRelayCommand(ConnectGoogleCalendarAsync);
@@ -161,6 +165,26 @@ public sealed class SettingsViewModel : ViewModelBase
         private set => SetProperty(ref databasePath, value);
     }
 
+    public bool IsAdminMode
+    {
+        get => isAdminMode;
+        set
+        {
+            if (SetProperty(ref isAdminMode, value))
+            {
+                OnPropertyChanged(nameof(ShowEconomyAdministration));
+            }
+        }
+    }
+
+    public bool ShowEconomyAdministration => IsAdminMode;
+
+    public DateTime? FirstApplicationInvoiceMonthDate
+    {
+        get => firstApplicationInvoiceMonthDate;
+        set => SetProperty(ref firstApplicationInvoiceMonthDate, NormalizeMonthDate(value));
+    }
+
     public string? ErrorMessage
     {
         get => errorMessage;
@@ -176,6 +200,8 @@ public sealed class SettingsViewModel : ViewModelBase
     public bool HasError => !string.IsNullOrWhiteSpace(ErrorMessage);
 
     public bool WasSaved { get; private set; }
+
+    public bool SavedAdminMode { get; private set; }
 
     public AsyncRelayCommand SaveCommand { get; }
 
@@ -227,6 +253,7 @@ public sealed class SettingsViewModel : ViewModelBase
             : "Google authorization: Not connected";
         AppDataFolderPath = snapshot.AppDataFolderPath;
         DatabasePath = snapshot.DatabasePath;
+        FirstApplicationInvoiceMonthDate = snapshot.EconomySettings?.FirstApplicationInvoiceMonth.ToDateTime(TimeOnly.MinValue);
     }
 
     private async Task SaveAsync()
@@ -252,10 +279,14 @@ public sealed class SettingsViewModel : ViewModelBase
             MobilePayAccount.Trim());
         CalendarId = NormalizeCalendarId(CalendarId);
         var calendarSettings = new CalendarSettings(CalendarId, GoogleAccountEmail.Trim());
+        var economySettings = IsAdminMode && FirstApplicationInvoiceMonthDate is not null
+            ? new EconomySettings(NormalizeMonth(DateOnly.FromDateTime(FirstApplicationInvoiceMonthDate.Value)))
+            : null;
 
         var result = await settingsService.SaveAsync(
             profile,
             calendarSettings,
+            economySettings,
             CancellationToken.None);
         if (!result.Succeeded)
         {
@@ -265,6 +296,7 @@ public sealed class SettingsViewModel : ViewModelBase
 
         SetGoogleOAuthAppConfigurationStatus(result.Value!.GoogleOAuthAppConfigurationStatus);
         WasSaved = true;
+        SavedAdminMode = IsAdminMode;
         ErrorMessage = null;
         CloseRequested?.Invoke(this, true);
     }
@@ -333,6 +365,12 @@ public sealed class SettingsViewModel : ViewModelBase
             return false;
         }
 
+        if (IsAdminMode && FirstApplicationInvoiceMonthDate is null)
+        {
+            ErrorMessage = "First application month is required when Admin Mode is enabled.";
+            return false;
+        }
+
         ErrorMessage = null;
         return true;
     }
@@ -347,6 +385,12 @@ public sealed class SettingsViewModel : ViewModelBase
 
     private static string NormalizeCalendarId(string value) =>
         string.IsNullOrWhiteSpace(value) ? DefaultCalendarId : value.Trim();
+
+    private static DateOnly NormalizeMonth(DateOnly month) =>
+        new(month.Year, month.Month, 1);
+
+    private static DateTime? NormalizeMonthDate(DateTime? date) =>
+        date is null ? null : new DateTime(date.Value.Year, date.Value.Month, 1);
 
     private string CreatePaymentInstructions() =>
         paymentInstructionChoice switch

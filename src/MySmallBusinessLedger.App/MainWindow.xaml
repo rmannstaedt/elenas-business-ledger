@@ -253,9 +253,6 @@
             <MenuItem Header="_Application">
                 <MenuItem Header="_Settings"
                           Command="{Binding OpenSettingsCommand}" />
-                <MenuItem Header="_Admin Mode"
-                          IsCheckable="True"
-                          IsChecked="{Binding IsAdminMode, Mode=TwoWay}" />
                 <MenuItem Header="About My Small Business Ledger"
                           Command="{Binding OpenAboutCommand}" />
             </MenuItem>

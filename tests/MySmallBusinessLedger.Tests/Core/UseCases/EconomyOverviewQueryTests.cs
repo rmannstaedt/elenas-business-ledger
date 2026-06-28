@@ -213,7 +213,7 @@ public sealed class EconomyOverviewQueryTests
     }
 
     [Fact]
-    public async Task LoadAsyncFailsWhenIssuedInvoiceExistsBeforeCutOver()
+    public async Task LoadAsyncUsesIssuedInvoicesBeforeCutOverWhenNoManualOverrideExists()
     {
         var invoices = new FakeInvoiceRepository
         {
@@ -236,8 +236,68 @@ public sealed class EconomyOverviewQueryTests
 
         var result = await query.LoadAsync(2026, CancellationToken.None);
 
+        Assert.True(result.Succeeded);
+        var overview = result.Value!;
+        Assert.Single(overview.Invoices);
+        var may = Assert.Single(overview.Months, month => month.Month == 5);
+        Assert.True(may.HasInvoices);
+        Assert.True(may.IsLegacyManualMonth);
+        Assert.Equal(EconomyOverviewMonthSource.IssuedInvoices, may.Source);
+        Assert.Equal(MoneyAmount.Dkk(400m), may.Net);
+        Assert.Equal(MoneyAmount.Dkk(100m), may.Vat);
+        Assert.Equal(MoneyAmount.Dkk(500m), may.Total);
+
+        var q2 = Assert.Single(overview.Quarters, quarter => quarter.Quarter == 2);
+        Assert.True(q2.HasInvoices);
+        Assert.Equal(MoneyAmount.Dkk(400m), q2.Net);
+        Assert.Equal(MoneyAmount.Dkk(100m), q2.Vat);
+        Assert.Equal(MoneyAmount.Dkk(500m), q2.Total);
+
+        var currentYear = Assert.Single(overview.Years, year => year.Year == 2026);
+        Assert.True(currentYear.HasInvoices);
+        Assert.Equal(MoneyAmount.Dkk(400m), currentYear.Net);
+        Assert.Equal(MoneyAmount.Dkk(100m), currentYear.Vat);
+        Assert.Equal(MoneyAmount.Dkk(500m), currentYear.Total);
+    }
+
+    [Fact]
+    public async Task LoadAsyncFailsWhenManualOverrideAndIssuedInvoiceExistInSameMonth()
+    {
+        var invoices = new FakeInvoiceRepository
+        {
+            OverviewRowsByYear =
+            {
+                [2026] =
+                [
+                    new EconomyInvoiceRecord(
+                        new InvoiceNumber(1),
+                        new DateOnly(2026, 5, 31),
+                        new InvoicePeriod(new DateOnly(2026, 5, 1), new DateOnly(2026, 5, 31)),
+                        @"C:\Invoices\Invoice 001 May.pdf",
+                        new InvoiceTotals(MoneyAmount.Dkk(400m), MoneyAmount.Dkk(100m), MoneyAmount.Dkk(500m)))
+                ]
+            }
+        };
+        var query = new EconomyOverviewQuery(
+            invoices,
+            new FakeEconomyRepository
+            {
+                Settings = new EconomySettings(new DateOnly(2026, 7, 1)),
+                ManualOverrides =
+                [
+                    new EconomyManualMonthOverride(2026, 5, MoneyAmount.Dkk(900m), MoneyAmount.Dkk(225m))
+                ]
+            });
+
+        var result = await query.LoadAsync(2026, CancellationToken.None);
+
         Assert.False(result.Succeeded);
-        Assert.Contains(result.Errors, error => error.Code == "EconomyOverview.IssuedInvoiceBeforeCutOver");
+        Assert.Contains(result.Errors, error => error.Code == "EconomyOverview.ManualOverrideIssuedInvoiceConflict");
+        Assert.NotNull(result.Value);
+        Assert.Single(result.Value!.Invoices);
+        Assert.Equal(12, result.Value.Months.Count);
+        Assert.Contains("001", result.Errors[0].Message);
+        Assert.Contains("2026-05", result.Errors[0].Message);
     }
 
     private sealed class FakeInvoiceRepository : IInvoiceRepository

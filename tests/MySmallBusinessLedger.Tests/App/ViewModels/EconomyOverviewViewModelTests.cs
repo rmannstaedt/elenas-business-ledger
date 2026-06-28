@@ -90,7 +90,6 @@ public sealed class EconomyOverviewViewModelTests
         await viewModel.LoadAsync(TestContext.Current.CancellationToken);
 
         Assert.True(viewModel.ShowAdminControls);
-        Assert.Equal(new DateTime(2026, 7, 1), viewModel.FirstApplicationInvoiceMonthDate);
         Assert.True(viewModel.Months.Single(month => month.Month == 5).CanEditManualTotals);
         Assert.False(viewModel.Months.Single(month => month.Month == 8).CanEditManualTotals);
 
@@ -115,6 +114,35 @@ public sealed class EconomyOverviewViewModelTests
     }
 
     [Fact]
+    public async Task AdminModeSaveSkipsReadOnlyIssuedInvoiceLegacyMonths()
+    {
+        var service = new FakeEconomyOverviewService
+        {
+            NextLoadResult = OperationResult<EconomyOverview>.Success(CreateOverviewWithIssuedLegacyMonth(2026))
+        };
+        var viewModel = CreateViewModel(service: service, isAdminMode: true);
+        await viewModel.LoadAsync(TestContext.Current.CancellationToken);
+
+        var march = viewModel.Months.Single(month => month.Month == 3);
+        var may = viewModel.Months.Single(month => month.Month == 5);
+        Assert.True(march.CanEditManualTotals);
+        Assert.False(may.CanEditManualTotals);
+
+        march.NetText = "1.212,00";
+        march.VatText = "0,00";
+
+        await viewModel.SaveManualMonthsCommand.ExecuteAsync();
+
+        Assert.Contains(service.SavedManualOverrides, manual =>
+            manual.Year == 2026 &&
+            manual.Month == 3 &&
+            manual.Net == MoneyAmount.Dkk(1212m) &&
+            manual.Vat == MoneyAmount.Dkk(0m));
+        Assert.DoesNotContain(service.SavedManualOverrides, manual => manual.Year == 2026 && manual.Month == 5);
+        Assert.False(viewModel.HasError);
+    }
+
+    [Fact]
     public async Task AdminModeWithoutCutOverKeepsMonthsReadOnly()
     {
         var viewModel = CreateViewModel(isAdminMode: true);
@@ -122,7 +150,7 @@ public sealed class EconomyOverviewViewModelTests
         await viewModel.LoadAsync(TestContext.Current.CancellationToken);
 
         Assert.All(viewModel.Months, month => Assert.False(month.CanEditManualTotals));
-        Assert.Contains("Set the first application-backed invoice month", viewModel.ManualEditStatusText);
+        Assert.Contains("Application Settings", viewModel.ManualEditStatusText);
     }
 
     [Fact]
@@ -139,6 +167,50 @@ public sealed class EconomyOverviewViewModelTests
         Assert.False(viewModel.ShowAdminControls);
         Assert.All(viewModel.Months, month => Assert.False(month.CanEditManualTotals));
         Assert.False(viewModel.SaveManualMonthsCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public void AdminModeKeepsApplicationIssuedLegacyMonthsReadOnly()
+    {
+        var month = new EconomyOverviewViewModel.EconomyOverviewMonthDisplayModel(
+            2026,
+            5,
+            "maj",
+            "1.000,00 DKK",
+            "250,00 DKK",
+            "1.250,00 DKK",
+            EconomyOverviewMonthSource.IssuedInvoices,
+            isAdminMode: true,
+            firstApplicationInvoiceMonth: new DateOnly(2026, 7, 1));
+
+        Assert.False(month.CanEditManualTotals);
+    }
+
+    [Fact]
+    public async Task LoadAsyncDisplaysReturnedOverviewDisablesExportButKeepsManualCorrectionActionsAvailable()
+    {
+        var overview = CreateOverview(2026, new DateOnly(2026, 6, 1));
+        var service = new FakeEconomyOverviewService
+        {
+            NextLoadResult = OperationResult<EconomyOverview>.Failure(
+                overview,
+                new ValidationError(
+                    "EconomyOverview.ManualOverrideIssuedInvoiceConflict",
+                    "Manual month totals for 2026-05 conflict with Invoice 001."))
+        };
+        var viewModel = CreateViewModel(service: service, isAdminMode: true);
+
+        await viewModel.LoadAsync(TestContext.Current.CancellationToken);
+
+        Assert.True(viewModel.HasError);
+        Assert.Contains("Invoice 001", viewModel.ErrorMessage);
+        Assert.Single(viewModel.Invoices);
+        Assert.Equal(12, viewModel.Months.Count);
+        Assert.Equal(4, viewModel.Quarters.Count);
+        Assert.Equal(5, viewModel.Years.Count);
+        Assert.False(viewModel.ExportCsvCommand.CanExecute(null));
+        Assert.True(viewModel.SaveManualMonthsCommand.CanExecute(null));
+        Assert.True(viewModel.CancelManualMonthsCommand.CanExecute(null));
     }
 
     private static EconomyOverviewViewModel CreateViewModel(
@@ -214,6 +286,61 @@ public sealed class EconomyOverviewViewModelTests
                 .ToArray(),
             firstApplicationInvoiceMonth);
 
+    private static EconomyOverview CreateOverviewWithIssuedLegacyMonth(int year) =>
+        new(
+            year,
+            [
+                new EconomyOverviewInvoiceRow(
+                    new InvoiceNumber(1),
+                    new DateOnly(year, 5, 31),
+                    new InvoicePeriod(new DateOnly(year, 5, 1), new DateOnly(year, 5, 31)),
+                    @"C:\Invoices\Invoice 001.pdf",
+                    "Invoice 001.pdf",
+                    MoneyAmount.Dkk(2550m),
+                    MoneyAmount.Dkk(0m),
+                    MoneyAmount.Dkk(2550m))
+            ],
+            Enumerable.Range(1, 12)
+                .Select(month => month == 5
+                    ? new EconomyOverviewMonthTotal(
+                        month,
+                        HasInvoices: true,
+                        MoneyAmount.Dkk(2550m),
+                        MoneyAmount.Dkk(0m),
+                        MoneyAmount.Dkk(2550m),
+                        EconomyOverviewMonthSource.IssuedInvoices,
+                        IsLegacyManualMonth: true)
+                    : new EconomyOverviewMonthTotal(
+                        month,
+                        HasInvoices: false,
+                        null,
+                        null,
+                        null,
+                        EconomyOverviewMonthSource.None,
+                        IsLegacyManualMonth: month < 6))
+                .ToArray(),
+            [
+                new EconomyOverviewQuarterTotal(1, HasInvoices: false, null, null, null),
+                new EconomyOverviewQuarterTotal(2, HasInvoices: true, MoneyAmount.Dkk(2550m), MoneyAmount.Dkk(0m), MoneyAmount.Dkk(2550m)),
+                new EconomyOverviewQuarterTotal(3, HasInvoices: false, null, null, null),
+                new EconomyOverviewQuarterTotal(4, HasInvoices: false, null, null, null)
+            ],
+            new EconomyOverviewYearToDateTotal(
+                MoneyAmount.Dkk(2550m),
+                MoneyAmount.Dkk(0m),
+                MoneyAmount.Dkk(2550m)),
+            Enumerable.Range(0, 5)
+                .Select(offset => offset == 0
+                    ? new EconomyOverviewYearTotal(
+                        year,
+                        HasInvoices: true,
+                        MoneyAmount.Dkk(2550m),
+                        MoneyAmount.Dkk(0m),
+                        MoneyAmount.Dkk(2550m))
+                    : new EconomyOverviewYearTotal(year - offset, HasInvoices: false, null, null, null))
+                .ToArray(),
+            new DateOnly(year, 6, 1));
+
     private sealed class FakeEconomyOverviewService : IEconomyOverviewService
     {
         public List<int> RequestedYears { get; } = [];
@@ -226,10 +353,17 @@ public sealed class EconomyOverviewViewModelTests
 
         public EconomySettings? SavedSettings { get; private set; }
 
+        public OperationResult<EconomyOverview>? NextLoadResult { get; init; }
+
         public Task<OperationResult<EconomyOverview>> LoadAsync(int year, CancellationToken cancellationToken)
         {
             RequestedYears.Add(year);
             RequestedCancellationTokens.Add(cancellationToken);
+            if (NextLoadResult is not null)
+            {
+                return Task.FromResult(NextLoadResult);
+            }
+
             return Task.FromResult(OperationResult<EconomyOverview>.Success(CreateOverview(year, FirstApplicationInvoiceMonth)));
         }
 

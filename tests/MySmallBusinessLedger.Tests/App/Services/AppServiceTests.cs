@@ -133,6 +133,45 @@ public sealed class AppServiceTests
         Assert.True(snapshot.HasGoogleAuthorizationTokens);
     }
 
+    [Fact]
+    public async Task AppSettingsServiceLoadsAndSavesEconomySettings()
+    {
+        using var database = await TestDatabase.CreateAsync();
+        using var appData = new TemporaryDirectory();
+        var appPaths = AppPaths.FromAppDataFolder(appData.Path);
+        var economyRepository = new SqliteEconomyRepository(database.CreateContext);
+        await economyRepository.SaveSettingsAsync(
+            new EconomySettings(new DateOnly(2026, 7, 15)),
+            CancellationToken.None);
+        var service = new CoreAppSettingsService(
+            new SqliteCompanyProfileRepository(database.CreateContext),
+            new SqliteCalendarSettingsRepository(database.CreateContext),
+            appPaths,
+            new GoogleOAuthClientConfigurationProvider(Path.Combine(appData.Path, "missing-google-oauth-client.json")),
+            economyRepository: economyRepository);
+
+        var snapshot = await service.LoadAsync(CancellationToken.None);
+        var save = await service.SaveAsync(
+            CompanyProfile.Create(
+                "Maple Key Studio",
+                "Musikvej 1",
+                "12345678",
+                "elena@example.test",
+                cvr: null,
+                vatRegistrationDate: null,
+                vatStatus: VatStatus.NotRegistered,
+                invoiceFolderPath: @"C:\Invoices"),
+            new CalendarSettings("primary", "elena@example.test"),
+            new EconomySettings(new DateOnly(2026, 8, 20)),
+            CancellationToken.None);
+        var savedEconomySettings = await economyRepository.GetSettingsAsync(CancellationToken.None);
+
+        Assert.Equal(new DateOnly(2026, 7, 1), snapshot.EconomySettings?.FirstApplicationInvoiceMonth);
+        Assert.True(save.Succeeded);
+        Assert.Equal(new DateOnly(2026, 8, 1), save.Value?.EconomySettings?.FirstApplicationInvoiceMonth);
+        Assert.Equal(new DateOnly(2026, 8, 1), savedEconomySettings?.FirstApplicationInvoiceMonth);
+    }
+
     private sealed class EmptyStudentRepository : IStudentRepository
     {
         public Task<IReadOnlyList<StudentRecord>> ListStudentsAsync(CancellationToken cancellationToken) =>

@@ -120,7 +120,8 @@ internal sealed class ApplicationServiceGraph
         var studentOverviewService = new CoreStudentOverviewService(studentRepository, invoiceRepository);
         var economyOverviewService = new CoreEconomyOverviewService(
             new EconomyOverviewQuery(invoiceRepository, economyRepository),
-            economyRepository);
+            economyRepository,
+            invoiceRepository);
         var lessonEditorService = new CoreLessonEditorService(
             new AddLessonUseCase(calendarGateway, studentRepository, planCatalogRepository, lessonRepository),
             new EditLessonUseCase(calendarGateway, lessonRepository),
@@ -146,7 +147,8 @@ internal sealed class ApplicationServiceGraph
             calendarSettingsRepository,
             appPaths,
             googleOAuthClientConfigurationProvider,
-            googleCalendarClientFactory);
+            googleCalendarClientFactory,
+            economyRepository);
         var printerConfigurationService = new InvoicePrinterConfigurationService(
             settingsService,
             new WindowsInvoicePrinterSelectionDialog());

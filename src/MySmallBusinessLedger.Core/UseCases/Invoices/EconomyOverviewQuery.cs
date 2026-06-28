@@ -36,11 +36,8 @@ public sealed class EconomyOverviewQuery
             manual => (manual.Year, manual.Month),
             manual => manual);
 
-        var validationError = ValidateCutOverConsistency(firstApplicationInvoiceMonth, manualOverrides);
-        if (validationError is not null)
-        {
-            return OperationResult<EconomyOverview>.Failure(validationError);
-        }
+        var validationErrors = new List<ValidationError>();
+        AddIfNotNull(validationErrors, ValidateCutOverConsistency(firstApplicationInvoiceMonth, manualOverrides));
 
         IReadOnlyList<EconomyInvoiceRecord> currentYearRecords = [];
         IReadOnlyList<EconomyOverviewMonthTotal> currentYearMonths = [];
@@ -52,11 +49,9 @@ public sealed class EconomyOverviewQuery
                 .OrderBy(record => record.InvoiceNumber.Value)
                 .ToArray();
 
-            validationError = ValidateCutOverConsistency(firstApplicationInvoiceMonth, orderedYearRecords);
-            if (validationError is not null)
-            {
-                return OperationResult<EconomyOverview>.Failure(validationError);
-            }
+            AddIfNotNull(validationErrors, ValidateManualIssuedMonthConflict(
+                orderedYearRecords,
+                manualOverridesByMonth));
 
             var yearMonths = CreateMonthTotals(
                 summaryYear,
@@ -89,14 +84,17 @@ public sealed class EconomyOverviewQuery
             .ToArray();
         var yearToDate = CreateYearToDateTotal(currentYearMonths);
 
-        return OperationResult<EconomyOverview>.Success(new EconomyOverview(
+        var overview = new EconomyOverview(
             year,
             invoices,
             currentYearMonths,
             quarters,
             yearToDate,
             years,
-            firstApplicationInvoiceMonth));
+            firstApplicationInvoiceMonth);
+        return validationErrors.Count == 0
+            ? OperationResult<EconomyOverview>.Success(overview)
+            : OperationResult<EconomyOverview>.Failure(overview, validationErrors.ToArray());
     }
 
     private static IReadOnlyList<EconomyOverviewMonthTotal> CreateMonthTotals(
@@ -125,33 +123,74 @@ public sealed class EconomyOverviewQuery
             monthStart < firstApplicationInvoiceMonth.Value;
         if (isLegacyManualMonth)
         {
-            return manualOverridesByMonth.TryGetValue((year, month), out var manual)
-                ? new EconomyOverviewMonthTotal(
+            if (manualOverridesByMonth.TryGetValue((year, month), out var manual))
+            {
+                return new EconomyOverviewMonthTotal(
                     month,
                     HasInvoices: false,
                     manual.Net,
                     manual.Vat,
                     manual.Total,
                     EconomyOverviewMonthSource.ManualOverride,
-                    IsLegacyManualMonth: true)
-                : new EconomyOverviewMonthTotal(
-                    month,
-                    HasInvoices: false,
-                    null,
-                    null,
-                    null,
-                    EconomyOverviewMonthSource.None,
                     IsLegacyManualMonth: true);
+            }
+
+            return CreateIssuedInvoiceMonthTotal(month, records, isLegacyManualMonth: true);
         }
 
-        var totals = Sum(records);
-        return new EconomyOverviewMonthTotal(
+        return CreateIssuedInvoiceMonthTotal(month, records, isLegacyManualMonth: false);
+    }
+
+    private static ValidationError? ValidateManualIssuedMonthConflict(
+        IReadOnlyList<EconomyInvoiceRecord> records,
+        IReadOnlyDictionary<(int Year, int Month), EconomyManualMonthOverride> manualOverridesByMonth)
+    {
+        var conflictingInvoice = records.FirstOrDefault(record =>
+            manualOverridesByMonth.ContainsKey((record.Period.From.Year, record.Period.From.Month)));
+        return conflictingInvoice is null
+            ? null
+            : new ValidationError(
+                "EconomyOverview.ManualOverrideIssuedInvoiceConflict",
+                $"Manual month totals for {FormatMonth(conflictingInvoice.Period.From)} conflict with Invoice {conflictingInvoice.InvoiceNumber}. Remove either the manual month total or the application-issued invoice for that month.");
+    }
+
+    private static EconomyOverviewMonthTotal CreateEmptyLegacyMonthTotal(int month) =>
+        new(
             month,
-            records.Count > 0,
-            totals?.Net,
-            totals?.Vat,
-            totals?.Total,
-            records.Count > 0 ? EconomyOverviewMonthSource.IssuedInvoices : EconomyOverviewMonthSource.None);
+            HasInvoices: false,
+            null,
+            null,
+            null,
+            EconomyOverviewMonthSource.None,
+            IsLegacyManualMonth: true);
+
+    private static EconomyOverviewMonthTotal CreateEmptyApplicationMonthTotal(int month) =>
+        new(
+            month,
+            HasInvoices: false,
+            null,
+            null,
+            null,
+            EconomyOverviewMonthSource.None);
+
+    private static EconomyOverviewMonthTotal CreateIssuedInvoiceMonthTotal(
+        int month,
+        IReadOnlyList<EconomyInvoiceRecord> records,
+        bool isLegacyManualMonth)
+    {
+        var totals = Sum(records);
+        return totals is null
+            ? isLegacyManualMonth
+                ? CreateEmptyLegacyMonthTotal(month)
+                : CreateEmptyApplicationMonthTotal(month)
+            : new EconomyOverviewMonthTotal(
+                    month,
+                    HasInvoices: true,
+                    totals.Net,
+                    totals.Vat,
+                    totals.Total,
+                    EconomyOverviewMonthSource.IssuedInvoices,
+                    isLegacyManualMonth);
     }
 
     private static EconomyOverviewQuarterTotal CreateQuarterTotal(int quarter, IReadOnlyList<EconomyOverviewMonthTotal> months)
@@ -240,34 +279,31 @@ public sealed class EconomyOverviewQuery
         {
             return new ValidationError(
                 "EconomyOverview.CutOverMissing",
-                "Set the first application-backed invoice month before using manual month totals.");
+                "Set the first application month in Application Settings before using manual month totals.");
         }
 
         var conflictingManualOverride = manualOverrides.FirstOrDefault(manual =>
             new DateOnly(manual.Year, manual.Month, 1) >= firstApplicationInvoiceMonth.Value);
+        var conflictingMonth = conflictingManualOverride is null
+            ? default
+            : new DateOnly(conflictingManualOverride.Year, conflictingManualOverride.Month, 1);
         return conflictingManualOverride is null
             ? null
             : new ValidationError(
                 "EconomyOverview.ManualOverrideAfterCutOver",
-                "Manual month totals are only allowed before the first application-backed invoice month.");
+                $"Manual month totals for {FormatMonth(conflictingMonth)} are on or after the first application month {FormatMonth(firstApplicationInvoiceMonth.Value)}. Manual totals are only allowed before that month.");
     }
 
-    private static ValidationError? ValidateCutOverConsistency(
-        DateOnly? firstApplicationInvoiceMonth,
-        IReadOnlyList<EconomyInvoiceRecord> records)
+    private static void AddIfNotNull(List<ValidationError> errors, ValidationError? error)
     {
-        if (firstApplicationInvoiceMonth is null)
+        if (error is not null)
         {
-            return null;
+            errors.Add(error);
         }
-
-        var conflictingInvoice = records.FirstOrDefault(record => record.Period.From < firstApplicationInvoiceMonth.Value);
-        return conflictingInvoice is null
-            ? null
-            : new ValidationError(
-                "EconomyOverview.IssuedInvoiceBeforeCutOver",
-                "Issued application invoices are only allowed from the first application-backed invoice month onward.");
     }
+
+    private static string FormatMonth(DateOnly month) =>
+        month.ToString("yyyy-MM", System.Globalization.CultureInfo.InvariantCulture);
 
     private static int GetQuarter(int month) =>
         ((month - 1) / 3) + 1;

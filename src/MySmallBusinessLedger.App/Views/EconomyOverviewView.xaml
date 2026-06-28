@@ -118,22 +118,14 @@
                         HorizontalAlignment="Left"
                         VerticalAlignment="Center"
                         Visibility="{Binding ShowAdminControls, Converter={StaticResource BooleanToVisibilityConverter}}">
-                <TextBlock Text="First application month"
-                           VerticalAlignment="Center"
-                           Margin="0,0,6,0" />
-                <DatePicker SelectedDate="{Binding FirstApplicationInvoiceMonthDate, UpdateSourceTrigger=PropertyChanged}"
-                            Width="130"
-                            Height="28"
-                            VerticalContentAlignment="Center"
-                            AutomationProperties.Name="First application-backed invoice month" />
                 <Button Command="{Binding SaveManualMonthsCommand}"
-                        Content="Save"
-                        Width="72"
+                        Content="Save manual totals"
+                        Width="124"
                         Height="28"
-                        Margin="10,0,0,0" />
+                        Margin="0,0,0,0" />
                 <Button Command="{Binding CancelManualMonthsCommand}"
-                        Content="Cancel"
-                        Width="72"
+                        Content="Cancel edits"
+                        Width="90"
                         Height="28"
                         Margin="6,0,0,0" />
                 <TextBlock Text="{Binding ManualEditStatusText}"
@@ -143,19 +135,36 @@
             </StackPanel>
         </Grid>
 
-        <StackPanel DockPanel.Dock="Bottom"
-                    Orientation="Horizontal"
-                    HorizontalAlignment="Right"
-                    Margin="0,16,0,0">
-            <TextBlock Text="{Binding ErrorMessage}"
+        <Grid DockPanel.Dock="Bottom"
+              Margin="0,16,0,0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+            <TextBlock x:Name="ErrorStatusText"
+                       Text="{Binding ErrorMessage}"
                        Foreground="#A00000"
-                       VerticalAlignment="Center"
-                       Margin="0,0,16,0" />
+                       TextWrapping="Wrap"
+                       Visibility="{Binding HasError, Converter={StaticResource BooleanToVisibilityConverter}}"
+                       Margin="0,0,0,10" />
             <Button Content="Close"
+                    Grid.Row="1"
                     Width="84"
                     Height="30"
-                    IsCancel="True" />
-        </StackPanel>
+                    HorizontalAlignment="Right"
+                    Click="CloseButton_Click">
+                <Button.Style>
+                    <Style TargetType="{x:Type Button}">
+                        <Setter Property="IsCancel" Value="True" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding ShowAdminControls}" Value="True">
+                                <Setter Property="IsCancel" Value="False" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
+            </Button>
+        </Grid>
 
         <Grid>
             <Grid.ColumnDefinitions>

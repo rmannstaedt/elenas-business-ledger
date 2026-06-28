@@ -48,7 +48,7 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
-    public void ApplicationMenuShowsSettingsAdminModeAndAbout()
+    public void ApplicationMenuShowsSettingsAndAbout()
     {
         RunOnStaThread(() =>
         {
@@ -63,12 +63,7 @@ public sealed class MainWindowViewModelTests
                 .Cast<string>()
                 .ToArray();
 
-            Assert.Equal(["_Settings", "_Admin Mode", "About My Small Business Ledger"], applicationActions);
-            var adminModeItem = Assert.Single(
-                applicationMenu.Items.OfType<WpfMenuItem>(),
-                item => item.Header?.ToString() == "_Admin Mode");
-            Assert.True(adminModeItem.IsCheckable);
-            Assert.False(adminModeItem.IsChecked);
+            Assert.Equal(["_Settings", "About My Small Business Ledger"], applicationActions);
 
             window.Close();
         });
@@ -1452,13 +1447,15 @@ public sealed class MainWindowViewModelTests
     public async Task SettingsRefreshesDashboardAfterSave()
     {
         var dashboard = new FakeDashboardService();
-        var settings = new FakeSettingsLauncher { NextResult = true };
+        var settings = new FakeSettingsLauncher { NextResult = new SettingsDialogResult(true, IsAdminMode: true) };
         var viewModel = CreateViewModel(dashboard: dashboard, settingsLauncher: settings);
         await viewModel.LoadAsync();
 
         await viewModel.OpenSettingsCommand.ExecuteAsync();
 
         Assert.True(settings.WasShown);
+        Assert.False(settings.InitialAdminMode);
+        Assert.True(viewModel.IsAdminMode);
         Assert.Equal(2, dashboard.LoadCount);
     }
 
@@ -3140,13 +3137,16 @@ public sealed class MainWindowViewModelTests
 
     private sealed class FakeSettingsLauncher : ISettingsLauncher
     {
-        public bool NextResult { get; init; }
+        public SettingsDialogResult NextResult { get; init; } = new(false, false);
 
         public bool WasShown { get; private set; }
 
-        public Task<bool> ShowSettingsAsync(CancellationToken cancellationToken)
+        public bool InitialAdminMode { get; private set; }
+
+        public Task<SettingsDialogResult> ShowSettingsAsync(bool isAdminMode, CancellationToken cancellationToken)
         {
             WasShown = true;
+            InitialAdminMode = isAdminMode;
             return Task.FromResult(NextResult);
         }
     }

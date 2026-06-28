@@ -3,6 +3,7 @@ using MySmallBusinessLedger.App.ViewModels;
 using MySmallBusinessLedger.App.Views;
 using MySmallBusinessLedger.Core.Common;
 using MySmallBusinessLedger.Core.Company;
+using MySmallBusinessLedger.Core.Ports;
 using MySmallBusinessLedger.Infrastructure.Persistence;
 using System.Windows;
 using System.Windows.Controls;
@@ -27,6 +28,8 @@ public sealed class SettingsViewModelTests
             Assert.NotNull(FindGroupBoxByHeader(window, "Payment accounts"));
             Assert.NotNull(FindGroupBoxByHeader(window, "VAT"));
             Assert.NotNull(FindGroupBoxByHeader(window, "Invoicing"));
+            Assert.NotNull(FindGroupBoxByHeader(window, "Economy"));
+            Assert.NotNull(FindCheckBoxByContent(window, "Admin Mode"));
             Assert.NotNull(FindRadioButtonByContent(window, "Betales ved modtagelse"));
             Assert.NotNull(FindRadioButtonByContent(window, "8 dage fra fakturadato"));
             Assert.NotNull(FindRadioButtonByContent(window, "30 dage fra fakturadato"));
@@ -35,9 +38,10 @@ public sealed class SettingsViewModelTests
             AssertGroupBoxColumn(window, "Payment accounts", 0);
             AssertGroupBoxColumn(window, "Invoicing", 0);
             AssertGroupBoxColumn(window, "VAT", 2);
+            AssertGroupBoxColumn(window, "Economy", 2);
             var vatGroupBox = FindGroupBoxByHeader(window, "VAT");
             Assert.NotNull(vatGroupBox);
-            Assert.Equal(56, vatGroupBox.Margin.Top);
+            Assert.Equal(0, vatGroupBox.Margin.Top);
             var saveButton = FindButtonByContent(window, "Save");
             Assert.NotNull(saveButton);
             var actionPanel = Assert.IsType<StackPanel>(saveButton.Parent);
@@ -90,6 +94,7 @@ public sealed class SettingsViewModelTests
                 mobilePayAccount: "MobilePay 5678"),
                 new CalendarSettings("primary", "studio@example.test"),
                 GoogleOAuthAppConfigurationStatus: GoogleOAuthClientConfigurationStatus.Ready,
+                EconomySettings: new EconomySettings(new DateOnly(2026, 7, 1)),
                 AppDataFolderPath: @"C:\Users\ExampleUser\AppData\Roaming\visualtech.dk\MySmallBusinessLedger",
                 DatabasePath: @"C:\Users\ExampleUser\AppData\Roaming\visualtech.dk\MySmallBusinessLedger\ledger.db")
         };
@@ -109,6 +114,7 @@ public sealed class SettingsViewModelTests
         Assert.Equal("Google sign-in app: Ready", viewModel.GoogleOAuthAppStatusText);
         Assert.Equal(@"C:\Users\ExampleUser\AppData\Roaming\visualtech.dk\MySmallBusinessLedger", viewModel.AppDataFolderPath);
         Assert.Equal(@"C:\Users\ExampleUser\AppData\Roaming\visualtech.dk\MySmallBusinessLedger\ledger.db", viewModel.DatabasePath);
+        Assert.Equal(new DateTime(2026, 7, 1), viewModel.FirstApplicationInvoiceMonthDate);
         Assert.Equal("Google authorization: Not connected", viewModel.GoogleAuthorizationStatusText);
     }
 
@@ -337,6 +343,61 @@ public sealed class SettingsViewModelTests
     }
 
     [Fact]
+    public async Task SavePersistsEconomyCutOverOnlyWhenAdminModeIsEnabled()
+    {
+        var service = new FakeAppSettingsService();
+        var viewModel = new SettingsViewModel(service, isAdminMode: true)
+        {
+            CompanyName = "Maple Key Studio",
+            CompanyAddress = "Musikvej 1",
+            CompanyPhone = "12345678",
+            CompanyEmail = "elena@example.test",
+            InvoiceFolderPath = @"C:\Invoices",
+            CalendarId = "primary",
+            GoogleAccountEmail = "studio@example.test",
+            FirstApplicationInvoiceMonthDate = new DateTime(2026, 7, 15)
+        };
+
+        await viewModel.SaveCommand.ExecuteAsync();
+
+        Assert.True(viewModel.WasSaved);
+        Assert.True(viewModel.SavedAdminMode);
+        Assert.Equal(new DateOnly(2026, 7, 1), service.SavedEconomySettings?.FirstApplicationInvoiceMonth);
+    }
+
+    [Fact]
+    public void FirstApplicationInvoiceMonthNormalizesSelectedDayImmediately()
+    {
+        var viewModel = new SettingsViewModel(new FakeAppSettingsService(), isAdminMode: true)
+        {
+            FirstApplicationInvoiceMonthDate = new DateTime(2026, 6, 18)
+        };
+
+        Assert.Equal(new DateTime(2026, 6, 1), viewModel.FirstApplicationInvoiceMonthDate);
+    }
+
+    [Fact]
+    public async Task SaveRequiresFirstApplicationMonthWhenAdminModeIsEnabled()
+    {
+        var service = new FakeAppSettingsService();
+        var viewModel = new SettingsViewModel(service, isAdminMode: true)
+        {
+            CompanyName = "Maple Key Studio",
+            CompanyAddress = "Musikvej 1",
+            CompanyPhone = "12345678",
+            CompanyEmail = "elena@example.test",
+            InvoiceFolderPath = @"C:\Invoices",
+            CalendarId = "primary",
+            GoogleAccountEmail = "studio@example.test"
+        };
+
+        await viewModel.SaveCommand.ExecuteAsync();
+
+        Assert.Null(service.SavedProfile);
+        Assert.Contains("First application month", viewModel.ErrorMessage);
+    }
+
+    [Fact]
     public async Task ClearInvoicePrinterCommandClearsRememberedPrinter()
     {
         var viewModel = new SettingsViewModel(new FakeAppSettingsService())
@@ -461,6 +522,8 @@ public sealed class SettingsViewModelTests
 
         public CalendarSettings? SavedCalendarSettings { get; private set; }
 
+        public EconomySettings? SavedEconomySettings { get; private set; }
+
         public CalendarSettings? ConnectedCalendarSettings { get; private set; }
 
         public bool ConnectGoogleCalendarWasCalled { get; private set; }
@@ -473,12 +536,14 @@ public sealed class SettingsViewModelTests
         public Task<OperationResult<AppSettingsSnapshot>> SaveAsync(
             CompanyProfile companyProfile,
             CalendarSettings calendarSettings,
+            EconomySettings? economySettings,
             CancellationToken cancellationToken)
         {
             SavedProfile = companyProfile;
             SavedCalendarSettings = calendarSettings;
+            SavedEconomySettings = economySettings;
             return Task.FromResult(OperationResult<AppSettingsSnapshot>.Success(
-                new AppSettingsSnapshot(companyProfile, calendarSettings, GoogleOAuthClientConfigurationStatus.Ready)));
+                new AppSettingsSnapshot(companyProfile, calendarSettings, GoogleOAuthClientConfigurationStatus.Ready, economySettings)));
         }
 
         public Task<OperationResult<bool>> ConnectGoogleCalendarAsync(
@@ -577,6 +642,28 @@ public sealed class SettingsViewModelTests
             if (child is DependencyObject dependencyObject)
             {
                 var match = FindRadioButtonByContent(dependencyObject, content);
+                if (match is not null)
+                {
+                    return match;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static CheckBox? FindCheckBoxByContent(DependencyObject root, string content)
+    {
+        foreach (var child in LogicalTreeHelper.GetChildren(root))
+        {
+            if (child is CheckBox checkBox && string.Equals(checkBox.Content as string, content, StringComparison.Ordinal))
+            {
+                return checkBox;
+            }
+
+            if (child is DependencyObject dependencyObject)
+            {
+                var match = FindCheckBoxByContent(dependencyObject, content);
                 if (match is not null)
                 {
                     return match;

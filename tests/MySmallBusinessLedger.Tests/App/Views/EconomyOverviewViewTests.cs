@@ -3,6 +3,7 @@ using System.Runtime.ExceptionServices;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Media;
 using System.Windows.Threading;
 using MySmallBusinessLedger.App.Services;
@@ -95,15 +96,17 @@ public sealed class EconomyOverviewViewTests
         {
             var normalView = new EconomyOverviewView(CreateViewModel());
             ProcessDataBindings(normalView);
-            var normalCutOverPicker = Assert.Single(FindChildren<DatePicker>(normalView), picker =>
-                AutomationProperties.GetName(picker) == "First application-backed invoice month");
-            Assert.Equal(Visibility.Collapsed, Assert.IsAssignableFrom<FrameworkElement>(normalCutOverPicker.Parent).Visibility);
+            Assert.Empty(FindChildren<DatePicker>(normalView));
+            var normalSaveButton = Assert.Single(FindChildren<Button>(normalView), button =>
+                button.Content?.ToString() == "Save manual totals");
+            Assert.Equal(Visibility.Collapsed, Assert.IsAssignableFrom<FrameworkElement>(normalSaveButton.Parent).Visibility);
 
             var adminView = new EconomyOverviewView(CreateViewModel(isAdminMode: true));
             ProcessDataBindings(adminView);
-            var adminCutOverPicker = Assert.Single(FindChildren<DatePicker>(adminView), picker =>
-                AutomationProperties.GetName(picker) == "First application-backed invoice month");
-            Assert.Equal(Visibility.Visible, Assert.IsAssignableFrom<FrameworkElement>(adminCutOverPicker.Parent).Visibility);
+            Assert.Empty(FindChildren<DatePicker>(adminView));
+            var adminSaveButton = Assert.Single(FindChildren<Button>(adminView), button =>
+                button.Content?.ToString() == "Save manual totals");
+            Assert.Equal(Visibility.Visible, Assert.IsAssignableFrom<FrameworkElement>(adminSaveButton.Parent).Visibility);
 
             var monthsGrid = FindChildren<WpfDataGrid>(adminView)
                 .Single(grid => grid.Columns.Count > 0 &&
@@ -115,9 +118,96 @@ public sealed class EconomyOverviewViewTests
         });
     }
 
-    private static EconomyOverviewViewModel CreateViewModel(bool isAdminMode = false) =>
+    [Fact]
+    public void CloseButtonDoesNotCloseWindowOnEscapeInAdminMode()
+    {
+        RunOnStaThread(() =>
+        {
+            var normalView = new EconomyOverviewView(CreateViewModel());
+            ProcessDataBindings(normalView);
+            var normalCloseButton = Assert.Single(FindChildren<Button>(normalView), button =>
+                button.Content?.ToString() == "Close");
+            Assert.True(normalCloseButton.IsCancel);
+
+            var adminView = new EconomyOverviewView(CreateViewModel(isAdminMode: true));
+            ProcessDataBindings(adminView);
+            var adminCloseButton = Assert.Single(FindChildren<Button>(adminView), button =>
+                button.Content?.ToString() == "Close");
+            Assert.False(adminCloseButton.IsCancel);
+        });
+    }
+
+    [Fact]
+    public void CloseButtonStillClosesWindowInAdminMode()
+    {
+        RunOnStaThread(() =>
+        {
+            var storePath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.json");
+            WindowPlacementStore.StorePathOverride = storePath;
+            try
+            {
+                var adminView = new EconomyOverviewView(CreateViewModel(isAdminMode: true));
+                var wasClosed = false;
+                adminView.Closed += (_, _) => wasClosed = true;
+                adminView.Show();
+                ProcessDataBindings(adminView);
+
+                var closeButton = Assert.Single(FindChildren<Button>(adminView), button =>
+                    button.Content?.ToString() == "Close");
+                closeButton.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+                adminView.Dispatcher.Invoke(() => { }, DispatcherPriority.Background);
+
+                Assert.True(wasClosed);
+            }
+            finally
+            {
+                WindowPlacementStore.StorePathOverride = null;
+                if (File.Exists(storePath))
+                {
+                    File.Delete(storePath);
+                }
+            }
+        });
+    }
+
+    [Fact]
+    public void BlockingErrorUsesWrappedStatusAreaAndExpandsWindow()
+    {
+        RunOnStaThread(() =>
+        {
+            var normalViewModel = CreateViewModel();
+            var normalView = new EconomyOverviewView(normalViewModel);
+            ProcessDataBindings(normalView);
+
+            var normalErrorText = Assert.IsType<TextBlock>(normalView.FindName("ErrorStatusText"));
+            Assert.Equal(TextWrapping.Wrap, normalErrorText.TextWrapping);
+            Assert.Equal(Visibility.Collapsed, normalErrorText.Visibility);
+            Assert.Equal(760, normalView.Height);
+
+            var failingViewModel = CreateViewModel(
+                loadResult: OperationResult<EconomyOverview>.Failure(
+                    CreateOverview(2026),
+                    new MySmallBusinessLedger.Core.Common.ValidationError(
+                        "EconomyOverview.ManualOverrideIssuedInvoiceConflict",
+                        "Manual month totals for 2026-05 conflict with invoice 001. Remove either the manual month total or the application-issued invoice for that month.")));
+            var failingView = new EconomyOverviewView(failingViewModel);
+
+            failingViewModel.LoadAsync(CancellationToken.None).GetAwaiter().GetResult();
+            ProcessDataBindings(failingView);
+
+            var failingErrorText = Assert.IsType<TextBlock>(failingView.FindName("ErrorStatusText"));
+            Assert.Equal(Visibility.Visible, failingErrorText.Visibility);
+            Assert.Equal(TextWrapping.Wrap, failingErrorText.TextWrapping);
+            Assert.Equal(800, failingView.Height);
+            Assert.Equal(760, failingView.MinHeight);
+        });
+    }
+
+    private static EconomyOverviewViewModel CreateViewModel(
+        bool isAdminMode = false,
+        OperationResult<EconomyOverview>? loadResult = null) =>
         new(
-            new FakeEconomyOverviewService(),
+            new FakeEconomyOverviewService(loadResult),
             new FakeEconomyOverviewExportDialog(),
             new FakeEconomyOverviewCsvFileService(),
             new FakeInvoicePdfLauncher(),
@@ -210,10 +300,10 @@ public sealed class EconomyOverviewViewTests
         capturedException?.Throw();
     }
 
-    private sealed class FakeEconomyOverviewService : IEconomyOverviewService
+    private sealed class FakeEconomyOverviewService(OperationResult<EconomyOverview>? loadResult) : IEconomyOverviewService
     {
         public Task<OperationResult<EconomyOverview>> LoadAsync(int year, CancellationToken cancellationToken) =>
-            Task.FromResult(OperationResult<EconomyOverview>.Success(CreateOverview(year)));
+            Task.FromResult(loadResult ?? OperationResult<EconomyOverview>.Success(CreateOverview(year)));
 
         public Task<OperationResult<EconomyOverview>> SaveManualMonthOverridesAsync(
             int overviewYear,

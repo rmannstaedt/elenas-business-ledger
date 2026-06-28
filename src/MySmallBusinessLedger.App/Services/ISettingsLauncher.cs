@@ -1,6 +1,8 @@
 namespace MySmallBusinessLedger.App.Services;
 
+public sealed record SettingsDialogResult(bool WasSaved, bool IsAdminMode);
+
 public interface ISettingsLauncher
 {
-    Task<bool> ShowSettingsAsync(CancellationToken cancellationToken);
+    Task<SettingsDialogResult> ShowSettingsAsync(bool isAdminMode, CancellationToken cancellationToken);
 }

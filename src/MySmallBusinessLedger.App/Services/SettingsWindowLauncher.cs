@@ -13,15 +13,16 @@ public sealed class SettingsWindowLauncher : ISettingsLauncher
         this.settingsService = settingsService;
     }
 
-    public async Task<bool> ShowSettingsAsync(CancellationToken cancellationToken)
+    public async Task<SettingsDialogResult> ShowSettingsAsync(bool isAdminMode, CancellationToken cancellationToken)
     {
-        var viewModel = new SettingsViewModel(settingsService);
+        var viewModel = new SettingsViewModel(settingsService, isAdminMode);
         await viewModel.LoadAsync();
         var window = new SettingsView(viewModel)
         {
             Owner = Application.Current?.MainWindow
         };
 
-        return window.ShowDialog() == true && viewModel.WasSaved;
+        var wasSaved = window.ShowDialog() == true && viewModel.WasSaved;
+        return new SettingsDialogResult(wasSaved, wasSaved ? viewModel.SavedAdminMode : isAdminMode);
     }
 }
