@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
 using MySmallBusinessLedger.App.Services;
@@ -171,6 +172,63 @@ public sealed class EconomyOverviewViewTests
     }
 
     [Fact]
+    public void EnterInEditableMonthAmountFocusesSameColumnOnNextEditableRow()
+    {
+        RunOnStaThread(() =>
+        {
+            var storePath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.json");
+            WindowPlacementStore.StorePathOverride = storePath;
+            EconomyOverviewView? view = null;
+            try
+            {
+                var viewModel = CreateViewModel(
+                    isAdminMode: true,
+                    loadResult: OperationResult<EconomyOverview>.Success(
+                        CreateOverview(2026, new DateOnly(2026, 7, 1))));
+                viewModel.LoadAsync(CancellationToken.None).GetAwaiter().GetResult();
+                view = new EconomyOverviewView(viewModel);
+                view.Show();
+                ProcessDataBindings(view);
+
+                var monthsGrid = FindChildren<WpfDataGrid>(view)
+                    .Single(grid => grid.Columns.Count > 0 &&
+                        Convert.ToString(grid.Columns[0].Header, CultureInfo.InvariantCulture) == "Month");
+                var march = viewModel.Months.Single(month => month.Month == 3);
+                var april = viewModel.Months.Single(month => month.Month == 4);
+                var marchNetTextBox = FindMonthTextBox(monthsGrid, march, nameof(march.NetText));
+                marchNetTextBox.Focus();
+                Keyboard.Focus(marchNetTextBox);
+                Assert.Same(marchNetTextBox, Keyboard.FocusedElement);
+
+                var keyEventArgs = new KeyEventArgs(
+                    Keyboard.PrimaryDevice,
+                    PresentationSource.FromVisual(marchNetTextBox)!,
+                    0,
+                    Key.Enter)
+                {
+                    RoutedEvent = UIElement.PreviewKeyDownEvent,
+                    Source = marchNetTextBox
+                };
+                marchNetTextBox.RaiseEvent(keyEventArgs);
+                view.Dispatcher.Invoke(() => { }, DispatcherPriority.Background);
+                view.Dispatcher.Invoke(() => { }, DispatcherPriority.ApplicationIdle);
+
+                var aprilNetTextBox = FindMonthTextBox(monthsGrid, april, nameof(april.NetText));
+                Assert.Same(aprilNetTextBox, Keyboard.FocusedElement);
+            }
+            finally
+            {
+                view?.Close();
+                WindowPlacementStore.StorePathOverride = null;
+                if (File.Exists(storePath))
+                {
+                    File.Delete(storePath);
+                }
+            }
+        });
+    }
+
+    [Fact]
     public void BlockingErrorUsesWrappedStatusAreaAndExpandsWindow()
     {
         RunOnStaThread(() =>
@@ -214,7 +272,7 @@ public sealed class EconomyOverviewViewTests
             new FakeUiClock(new DateTimeOffset(2026, 6, 27, 12, 0, 0, TimeSpan.Zero)),
             isAdminMode);
 
-    private static EconomyOverview CreateOverview(int year) =>
+    private static EconomyOverview CreateOverview(int year, DateOnly? firstApplicationInvoiceMonth = null) =>
         new(
             year,
             [
@@ -251,7 +309,8 @@ public sealed class EconomyOverviewViewTests
                         MoneyAmount.Dkk(250m),
                         MoneyAmount.Dkk(1250m))
                     : new EconomyOverviewYearTotal(year - offset, HasInvoices: false, null, null, null))
-                .ToArray());
+                .ToArray(),
+            firstApplicationInvoiceMonth);
 
     private static IReadOnlyList<T> FindChildren<T>(DependencyObject root)
         where T : DependencyObject
@@ -277,6 +336,40 @@ public sealed class EconomyOverviewViewTests
     {
         window.Dispatcher.Invoke(() => { }, DispatcherPriority.DataBind);
         window.UpdateLayout();
+    }
+
+    private static TextBox FindMonthTextBox(
+        WpfDataGrid grid,
+        EconomyOverviewViewModel.EconomyOverviewMonthDisplayModel month,
+        string bindingPath)
+    {
+        grid.ScrollIntoView(month);
+        grid.UpdateLayout();
+
+        var row = FindVisualChildren<DataGridRow>(grid)
+            .Single(dataGridRow => ReferenceEquals(dataGridRow.Item, month));
+        return FindVisualChildren<TextBox>(row)
+            .Single(textBox =>
+                ReferenceEquals(textBox.DataContext, month) &&
+                textBox.GetBindingExpression(TextBox.TextProperty)?.ParentBinding.Path.Path == bindingPath);
+    }
+
+    private static IReadOnlyList<T> FindVisualChildren<T>(DependencyObject root)
+        where T : DependencyObject
+    {
+        var matches = new List<T>();
+        for (var index = 0; index < VisualTreeHelper.GetChildrenCount(root); index++)
+        {
+            var child = VisualTreeHelper.GetChild(root, index);
+            if (child is T match)
+            {
+                matches.Add(match);
+            }
+
+            matches.AddRange(FindVisualChildren<T>(child));
+        }
+
+        return matches;
     }
 
     private static void RunOnStaThread(Action action)

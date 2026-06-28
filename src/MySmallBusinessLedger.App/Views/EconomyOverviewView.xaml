@@ -258,7 +258,8 @@
                                         <TextBox Text="{Binding NetText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                  BorderThickness="0"
                                                  Padding="4,0"
-                                                 VerticalContentAlignment="Center">
+                                                 VerticalContentAlignment="Center"
+                                                 PreviewKeyDown="MonthManualTextBox_PreviewKeyDown">
                                             <TextBox.Style>
                                                 <Style TargetType="{x:Type TextBox}">
                                                     <Setter Property="Visibility" Value="Collapsed" />
@@ -296,7 +297,8 @@
                                         <TextBox Text="{Binding VatText, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                                  BorderThickness="0"
                                                  Padding="4,0"
-                                                 VerticalContentAlignment="Center">
+                                                 VerticalContentAlignment="Center"
+                                                 PreviewKeyDown="MonthManualTextBox_PreviewKeyDown">
                                             <TextBox.Style>
                                                 <Style TargetType="{x:Type TextBox}">
                                                     <Setter Property="Visibility" Value="Collapsed" />
