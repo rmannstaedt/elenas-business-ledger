@@ -31,6 +31,26 @@ dotnet build MySmallBusinessLedger.sln -nodeReuse:false
 dotnet test MySmallBusinessLedger.sln -nodeReuse:false
 ```
 
+## Build the installer
+
+The application can be packaged as a single-file Inno Setup installer for Windows x64:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\build-installer.ps1
+```
+
+The script publishes a self-contained Release build and creates:
+
+```text
+artifacts\installer\MySmallBusinessLedger-1.20.0-Setup.exe
+```
+
+Inno Setup 6 must be installed at `C:\Program Files (x86)\Inno Setup 6\ISCC.exe`, or pass `-InnoSetupCompiler` to the script. If the release installer should include Google Calendar sign-in support, place the real publisher OAuth Desktop JSON at `src\MySmallBusinessLedger.App\Configuration\google-oauth-client.json` before building; that file remains ignored by Git.
+
+The installer installs per-user under `%LOCALAPPDATA%\Programs\MySmallBusinessLedger`, creates a Start menu shortcut, and offers an optional desktop shortcut. It installs only this version and does not auto-update. Later installers use the same application identity and install location so they replace application files without deleting runtime data. Install, upgrade, and uninstall must leave `%APPDATA%\visualtech.dk\MySmallBusinessLedger` intact, including `ledger.db`, Settings data, Google token files, window placement, and grid column widths.
+
+The installer is not code-signed in version 1.20, so Windows SmartScreen may warn before running it.
+
 ## Pilot setup
 
 Run the WPF app from Visual Studio or with:

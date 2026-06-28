@@ -15,6 +15,7 @@ Target framework: .NET 10
 Platform: Windows desktop
 UI: WPF
 Architecture: local-first desktop app
+Installer/distribution: single-file Inno Setup installer for Windows x64, built by `scripts\build-installer.ps1` into `artifacts\installer\MySmallBusinessLedger-1.20.0-Setup.exe`; installer is per-user, installs to `%LOCALAPPDATA%\Programs\MySmallBusinessLedger`, creates a Start menu shortcut, offers an optional desktop shortcut, has no auto-update behavior, and must not delete `%APPDATA%\visualtech.dk\MySmallBusinessLedger` during install, replacement, or uninstall
 
 ## Solution shape
 
@@ -86,6 +87,7 @@ Resizable desktop windows must remember size and position, including subwindows,
 ```powershell
 dotnet build MySmallBusinessLedger.sln -nodeReuse:false
 dotnet test MySmallBusinessLedger.sln -nodeReuse:false
+powershell -ExecutionPolicy Bypass -File scripts\build-installer.ps1
 ```
 
 ## Test policy
