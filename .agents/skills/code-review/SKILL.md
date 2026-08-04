@@ -24,6 +24,7 @@ Catch issues such as:
 - mismatches between the state a command mutates and the source later used by billing, reporting, audit, permissions, previews, exports, synchronization, destructive actions, or UI refresh;
 - overly loose, misleading, or under-specified contracts;
 - cancellation, retry, timeout, resume, idempotency, shutdown, or partial-failure bugs;
+- correctness that depends on fixed delays, polling intervals, retry/pass counts, scheduler turns, clock resolution, or assumed machine speed;
 - missing failure recording or poor error reporting;
 - resource lifetime, disposal, concurrency, async, or thread-affinity problems;
 - inefficient unbounded memory, I/O, rendering, database, network, or UI-thread work;
@@ -148,13 +149,14 @@ Prioritize findings in this order:
 3. Verification correctness, proof, finalization, idempotency, and durable state truthfulness.
 4. Persistence, database, artifact, migration, queue, cache, identity, lineage, or durable-reference consistency risks.
 5. Cancellation, retry, timeout, resume, shutdown, and partial-failure recovery correctness.
-6. Runtime bugs, exceptions, races, deadlocks, resource leaks, and thread/UI-affinity problems.
-7. Contract correctness, identity preservation, reference soundness, and interface soundness.
-8. Unbounded memory, CPU, I/O, database, network, rendering, or concurrency cost that can hurt realistic workloads.
-9. Layer boundaries and local ownership drift.
-10. SOLID/design-standard adherence.
-11. Test coverage and verification gaps.
-12. Simplicity, readability, and maintainability.
+6. Timing, ordering, scheduling, clock, and machine-speed assumptions that can cause false success, late regressions, or hardware-dependent correctness.
+7. Runtime bugs, exceptions, races, deadlocks, resource leaks, and thread/UI-affinity problems.
+8. Contract correctness and interface soundness.
+9. Unbounded memory, CPU, I/O, database, network, rendering, or concurrency cost that can hurt realistic workloads.
+10. Layer boundaries and local ownership drift.
+11. SOLID/design-standard adherence.
+12. Test coverage and verification gaps.
+13. Simplicity, readability, and maintainability.
 
 Do not inflate minor style issues above correctness or safety.
 
@@ -181,6 +183,7 @@ Do not inflate severity. Do not report purely subjective style preferences as fi
 - Distinguish confirmed problems from plausible risks.
 - Distinguish bugs from design concerns.
 - Distinguish local code-structure issues from full architecture issues.
+- Preserve user-visible behavior unless a behavior change was explicitly requested.
 - Preserve user-visible behavior unless a behavior change was explicitly requested.
 - Prefer small targeted fixes over broad rewrites.
 - Do not propose speculative abstractions.

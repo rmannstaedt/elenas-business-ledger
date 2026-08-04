@@ -63,6 +63,42 @@ Check for:
 - overly broad NuGet dependencies for a small task;
 - public XML docs that promise behavior the implementation does not provide.
 
+## Timing, Ordering, Scheduling, and Machine-Speed Checks
+
+Apply whenever correctness, completion, stability, retries, UI realization, external readiness, or tests depend on elapsed time or scheduled work.
+
+Search the relevant scope for fixed and configurable timing mechanisms, including:
+
+- `Thread.Sleep`, finite `Task.Delay`, timers, polling loops, `SpinWait`, `WaitAsync`, `WaitForExit`, and cancellation sources created with a timeout;
+- hard-coded connection, process, network, startup, shutdown, retry, lease, debounce, and command timeouts;
+- bounded retry or stabilization counts, dispatcher/scheduler priorities, render/layout passes, event-loop turns, and one-shot deferred callbacks;
+- clock reads, timestamp-difference sleeps, wall-clock deadlines, and assumptions about timer or filesystem timestamp resolution;
+- tests with fixed sleeps, short observation windows, hard deadlines, or performance thresholds.
+
+For every occurrence, determine:
+
+- whether it is deliberate UX behavior, a performance budget, a safety circuit breaker, or an implicit proof that asynchronous work has completed;
+- what observable state, event, predicate, acknowledgement, generation/version, or durable record actually proves completion;
+- whether late or out-of-order work can occur after the code or test has declared success, stability, cancellation, failure, or disposal;
+- whether a slower or busier machine, remote desktop, large dataset, cold service, slow disk/network, virtualization, debugger, or loaded CI runner changes correctness rather than merely latency;
+- whether retries or dispatcher passes are paced by elapsed time or by event-loop opportunities, and whether the bounded count can be exhausted before the required condition becomes true;
+- whether timeout expiry is distinguished truthfully from user cancellation, external failure, retry exhaustion, and partial success;
+- whether stale operations are cancelled, versioned, or prevented from overwriting newer state;
+- whether configured timeouts are appropriate for the deployment environment and remain cancellable;
+- whether performance thresholds are isolated from functional tests and documented against representative hardware.
+
+Report fixed timing as a correctness finding when success depends on “enough time probably passed” or “enough scheduler passes probably ran.” Prefer state/event-driven completion, explicit acknowledgements, generation tokens, or predicate-based waiting. Retain a timeout or attempt cap only as a cancellation, diagnostic, or failure boundary—not as proof that the operation succeeded.
+
+Treat tests with special care:
+
+- a fixed wait before a positive assertion can false-fail on a slower system;
+- a fixed observation window before a negative or stability assertion can false-pass when the forbidden or regressive event occurs later;
+- polling with a deadline is more adaptive than a fixed sleep, but its upper bound can still create hardware-dependent failures;
+- replace timing-based proof with observable completion or quiescence signals where feasible;
+- centralize unavoidable test timeouts, use a monotonic clock, make environment scaling explicit, and keep performance regression tests separate from functional correctness.
+
+Do not report ordinary debounce intervals, tooltip durations, intentional simulation delays, or documented performance budgets as correctness bugs merely because they are numeric. Verify their guards, cancellation, stale-result handling, configurability, and classification.
+
 ## Contract and API Checks
 
 A contract includes names, signatures, nullability, exceptions, result models, comments, XML docs, tests, and caller assumptions.
