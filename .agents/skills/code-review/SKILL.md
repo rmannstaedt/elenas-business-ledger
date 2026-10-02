@@ -101,6 +101,8 @@ Default to a whole-solution impact review when the user asks for a general code 
 
 If the user provides a specific diff, file, or concern, focus there but follow consequences through callers, implementations, tests, contracts, DTOs, persistence/artifact paths, DI registrations, UI/CLI entry points, database queries/migrations, service/job paths, verification/finalization paths, and error-reporting paths when relevant.
 
+For a stateful UI or unintended-mutation defect, do not stop after finding one plausible event handler. Inventory every route by which framework or application state can write to the model, including bindings and their update triggers, selection/current-item synchronization, validation and converters, event handlers, commands, behaviors, collection-view state, and deferred callbacks. Compare the lifetime and identity of each source with the lifetime and identity of the record being edited. A programmatic or framework-generated value change is not evidence of user intent.
+
 When code mutates state that is also represented in a UI projection, cache, external system, local database, generated artifact, queue, report, or read model, trace both the mutation path and the next consequential read path. Consequential readers include billing/previews, reports, exports, audits, permissions, finalization, cleanup, synchronization, destructive actions, and any UI that claims the operation succeeded.
 
 For very large solutions, prioritize high-risk paths first and clearly state what was not reviewed. Prefer depth on high-risk paths over shallow commentary on every file.
@@ -189,6 +191,7 @@ Do not inflate severity. Do not report purely subjective style preferences as fi
 - Do not propose speculative abstractions.
 - Do not recommend changing source code during review unless the user asked for fixes.
 - Group repeated symptoms under one root cause.
+- For state-leakage or unintended-edit fixes, require a lifecycle regression scenario that first creates the contaminating state and then observes the next record. A source-shape assertion or isolated happy-path test is not enough when the defect depends on save, discard, selection change, window reuse, or reopening.
 - If a finding is architectural rather than local, recommend `architecture-review`.
 - If a finding suggests structural friction, recommend `refactor-planning` before editing.
 - If documentation appears inconsistent with code, recommend `documentation-refresh`.

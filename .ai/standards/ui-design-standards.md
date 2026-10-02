@@ -116,6 +116,21 @@ Preserve useful user-adjusted layout such as column order, widths, splitters, fi
 
 Desktop applications should preserve window size and position for main windows and subwindows, then restore them inside the current visible screen area so windows are never stranded off-screen after monitor or resolution changes.
 
+## Editable Controls And User Intent
+
+Programmatic or framework-generated selection/current-item changes are not catalog edits. Loading a record, changing `DataContext`, replacing `ItemsSource`, moving an `ICollectionView` current item, resetting a selector, reusing a window, or reopening an editor must not write a value to the editable model unless a validated user action explicitly commits it.
+
+For editable selectors and other stateful inputs:
+
+* inventory every write path into the model, including binding update triggers, `SelectedItem`/`SelectedValue`, editable `ComboBox.Text`, validation/converters, event handlers, commands, selection/current-item synchronization, and deferred dispatcher callbacks;
+* do not allow a long-lived suggestion collection or its default collection view to transfer mutable current-item/selection state between records or controls; disable implicit current-item synchronization or provide an explicitly isolated view as appropriate;
+* when source updates are coordinated by view mechanics, use explicit source-update timing and refresh the target deliberately when the record changes;
+* during record or `DataContext` replacement, close transient popups, clear stale selector state, and suppress edit handlers until the new model is fully established;
+* deferred work must capture and validate the exact record/ViewModel identity for which it was scheduled before it writes or restores control state;
+* discard/close must not leave a mutation in the persisted record, a reused ViewModel, a shared item source, or the next editor session.
+
+A regression test for cross-record contamination must create the contaminating state before inspecting the target: edit and save record A, open record B, verify untouched fields, close/discard, reopen record B, and verify again. Exercise a further record transition when the same controls or item sources are reused. Verify both the visible form and persisted data. Source/XAML assertions are useful guards, but they do not replace this lifecycle scenario.
+
 ## Visual design and design systems
 
 This document does not define a visual theme. It defines interaction and clarity standards.

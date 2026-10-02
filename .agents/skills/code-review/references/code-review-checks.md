@@ -306,12 +306,17 @@ Apply only when relevant.
 Check whether:
 
 - UI state remains typed, truthful, and stable;
+- every route that can mutate an editable model has been identified: two-way or one-way-to-source bindings and their update triggers, validation/converters, event handlers, commands, behaviors, selection/current-item synchronization, collection-view state, and deferred callbacks;
+- framework-generated or programmatic selection, current-item, focus, validation, `DataContext`, or `ItemsSource` changes are prevented from masquerading as user edits;
+- controls and item sources with different lifetimes do not share mutable selection/current-item state across records, windows, dialogs, sessions, or reused view models;
 - late or out-of-order data can regress visible state or overwrite current selection;
 - UI code starts doing backend execution, persistence, verification, migration, or workflow ownership;
 - dangerous, destructive, partial, skipped, failed, cancelled, unauthorized, or unverified states are visible before and after action;
 - command availability, cancellation, progress, disabled reasons, and errors are understandable;
 - UI thread remains responsive;
 - WPF collection and property notifications occur on the appropriate thread;
+- WPF editable selectors deliberately control `ComboBox.Text`, `SelectedItem`/`SelectedValue`, `IsSynchronizedWithCurrentItem`, default `ICollectionView` current position, and source-update timing when an item source is shared or a record context can change;
+- deferred dispatcher work captures or validates the exact record/view-model identity it was scheduled for before it writes, restores focus, or commits a value;
 - binding failures, converter behavior, validation errors, and accessibility names are considered;
 - tests cover ViewModel state transitions, stale update handling, command availability, and critical UI workflows.
 
@@ -338,6 +343,7 @@ Check whether tests cover behavior at the level where risk lives:
 - failure, exception, cancellation, timeout, retry, resume, partial success, and repeated-run paths;
 - boundary tests for serialization, persistence, paths, network, database, CLI, UI, and external APIs;
 - integration or scenario tests when behavior crosses important layers;
+- producer-transition-observer lifecycle scenarios for unintended mutation or state leakage, such as edit and save record A, open record B, verify untouched fields, discard/close, reopen B, and verify again;
 - characterization tests before risky refactoring;
 - tests proving false success, hidden partial failure, and misleading durable state cannot occur.
 

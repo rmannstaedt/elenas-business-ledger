@@ -91,6 +91,10 @@ For WPF projects, check whether:
 - code-behind is limited to WPF-specific view mechanics;
 - ViewModels do not perform backend execution, durable jobs, transfer, hashing, verification, finalization, database migrations, or long-running infrastructure work;
 - bindings are stable and not stringly typed where typed state is needed;
+- editable controls distinguish user input from framework synchronization: audit binding modes/update triggers, `ComboBox.Text`, `SelectedItem`/`SelectedValue`, `IsSynchronizedWithCurrentItem`, default `ICollectionView` current position, `ItemsSource` replacement, and `DataContext` changes;
+- reusable item sources, collection views, dialogs, or ViewModels do not carry selection/current-item state from one record into another;
+- programmatic model loading, record navigation, window reuse, and window reopening cannot execute an edit path or make the form dirty without user input;
+- deferred dispatcher callbacks are cancelled, versioned, or identity-guarded so work scheduled for an old record cannot mutate the current one;
 - `INotifyPropertyChanged`, `INotifyCollectionChanged`, commands, validation, and dispatcher/threading behavior are correct;
 - collection updates occur on the correct thread or through safe synchronization;
 - command availability updates when state changes;
@@ -118,6 +122,10 @@ Review whether UI behavior is tested at the right level:
 - UI automation for critical workflows where stable enough;
 - visual/screenshot/manual checks for layout, blank waiting states, clipping, overflow, focus, keyboard operation, high contrast, localization/text expansion, and accessibility risk;
 - cancellation, repeated runs, refresh, selection changes, and interrupted work.
+
+For state leakage or unintended edits, test the lifecycle that can produce the stale state, not only a freshly opened target record. At minimum, cover: edit record A, save it, open record B, verify untouched fields, close/discard without saving, reopen record B, and verify again. Add other record transitions that exercise shared controls or item sources. Confirm both visible values and the persisted model, and confirm that a programmatic selection/current-item change does not create user intent.
+
+If that sequence is not covered by reliable automation, record it as a mandatory manual acceptance test. A successful build, XAML/source inspection, or isolated binding assertion does not verify the user-visible fix.
 
 Do not consider a UI change complete merely because it compiles.
 

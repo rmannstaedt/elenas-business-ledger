@@ -28,7 +28,7 @@ Use only the standards that match the task and the project profile:
 - `.ai/standards/domain-data-integrity.md` — stable identities, durable references, snapshots, lineage, financial/audit state ownership, and natural-key risks. Apply when durable business data or cross-record state is involved.
 - `.ai/standards/database-standards.md` — SQL, SQLite, EF Core, migrations, transactions, concurrency, and database testing. Apply only when a database component exists.
 - `.ai/standards/service-worker-and-job-design.md` — Windows services, hosted workers, schedulers, durable jobs, queues, resumability, staging, verification, shutdown, and progress. Apply only when those components exist.
-- `.ai/standards/ui-design-standards.md` — generic UI design, state, progress, accessibility, safety-critical UI, layout, and review.
+- `.ai/standards/ui-design-standards.md` — generic UI design, state, transitions, progress, accessibility, safety-critical UI, layout, and review.
 - `.ai/standards/wpf-mvvm-standards.md` — WPF-specific MVVM, XAML, binding, threading, dialogs, validation, accessibility, and FlaUI posture. Apply only to WPF projects/components.
 - `.ai/standards/review-checklists.md` — severity model and focused review checklists.
 
