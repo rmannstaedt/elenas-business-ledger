@@ -7,7 +7,7 @@ namespace MySmallBusinessLedger.App.Services;
 
 public interface ILessonEditorService
 {
-    Task<OperationResult<IReadOnlyList<CalendarLesson>>> AddAsync(
+    Task<OperationResult<LessonAddResult>> AddAsync(
         LessonAddRequest request,
         DateOnly refreshMonth,
         CancellationToken cancellationToken);
@@ -15,7 +15,6 @@ public interface ILessonEditorService
     Task<OperationResult<PopulateCalendarResult>> PopulateCalendarAsync(
         string studentShortName,
         DateOnly displayMonth,
-        DateOnly today,
         CancellationToken cancellationToken);
 
     Task<OperationResult<IReadOnlyList<CalendarLesson>>> EditAsync(

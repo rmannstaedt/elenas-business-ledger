@@ -557,7 +557,8 @@ public sealed class UseCaseTests
             CancellationToken.None);
 
         Assert.True(result.Succeeded);
-        Assert.Contains(result.Value!, lesson => lesson.Id == addedLesson.Id && lesson.StartsAt == addedLesson.StartsAt);
+        Assert.Equal(addedLesson, result.Value!.CreatedLesson);
+        Assert.Contains(addedLesson, result.Value.Lessons);
         var savedLesson = Assert.Single(lessons.SavedLessons);
         Assert.Equal(77, savedLesson.PlanCatalogId);
         Assert.Equal("Proevetime", savedLesson.PlanName);
@@ -588,7 +589,7 @@ public sealed class UseCaseTests
 
         Assert.False(result.Succeeded);
         Assert.Contains(result.Errors, error => error.Code == "Calendar.RefreshFailed");
-        Assert.Contains(result.Value!, lesson => lesson.Id == addedLesson.Id);
+        Assert.Equal(addedLesson, result.Value!.CreatedLesson);
         var savedLesson = Assert.Single(lessons.SavedLessons);
         Assert.Equal(77, savedLesson.PlanCatalogId);
         Assert.Equal("Proevetime", savedLesson.PlanName);
@@ -619,30 +620,45 @@ public sealed class UseCaseTests
     }
 
     [Fact]
-    public async Task PopulateCalendarCurrentMonthStartsTodayAndSkipsExactDuplicates()
+    public async Task PopulateCalendarFillsWholeMonthAndSkipsExistingAndLockedLessonsOnRepeat()
     {
         var timeZone = TimeZoneInfo.FindSystemTimeZoneById("Romance Standard Time");
         var existingDuplicate = new CalendarLesson(
             "existing",
-            "Anna",
-            new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.FromHours(2)));
-        var students = new FakeStudentRepository([CreateStudentRecord("Anna")]);
+            "anna",
+            new DateTimeOffset(2026, 6, 9, 15, 0, 0, TimeSpan.FromHours(2)));
+        var lockedStart = new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.FromHours(2));
+        var student = CreateStudentRecord("Anna") with { Id = 8 };
+        var students = new FakeStudentRepository([student]);
         var calendar = new FakeCalendarGateway([existingDuplicate]);
-        var useCase = new PopulateCalendarUseCase(students, calendar, timeZone, new FakeLessonRepository());
-
-        var result = await useCase.ExecuteAsync(
-            new PopulateCalendarRequest("Anna", new DateOnly(2026, 6, 1), new DateOnly(2026, 6, 16)),
+        var lessons = new FakeLessonRepository();
+        await lessons.SaveAsync(
+            new LessonRecord(1, student.Id, "Anna", 42, "Standard", lockedStart, 60,
+                LessonState.Completed, "deleted-from-calendar", new InvoiceNumber(1)),
             CancellationToken.None);
+        var useCase = new PopulateCalendarUseCase(students, calendar, timeZone, lessons);
+        var request = new PopulateCalendarRequest("Anna", new DateOnly(2026, 6, 16));
+
+        var result = await useCase.ExecuteAsync(request, CancellationToken.None);
 
         Assert.True(result.Succeeded);
-        Assert.Equal(2, result.Value!.CreatedCount);
-        Assert.Equal(1, result.Value.SkippedDuplicateCount);
+        Assert.Equal(3, result.Value!.CreatedCount);
+        Assert.Equal(2, result.Value.SkippedDuplicateCount);
         Assert.Equal(
             [
+                new DateTimeOffset(2026, 6, 2, 15, 0, 0, TimeSpan.FromHours(2)),
                 new DateTimeOffset(2026, 6, 23, 15, 0, 0, TimeSpan.FromHours(2)),
                 new DateTimeOffset(2026, 6, 30, 15, 0, 0, TimeSpan.FromHours(2))
             ],
             calendar.PopulatedRequests.Select(request => request.StartsAt).ToArray());
+
+        var repeated = await useCase.ExecuteAsync(request, CancellationToken.None);
+
+        Assert.True(repeated.Succeeded);
+        Assert.Equal(0, repeated.Value!.CreatedCount);
+        Assert.Equal(5, repeated.Value.SkippedDuplicateCount);
+        Assert.Equal(3, calendar.PopulatedRequests.Count);
+        Assert.Equal(4, lessons.SavedLessons.Count);
     }
 
     [Fact]
@@ -655,7 +671,7 @@ public sealed class UseCaseTests
         var useCase = new PopulateCalendarUseCase(students, calendar, timeZone, lessons);
 
         var result = await useCase.ExecuteAsync(
-            new PopulateCalendarRequest("Anna", new DateOnly(2026, 6, 1), new DateOnly(2026, 6, 16)),
+            new PopulateCalendarRequest("Anna", new DateOnly(2026, 6, 1)),
             CancellationToken.None);
 
         Assert.True(result.Succeeded);
@@ -679,7 +695,7 @@ public sealed class UseCaseTests
         var useCase = new PopulateCalendarUseCase(students, calendar, timeZone, lessons);
 
         var result = await useCase.ExecuteAsync(
-            new PopulateCalendarRequest("Anna", new DateOnly(2026, 6, 1), new DateOnly(2026, 6, 16)),
+            new PopulateCalendarRequest("Anna", new DateOnly(2026, 6, 1)),
             CancellationToken.None);
 
         Assert.False(result.Succeeded);
@@ -700,7 +716,7 @@ public sealed class UseCaseTests
         var useCase = new PopulateCalendarUseCase(students, calendar, timeZone, lessons);
 
         var result = await useCase.ExecuteAsync(
-            new PopulateCalendarRequest("Anna", new DateOnly(2026, 6, 1), new DateOnly(2026, 6, 16)),
+            new PopulateCalendarRequest("Anna", new DateOnly(2026, 6, 1)),
             CancellationToken.None);
 
         Assert.False(result.Succeeded);
@@ -718,7 +734,7 @@ public sealed class UseCaseTests
         var useCase = new PopulateCalendarUseCase(students, calendar, timeZone, new FakeLessonRepository());
 
         var result = await useCase.ExecuteAsync(
-            new PopulateCalendarRequest("Anna", new DateOnly(2026, 7, 1), new DateOnly(2026, 6, 16)),
+            new PopulateCalendarRequest("Anna", new DateOnly(2026, 7, 1)),
             CancellationToken.None);
 
         Assert.True(result.Succeeded);
@@ -742,7 +758,7 @@ public sealed class UseCaseTests
         var useCase = new PopulateCalendarUseCase(students, calendar, timeZone, new FakeLessonRepository());
 
         var result = await useCase.ExecuteAsync(
-            new PopulateCalendarRequest("Anna", new DateOnly(2026, 5, 1), new DateOnly(2026, 6, 16)),
+            new PopulateCalendarRequest("Anna", new DateOnly(2026, 5, 1)),
             CancellationToken.None);
 
         Assert.True(result.Succeeded);
@@ -766,7 +782,7 @@ public sealed class UseCaseTests
         var useCase = new PopulateCalendarUseCase(students, calendar, timeZone, new FakeLessonRepository());
 
         var result = await useCase.ExecuteAsync(
-            new PopulateCalendarRequest("Anna", new DateOnly(2026, 6, 1), new DateOnly(2026, 6, 16)),
+            new PopulateCalendarRequest("Anna", new DateOnly(2026, 6, 1)),
             CancellationToken.None);
 
         Assert.False(result.Succeeded);
@@ -787,7 +803,7 @@ public sealed class UseCaseTests
         var useCase = new PopulateCalendarUseCase(students, calendar, timeZone, new FakeLessonRepository());
 
         var result = await useCase.ExecuteAsync(
-            new PopulateCalendarRequest("Anna", new DateOnly(2026, 6, 1), new DateOnly(2026, 6, 16)),
+            new PopulateCalendarRequest("Anna", new DateOnly(2026, 6, 1)),
             CancellationToken.None);
 
         Assert.False(result.Succeeded);
@@ -1886,6 +1902,8 @@ public sealed class UseCaseTests
 
     private sealed class FakeCalendarGateway(IReadOnlyList<CalendarLesson> lessons) : IGoogleCalendarGateway
     {
+        private readonly List<CalendarLesson> populatedLessons = [];
+
         public OperationResult<IReadOnlyList<CalendarLesson>> UpdateResult { get; init; } =
             OperationResult<IReadOnlyList<CalendarLesson>>.Success(lessons);
 
@@ -1903,7 +1921,7 @@ public sealed class UseCaseTests
 
         public Task<IReadOnlyList<CalendarLesson>> ListLessonsAsync(DateOnly from, DateOnly to, CancellationToken cancellationToken)
         {
-            var matchingLessons = lessons
+            var matchingLessons = lessons.Concat(populatedLessons)
                 .Where(lesson => DateOnly.FromDateTime(lesson.StartsAt.DateTime) >= from)
                 .Where(lesson => DateOnly.FromDateTime(lesson.StartsAt.DateTime) <= to)
                 .ToArray();
@@ -1954,12 +1972,13 @@ public sealed class UseCaseTests
 
             var createdLessons = requests
                 .Select((request, index) => new CalendarLesson(
-                    $"populated-{index + 1}",
+                    $"populated-{populatedLessons.Count + index + 1}",
                     request.StudentShortName,
                     request.StartsAt,
                     LessonState.Planned,
                     request.HasKnownStartTime))
                 .ToArray();
+            populatedLessons.AddRange(createdLessons);
             if (FailPopulateRefreshAfterCreate)
             {
                 return Task.FromResult(OperationResult<IReadOnlyList<CalendarLesson>>.Failure(
@@ -1968,7 +1987,7 @@ public sealed class UseCaseTests
             }
 
             var refreshedLessons = UpdateResult.Value!
-                .Concat(createdLessons)
+                .Concat(populatedLessons)
                 .OrderBy(lesson => lesson.StartsAt)
                 .ToArray();
 

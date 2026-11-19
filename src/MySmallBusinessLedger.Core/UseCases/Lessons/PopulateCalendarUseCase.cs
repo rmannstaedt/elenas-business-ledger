@@ -1,6 +1,9 @@
 using MySmallBusinessLedger.Core.Calendar;
 using MySmallBusinessLedger.Core.Common;
+using MySmallBusinessLedger.Core.Lessons;
+using MySmallBusinessLedger.Core.Plans;
 using MySmallBusinessLedger.Core.Ports;
+using MySmallBusinessLedger.Core.Students;
 
 namespace MySmallBusinessLedger.Core.UseCases.Lessons;
 
@@ -28,7 +31,6 @@ public sealed class PopulateCalendarUseCase
         CancellationToken cancellationToken)
     {
         var firstOfDisplayMonth = new DateOnly(request.DisplayMonth.Year, request.DisplayMonth.Month, 1);
-        var firstOfCurrentMonth = new DateOnly(request.Today.Year, request.Today.Month, 1);
         var student = await studentRepository.GetByShortNameAsync(request.StudentShortName, cancellationToken);
         if (student is null)
         {
@@ -44,26 +46,32 @@ public sealed class PopulateCalendarUseCase
                 "The selected student has no saved schedule to populate."));
         }
 
-        var from = firstOfDisplayMonth == firstOfCurrentMonth ? request.Today : firstOfDisplayMonth;
-        var to = firstOfDisplayMonth.AddMonths(1).AddDays(-1);
-        var existingLessons = await calendarGateway.ListLessonsAsync(from, to, cancellationToken);
+        var studentShortName = student.Student.ShortName;
+        var lastOfDisplayMonth = firstOfDisplayMonth.AddMonths(1).AddDays(-1);
+        var existingLessons = await calendarGateway.ListLessonsAsync(firstOfDisplayMonth, lastOfDisplayMonth, cancellationToken);
+        var localLessons = await lessonRepository.ListForStudentMonthAsync(studentShortName, firstOfDisplayMonth, cancellationToken);
         var existingStarts = existingLessons
-            .Where(lesson => string.Equals(lesson.StudentShortName, request.StudentShortName, StringComparison.OrdinalIgnoreCase))
+            .Where(lesson => lesson.HasKnownStartTime &&
+                string.Equals(lesson.StudentShortName, studentShortName, StringComparison.OrdinalIgnoreCase))
             .Select(lesson => lesson.StartsAt)
+            .Concat(localLessons
+                .Where(lesson => lesson.StudentId == student.Id && lesson.InvoiceNumber is not null && lesson.HasKnownStartTime)
+                .Select(lesson => lesson.StartsAt))
             .ToHashSet();
 
-        var candidates = CreateScheduledStarts(student.Schedule, from, to)
+        var candidates = CreateScheduledStarts(student.Schedule, firstOfDisplayMonth, lastOfDisplayMonth)
+            .Distinct()
             .Select(startsAt => new
             {
                 StartsAt = startsAt,
-                Plan = MySmallBusinessLedger.Core.Plans.StudentPlanPeriod.GetActivePlan(
+                Plan = StudentPlanPeriod.GetActivePlan(
                     student.PlanPeriods,
                     DateOnly.FromDateTime(startsAt.DateTime))
             })
             .Where(candidate => candidate.Plan is not null)
             .Select(candidate => new ScheduledLessonCandidate(
                 new LessonAddRequest(
-                    request.StudentShortName,
+                    studentShortName,
                     candidate.StartsAt,
                     candidate.Plan!.PlanCatalogId),
                 candidate.Plan!))
@@ -157,7 +165,7 @@ public sealed class PopulateCalendarUseCase
                 }
 
                 await lessonRepository.SaveAsync(
-                    new MySmallBusinessLedger.Core.Lessons.LessonRecord(
+                    new LessonRecord(
                         Id: 0,
                         StudentId: studentId,
                         StudentShortName: candidate.Request.StudentShortName,
@@ -183,7 +191,7 @@ public sealed class PopulateCalendarUseCase
     }
 
     private IEnumerable<DateTimeOffset> CreateScheduledStarts(
-        IReadOnlyList<MySmallBusinessLedger.Core.Students.StudentScheduleEntry> schedule,
+        IReadOnlyList<StudentScheduleEntry> schedule,
         DateOnly from,
         DateOnly to)
     {
@@ -204,5 +212,5 @@ public sealed class PopulateCalendarUseCase
 
     private sealed record ScheduledLessonCandidate(
         LessonAddRequest Request,
-        MySmallBusinessLedger.Core.Plans.Plan Plan);
+        Plan Plan);
 }

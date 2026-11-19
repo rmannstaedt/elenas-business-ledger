@@ -27,20 +27,30 @@ public sealed class CoreLessonEditorService : ILessonEditorService
         this.updateLessonPlanUseCase = updateLessonPlanUseCase;
     }
 
-    public Task<OperationResult<IReadOnlyList<CalendarLesson>>> AddAsync(
+    public Task<OperationResult<LessonAddResult>> AddAsync(
         LessonAddRequest request,
         DateOnly refreshMonth,
         CancellationToken cancellationToken) =>
         addLessonUseCase.ExecuteAsync(request, refreshMonth, cancellationToken);
 
-    public Task<OperationResult<PopulateCalendarResult>> PopulateCalendarAsync(
+    public async Task<OperationResult<PopulateCalendarResult>> PopulateCalendarAsync(
         string studentShortName,
         DateOnly displayMonth,
-        DateOnly today,
-        CancellationToken cancellationToken) =>
-        populateCalendarUseCase.ExecuteAsync(
-            new PopulateCalendarRequest(studentShortName, displayMonth, today),
-            cancellationToken);
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await populateCalendarUseCase.ExecuteAsync(
+                new PopulateCalendarRequest(studentShortName, displayMonth),
+                cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return OperationResult<PopulateCalendarResult>.Failure(new ValidationError(
+                "Calendar.PopulateFailed",
+                "Could not populate Google Calendar. Refresh the lesson list and try again."));
+        }
+    }
 
     public Task<OperationResult<IReadOnlyList<CalendarLesson>>> EditAsync(
         LessonEditRequest request,

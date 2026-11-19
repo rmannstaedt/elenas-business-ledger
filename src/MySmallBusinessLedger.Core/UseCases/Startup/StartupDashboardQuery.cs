@@ -129,6 +129,11 @@ public sealed class StartupDashboardQuery
             .ToArray();
         var studentNavigationEntries = CreateStudentNavigationEntries(selectedMonth, knownCalendarLessons, students);
         var planOptions = await CreatePlanOptionsAsync(students, cancellationToken);
+        var selectedStudent = students.FirstOrDefault(student =>
+            string.Equals(student.Student.ShortName, currentStudent, StringComparison.OrdinalIgnoreCase));
+        var lessonDefaults = selectedStudent is null
+            ? null
+            : new DashboardStudentLessonDefaults(selectedStudent.Student.ShortName, selectedStudent.Schedule, selectedStudent.PlanPeriods);
 
         return OperationResult<StartupDashboardResult>.Success(
             new StartupDashboardResult(
@@ -136,9 +141,10 @@ public sealed class StartupDashboardQuery
                 studentShortNames,
                 lessons,
                 invoices,
-                CurrentStudentHasSchedule(students, currentStudent),
+                selectedStudent?.Schedule.Count > 0,
                 studentNavigationEntries,
-                planOptions));
+                planOptions,
+                lessonDefaults));
     }
 
     private async Task<DashboardLesson> ReconcileCalendarLessonAsync(
@@ -231,15 +237,6 @@ public sealed class StartupDashboardQuery
             InvoiceNumber: null,
             HasKnownStartTime: calendarLesson.HasKnownStartTime);
     }
-
-    private static bool CurrentStudentHasSchedule(IReadOnlyList<StudentRecord> students, string? currentStudent) =>
-        currentStudent is not null &&
-        students
-            .FirstOrDefault(student => string.Equals(
-                student.Student.ShortName,
-                currentStudent,
-                StringComparison.OrdinalIgnoreCase))
-            ?.Schedule.Count > 0;
 
     private string? PickCurrentStudent(IReadOnlyList<CalendarLesson> calendarLessons, IReadOnlyList<StudentRecord> students)
     {

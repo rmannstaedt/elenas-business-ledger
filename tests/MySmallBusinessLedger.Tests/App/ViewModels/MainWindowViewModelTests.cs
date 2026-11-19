@@ -1,8 +1,11 @@
 using MySmallBusinessLedger.App.Services;
 using MySmallBusinessLedger.App.ViewModels;
+using MySmallBusinessLedger.Core.Calendar;
 using MySmallBusinessLedger.Core.Common;
 using MySmallBusinessLedger.Core.Invoices;
 using MySmallBusinessLedger.Core.Lessons;
+using MySmallBusinessLedger.Core.Plans;
+using MySmallBusinessLedger.Core.Students;
 using MySmallBusinessLedger.Core.UseCases.Lessons;
 using MySmallBusinessLedger.Core.UseCases.Startup;
 using System.Windows;
@@ -883,6 +886,64 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public void AddLessonButtonSavesStudentDefaultsAndSelectsTheCreatedLessonAtAnOccupiedTime()
+    {
+        RunOnStaThread(() =>
+        {
+            var startsAt = new DateTimeOffset(2026, 6, 16, 14, 30, 0, TimeSpan.FromHours(2));
+            var existingLesson = new CalendarLesson("existing-lesson", "Anna", startsAt);
+            var createdLesson = new CalendarLesson("new-lesson", "Anna", startsAt);
+            var lessonEditor = new FakeLessonEditorService
+            {
+                AddResult = OperationResult<LessonAddResult>.Success(new LessonAddResult(createdLesson, [existingLesson, createdLesson]))
+            };
+            var assignedPlan = new Plan("Assigned plan", 350m, LessonsPerWeek.One, 60,
+                PlanFlexibility.MoveOrCancelByAgreement, 1, startsAt, planCatalogId: 77);
+            var existingRow = new DashboardLesson(existingLesson.Id, "Anna", startsAt, LessonState.Planned,
+                IsInvoiced: false, PaymentStatus: null, PlanCatalogId: 42, PlanName: "Other plan", LocalLessonId: 10);
+            var dashboard = new FakeDashboardService
+            {
+                LessonDefaults = new DashboardStudentLessonDefaults("Anna",
+                    [new(DayOfWeek.Monday, new TimeOnly(16, 0)), new(DayOfWeek.Tuesday, new TimeOnly(14, 30))],
+                    [new(assignedPlan, new DateOnly(2026, 6, 1), null)]),
+                PlanOptions = [new(42, "Other plan"), new(77, assignedPlan.Name)],
+                DashboardLessons = [existingRow],
+                DashboardLessonsAfterFirstLoad =
+                [
+                    existingRow,
+                    existingRow with { Id = createdLesson.Id, LocalLessonId = 11, PlanCatalogId = 77, PlanName = assignedPlan.Name }
+                ],
+                StudentNavigationEntries = [new("Anna", startsAt)]
+            };
+            var viewModel = CreateViewModel(dashboard: dashboard, lessonEditorService: lessonEditor,
+                clock: new FakeUiClock(startsAt), lessonTimeZone: TimeZoneInfo.FindSystemTimeZoneById("Romance Standard Time"));
+            var window = new AppMainWindow(viewModel);
+            try
+            {
+                window.Show();
+                PumpUntil(() => !viewModel.IsBusy && viewModel.Lessons.Count == 1);
+
+                RaisePreviewLeftClick(FindButton(window, "Add Lesson"));
+                PumpUntil(() => !viewModel.IsBusy && viewModel.Lessons.Count == 2);
+
+                Assert.Equal(1, lessonEditor.AddCount);
+                Assert.Equal(new LessonAddRequest("Anna", startsAt, 77), lessonEditor.LastAddRequest);
+                var selected = Assert.IsType<LessonDisplayModel>(viewModel.SelectedLesson);
+                Assert.Equal(createdLesson.Id, selected.Id);
+                Assert.Equal("Tuesday 16-06", selected.StartsOnDateText);
+                Assert.Equal("14:30", selected.StartsAtTimeText);
+                Assert.Equal(assignedPlan.Name, selected.PlanName);
+                Assert.False(selected.IsDraft);
+                Assert.True(selected.CanEditPlan);
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
+    [Fact]
     public void AddLessonButtonPreviewClickWorksAfterStudentNavigation()
     {
         RunOnStaThread(() =>
@@ -1745,7 +1806,7 @@ public sealed class MainWindowViewModelTests
         var draft = viewModel.Lessons[1];
         Assert.True(draft.IsDraft);
         Assert.Equal("Anna", draft.StudentShortName);
-        Assert.Null(draft.StartsOnDate);
+        Assert.Equal(new DateTime(2026, 6, 16), draft.StartsOnDate);
         Assert.Equal(string.Empty, draft.StartsAtTimeText);
         Assert.True(draft.CanEdit);
     }
@@ -1971,14 +2032,9 @@ public sealed class MainWindowViewModelTests
         var startsAt = new DateTimeOffset(2026, 6, 15, 0, 0, 0, TimeSpan.FromHours(2));
         var lessonEditor = new FakeLessonEditorService
         {
-            AddResult = OperationResult<IReadOnlyList<MySmallBusinessLedger.Core.Calendar.CalendarLesson>>.Success(
-            [
-                new MySmallBusinessLedger.Core.Calendar.CalendarLesson(
-                    "different-lesson",
-                    "Anna",
-                    startsAt.AddDays(1),
-                    HasKnownStartTime: false)
-            ])
+            AddResult = OperationResult<LessonAddResult>.Success(new LessonAddResult(
+                new CalendarLesson("new-lesson", "Anna", startsAt, HasKnownStartTime: false),
+                [new CalendarLesson("different-lesson", "Anna", startsAt.AddDays(1), HasKnownStartTime: false)]))
         };
         var dashboard = new FakeDashboardService
         {
@@ -2183,7 +2239,6 @@ public sealed class MainWindowViewModelTests
 
         Assert.Equal("Anna", lessonEditor.LastPopulateStudentShortName);
         Assert.Equal(new DateOnly(2026, 6, 1), lessonEditor.LastPopulateDisplayMonth);
-        Assert.Equal(new DateOnly(2026, 6, 16), lessonEditor.LastPopulateToday);
         Assert.Equal(2, dashboard.LoadCount);
         Assert.False(viewModel.HasError);
     }
@@ -2211,7 +2266,6 @@ public sealed class MainWindowViewModelTests
 
         Assert.Equal("Anna", lessonEditor.LastPopulateStudentShortName);
         Assert.Equal(new DateOnly(2026, 5, 1), lessonEditor.LastPopulateDisplayMonth);
-        Assert.Equal(new DateOnly(2026, 6, 16), lessonEditor.LastPopulateToday);
     }
 
     [Fact]
@@ -2794,6 +2848,8 @@ public sealed class MainWindowViewModelTests
 
         public IReadOnlyList<DashboardPlanOption>? PlanOptions { get; init; }
 
+        public DashboardStudentLessonDefaults? LessonDefaults { get; init; }
+
         public OperationResult<StartupDashboardResult>? NextResult { get; set; }
 
         public LessonState LessonState { get; init; } = LessonState.Completed;
@@ -2866,7 +2922,8 @@ public sealed class MainWindowViewModelTests
                             shortName,
                             new DateTimeOffset(2026, 6, 16, 15, index, 0, TimeSpan.FromHours(2))))
                         .ToArray(),
-                    PlanOptions ?? [new DashboardPlanOption(42, "Standard")]));
+                    PlanOptions ?? [new DashboardPlanOption(42, "Standard")],
+                    LessonDefaults));
 
             NextResult = null;
             return result;
@@ -3056,7 +3113,9 @@ public sealed class MainWindowViewModelTests
 
     private sealed class FakeLessonEditorService : ILessonEditorService
     {
-        public bool AddWasCalled { get; private set; }
+        public bool AddWasCalled => AddCount > 0;
+
+        public int AddCount { get; private set; }
 
         public bool EditWasCalled { get; private set; }
 
@@ -3070,8 +3129,6 @@ public sealed class MainWindowViewModelTests
 
         public DateOnly? LastPopulateDisplayMonth { get; private set; }
 
-        public DateOnly? LastPopulateToday { get; private set; }
-
         public int? LastPlanLessonId { get; private set; }
 
         public int? LastPlanCatalogId { get; private set; }
@@ -3082,40 +3139,35 @@ public sealed class MainWindowViewModelTests
 
         public Func<Task>? BeforeDeleteReturnAsync { get; set; }
 
-        public OperationResult<IReadOnlyList<MySmallBusinessLedger.Core.Calendar.CalendarLesson>>? AddResult { get; init; }
+        public OperationResult<LessonAddResult>? AddResult { get; init; }
 
         public OperationResult<PopulateCalendarResult> PopulateResult { get; init; } =
             OperationResult<PopulateCalendarResult>.Success(new PopulateCalendarResult(2, 0, []));
 
-        public Task<OperationResult<IReadOnlyList<MySmallBusinessLedger.Core.Calendar.CalendarLesson>>> AddAsync(
+        public Task<OperationResult<LessonAddResult>> AddAsync(
             MySmallBusinessLedger.Core.UseCases.Lessons.LessonAddRequest request,
             DateOnly refreshMonth,
             CancellationToken cancellationToken)
         {
-            AddWasCalled = true;
+            AddCount++;
             LastAddRequest = request;
             if (AddResult is not null)
             {
                 return Task.FromResult(AddResult);
             }
 
-            return Task.FromResult(OperationResult<IReadOnlyList<MySmallBusinessLedger.Core.Calendar.CalendarLesson>>.Success(
-                [new MySmallBusinessLedger.Core.Calendar.CalendarLesson(
-                    "new-lesson",
-                    request.StudentShortName,
-                    request.StartsAt,
-                    HasKnownStartTime: request.HasKnownStartTime)]));
+            var createdLesson = new CalendarLesson(
+                "new-lesson", request.StudentShortName, request.StartsAt, HasKnownStartTime: request.HasKnownStartTime);
+            return Task.FromResult(OperationResult<LessonAddResult>.Success(new LessonAddResult(createdLesson, [createdLesson])));
         }
 
         public Task<OperationResult<PopulateCalendarResult>> PopulateCalendarAsync(
             string studentShortName,
             DateOnly displayMonth,
-            DateOnly today,
             CancellationToken cancellationToken)
         {
             LastPopulateStudentShortName = studentShortName;
             LastPopulateDisplayMonth = displayMonth;
-            LastPopulateToday = today;
             return Task.FromResult(PopulateResult);
         }
 

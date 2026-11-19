@@ -25,91 +25,59 @@ public sealed class AddLessonUseCase
         this.lessonRepository = lessonRepository;
     }
 
-    public async Task<OperationResult<IReadOnlyList<CalendarLesson>>> ExecuteAsync(
+    public async Task<OperationResult<LessonAddResult>> ExecuteAsync(
         LessonAddRequest request,
         DateOnly refreshMonth,
         CancellationToken cancellationToken)
     {
         if (request.PlanCatalogId <= 0)
         {
-            return OperationResult<IReadOnlyList<CalendarLesson>>.Failure(
+            return OperationResult<LessonAddResult>.Failure(
                 new ValidationError("Lesson.PlanRequired", "A lesson plan is required."));
         }
 
         var student = await studentRepository.GetByShortNameAsync(request.StudentShortName, cancellationToken);
         if (student is null)
         {
-            return OperationResult<IReadOnlyList<CalendarLesson>>.Failure(
+            return OperationResult<LessonAddResult>.Failure(
                 new ValidationError("Lesson.StudentNotFound", "The selected student was not found."));
         }
 
         var plan = await planCatalogRepository.GetAsync(request.PlanCatalogId, cancellationToken);
         if (plan is null)
         {
-            return OperationResult<IReadOnlyList<CalendarLesson>>.Failure(
+            return OperationResult<LessonAddResult>.Failure(
                 new ValidationError("Lesson.PlanNotFound", "The selected plan was not found."));
         }
 
         if (!plan.CanBeAssigned)
         {
-            return OperationResult<IReadOnlyList<CalendarLesson>>.Failure(
+            return OperationResult<LessonAddResult>.Failure(
                 new ValidationError("Lesson.PlanNotAssignable", "The selected plan cannot be assigned to a lesson."));
         }
 
         var addResult = await calendarGateway.AddLessonAsync(request, refreshMonth, cancellationToken);
-        if (!addResult.Succeeded)
+        if (addResult.Value is not { } calendarResult || string.IsNullOrWhiteSpace(calendarResult.CreatedLesson.Id))
         {
-            if (addResult.Value?.CreatedLesson is not null)
-            {
-                var saveFailure = await TrySaveCreatedLessonAsync(
-                    request,
-                    student.Id,
-                    plan,
-                    addResult.Value.CreatedLesson,
-                    addResult.Value.Lessons,
-                    refreshMonth,
-                    cancellationToken);
-                if (saveFailure is not null)
-                {
-                    return saveFailure;
-                }
-
-                var currentLessons = addResult.Value.Lessons.Count > 0
-                    ? addResult.Value.Lessons
-                    : [addResult.Value.CreatedLesson];
-                return OperationResult<IReadOnlyList<CalendarLesson>>.Failure(
-                    currentLessons,
-                    addResult.Errors.ToArray());
-            }
-
-            return OperationResult<IReadOnlyList<CalendarLesson>>.Failure(
-                addResult.Value?.Lessons ?? [],
-                addResult.Errors.ToArray());
+            return OperationResult<LessonAddResult>.Failure(addResult.Errors.ToArray());
         }
 
-        var createdLesson = addResult.Value!.CreatedLesson;
-        var successfulSaveFailure = await TrySaveCreatedLessonAsync(
+        var saveFailure = await TrySaveCreatedLessonAsync(
             request,
             student.Id,
             plan,
-            createdLesson,
-            addResult.Value.Lessons,
+            calendarResult.CreatedLesson,
             refreshMonth,
             cancellationToken);
-        if (successfulSaveFailure is not null)
-        {
-            return successfulSaveFailure;
-        }
 
-        return OperationResult<IReadOnlyList<CalendarLesson>>.Success(addResult.Value.Lessons);
+        return saveFailure ?? addResult;
     }
 
-    private async Task<OperationResult<IReadOnlyList<CalendarLesson>>?> TrySaveCreatedLessonAsync(
+    private async Task<OperationResult<LessonAddResult>?> TrySaveCreatedLessonAsync(
         LessonAddRequest request,
         int studentId,
         PlanCatalogItem plan,
         CalendarLesson createdLesson,
-        IReadOnlyList<CalendarLesson> fallbackLessons,
         DateOnly refreshMonth,
         CancellationToken cancellationToken)
     {
@@ -138,9 +106,7 @@ public sealed class AddLessonUseCase
                 new("Lesson.LocalSaveFailed", "The lesson could not be saved locally. The app attempted to remove the Google Calendar entry.")
             };
             errors.AddRange(cleanup.Errors);
-            return OperationResult<IReadOnlyList<CalendarLesson>>.Failure(
-                cleanup.Value ?? fallbackLessons,
-                errors.ToArray());
+            return OperationResult<LessonAddResult>.Failure(errors.ToArray());
         }
 
         return null;

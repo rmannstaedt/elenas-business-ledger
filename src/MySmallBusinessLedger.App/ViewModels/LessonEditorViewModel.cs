@@ -135,13 +135,17 @@ public sealed class LessonEditorViewModel : ViewModelBase
         IsBusy = true;
         try
         {
-            var result = isNewLesson
-                ? await lessonEditorService.AddAsync(new LessonAddRequest(StudentShortName, startsAt, PlanCatalogId: 0), refreshMonth, CancellationToken.None)
-                : await lessonEditorService.EditAsync(new LessonEditRequest(lessonId!, StudentShortName, startsAt), refreshMonth, CancellationToken.None);
+            const string failureMessage = "Google Calendar lesson update failed.";
+            var failed = isNewLesson
+                ? ShowFailureIfNeeded(
+                    await lessonEditorService.AddAsync(new LessonAddRequest(StudentShortName, startsAt, PlanCatalogId: 0), refreshMonth, CancellationToken.None),
+                    failureMessage)
+                : ShowFailureIfNeeded(
+                    await lessonEditorService.EditAsync(new LessonEditRequest(lessonId!, StudentShortName, startsAt), refreshMonth, CancellationToken.None),
+                    failureMessage);
 
-            if (!result.Succeeded)
+            if (failed)
             {
-                ShowFailure(result, "Google Calendar lesson update failed.");
                 return;
             }
 
@@ -173,9 +177,8 @@ public sealed class LessonEditorViewModel : ViewModelBase
         try
         {
             var result = await lessonEditorService.DeleteAsync(lessonId, refreshMonth, CancellationToken.None);
-            if (!result.Succeeded)
+            if (ShowFailureIfNeeded(result, "Google Calendar lesson delete failed."))
             {
-                ShowFailure(result, "Google Calendar lesson delete failed.");
                 return;
             }
 
@@ -210,8 +213,14 @@ public sealed class LessonEditorViewModel : ViewModelBase
         return true;
     }
 
-    private void ShowFailure<T>(OperationResult<T> result, string fallbackMessage)
+    private bool ShowFailureIfNeeded<T>(OperationResult<T> result, string fallbackMessage)
     {
+        if (result.Succeeded)
+        {
+            return false;
+        }
+
         ErrorMessage = result.Errors.FirstOrDefault()?.Message ?? fallbackMessage;
+        return true;
     }
 }

@@ -5,6 +5,7 @@ using MySmallBusinessLedger.App.Commands;
 using MySmallBusinessLedger.App.Services;
 using MySmallBusinessLedger.Core.Invoices;
 using MySmallBusinessLedger.Core.Lessons;
+using MySmallBusinessLedger.Core.Plans;
 using MySmallBusinessLedger.Core.UseCases.Lessons;
 using MySmallBusinessLedger.Core.UseCases.Startup;
 
@@ -42,7 +43,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private int? selectedStudentNavigationIndex;
     private bool suppressNavigationSelectionOnce;
     private DateOnly displayMonth;
-    private bool currentStudentHasSchedule;
+    private DashboardStudentLessonDefaults? currentStudentLessonDefaults;
     private Task? activationRefreshTask;
     private bool isBusy;
     private int activationRefreshSuspendCount;
@@ -287,7 +288,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         }
     }
 
-    private async Task RefreshAsync(Func<bool>? shouldApply = null)
+    private async Task RefreshAsync(Func<bool>? shouldApply = null, string? lessonIdToSelect = null)
     {
         IsBusy = true;
         try
@@ -304,7 +305,7 @@ public sealed class MainWindowViewModel : ViewModelBase
                 return;
             }
 
-            ApplyDashboard(result.Value!);
+            ApplyDashboard(result.Value!, lessonIdToSelect);
             ErrorMessage = null;
             lastRefreshAt = clock.Now;
         }
@@ -519,27 +520,52 @@ public sealed class MainWindowViewModel : ViewModelBase
         }
     }
 
-    private Task AddLessonAsync()
+    private async Task AddLessonAsync()
     {
-        if (CurrentStudentShortName is null)
+        if (CurrentStudentShortName is not { } studentShortName)
         {
-            return Task.CompletedTask;
+            return;
         }
 
         if (PlanOptions.Count == 0)
         {
             ErrorMessage = "Create or publish an active plan first.";
-            return Task.CompletedTask;
+            return;
         }
 
-        DateTime? defaultDate = DisplayMonth == CurrentMonth()
-            ? null
-            : DisplayMonth.ToDateTime(TimeOnly.MinValue);
-        var draft = LessonDisplayModel.CreateDraft(CurrentStudentShortName, lessonTimeZone, defaultDate);
+        var today = DateOnly.FromDateTime(clock.Now.DateTime);
+        var defaultDate = DisplayMonth == new DateOnly(today.Year, today.Month, 1) ? today : DisplayMonth;
+        TimeOnly? defaultTime = null;
+        DashboardPlanOption? defaultPlan = null;
+        if (currentStudentLessonDefaults is { } defaults &&
+            StringComparer.OrdinalIgnoreCase.Equals(defaults.StudentShortName, studentShortName))
+        {
+            var slot = defaults.Schedule.FirstOrDefault(entry => entry.Weekday == defaultDate.DayOfWeek)
+                ?? defaults.Schedule.FirstOrDefault();
+            defaultTime = slot?.StartsAt;
+            var plan = StudentPlanPeriod.GetActivePlan(defaults.PlanPeriods, defaultDate);
+            defaultPlan = PlanOptions.FirstOrDefault(option => option.PlanCatalogId == plan?.PlanCatalogId);
+        }
+
+        var draft = LessonDisplayModel.CreateDraft(
+            studentShortName, lessonTimeZone, defaultDate.ToDateTime(TimeOnly.MinValue), defaultTime, defaultPlan);
         AddLessonRow(draft);
         SelectedLesson = draft;
         RaiseCommandAvailabilityChanged();
-        return Task.CompletedTask;
+        if (defaultPlan is null)
+        {
+            return;
+        }
+
+        IsBusy = true;
+        try
+        {
+            await SaveLessonAsync(draft);
+        }
+        finally
+        {
+            IsBusy = false;
+        }
     }
 
     private async Task PopulateCalendarAsync()
@@ -549,19 +575,26 @@ public sealed class MainWindowViewModel : ViewModelBase
             return;
         }
 
-        var result = await lessonEditorService.PopulateCalendarAsync(
-            CurrentStudentShortName,
-            DisplayMonth,
-            DateOnly.FromDateTime(clock.Now.DateTime),
-            CancellationToken.None);
-        if (!result.Succeeded)
+        IsBusy = true;
+        try
         {
-            ErrorMessage = result.Errors.FirstOrDefault()?.Message ?? "Google Calendar could not be populated.";
-            return;
-        }
+            var result = await lessonEditorService.PopulateCalendarAsync(
+                CurrentStudentShortName,
+                DisplayMonth,
+                CancellationToken.None);
+            if (!result.Succeeded)
+            {
+                ErrorMessage = result.Errors.FirstOrDefault()?.Message ?? "Google Calendar could not be populated.";
+                return;
+            }
 
-        ErrorMessage = null;
-        await RefreshAsync();
+            ErrorMessage = null;
+            await RefreshAsync();
+        }
+        finally
+        {
+            IsBusy = false;
+        }
     }
 
     public void ClearError()
@@ -584,16 +617,14 @@ public sealed class MainWindowViewModel : ViewModelBase
             return;
         }
 
-        if (!initiatedByAutoSave && lesson.IsDraft && savingDraftLessons.Contains(lesson))
+        if (lesson.IsDraft && savingDraftLessons.Contains(lesson))
         {
             return;
         }
 
-        if (!initiatedByAutoSave && lesson.IsDraft)
+        if (!initiatedByAutoSave && lesson.IsDraft && autoSaveDraftVersions.TryGetValue(lesson, out var version))
         {
-            autoSaveDraftVersions[lesson] = autoSaveDraftVersions.TryGetValue(lesson, out var version)
-                ? version + 1
-                : 1;
+            autoSaveDraftVersions[lesson] = version + 1;
         }
 
         if (lesson.IsDraft && lesson.PlanCatalogId <= 0)
@@ -610,7 +641,16 @@ public sealed class MainWindowViewModel : ViewModelBase
 
         if (lesson.IsDraft)
         {
-            await SaveDraftLessonAsync(lesson, startsAt, hasKnownStartTime);
+            savingDraftLessons.Add(lesson);
+            try
+            {
+                await SaveDraftLessonAsync(lesson, startsAt, hasKnownStartTime);
+            }
+            finally
+            {
+                savingDraftLessons.Remove(lesson);
+                autoSaveDraftVersions.Remove(lesson);
+            }
             return;
         }
 
@@ -642,29 +682,20 @@ public sealed class MainWindowViewModel : ViewModelBase
             new LessonAddRequest(lesson.StudentShortName, startsAt, requestedPlanCatalogId, hasKnownStartTime),
             DisplayMonth,
             CancellationToken.None);
+        if (result.Value is { CreatedLesson: { } createdLesson })
+        {
+            lesson.AcceptCreatedLesson(createdLesson);
+            RaiseCommandAvailabilityChanged();
+        }
+
         if (!result.Succeeded)
         {
             ErrorMessage = result.Errors.FirstOrDefault()?.Message ?? "Google Calendar lesson creation failed.";
             return;
         }
 
-        var createdLesson = result.Value!
-            .FirstOrDefault(created =>
-                StringComparer.OrdinalIgnoreCase.Equals(created.StudentShortName, lesson.StudentShortName) &&
-                created.StartsAt == startsAt &&
-                created.HasKnownStartTime == hasKnownStartTime);
-        if (createdLesson is not null)
-        {
-            lesson.AcceptCreatedLesson(createdLesson);
-        }
-        else
-        {
-            lesson.AcceptSubmittedDraft();
-        }
-
         ErrorMessage = null;
-        RaiseCommandAvailabilityChanged();
-        await RefreshAsync();
+        await RefreshAsync(lessonIdToSelect: ReferenceEquals(SelectedLesson, lesson) ? lesson.Id : null);
     }
 
     private async Task DeleteLessonAsync(LessonDisplayModel lesson)
@@ -800,13 +831,13 @@ public sealed class MainWindowViewModel : ViewModelBase
         }
     }
 
-    private void ApplyDashboard(StartupDashboardResult dashboard)
+    private void ApplyDashboard(StartupDashboardResult dashboard, string? lessonIdToSelect)
     {
         var selectedLesson = SelectedLesson;
         var selectedLessonId = selectedLesson?.Id;
         var selectedInvoiceNumber = SelectedInvoice?.InvoiceNumber;
         CurrentStudentShortName = dashboard.CurrentStudentShortName;
-        currentStudentHasSchedule = dashboard.CurrentStudentHasSchedule;
+        currentStudentLessonDefaults = dashboard.LessonDefaults;
         studentShortNames = dashboard.StudentShortNames
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Order(StringComparer.OrdinalIgnoreCase)
@@ -853,7 +884,12 @@ public sealed class MainWindowViewModel : ViewModelBase
             ? null
             : Lessons.FirstOrDefault(lesson => string.Equals(lesson.Id, selectedLessonId, StringComparison.OrdinalIgnoreCase));
         refreshedSelectedLesson ??= FindRefreshedLessonByDateTime(selectedLesson);
-        if (selectedLesson is { IsDraft: true } && Lessons.Contains(selectedLesson))
+        if (lessonIdToSelect is not null)
+        {
+            SelectedLesson = Lessons.FirstOrDefault(lesson =>
+                StringComparer.OrdinalIgnoreCase.Equals(lesson.Id, lessonIdToSelect));
+        }
+        else if (selectedLesson is { IsDraft: true } && Lessons.Contains(selectedLesson))
         {
             SelectedLesson = selectedLesson;
         }
@@ -1190,14 +1226,12 @@ public sealed class MainWindowViewModel : ViewModelBase
             return;
         }
 
-        savingDraftLessons.Add(lesson);
         try
         {
             await SaveLessonAsync(lesson, initiatedByAutoSave: true);
         }
         finally
         {
-            savingDraftLessons.Remove(lesson);
             if (autoSaveDraftVersions.TryGetValue(lesson, out latestVersion) &&
                 latestVersion == version)
             {
@@ -1226,12 +1260,6 @@ public sealed class MainWindowViewModel : ViewModelBase
         {
             await refreshTask;
         }
-    }
-
-    private DateOnly CurrentMonth()
-    {
-        var now = clock.Now;
-        return new DateOnly(now.Year, now.Month, 1);
     }
 
     private void RaiseCommandAvailabilityChanged()

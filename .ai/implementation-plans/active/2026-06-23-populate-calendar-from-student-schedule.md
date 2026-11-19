@@ -5,6 +5,8 @@ Created: 2026-06-23
 Last updated: 2026-06-23
 Owner/context: Ruben / My Small Business Ledger WPF pilot
 
+The 2026-11-19 lesson toolbar change extended the current-month range to the whole displayed month. The stages below record the original implementation.
+
 ## Related Docs And Standards
 
 - `AGENTS.md`
@@ -389,8 +391,7 @@ Exact user actions or commands:
 
 Expected successful result:
 
-- Current month creates scheduled lessons from today through month end.
-- Past and future months create scheduled lessons for the whole displayed month.
+- Every displayed month, including the current month, creates missing scheduled lessons for the whole month.
 - Re-running the command skips exact duplicate same-student same-date/time lessons and does not create duplicates.
 - The main lesson list refreshes to show the created lessons.
 

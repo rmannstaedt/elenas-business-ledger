@@ -55,13 +55,20 @@ public sealed class LessonDisplayModel : ViewModelBase
         planName = lesson.PlanName;
     }
 
-    private LessonDisplayModel(string studentShortName, TimeZoneInfo lessonTimeZone, DateTime? startsOnDate)
+    private LessonDisplayModel(
+        string studentShortName,
+        TimeZoneInfo lessonTimeZone,
+        DateTime? startsOnDate,
+        TimeOnly? startsAt,
+        DashboardPlanOption? plan)
     {
         id = $"draft-{Guid.NewGuid():N}";
         StudentShortName = studentShortName;
         this.lessonTimeZone = lessonTimeZone;
         this.startsOnDate = startsOnDate;
-        startsAtTimeText = string.Empty;
+        startsAtTimeText = startsAt?.ToString("HH:mm", CultureInfo.InvariantCulture) ?? string.Empty;
+        planCatalogId = plan?.PlanCatalogId ?? 0;
+        planName = plan?.Name ?? string.Empty;
         state = LessonState.Planned;
         IsInvoiced = false;
         InvoiceNumber = null;
@@ -72,8 +79,10 @@ public sealed class LessonDisplayModel : ViewModelBase
     public static LessonDisplayModel CreateDraft(
         string studentShortName,
         TimeZoneInfo lessonTimeZone,
-        DateTime? startsOnDate = null) =>
-        new(studentShortName, lessonTimeZone, startsOnDate);
+        DateTime? startsOnDate = null,
+        TimeOnly? startsAt = null,
+        DashboardPlanOption? plan = null) =>
+        new(studentShortName, lessonTimeZone, startsOnDate, startsAt, plan);
 
     public string Id => id;
 
@@ -220,12 +229,6 @@ public sealed class LessonDisplayModel : ViewModelBase
     {
         savedStartsAt = StartsAt;
         savedHasKnownStartTime = HasKnownStartTime;
-    }
-
-    public void AcceptSubmittedDraft()
-    {
-        AcceptDateTimeChange();
-        IsDraft = false;
     }
 
     public void AcceptCreatedLesson(CalendarLesson lesson)
