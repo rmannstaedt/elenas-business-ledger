@@ -11,7 +11,7 @@ $projectPath = Join-Path $repoRoot "src\MySmallBusinessLedger.App\MySmallBusines
 $innoScriptPath = Join-Path $repoRoot "installer\MySmallBusinessLedger.iss"
 $publishDir = Join-Path $repoRoot "artifacts\publish\MySmallBusinessLedger\$Runtime"
 $installerDir = Join-Path $repoRoot "artifacts\installer"
-$installerFileName = "MySmallBusinessLedger-1.30.0-Setup.exe"
+$installerFileName = "MySmallBusinessLedger-1.31.0-Setup.exe"
 $installerPath = Join-Path $installerDir $installerFileName
 
 if (-not (Test-Path -LiteralPath $InnoSetupCompiler)) {
@@ -39,6 +39,7 @@ New-Item -ItemType Directory -Force -Path $publishDir, $installerDir | Out-Null
 Write-Host "Publishing $projectPath..."
 & dotnet publish $projectPath `
     --configuration $Configuration `
+    --framework net11.0-windows `
     --runtime $Runtime `
     --self-contained true `
     --output $publishDir `

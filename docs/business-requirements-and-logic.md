@@ -288,7 +288,7 @@ The invoice printer is selected from Application Settings during setup. If no in
 
 ## Limitations
 
-### Version 1.30
+### Version 1.31
 
   * VAT exemptions for individual students are outside the current scope.
   * No formal VAT return or bookkeeping-system VAT report; Economy Overview summarizes issued invoice net/VAT totals plus explicit manual legacy month overrides only.

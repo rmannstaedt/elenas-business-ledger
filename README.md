@@ -2,7 +2,7 @@
 
 This repository contains a small local-first ledger application for independent piano teachers.
 
-Current app version: 1.30.
+Current app version: 1.31.
 
 Primary goal:
 
@@ -26,6 +26,8 @@ tests/
 
 ## Build and test
 
+The Ledger builds with the .NET 11 SDK and uses EF Core 11. IDE builds require Visual Studio 18.12 or later.
+
 ```powershell
 dotnet build MySmallBusinessLedger.sln -nodeReuse:false
 dotnet test MySmallBusinessLedger.sln -nodeReuse:false
@@ -39,17 +41,17 @@ The application can be packaged as a single-file Inno Setup installer for Window
 powershell -ExecutionPolicy Bypass -File scripts\build-installer.ps1
 ```
 
-The script publishes a self-contained Release build and creates:
+The script publishes a self-contained .NET 11 Release build and creates the installer at the following path.
 
 ```text
-artifacts\installer\MySmallBusinessLedger-1.30.0-Setup.exe
+artifacts\installer\MySmallBusinessLedger-1.31.0-Setup.exe
 ```
 
 Inno Setup 6 must be installed at `C:\Program Files (x86)\Inno Setup 6\ISCC.exe`, or pass `-InnoSetupCompiler` to the script. If the release installer should include Google Calendar sign-in support, place the real publisher OAuth Desktop JSON at `src\MySmallBusinessLedger.App\Configuration\google-oauth-client.json` before building; that file remains ignored by Git.
 
 The installer installs per-user under `%LOCALAPPDATA%\Programs\MySmallBusinessLedger`, creates a Start menu shortcut, and offers an optional desktop shortcut. It installs only this version and does not auto-update. Later installers use the same application identity and install location so they replace application files without deleting runtime data. Install, upgrade, and uninstall must leave `%APPDATA%\visualtech.dk\MySmallBusinessLedger` intact, including `ledger.db`, Settings data, Google token files, window placement, and grid column widths.
 
-The installer is not code-signed in version 1.30, so Windows SmartScreen may warn before running it.
+The installer is not code-signed in version 1.31, so Windows SmartScreen may warn before running it.
 
 ## Pilot setup
 
@@ -88,8 +90,8 @@ The main window can populate Google Calendar from the selected student's saved s
 
 ## Current key assumptions
 
-- Under-30 teaching support remains in the data model because future students may require it (but out of scope for version 1.30).
-- Lønsumsafgift is out of scope for version 1.30.
+- Under-30 teaching support remains in the data model because future students may require it (but out of scope for version 1.31).
+- Lønsumsafgift is out of scope for version 1.31.
 - Google Calendar is the operational schedule surface for uninvoiced lessons; local SQLite Lessons records are the durable billing ledger and invoiced lessons ignore later calendar edits/deletions.
 - Google Calendar integration uses the official Google Calendar API client, external browser OAuth for explicit Settings connection, and Windows-protected local token storage with hashed token-key filenames. Startup refreshes use saved local credentials non-interactively and do not launch browser OAuth. The app requests the narrower `https://www.googleapis.com/auth/calendar.events.owned` OAuth scope so it can read, create, move, complete, and delete lesson events on calendars owned by the signed-in Google account; entries still must match the documented `$` student marker before the app treats them as lessons.
 - The Google OAuth app identity is publisher-owned and supplied from `Configuration\google-oauth-client.json`, not selected by each user in Settings.
@@ -105,7 +107,7 @@ The main window can populate Google Calendar from the selected student's saved s
 - The main window `Populate Calendar` action writes scheduled lessons directly to Google Calendar and saves created local billing rows for the selected student/month before reporting success; if the post-create refresh fails, created event ids are still saved locally before the refresh failure is reported. It fills the entire displayed month and skips exact same-student date/time matches in Google Calendar and invoice-locked local slots.
 - The app stores issued invoice PDFs in a configurable invoices folder.
 - Invoice PDFs are generated with QuestPDF, staged and verified before final storage, and never silently overwritten. Failed pre-publication issue attempts discard staged PDFs and release the reserved invoice number. Once the final PDF has been published, database finalization failures preserve the in-progress reservation and published path for retry/support recovery instead of deleting the only durable evidence. Invoice printing uses the remembered Settings printer and can be retried from the invoice viewer using the stored issued PDF.
-- The initial UI recommendation is WPF + .NET 10.
+- The desktop app uses WPF.
 - The initial database recommendation is SQLite.
 - Database access and schema evolution use EF Core SQLite migrations.
 - The PDF dependency is QuestPDF.

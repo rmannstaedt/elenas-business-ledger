@@ -61,7 +61,7 @@ public sealed class SqliteLessonRepository : ILessonRepository
 
         await using var context = createContext();
         var lessons = await context.Lessons
-            .FromSqlInterpolated($"""SELECT * FROM "Lessons" WHERE "StartsAt" >= {fromText} AND "StartsAt" < {toExclusiveText}""")
+            .FromSql($"""SELECT * FROM "Lessons" WHERE "StartsAt" >= {fromText} AND "StartsAt" < {toExclusiveText}""")
             .AsNoTracking()
             .Include(lesson => lesson.Student)
             .Where(lesson => lesson.Student.ShortName == studentShortName)
@@ -86,7 +86,7 @@ public sealed class SqliteLessonRepository : ILessonRepository
 
         await using var context = createContext();
         var lessons = await context.Lessons
-            .FromSqlInterpolated($"""SELECT * FROM "Lessons" WHERE "StartsAt" >= {fromText} AND "StartsAt" < {toExclusiveText}""")
+            .FromSql($"""SELECT * FROM "Lessons" WHERE "StartsAt" >= {fromText} AND "StartsAt" < {toExclusiveText}""")
             .AsNoTracking()
             .Include(lesson => lesson.Student)
             .ToArrayAsync(cancellationToken);

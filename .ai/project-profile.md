@@ -4,18 +4,18 @@
 
 Working name: My Small Business Ledger
 
-Current app version: 1.30
+Current app version: 1.31
 
 Internal namespace/project prefix:
 MySmallBusinessLedger
 
 ## Target framework and platform
 
-Target framework: .NET 10
+Target framework: .NET 11. IDE builds require Visual Studio 18.12 or later.
 Platform: Windows desktop
 UI: WPF
 Architecture: local-first desktop app
-Installer/distribution: single-file Inno Setup installer for Windows x64, built by `scripts\build-installer.ps1` into `artifacts\installer\MySmallBusinessLedger-1.30.0-Setup.exe`; installer is per-user, installs to `%LOCALAPPDATA%\Programs\MySmallBusinessLedger`, creates a Start menu shortcut, offers an optional desktop shortcut, has no auto-update behavior, and must not delete `%APPDATA%\visualtech.dk\MySmallBusinessLedger` during install, replacement, or uninstall
+Installer/distribution: single-file Inno Setup installer with a self-contained .NET 11 build for Windows x64. The `scripts\build-installer.ps1` script creates `artifacts\installer\MySmallBusinessLedger-1.31.0-Setup.exe`. The per-user installer installs to `%LOCALAPPDATA%\Programs\MySmallBusinessLedger`, creates a Start menu shortcut, offers an optional desktop shortcut, has no auto-update behavior, and must preserve `%APPDATA%\visualtech.dk\MySmallBusinessLedger` during install, replacement, and uninstall.
 
 ## Solution shape
 
@@ -30,7 +30,7 @@ tests/
 ## Persistence and storage
 
 Database: SQLite
-Database access: EF Core SQLite
+Database access: EF Core SQLite 11.
 Database schema evolution: EF Core migrations, applied by the WPF startup bootstrapper before repositories are used
 Plan catalog: stored in SQLite with Draft, Active, and Retired lifecycle state; Draft plans are editable/deletable and may be incomplete, publishing requires all fields except Retire on, Active plans are immutable/assignable except for name-only rename, Retire on scheduling, and immediate retirement, and Retired plans are immutable/reactivatable except for name-only rename but not assignable
 Student plan periods: stored with a required catalog plan identity plus copied commercial-term snapshots including price, cadence, duration, flexibility, student count, effective date, payment terms, and start/end dates; catalog lifecycle changes and name-only renames must not rewrite copied commercial terms or issued invoice data
@@ -51,7 +51,7 @@ Publisher Google OAuth Desktop client configuration: local/release file `src\MyS
 Google OAuth protected token folder: `%APPDATA%\visualtech.dk\MySmallBusinessLedger\GoogleTokens`
 Window placement file path: `%APPDATA%\visualtech.dk\MySmallBusinessLedger\window-placement.json`
 Grid column width file path: `%APPDATA%\visualtech.dk\MySmallBusinessLedger\grid-column-widths.json`
-Backup: no automated backup in version 1.30; keep persistence design compatible with later manual backup/export
+Backup: no automated backup in version 1.31; keep persistence design compatible with later manual backup/export
 
 ## External integrations
 

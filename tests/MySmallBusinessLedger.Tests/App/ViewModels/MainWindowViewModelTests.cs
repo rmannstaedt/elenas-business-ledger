@@ -1690,9 +1690,9 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public void ApplicationInfoUsesAppAssemblyVersion()
     {
-        Assert.Equal("1.30", ApplicationInfo.Version);
+        Assert.Equal("1.31", ApplicationInfo.Version);
         Assert.Contains("My Small Business Ledger", ApplicationInfo.AboutText);
-        Assert.Contains("Version 1.30", ApplicationInfo.AboutText);
+        Assert.Contains("Version 1.31", ApplicationInfo.AboutText);
     }
 
     [Fact]

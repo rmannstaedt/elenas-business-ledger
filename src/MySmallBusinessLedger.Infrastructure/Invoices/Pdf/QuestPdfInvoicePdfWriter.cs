@@ -20,6 +20,9 @@ public sealed class QuestPdfInvoicePdfWriter : IInvoicePdfWriter
     static QuestPdfInvoicePdfWriter()
     {
         QuestPDF.Settings.License = LicenseType.Community;
+        // Invoices use Windows' Segoe UI and fall back to the bundled font if it is unavailable.
+        QuestPDF.Settings.UseSystemFonts = true;
+        QuestPDF.Settings.ThrowOnMissingFontFamilies = false;
     }
 
     public Task<OperationResult<string>> WriteAsync(

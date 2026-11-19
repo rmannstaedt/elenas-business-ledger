@@ -4,14 +4,14 @@ namespace MySmallBusinessLedger.Tests.Packaging;
 
 public sealed class InstallerPackagingTests
 {
-    private const string InstallerFileName = "MySmallBusinessLedger-1.30.0-Setup.exe";
+    private const string InstallerFileName = "MySmallBusinessLedger-1.31.0-Setup.exe";
 
     [Fact]
     public void InnoSetupScriptInstallsPerUserAndPreservesAppData()
     {
         var script = File.ReadAllText(Path.Combine(FindRepositoryRoot(), "installer", "MySmallBusinessLedger.iss"));
 
-        Assert.Contains("#define MyAppVersion \"1.30.0\"", script, StringComparison.Ordinal);
+        Assert.Contains("#define MyAppVersion \"1.31.0\"", script, StringComparison.Ordinal);
         Assert.Contains("AppId={{8F2B99B4-0C13-4980-8B57-0A58D9CCFC3F}", script, StringComparison.Ordinal);
         Assert.Contains("PrivilegesRequired=lowest", script, StringComparison.Ordinal);
         Assert.Contains(@"DefaultDirName={localappdata}\Programs\MySmallBusinessLedger", script, StringComparison.Ordinal);
@@ -39,6 +39,7 @@ public sealed class InstallerPackagingTests
         Assert.Contains("publish", script, StringComparison.Ordinal);
         Assert.Contains("--configuration", script, StringComparison.Ordinal);
         Assert.Contains("Release", script, StringComparison.Ordinal);
+        Assert.Contains("--framework net11.0-windows", script, StringComparison.Ordinal);
         Assert.Contains("--runtime", script, StringComparison.Ordinal);
         Assert.Contains("win-x64", script, StringComparison.Ordinal);
         Assert.Contains("--self-contained", script, StringComparison.Ordinal);
