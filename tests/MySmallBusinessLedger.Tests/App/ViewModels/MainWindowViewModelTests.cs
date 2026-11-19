@@ -1247,6 +1247,61 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public void FirstPreviousStudentClickStartsFromTodaysDisplayedLesson()
+    {
+        RunOnStaThread(() =>
+        {
+            var earlierMonth = new DateTimeOffset(2026, 5, 28, 15, 0, 0, TimeSpan.FromHours(2));
+            var previousLesson = new DateTimeOffset(2026, 6, 13, 14, 0, 0, TimeSpan.FromHours(2));
+            var currentLesson = new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.FromHours(2));
+            var lastLesson = new DateTimeOffset(2026, 6, 30, 15, 0, 0, TimeSpan.FromHours(2));
+            var dashboard = new FakeDashboardService
+            {
+                StudentShortNames = ["Anna", "Bo"],
+                StudentNavigationEntries =
+                [
+                    new("Anna", earlierMonth),
+                    new("Bo", previousLesson),
+                    new("Anna", currentLesson),
+                    new("Anna", lastLesson)
+                ],
+                DashboardLessons =
+                [
+                    new("anna-earlier-month", "Anna", earlierMonth, LessonState.Completed, false, null),
+                    new("anna-today", "Anna", currentLesson, LessonState.Planned, false, null),
+                    new("anna-last", "Anna", lastLesson, LessonState.Planned, false, null)
+                ],
+                DashboardLessonsAfterFirstLoad =
+                [
+                    new("bo-previous", "Bo", previousLesson, LessonState.Completed, false, null)
+                ]
+            };
+            var viewModel = CreateViewModel(dashboard: dashboard,
+                clock: new FakeUiClock(currentLesson.AddHours(1)),
+                lessonTimeZone: TimeZoneInfo.FindSystemTimeZoneById("Romance Standard Time"));
+            var window = new AppMainWindow(viewModel);
+            try
+            {
+                window.Show();
+                PumpUntil(() => !viewModel.IsBusy && viewModel.CurrentStudentShortName == "Anna");
+                Assert.Equal("anna-today", viewModel.SelectedLesson?.Id);
+                Assert.Same(viewModel.SelectedLesson, window.LessonsGrid.SelectedItem);
+
+                InvokeButton(FindButton(window, "Previous student"));
+                PumpUntil(() => !viewModel.IsBusy && viewModel.CurrentStudentShortName == "Bo");
+
+                Assert.Equal("bo-previous", viewModel.SelectedLesson?.Id);
+                Assert.Same(viewModel.SelectedLesson, window.LessonsGrid.SelectedItem);
+                Assert.Equal(new DateOnly(2026, 6, 1), viewModel.DisplayMonth);
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
+    [Fact]
     public async Task StudentNavigationUsesDashboardOccurrenceListAndCanRepeatCurrentStudent()
     {
         var annaFirst = new DateTimeOffset(2026, 6, 2, 15, 0, 0, TimeSpan.FromHours(2));
@@ -1635,9 +1690,9 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public void ApplicationInfoUsesAppAssemblyVersion()
     {
-        Assert.Equal("1.20", ApplicationInfo.Version);
+        Assert.Equal("1.30", ApplicationInfo.Version);
         Assert.Contains("My Small Business Ledger", ApplicationInfo.AboutText);
-        Assert.Contains("Version 1.20", ApplicationInfo.AboutText);
+        Assert.Contains("Version 1.30", ApplicationInfo.AboutText);
     }
 
     [Fact]

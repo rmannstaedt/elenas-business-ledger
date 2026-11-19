@@ -1,5 +1,5 @@
 #define MyAppName "My Small Business Ledger"
-#define MyAppVersion "1.20.0"
+#define MyAppVersion "1.30.0"
 #define MyAppPublisher "visualtech.dk"
 #define MyAppExeName "MySmallBusinessLedger.App.exe"
 
@@ -20,7 +20,7 @@ DefaultDirName={localappdata}\Programs\MySmallBusinessLedger
 DefaultGroupName=My Small Business Ledger
 DisableProgramGroupPage=yes
 OutputDir={#OutputDir}
-OutputBaseFilename=MySmallBusinessLedger-1.20.0-Setup
+OutputBaseFilename=MySmallBusinessLedger-1.30.0-Setup
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern

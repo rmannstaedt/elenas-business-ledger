@@ -2,7 +2,7 @@
 
 This repository contains a small local-first ledger application for independent piano teachers.
 
-Current app version: 1.20.
+Current app version: 1.30.
 
 Primary goal:
 
@@ -42,14 +42,14 @@ powershell -ExecutionPolicy Bypass -File scripts\build-installer.ps1
 The script publishes a self-contained Release build and creates:
 
 ```text
-artifacts\installer\MySmallBusinessLedger-1.20.0-Setup.exe
+artifacts\installer\MySmallBusinessLedger-1.30.0-Setup.exe
 ```
 
 Inno Setup 6 must be installed at `C:\Program Files (x86)\Inno Setup 6\ISCC.exe`, or pass `-InnoSetupCompiler` to the script. If the release installer should include Google Calendar sign-in support, place the real publisher OAuth Desktop JSON at `src\MySmallBusinessLedger.App\Configuration\google-oauth-client.json` before building; that file remains ignored by Git.
 
 The installer installs per-user under `%LOCALAPPDATA%\Programs\MySmallBusinessLedger`, creates a Start menu shortcut, and offers an optional desktop shortcut. It installs only this version and does not auto-update. Later installers use the same application identity and install location so they replace application files without deleting runtime data. Install, upgrade, and uninstall must leave `%APPDATA%\visualtech.dk\MySmallBusinessLedger` intact, including `ledger.db`, Settings data, Google token files, window placement, and grid column widths.
 
-The installer is not code-signed in version 1.20, so Windows SmartScreen may warn before running it.
+The installer is not code-signed in version 1.30, so Windows SmartScreen may warn before running it.
 
 ## Pilot setup
 
@@ -88,8 +88,8 @@ The main window can populate Google Calendar from the selected student's saved s
 
 ## Current key assumptions
 
-- Under-30 teaching support remains in the data model because future students may require it (but out of scope for version 1.20).
-- Lønsumsafgift is out of scope for version 1.20.
+- Under-30 teaching support remains in the data model because future students may require it (but out of scope for version 1.30).
+- Lønsumsafgift is out of scope for version 1.30.
 - Google Calendar is the operational schedule surface for uninvoiced lessons; local SQLite Lessons records are the durable billing ledger and invoiced lessons ignore later calendar edits/deletions.
 - Google Calendar integration uses the official Google Calendar API client, external browser OAuth for explicit Settings connection, and Windows-protected local token storage with hashed token-key filenames. Startup refreshes use saved local credentials non-interactively and do not launch browser OAuth. The app requests the narrower `https://www.googleapis.com/auth/calendar.events.owned` OAuth scope so it can read, create, move, complete, and delete lesson events on calendars owned by the signed-in Google account; entries still must match the documented `$` student marker before the app treats them as lessons.
 - The Google OAuth app identity is publisher-owned and supplied from `Configuration\google-oauth-client.json`, not selected by each user in Settings.

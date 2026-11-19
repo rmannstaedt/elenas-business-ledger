@@ -16,11 +16,11 @@
                     Orientation="Horizontal"
                     HorizontalAlignment="Right"
                     Margin="0,14,0,0">
-            <Button Content="Print Invoice"
+            <Button Content="Save &amp; Print Invoice"
                     Command="{Binding PrintInvoiceCommand}"
                     MinWidth="110"
                     Height="32"
-                    Margin="0,0,8,0" />
+                    Margin="0,0,8,0" Width="128" />
             <Button Content="Cancel"
                     Click="OnCancel"
                     MinWidth="84"
@@ -132,7 +132,7 @@
                 </Grid.ColumnDefinitions>
 
                 <StackPanel>
-                    <TextBlock Text="Price adjustment" />
+                    <TextBlock Text="Price adjustment (excl. VAT)" />
                     <Grid Margin="0,3,0,0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="110" />

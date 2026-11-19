@@ -160,7 +160,7 @@ The application also opens Google Calendar in a separate browser window on the s
 
 The application will automatically refresh the lesson list from Google Calendar as suitable.
 
-There are Previous / Next buttons for the selected student. These navigate a calendar-based occurrence list, not an alphabetical student-name list. Google Calendar lessons for active students in the loaded previous/current/next month window are ordered by lesson date/time and the same Student may therefore appear multiple times before other Students appear. The target Google Calendar lesson is selected in the lesson list so the reason for the selected Student is visible. If the target lesson is in another month, the displayed month changes to that target lesson's month. If there are no Google Calendar lessons in the loaded navigation window, navigation falls back to active Students' saved standard schedule day/time entries for the displayed month; those fallback entries are schedule hints, not actual calendar lessons. The selected Student name also has a dropdown menu listing other active Student short names alphabetically. Choosing a Student from that dropdown directly switches the selected Student and refreshes that Student's rows, but does not select a lesson.
+There are Previous / Next buttons for the selected student. These navigate a calendar-based occurrence list, not an alphabetical student-name list. Google Calendar lessons for active students in the loaded previous/current/next month window are ordered by lesson date/time and the same Student may therefore appear multiple times before other Students appear. The initial position prefers the displayed Student's calendar lesson closest to the current time on the current date, then their first occurrence in the displayed month. The target Google Calendar lesson is selected in the lesson list so the reason for the selected Student is visible. If the target lesson is in another month, the displayed month changes to that target lesson's month. If there are no Google Calendar lessons in the loaded navigation window, navigation falls back to active Students' saved standard schedule day/time entries for the displayed month; those fallback entries are schedule hints, not actual calendar lessons. The selected Student name also has a dropdown menu listing other active Student short names alphabetically. Choosing a Student from that dropdown directly switches the selected Student and refreshes that Student's rows, but does not select a lesson.
 There are also Previous / Next buttons for the month, to switch the display back/forth by a month.
 
 The application contains a Student menu with this entry:
@@ -263,11 +263,11 @@ The user may edit the list of lessons.
 The user may add a price adjustment and reason.
 The Invoice VAT and price information will reflect user changes.
 
-The user may Cancel the edit before pressing "Print Invoice".
+The user may Cancel the edit before pressing "Save & Print Invoice".
 If the user Cancels before printing starts, the invoice is not saved and no data are updated in the system.
 
-Once the invoice has been edited, the user may press the "Print Invoice" button on the Invoice form.
-The "Print Invoice" button does the following:
+Once the invoice has been edited, the user may press the "Save & Print Invoice" button on the Invoice form.
+The "Save & Print Invoice" button does the following:
   - Reserves the Invoice in the local database as an in-progress issue operation.
   - Saves a PDF copy of the invoice in the company invoice folder path through a staging, verification, and publish flow.
     -- note: the final PDF file name uses the invoice number, invoice period, and Student full name, e.g. `Invoice 001 Juni 2026 - Mira Vale.pdf`.
@@ -288,7 +288,7 @@ The invoice printer is selected from Application Settings during setup. If no in
 
 ## Limitations
 
-### Version 1.20
+### Version 1.30
 
   * VAT exemptions for individual students are outside the current scope.
   * No formal VAT return or bookkeeping-system VAT report; Economy Overview summarizes issued invoice net/VAT totals plus explicit manual legacy month overrides only.

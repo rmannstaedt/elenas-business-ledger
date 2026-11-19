@@ -11,7 +11,7 @@ $projectPath = Join-Path $repoRoot "src\MySmallBusinessLedger.App\MySmallBusines
 $innoScriptPath = Join-Path $repoRoot "installer\MySmallBusinessLedger.iss"
 $publishDir = Join-Path $repoRoot "artifacts\publish\MySmallBusinessLedger\$Runtime"
 $installerDir = Join-Path $repoRoot "artifacts\installer"
-$installerFileName = "MySmallBusinessLedger-1.20.0-Setup.exe"
+$installerFileName = "MySmallBusinessLedger-1.30.0-Setup.exe"
 $installerPath = Join-Path $installerDir $installerFileName
 
 if (-not (Test-Path -LiteralPath $InnoSetupCompiler)) {

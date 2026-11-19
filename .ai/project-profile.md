@@ -4,7 +4,7 @@
 
 Working name: My Small Business Ledger
 
-Current app version: 1.20
+Current app version: 1.30
 
 Internal namespace/project prefix:
 MySmallBusinessLedger
@@ -15,7 +15,7 @@ Target framework: .NET 10
 Platform: Windows desktop
 UI: WPF
 Architecture: local-first desktop app
-Installer/distribution: single-file Inno Setup installer for Windows x64, built by `scripts\build-installer.ps1` into `artifacts\installer\MySmallBusinessLedger-1.20.0-Setup.exe`; installer is per-user, installs to `%LOCALAPPDATA%\Programs\MySmallBusinessLedger`, creates a Start menu shortcut, offers an optional desktop shortcut, has no auto-update behavior, and must not delete `%APPDATA%\visualtech.dk\MySmallBusinessLedger` during install, replacement, or uninstall
+Installer/distribution: single-file Inno Setup installer for Windows x64, built by `scripts\build-installer.ps1` into `artifacts\installer\MySmallBusinessLedger-1.30.0-Setup.exe`; installer is per-user, installs to `%LOCALAPPDATA%\Programs\MySmallBusinessLedger`, creates a Start menu shortcut, offers an optional desktop shortcut, has no auto-update behavior, and must not delete `%APPDATA%\visualtech.dk\MySmallBusinessLedger` during install, replacement, or uninstall
 
 ## Solution shape
 
@@ -51,7 +51,7 @@ Publisher Google OAuth Desktop client configuration: local/release file `src\MyS
 Google OAuth protected token folder: `%APPDATA%\visualtech.dk\MySmallBusinessLedger\GoogleTokens`
 Window placement file path: `%APPDATA%\visualtech.dk\MySmallBusinessLedger\window-placement.json`
 Grid column width file path: `%APPDATA%\visualtech.dk\MySmallBusinessLedger\grid-column-widths.json`
-Backup: no automated backup in version 1.20; keep persistence design compatible with later manual backup/export
+Backup: no automated backup in version 1.30; keep persistence design compatible with later manual backup/export
 
 ## External integrations
 

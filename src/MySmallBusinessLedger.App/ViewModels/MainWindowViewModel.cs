@@ -347,9 +347,7 @@ public sealed class MainWindowViewModel : ViewModelBase
             }
         }
 
-        return Array.FindIndex(
-            studentNavigationEntries,
-            entry => StringComparer.OrdinalIgnoreCase.Equals(entry.StudentShortName, CurrentStudentShortName));
+        return FindStartingNavigationIndex(CurrentStudentShortName);
     }
 
     private async Task SelectAdjacentStudentAsync(int delta)
@@ -836,6 +834,10 @@ public sealed class MainWindowViewModel : ViewModelBase
         var selectedLesson = SelectedLesson;
         var selectedLessonId = selectedLesson?.Id;
         var selectedInvoiceNumber = SelectedInvoice?.InvoiceNumber;
+        var preferredNavigationEntry = selectedStudentNavigationIndex is { } index &&
+            index >= 0 && index < studentNavigationEntries.Length
+            ? studentNavigationEntries[index]
+            : null;
         CurrentStudentShortName = dashboard.CurrentStudentShortName;
         currentStudentLessonDefaults = dashboard.LessonDefaults;
         studentShortNames = dashboard.StudentShortNames
@@ -855,7 +857,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         selectedStudentNavigationIndex = suppressNavigationSelection
             ? null
             : ResolveNavigationIndex(
-                selectedStudentNavigationIndex,
+                preferredNavigationEntry,
                 dashboard.CurrentStudentShortName,
                 selectedLesson);
 
@@ -971,7 +973,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     }
 
     private int? ResolveNavigationIndex(
-        int? preferredIndex,
+        DashboardStudentNavigationEntry? preferredEntry,
         string? currentStudent,
         LessonDisplayModel? selectedLesson)
     {
@@ -980,44 +982,47 @@ public sealed class MainWindowViewModel : ViewModelBase
             return null;
         }
 
-        if (preferredIndex is { } index &&
-            index >= 0 &&
-            index < studentNavigationEntries.Length &&
-            StringComparer.OrdinalIgnoreCase.Equals(
-                studentNavigationEntries[index].StudentShortName,
-                currentStudent))
+        if (preferredEntry is not null &&
+            IsInDisplayMonth(preferredEntry.StartsAt) &&
+            StringComparer.OrdinalIgnoreCase.Equals(preferredEntry.StudentShortName, currentStudent))
         {
-            return index;
+            var preferredIndex = Array.IndexOf(studentNavigationEntries, preferredEntry);
+            if (preferredIndex >= 0)
+            {
+                return preferredIndex;
+            }
         }
 
-        if (selectedLesson is not null &&
-            selectedLesson.TryGetStartsAt(out var selectedStartsAt))
+        if (selectedLesson is { IsDraft: false } &&
+            IsInDisplayMonth(selectedLesson.StartsAt) &&
+            StringComparer.OrdinalIgnoreCase.Equals(selectedLesson.StudentShortName, currentStudent))
         {
             var matchingLessonIndex = Array.FindIndex(
                 studentNavigationEntries,
-                entry =>
-                    StringComparer.OrdinalIgnoreCase.Equals(entry.StudentShortName, selectedLesson.StudentShortName) &&
-                    entry.StartsAt == selectedStartsAt);
+                entry => NavigationEntryMatchesLesson(entry, selectedLesson));
             if (matchingLessonIndex >= 0)
             {
                 return matchingLessonIndex;
             }
         }
 
-        var matchingCalendarStudentIndex = Array.FindIndex(
-            studentNavigationEntries,
-            entry =>
-                entry.HasCalendarLesson &&
-                StringComparer.OrdinalIgnoreCase.Equals(entry.StudentShortName, currentStudent));
-        if (matchingCalendarStudentIndex >= 0)
-        {
-            return matchingCalendarStudentIndex;
-        }
+        var startingIndex = FindStartingNavigationIndex(currentStudent);
+        return startingIndex >= 0 ? startingIndex : null;
+    }
 
-        var matchingStudentIndex = Array.FindIndex(
-            studentNavigationEntries,
-            entry => StringComparer.OrdinalIgnoreCase.Equals(entry.StudentShortName, currentStudent));
-        return matchingStudentIndex >= 0 ? matchingStudentIndex : null;
+    private int FindStartingNavigationIndex(string? student)
+    {
+        var now = clock.Now;
+        var studentEntries = studentNavigationEntries.Where(entry =>
+            StringComparer.OrdinalIgnoreCase.Equals(entry.StudentShortName, student));
+        var displayedEntries = studentEntries.Where(entry => IsInDisplayMonth(entry.StartsAt));
+        var startingEntry = displayedEntries
+            .Where(entry => entry.HasCalendarLesson && entry.StartsAt.Date == now.Date)
+            .MinBy(entry => (entry.StartsAt - now).Duration())
+            ?? displayedEntries.FirstOrDefault()
+            ?? studentEntries.FirstOrDefault();
+
+        return startingEntry is null ? -1 : Array.IndexOf(studentNavigationEntries, startingEntry);
     }
 
     private bool HasSelectedNavigationEntry() =>
