@@ -11,6 +11,7 @@ public partial class InvoiceViewerView : Window
         InitializeComponent();
         DataContext = viewModel;
         WindowPlacementStore.Attach(this, nameof(InvoiceViewerView));
+        GridWidthStore.Attach(this, nameof(InvoiceViewerView), [InvoiceLinesGrid]);
     }
 
     private void OnClose(object sender, RoutedEventArgs e)

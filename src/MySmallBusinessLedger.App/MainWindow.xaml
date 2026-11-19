@@ -271,7 +271,8 @@
         </Menu>
 
         <Grid x:Name="RootGrid"
-              Margin="20">
+              Margin="20"
+              SizeChanged="OnDashboardSizeChanged">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
@@ -439,9 +440,9 @@
 
             <Grid Grid.Row="2">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="640" MinWidth="420" />
-                    <ColumnDefinition Width="8" />
-                    <ColumnDefinition Width="*" MinWidth="300" />
+                    <ColumnDefinition x:Name="LessonsPaneColumn" Width="640" MinWidth="420" />
+                    <ColumnDefinition x:Name="PaneDividerColumn" Width="8" />
+                    <ColumnDefinition x:Name="InvoicesPaneColumn" Width="*" MinWidth="300" />
                 </Grid.ColumnDefinitions>
 
                 <Grid Grid.Column="0"
@@ -473,7 +474,8 @@
                         </StackPanel>
                     </Grid>
 
-                    <DataGrid Grid.Row="1"
+                    <DataGrid x:Name="LessonsGrid"
+                              Grid.Row="1"
                               ItemsSource="{Binding Lessons}"
                               SelectedItem="{Binding SelectedLesson, Mode=TwoWay}"
                               AutoGenerateColumns="False"
@@ -647,7 +649,8 @@
                                    FontWeight="SemiBold"
                                    VerticalAlignment="Center" />
                     </Grid>
-                    <DataGrid Grid.Row="1"
+                    <DataGrid x:Name="InvoicesGrid"
+                              Grid.Row="1"
                               ItemsSource="{Binding Invoices}"
                               SelectedItem="{Binding SelectedInvoice, Mode=TwoWay}"
                               AutoGenerateColumns="False"

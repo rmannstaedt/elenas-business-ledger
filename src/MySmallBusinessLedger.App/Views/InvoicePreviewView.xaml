@@ -86,7 +86,8 @@
                        FontWeight="SemiBold"
                        Margin="0,18,0,8" />
 
-            <DataGrid Grid.Row="2"
+            <DataGrid x:Name="InvoiceLinesGrid"
+                      Grid.Row="2"
                       ItemsSource="{Binding Lines}"
                       AutoGenerateColumns="False"
                       CanUserAddRows="False"

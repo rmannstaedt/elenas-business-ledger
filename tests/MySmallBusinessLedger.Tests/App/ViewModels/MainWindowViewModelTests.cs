@@ -21,10 +21,15 @@ using WpfDataGridGridLinesVisibility = System.Windows.Controls.DataGridGridLines
 using WpfDataGridLengthUnitType = System.Windows.Controls.DataGridLengthUnitType;
 using WpfDataGridTemplateColumn = System.Windows.Controls.DataGridTemplateColumn;
 using WpfDataGridTextColumn = System.Windows.Controls.DataGridTextColumn;
+using WpfDataGridColumnHeader = System.Windows.Controls.Primitives.DataGridColumnHeader;
+using WpfDragCompletedEventArgs = System.Windows.Controls.Primitives.DragCompletedEventArgs;
+using WpfDragDeltaEventArgs = System.Windows.Controls.Primitives.DragDeltaEventArgs;
+using WpfDragStartedEventArgs = System.Windows.Controls.Primitives.DragStartedEventArgs;
 using WpfGrid = System.Windows.Controls.Grid;
 using WpfGridSplitter = System.Windows.Controls.GridSplitter;
 using WpfListBox = System.Windows.Controls.ListBox;
 using WpfMenuItem = System.Windows.Controls.MenuItem;
+using WpfThumb = System.Windows.Controls.Primitives.Thumb;
 using AppMainWindow = MySmallBusinessLedger.App.MainWindow;
 
 namespace MySmallBusinessLedger.Tests.App.ViewModels;
@@ -170,6 +175,74 @@ public sealed class MainWindowViewModelTests
             finally
             {
                 window.Close();
+            }
+        });
+    }
+
+    [Fact]
+    public void MainWindowRestoresResizedColumnsAndDividerWhenReopened()
+    {
+        RunOnStaThread(() =>
+        {
+            const double windowWidth = 1480;
+            var firstWindow = new AppMainWindow(CreateViewModel()) { Width = windowWidth, ShowActivated = false };
+            double planWidth;
+            double lessonPaneWidth;
+            double[] invoiceColumnWidths;
+            try
+            {
+                firstWindow.Show();
+                PumpUntil(() => firstWindow.LessonsGrid.IsLoaded && firstWindow.InvoicesGrid.IsLoaded);
+
+                ResizeColumn(firstWindow.LessonsGrid, "Plan", 110);
+                DragHorizontally(Assert.Single(FindVisualChildren<WpfGridSplitter>(firstWindow)), 110);
+                firstWindow.UpdateLayout();
+                ResizeColumn(firstWindow.InvoicesGrid, "Date", 35);
+                firstWindow.UpdateLayout();
+
+                planWidth = firstWindow.LessonsGrid.Columns.Single(column => Equals(column.Header, "Plan")).ActualWidth;
+                lessonPaneWidth = firstWindow.LessonsPaneColumn.ActualWidth;
+                invoiceColumnWidths = firstWindow.InvoicesGrid.Columns.Select(column => column.ActualWidth).ToArray();
+                Assert.InRange(planWidth, 221, 223);
+                Assert.InRange(lessonPaneWidth, 749, 751);
+                Assert.True(invoiceColumnWidths[1] > invoiceColumnWidths[0]);
+            }
+            finally
+            {
+                firstWindow.Close();
+            }
+
+            var reopened = new AppMainWindow(CreateViewModel()) { ShowActivated = false };
+            try
+            {
+                reopened.Show();
+                reopened.Width = windowWidth;
+                reopened.UpdateLayout();
+                PumpUntil(() => reopened.LessonsGrid.IsLoaded && reopened.InvoicesGrid.IsLoaded);
+
+                var planColumn = reopened.LessonsGrid.Columns.Single(column => Equals(column.Header, "Plan"));
+                Assert.InRange(planColumn.ActualWidth, planWidth - 1, planWidth + 1);
+                Assert.InRange(reopened.LessonsPaneColumn.ActualWidth, lessonPaneWidth - 1, lessonPaneWidth + 1);
+                for (var index = 0; index < invoiceColumnWidths.Length; index++)
+                {
+                    var column = reopened.InvoicesGrid.Columns[index];
+                    Assert.True(column.Width.IsStar);
+                    Assert.InRange(column.ActualWidth, invoiceColumnWidths[index] - 1, invoiceColumnWidths[index] + 1);
+                }
+
+                reopened.Width = reopened.MinWidth;
+                reopened.UpdateLayout();
+                Assert.True(reopened.LessonsPaneColumn.ActualWidth < lessonPaneWidth);
+                Assert.True(reopened.InvoicesGrid.ActualWidth >= reopened.InvoicesPaneColumn.MinWidth - 1);
+                Assert.InRange(planColumn.ActualWidth, planWidth - 1, planWidth + 1);
+
+                reopened.Width = windowWidth;
+                reopened.UpdateLayout();
+                Assert.InRange(reopened.LessonsPaneColumn.ActualWidth, lessonPaneWidth - 1, lessonPaneWidth + 1);
+            }
+            finally
+            {
+                reopened.Close();
             }
         });
     }
@@ -2532,10 +2605,30 @@ public sealed class MainWindowViewModelTests
         Exception? exception = null;
         var thread = new Thread(() =>
         {
-            SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(Dispatcher.CurrentDispatcher));
+            var dispatcher = Dispatcher.CurrentDispatcher;
+            SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(dispatcher));
             try
             {
-                action();
+                var preferenceDirectory = Directory.CreateTempSubdirectory("LedgerMainWindowTests-");
+                var windowPath = Path.Combine(preferenceDirectory.FullName, "windows.json");
+                var gridPath = Path.Combine(preferenceDirectory.FullName, "grids.json");
+                var previousWindowPath = WindowPlacementStore.StorePathOverride;
+                var previousGridPath = GridWidthStore.StorePathOverride;
+                WindowPlacementStore.StorePathOverride = windowPath;
+                GridWidthStore.StorePathOverride = gridPath;
+                try
+                {
+                    action();
+                }
+                finally
+                {
+                    dispatcher.InvokeShutdown();
+                    GridWidthStore.StorePathOverride = previousGridPath;
+                    WindowPlacementStore.StorePathOverride = previousWindowPath;
+                    File.Delete(windowPath);
+                    File.Delete(gridPath);
+                    preferenceDirectory.Delete();
+                }
             }
             catch (Exception ex)
             {
@@ -2631,6 +2724,20 @@ public sealed class MainWindowViewModelTests
     {
         var peer = new ButtonAutomationPeer(button);
         ((IInvokeProvider)peer.GetPattern(PatternInterface.Invoke)).Invoke();
+    }
+
+    private static void ResizeColumn(WpfDataGrid grid, string headerText, double horizontalChange)
+    {
+        var header = Assert.Single(FindVisualChildren<WpfDataGridColumnHeader>(grid), item => Equals(item.Content, headerText));
+        var gripper = Assert.IsType<WpfThumb>(header.Template.FindName("PART_RightHeaderGripper", header));
+        DragHorizontally(gripper, horizontalChange);
+    }
+
+    private static void DragHorizontally(WpfThumb thumb, double horizontalChange)
+    {
+        thumb.RaiseEvent(new WpfDragStartedEventArgs(0, 0) { RoutedEvent = WpfThumb.DragStartedEvent });
+        thumb.RaiseEvent(new WpfDragDeltaEventArgs(horizontalChange, 0) { RoutedEvent = WpfThumb.DragDeltaEvent });
+        thumb.RaiseEvent(new WpfDragCompletedEventArgs(horizontalChange, 0, false) { RoutedEvent = WpfThumb.DragCompletedEvent });
     }
 
     private static void InvokeActivated(AppMainWindow window)

@@ -13,7 +13,7 @@ public partial class StudentOverviewView : Window
         InitializeComponent();
         DataContext = viewModel;
         WindowPlacementStore.Attach(this, nameof(StudentOverviewView));
-        DataGridColumnWidthStore.Attach(StudentsGrid, nameof(StudentOverviewView) + ".StudentsGrid");
+        GridWidthStore.Attach(this, nameof(StudentOverviewView), [StudentsGrid]);
         Closing += OnClosing;
     }
 

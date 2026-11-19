@@ -28,6 +28,7 @@ public partial class MainWindow : Window
         InitializeComponent();
         DataContext = viewModel;
         WindowPlacementStore.Attach(this, nameof(MainWindow));
+        GridWidthStore.Attach(this, nameof(MainWindow), [LessonsGrid, InvoicesGrid], LessonsPaneColumn);
         Closed += OnClosed;
         if (Application.Current is { } application)
         {
@@ -36,6 +37,16 @@ public partial class MainWindow : Window
     }
 
     private MainWindowViewModel ViewModel => (MainWindowViewModel)DataContext;
+
+    private void OnDashboardSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (e.WidthChanged)
+        {
+            LessonsPaneColumn.MaxWidth = Math.Max(
+                LessonsPaneColumn.MinWidth,
+                e.NewSize.Width - PaneDividerColumn.Width.Value - InvoicesPaneColumn.MinWidth);
+        }
+    }
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {

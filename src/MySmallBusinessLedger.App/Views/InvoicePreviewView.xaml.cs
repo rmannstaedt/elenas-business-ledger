@@ -17,6 +17,7 @@ public partial class InvoicePreviewView : Window
         DataContext = viewModel;
         viewModel.CloseRequested += OnCloseRequested;
         WindowPlacementStore.Attach(this, nameof(InvoicePreviewView));
+        GridWidthStore.Attach(this, nameof(InvoicePreviewView), [InvoiceLinesGrid]);
         Closing += OnClosing;
     }
 
