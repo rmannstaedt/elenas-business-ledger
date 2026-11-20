@@ -111,6 +111,52 @@ namespace MySmallBusinessLedger.Infrastructure.Persistence.Migrations
                     b.ToTable("CompanyProfiles");
                 });
 
+            modelBuilder.Entity("MySmallBusinessLedger.Infrastructure.Persistence.EconomyManualMonthOverrideEntity", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Month")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal>("NetAmount")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("VatAmount")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Year")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Year", "Month")
+                        .IsUnique();
+
+                    b.ToTable("EconomyManualMonthOverrides");
+                });
+
+            modelBuilder.Entity("MySmallBusinessLedger.Infrastructure.Persistence.EconomySettingsEntity", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateOnly>("FirstApplicationInvoiceMonth")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("EconomySettings");
+                });
+
             modelBuilder.Entity("MySmallBusinessLedger.Infrastructure.Persistence.IssuedInvoiceEntity", b =>
                 {
                     b.Property<int>("Id")
@@ -238,6 +284,11 @@ namespace MySmallBusinessLedger.Infrastructure.Persistence.Migrations
                         .HasMaxLength(3)
                         .HasColumnType("TEXT");
 
+                    b.Property<bool>("HasKnownLessonTime")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(true);
+
                     b.Property<int>("IssuedInvoiceEntityId")
                         .HasColumnType("INTEGER");
 
@@ -245,6 +296,9 @@ namespace MySmallBusinessLedger.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(40)
                         .HasColumnType("TEXT");
+
+                    b.Property<int>("LessonId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("PlanCatalogId")
                         .HasColumnType("INTEGER");
@@ -263,9 +317,66 @@ namespace MySmallBusinessLedger.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("LessonDateTime");
 
+                    b.HasIndex("LessonId")
+                        .IsUnique();
+
                     b.HasIndex("PlanCatalogId");
 
                     b.ToTable("IssuedInvoiceLines");
+                });
+
+            modelBuilder.Entity("MySmallBusinessLedger.Infrastructure.Persistence.LessonEntity", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("DurationMinutes")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("GoogleCalendarEventId")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("HasKnownStartTime")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasDefaultValue(true);
+
+                    b.Property<int?>("InvoiceNumber")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("PlanCatalogId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("PlanName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset>("StartsAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("StudentId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("GoogleCalendarEventId")
+                        .IsUnique();
+
+                    b.HasIndex("PlanCatalogId");
+
+                    b.HasIndex("StartsAt");
+
+                    b.HasIndex("StudentId", "StartsAt");
+
+                    b.ToTable("Lessons");
                 });
 
             modelBuilder.Entity("MySmallBusinessLedger.Infrastructure.Persistence.PlanCatalogEntity", b =>
@@ -494,7 +605,34 @@ namespace MySmallBusinessLedger.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("MySmallBusinessLedger.Infrastructure.Persistence.LessonEntity", "Lesson")
+                        .WithMany()
+                        .HasForeignKey("LessonId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.Navigation("Invoice");
+
+                    b.Navigation("Lesson");
+                });
+
+            modelBuilder.Entity("MySmallBusinessLedger.Infrastructure.Persistence.LessonEntity", b =>
+                {
+                    b.HasOne("MySmallBusinessLedger.Infrastructure.Persistence.PlanCatalogEntity", "PlanCatalog")
+                        .WithMany()
+                        .HasForeignKey("PlanCatalogId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("MySmallBusinessLedger.Infrastructure.Persistence.StudentEntity", "Student")
+                        .WithMany("Lessons")
+                        .HasForeignKey("StudentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("PlanCatalog");
+
+                    b.Navigation("Student");
                 });
 
             modelBuilder.Entity("MySmallBusinessLedger.Infrastructure.Persistence.PlanNameChangeEntity", b =>
@@ -545,6 +683,8 @@ namespace MySmallBusinessLedger.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("MySmallBusinessLedger.Infrastructure.Persistence.StudentEntity", b =>
                 {
+                    b.Navigation("Lessons");
+
                     b.Navigation("PlanPeriods");
 
                     b.Navigation("ScheduleEntries");

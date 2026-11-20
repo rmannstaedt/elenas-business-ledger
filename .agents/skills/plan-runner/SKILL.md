@@ -202,6 +202,8 @@ Before marking a plan complete or moving it to `completed/`, the runner must:
 3. Treat final manual testing as mandatory post-completion user testing, not as a blocking runner gate after all implementation/verification is done.
 4. Include a user-facing section titled **How To Test The Completed Plan** in the final report.
 
+Implementation completion and release acceptance are distinct. When a fix depends on state carried across actions, records, windows, sessions, or deferred work, run the plan's producer-transition-observer lifecycle scenario before describing the behavior as verified. If that scenario is manual-only, implementation and packaging may still complete, but the resulting artifact must be labelled an unverified candidate until the user performs it.
+
 Final test instructions must include prerequisites/setup, exact user actions or CLI commands, expected success result, expected failure/safety result when relevant, where to inspect artifacts/logs/UI state, cleanup/reset instructions, and the sentence `Post-completion user test: mandatory.`
 
 If no meaningful manual test exists, say so and explain which automated verification commands prove the result, then state what the user should inspect to accept the work.
@@ -245,6 +247,8 @@ If a follow-on skill is required by the plan, do not silently omit it. Either ru
 Use verification commands listed by the implementation plan when practical. Prefer the narrowest useful verification for the current stage.
 
 For safety-sensitive, persistence/artifact, service/job, database, migration, endpoint, external-process, verification, or UI behavior changes, build success alone is not enough. Run or recommend behavioral tests or scenario checks.
+
+For an unintended-mutation or state-leakage regression, the verification must first create the contaminating state and then cross the relevant boundary. A representative editor scenario is: edit and save record A; open record B; verify untouched fields; close/discard; reopen record B; verify again; then repeat through another record transition if controls or item sources are reused. Verify persisted state as well as visible state. Source/XAML assertions may supplement this scenario but do not replace it.
 
 Do not claim verification passed unless it was actually run. If verification cannot be run, record why in the plan and report what remains unverified.
 

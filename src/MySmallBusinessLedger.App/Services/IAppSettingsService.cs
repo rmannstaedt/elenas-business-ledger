@@ -1,5 +1,6 @@
 using MySmallBusinessLedger.Core.Common;
 using MySmallBusinessLedger.Core.Company;
+using MySmallBusinessLedger.Core.Ports;
 using MySmallBusinessLedger.Infrastructure.Persistence;
 
 namespace MySmallBusinessLedger.App.Services;
@@ -8,6 +9,7 @@ public sealed record AppSettingsSnapshot(
     CompanyProfile? CompanyProfile,
     CalendarSettings? CalendarSettings,
     GoogleOAuthClientConfigurationStatus GoogleOAuthAppConfigurationStatus,
+    EconomySettings? EconomySettings = null,
     string AppDataFolderPath = "",
     string DatabasePath = "",
     string GoogleTokenFolderPath = "",
@@ -21,6 +23,7 @@ public interface IAppSettingsService
     Task<OperationResult<AppSettingsSnapshot>> SaveAsync(
         CompanyProfile companyProfile,
         CalendarSettings calendarSettings,
+        EconomySettings? economySettings,
         CancellationToken cancellationToken);
 
     Task<OperationResult<bool>> ConnectGoogleCalendarAsync(

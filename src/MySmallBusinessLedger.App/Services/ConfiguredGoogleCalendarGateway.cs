@@ -34,14 +34,21 @@ public sealed class ConfiguredGoogleCalendarGateway : IGoogleCalendarGateway
         return await gateway.ListLessonsAsync(from, to, cancellationToken);
     }
 
-    public async Task<OperationResult<IReadOnlyList<CalendarLesson>>> AddLessonAsync(
+    public async Task<OperationResult<LessonAddResult>> AddLessonAsync(
         LessonAddRequest request,
         DateOnly refreshMonth,
         CancellationToken cancellationToken)
     {
         var gateway = await TryCreateGatewayAsync(cancellationToken);
         return gateway is null
-            ? CalendarNotConfigured<IReadOnlyList<CalendarLesson>>([])
+            ? CalendarNotConfigured(new LessonAddResult(
+                new CalendarLesson(
+                    string.Empty,
+                    request.StudentShortName,
+                    request.StartsAt,
+                    LessonState.Planned,
+                    request.HasKnownStartTime),
+                []))
             : await gateway.AddLessonAsync(request, refreshMonth, cancellationToken);
     }
 
@@ -116,5 +123,5 @@ public sealed class ConfiguredGoogleCalendarGateway : IGoogleCalendarGateway
             new ValidationError("Calendar.NotConfigured", NotConfiguredMessage));
 
     private const string NotConfiguredMessage =
-        "Google Calendar is not configured. Configure a Google account and calendar before using lesson sync.";
+        "Google Calendar is not configured or authorization is missing. Open Application > Settings and use Connect Google Calendar before using lesson sync.";
 }

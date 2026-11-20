@@ -63,7 +63,8 @@ public sealed class InvoiceWorkflowWindowLauncher : IInvoiceWorkflowLauncher
         var previewViewModel = new InvoicePreviewViewModel(
             invoiceWorkflowService,
             preview.Value!,
-            EnsureInvoicePrinterConfiguredAsync);
+            EnsureInvoicePrinterConfiguredAsync,
+            ConfirmContinueWaitingForInvoiceIssueAsync);
         var previewWindow = new InvoicePreviewView(previewViewModel)
         {
             Owner = Application.Current?.MainWindow
@@ -102,6 +103,20 @@ public sealed class InvoiceWorkflowWindowLauncher : IInvoiceWorkflowLauncher
         }
 
         return result.Value;
+    }
+
+    private static Task<bool> ConfirmContinueWaitingForInvoiceIssueAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var result = MessageBox.Show(
+            "The invoice is still being written and printed. The invoice window needs to stay open until the result is known. Keep waiting?",
+            "Invoice",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Question,
+            MessageBoxResult.Yes);
+
+        return Task.FromResult(result == MessageBoxResult.Yes);
     }
 
     private static void ShowWarning(string message) =>

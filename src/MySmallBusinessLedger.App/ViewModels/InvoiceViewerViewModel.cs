@@ -175,7 +175,9 @@ public sealed class InvoiceViewerLineDisplayModel
 {
     public InvoiceViewerLineDisplayModel(IssuedInvoiceLine line)
     {
-        LessonDateTimeText = line.LessonDateTime.ToString("dd-MM-yyyy HH:mm", CultureInfo.InvariantCulture);
+        LessonDateTimeText = line.HasKnownLessonTime
+            ? line.LessonDateTime.ToString("dd-MM-yyyy HH:mm", CultureInfo.InvariantCulture)
+            : line.LessonDateTime.ToString("dd-MM-yyyy", CultureInfo.InvariantCulture);
         PlanName = line.PlanName;
         PriceWithoutVatText = string.Create(
             CultureInfo.GetCultureInfo("da-DK"),

@@ -53,7 +53,6 @@ public sealed class StudentOverviewViewModel : ViewModelBase
 
         AddStudentCommand = new AsyncRelayCommand(AddStudentAsync, () => !IsBusy);
         SaveStudentCommand = new AsyncRelayCommand(SaveStudentAsync, () => !IsBusy && SelectedStudentEditor is not null);
-        CancelStudentEditCommand = new AsyncRelayCommand(CancelStudentEditAsync, () => !IsBusy && SelectedStudentEditor is not null);
         OpenInvoiceCommand = new AsyncRelayCommand(
             parameter => OpenInvoiceAsync((InvoiceDisplayModel)parameter!),
             parameter => parameter is InvoiceDisplayModel && !IsBusy);
@@ -122,6 +121,17 @@ public sealed class StudentOverviewViewModel : ViewModelBase
         return true;
     }
 
+    public async Task<bool> PrepareForDetailsWindowCloseAsync()
+    {
+        if (!await PrepareCurrentEditorForDetailsCloseAsync())
+        {
+            return false;
+        }
+
+        ResetSelectionAfterDetailsClose();
+        return true;
+    }
+
     private void SetSelectedStudentCore(StudentOverviewStudentDisplayModel? student)
     {
         isSelectingStudent = true;
@@ -185,8 +195,6 @@ public sealed class StudentOverviewViewModel : ViewModelBase
     public AsyncRelayCommand AddStudentCommand { get; }
 
     public AsyncRelayCommand SaveStudentCommand { get; }
-
-    public AsyncRelayCommand CancelStudentEditCommand { get; }
 
     public AsyncRelayCommand OpenInvoiceCommand { get; }
 
@@ -263,18 +271,13 @@ public sealed class StudentOverviewViewModel : ViewModelBase
         return true;
     }
 
-    private async Task CancelStudentEditAsync()
+    private void ResetSelectionAfterDetailsClose()
     {
-        if (!await PrepareCurrentEditorForCancelAsync())
-        {
-            return;
-        }
-
-        var selectAfterCancel = SelectedStudent?.ShortName ?? selectedStudentBeforeAdd;
+        var selectAfterClose = SelectedStudent?.ShortName ?? selectedStudentBeforeAdd;
         selectedStudentBeforeAdd = null;
-        SetSelectedStudentCore(selectAfterCancel is null
+        SetSelectedStudentCore(selectAfterClose is null
             ? Students.FirstOrDefault()
-            : SelectStudent(selectAfterCancel) ?? Students.FirstOrDefault());
+            : SelectStudent(selectAfterClose) ?? Students.FirstOrDefault());
         ApplySelectedStudent();
     }
 
@@ -347,11 +350,10 @@ public sealed class StudentOverviewViewModel : ViewModelBase
     {
         AddStudentCommand.RaiseCanExecuteChanged();
         SaveStudentCommand.RaiseCanExecuteChanged();
-        CancelStudentEditCommand.RaiseCanExecuteChanged();
         OpenInvoiceCommand.RaiseCanExecuteChanged();
     }
 
-    private async Task<bool> PrepareCurrentEditorForCancelAsync()
+    private async Task<bool> PrepareCurrentEditorForDetailsCloseAsync()
     {
         if (SelectedStudentEditor?.HasChanges != true)
         {

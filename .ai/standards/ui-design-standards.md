@@ -108,12 +108,28 @@ Controls should be sized, placed, and named for the task.
 - Use clear command labels with verbs, such as Run, Pause, Resume, Cancel, Review, View details, Apply changes, or Export report.
 - Disable unavailable commands only when the unavailable state is understandable or explained.
 - Prefer preventing impossible actions over letting users fail late, but do not hide important actions so completely that the user cannot discover how to become eligible.
+- Activation, refresh, and focus recovery must not consume the user's first intentional click. If the application regains focus because the user clicks a button, menu item, row, field, dropdown, picker, or icon, that same click must either perform the visible action or be blocked for a clear user-facing reason. Background or activation refresh work must be deferred, coalesced, cancelled, or made non-disruptive so it cannot disable controls, close popups, rebuild rows, clear selection, or otherwise invalidate that input.
 
 Page structure should be steady. Avoid layout shifts caused by changing text, late-arriving data, progress bars, validation messages, or control visibility. Reserve stable space for progress, summaries, validation, and activity text when those elements are expected during a workflow. Use visual grouping to clarify relationships, not as decoration.
 
 Preserve useful user-adjusted layout such as column order, widths, splitters, filters, sorting, density, and window size where repeated use benefits from it. Provide a reset path when persisted layout can become confusing.
 
 Desktop applications should preserve window size and position for main windows and subwindows, then restore them inside the current visible screen area so windows are never stranded off-screen after monitor or resolution changes.
+
+## Editable Controls And User Intent
+
+Programmatic or framework-generated selection/current-item changes are not catalog edits. Loading a record, changing `DataContext`, replacing `ItemsSource`, moving an `ICollectionView` current item, resetting a selector, reusing a window, or reopening an editor must not write a value to the editable model unless a validated user action explicitly commits it.
+
+For editable selectors and other stateful inputs:
+
+* inventory every write path into the model, including binding update triggers, `SelectedItem`/`SelectedValue`, editable `ComboBox.Text`, validation/converters, event handlers, commands, selection/current-item synchronization, and deferred dispatcher callbacks;
+* do not allow a long-lived suggestion collection or its default collection view to transfer mutable current-item/selection state between records or controls; disable implicit current-item synchronization or provide an explicitly isolated view as appropriate;
+* when source updates are coordinated by view mechanics, use explicit source-update timing and refresh the target deliberately when the record changes;
+* during record or `DataContext` replacement, close transient popups, clear stale selector state, and suppress edit handlers until the new model is fully established;
+* deferred work must capture and validate the exact record/ViewModel identity for which it was scheduled before it writes or restores control state;
+* discard/close must not leave a mutation in the persisted record, a reused ViewModel, a shared item source, or the next editor session.
+
+A regression test for cross-record contamination must create the contaminating state before inspecting the target: edit and save record A, open record B, verify untouched fields, close/discard, reopen record B, and verify again. Exercise a further record transition when the same controls or item sources are reused. Verify both the visible form and persisted data. Source/XAML assertions are useful guards, but they do not replace this lifecycle scenario.
 
 ## Visual design and design systems
 
@@ -161,6 +177,7 @@ Data-dense views should support scanning, comparison, and safe action.
 - Use stable identifiers and meaningful names so rows remain recognizable across refreshes.
 - Preserve selection, scroll position, sort, filters, expanded groups, and visible columns where practical.
 - For selectable rows, make selection a deliberate contract: bind selected item/state where the platform supports it, keep selection visible, preserve it across refreshes by stable row identity, and verify that row clicks, double-clicks, embedded buttons, focus changes, and command handlers do not accidentally clear or steal selection.
+- Do not leave platform-default row or pane resize handles enabled unless resizing is an explicit product feature. Unintended resize cursors, grippers, mouse capture, or ghost outlines are interaction bugs because they can block normal clicks and make the UI feel stuck.
 - Do not let late detail loads overwrite the current selection.
 - Show row-level status, warnings, and failures where the user makes row-level decisions.
 - Keep bulk actions visibly scoped to the selected or filtered set.

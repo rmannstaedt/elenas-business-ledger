@@ -152,6 +152,38 @@ public sealed class PlanCatalogViewModel : ViewModelBase
 
     public Task LoadAsync() => ReloadAsync();
 
+    public async Task<bool> PrepareForCloseAsync()
+    {
+        if (SelectedPlan is null)
+        {
+            return true;
+        }
+
+        if (SelectedPlan.State == PlanCatalogState.Draft && HasDraftChanges(SelectedPlan.Plan))
+        {
+            var choice = await interactionService.PromptClosePlanSaveChangesAsync(CancellationToken.None);
+            return choice switch
+            {
+                PlanCatalogAddPlanChoice.Save => await SaveDraftPlanCoreAsync(SelectedPlan.Id),
+                PlanCatalogAddPlanChoice.Discard => true,
+                _ => false
+            };
+        }
+
+        if (SelectedPlan.State != PlanCatalogState.Draft && HasSelectedPlanChanges(SelectedPlan))
+        {
+            var choice = await interactionService.PromptClosePlanSaveChangesAsync(CancellationToken.None);
+            return choice switch
+            {
+                PlanCatalogAddPlanChoice.Save => await SaveSelectedPlanCoreAsync(SelectedPlan.Id),
+                PlanCatalogAddPlanChoice.Discard => true,
+                _ => false
+            };
+        }
+
+        return true;
+    }
+
     private async Task AddDraftPlanAsync()
     {
         if (!await PrepareCurrentPlanForAddAsync())

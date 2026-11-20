@@ -16,11 +16,11 @@
                     Orientation="Horizontal"
                     HorizontalAlignment="Right"
                     Margin="0,14,0,0">
-            <Button Content="Print Invoice"
+            <Button Content="Save &amp; Print Invoice"
                     Command="{Binding PrintInvoiceCommand}"
                     MinWidth="110"
                     Height="32"
-                    Margin="0,0,8,0" />
+                    Margin="0,0,8,0" Width="128" />
             <Button Content="Cancel"
                     Click="OnCancel"
                     MinWidth="84"
@@ -35,6 +35,17 @@
                 Margin="0,0,0,12"
                 Visibility="{Binding HasError, Converter={StaticResource BooleanToVisibilityConverter}}">
             <TextBlock Text="{Binding ErrorMessage}"
+                       TextWrapping="Wrap" />
+        </Border>
+
+        <Border DockPanel.Dock="Top"
+                Background="#E8F1FB"
+                BorderBrush="#6C8FB3"
+                BorderThickness="1"
+                Padding="10"
+                Margin="0,0,0,12"
+                Visibility="{Binding HasBusyStatus, Converter={StaticResource BooleanToVisibilityConverter}}">
+            <TextBlock Text="{Binding BusyStatusText}"
                        TextWrapping="Wrap" />
         </Border>
 
@@ -75,11 +86,13 @@
                        FontWeight="SemiBold"
                        Margin="0,18,0,8" />
 
-            <DataGrid Grid.Row="2"
+            <DataGrid x:Name="InvoiceLinesGrid"
+                      Grid.Row="2"
                       ItemsSource="{Binding Lines}"
                       AutoGenerateColumns="False"
                       CanUserAddRows="False"
                       CanUserDeleteRows="False"
+                      CanUserResizeRows="False"
                       IsReadOnly="False"
                       HeadersVisibility="Column"
                       GridLinesVisibility="Horizontal">
@@ -89,6 +102,7 @@
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
                                 <CheckBox IsChecked="{Binding IsIncluded, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                          AutomationProperties.Name="{Binding IncludeAutomationName}"
                                           HorizontalAlignment="Center"
                                           VerticalAlignment="Center"
                                           PreviewMouseLeftButtonDown="OnIncludeLinePreviewMouseLeftButtonDown" />
@@ -118,7 +132,7 @@
                 </Grid.ColumnDefinitions>
 
                 <StackPanel>
-                    <TextBlock Text="Price adjustment" />
+                    <TextBlock Text="Price adjustment (excl. VAT)" />
                     <Grid Margin="0,3,0,0">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="110" />

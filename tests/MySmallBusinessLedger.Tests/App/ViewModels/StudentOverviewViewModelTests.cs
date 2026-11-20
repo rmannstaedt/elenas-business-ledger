@@ -9,9 +9,19 @@ using MySmallBusinessLedger.Core.Students;
 using MySmallBusinessLedger.Core.UseCases.Plans;
 using MySmallBusinessLedger.Core.UseCases.Students;
 using System.Windows;
+using System.Windows.Automation;
+using System.Windows.Data;
+using System.Windows.Controls.Primitives;
 using WpfButton = System.Windows.Controls.Button;
+using WpfComboBox = System.Windows.Controls.ComboBox;
+using WpfDataGrid = System.Windows.Controls.DataGrid;
+using WpfDataGridLengthUnitType = System.Windows.Controls.DataGridLengthUnitType;
+using WpfDatePicker = System.Windows.Controls.DatePicker;
 using WpfGrid = System.Windows.Controls.Grid;
-using WpfGridSplitter = System.Windows.Controls.GridSplitter;
+using WpfScrollViewer = System.Windows.Controls.ScrollViewer;
+using WpfStackPanel = System.Windows.Controls.StackPanel;
+using WpfTextBox = System.Windows.Controls.TextBox;
+using WpfTextBlock = System.Windows.Controls.TextBlock;
 
 namespace MySmallBusinessLedger.Tests.App.ViewModels;
 
@@ -52,16 +62,53 @@ public sealed class StudentOverviewViewModelTests
             var window = new StudentOverviewView(viewModel);
 
             var closeButton = Assert.Single(FindChildren<WpfButton>(window), button => button.Content?.ToString() == "Close");
+            var closeButtonHost = Assert.IsType<WpfGrid>(closeButton.Parent);
 
             Assert.Equal(HorizontalAlignment.Right, closeButton.HorizontalAlignment);
             Assert.Equal(84, closeButton.MinWidth);
+            Assert.Equal("StudentListBottomActions", closeButtonHost.Name);
 
             window.Close();
         });
     }
 
     [Fact]
-    public void StudentOverviewLayoutKeepsEditorPanesFixedAndInvoicesResizable()
+    public void StudentOverviewHeadingsNamePaneContext()
+    {
+        RunOnStaThread(() =>
+        {
+            var viewModel = new StudentOverviewViewModel(
+                new FakeStudentOverviewService([CreateSnapshot("Anna", isActive: true)]),
+                new FakeStudentEditorService(),
+                new FakePlanCatalogService(),
+                new FakeInvoiceWorkflowLauncher(),
+                new FakeUiClock(new DateTimeOffset(2026, 6, 20, 12, 0, 0, TimeSpan.Zero)));
+            var window = new StudentOverviewView(viewModel);
+            var detailsWindow = new StudentDetailsView(viewModel);
+
+            var headings = FindChildren<WpfTextBlock>(window)
+                .Select(textBlock => textBlock.Text)
+                .ToArray();
+            var detailHeadings = FindChildren<WpfTextBlock>(detailsWindow)
+                .Select(textBlock => textBlock.Text)
+                .ToArray();
+
+            Assert.Contains("Students", headings);
+            Assert.DoesNotContain("Student Plan", headings);
+            Assert.DoesNotContain("Student Invoices", headings);
+            Assert.Contains("Student", detailHeadings);
+            Assert.Contains("Student Plan", detailHeadings);
+            Assert.Contains("Student Invoices", detailHeadings);
+            Assert.DoesNotContain("Current Plan", headings);
+            Assert.DoesNotContain("Invoices", headings);
+
+            detailsWindow.Close();
+            window.Close();
+        });
+    }
+
+    [Fact]
+    public void StudentOverviewKeepsAddStudentActionNearListHeading()
     {
         RunOnStaThread(() =>
         {
@@ -73,21 +120,298 @@ public sealed class StudentOverviewViewModelTests
                 new FakeUiClock(new DateTimeOffset(2026, 6, 20, 12, 0, 0, TimeSpan.Zero)));
             var window = new StudentOverviewView(viewModel);
 
-            var outerColumns = Assert.Single(FindChildren<WpfGrid>(window), grid => grid.Name == "StudentOverviewColumns");
-            Assert.Equal(GridUnitType.Star, outerColumns.ColumnDefinitions[0].Width.GridUnitType);
-            Assert.Equal(8, outerColumns.ColumnDefinitions[1].Width.Value);
-            Assert.Equal(360, outerColumns.ColumnDefinitions[2].Width.Value);
+            var addStudentButton = Assert.Single(FindChildren<WpfButton>(window), button => AutomationProperties.GetName(button) == "Add student");
+            var addStudentTexts = FindChildren<WpfTextBlock>(addStudentButton)
+                .Select(textBlock => textBlock.Text)
+                .ToArray();
+            var addStudentLabel = Assert.Single(FindChildren<WpfTextBlock>(addStudentButton), textBlock => textBlock.Text == "Add student");
 
-            var detailColumns = Assert.Single(FindChildren<WpfGrid>(window), grid => grid.Name == "StudentDetailColumns");
+            Assert.Equal(HorizontalAlignment.Right, addStudentButton.HorizontalAlignment);
+            Assert.Contains("+", addStudentTexts);
+            Assert.Contains("Add student", addStudentTexts);
+            Assert.Equal(14, addStudentLabel.FontSize);
+            Assert.Equal(FontWeights.Bold, addStudentLabel.FontWeight);
+            Assert.Equal(new Thickness(0), addStudentButton.BorderThickness);
+            Assert.Equal(1, WpfGrid.GetColumn(addStudentButton));
+            Assert.Equal(0, WpfGrid.GetRow(addStudentButton));
+
+            window.Close();
+        });
+    }
+
+    [Fact]
+    public void StudentDetailsLayoutUsesFixedColumnsWithoutResizeSplitter()
+    {
+        RunOnStaThread(() =>
+        {
+            var viewModel = new StudentOverviewViewModel(
+                new FakeStudentOverviewService([CreateSnapshot("Anna", isActive: true)]),
+                new FakeStudentEditorService(),
+                new FakePlanCatalogService(),
+                new FakeInvoiceWorkflowLauncher(),
+                new FakeUiClock(new DateTimeOffset(2026, 6, 20, 12, 0, 0, TimeSpan.Zero)));
+            var window = new StudentDetailsView(viewModel);
+
+            var outerColumns = Assert.Single(FindChildren<WpfGrid>(window), grid => grid.Name == "StudentDetailsOuterColumns");
+            Assert.Equal(ResizeMode.CanMinimize, window.ResizeMode);
+            Assert.Equal(1080, window.Width);
+            Assert.Equal(735, window.Height);
+            Assert.Equal(1080, window.MinWidth);
+            Assert.Equal(735, window.MinHeight);
+            Assert.Equal(3, outerColumns.ColumnDefinitions.Count);
+            Assert.Equal(GridUnitType.Pixel, outerColumns.ColumnDefinitions[0].Width.GridUnitType);
+            Assert.Equal(GridUnitType.Pixel, outerColumns.ColumnDefinitions[1].Width.GridUnitType);
+            Assert.Equal(GridUnitType.Pixel, outerColumns.ColumnDefinitions[2].Width.GridUnitType);
+            Assert.Equal(550, outerColumns.ColumnDefinitions[0].Width.Value);
+            Assert.Equal(18, outerColumns.ColumnDefinitions[1].Width.Value);
+            Assert.Equal(432, outerColumns.ColumnDefinitions[2].Width.Value);
+
+            var detailColumns = Assert.Single(FindChildren<WpfGrid>(window), grid => grid.Name == "StudentDetailsColumns");
+            Assert.Equal(3, detailColumns.ColumnDefinitions.Count);
+            Assert.Equal(GridUnitType.Pixel, detailColumns.ColumnDefinitions[0].Width.GridUnitType);
             Assert.Equal(GridUnitType.Pixel, detailColumns.ColumnDefinitions[2].Width.GridUnitType);
-            Assert.Equal(GridUnitType.Pixel, detailColumns.ColumnDefinitions[4].Width.GridUnitType);
-            Assert.Equal(252, detailColumns.ColumnDefinitions[2].Width.Value);
-            Assert.Equal(252, detailColumns.ColumnDefinitions[4].Width.Value);
+            Assert.Equal(252, detailColumns.ColumnDefinitions[0].Width.Value);
+            Assert.Equal(280, detailColumns.ColumnDefinitions[2].Width.Value);
 
-            var splitter = Assert.Single(FindChildren<WpfGridSplitter>(window), gridSplitter => gridSplitter.Name == "InvoicesPaneSplitter");
-            Assert.Equal(System.Windows.Controls.GridResizeDirection.Columns, splitter.ResizeDirection);
-            Assert.Equal(System.Windows.Controls.GridResizeBehavior.PreviousAndNext, splitter.ResizeBehavior);
+            var invoicesGrid = Assert.Single(FindChildren<WpfDataGrid>(window), grid => grid.Name == "InvoicesGrid");
+            Assert.Equal(430, invoicesGrid.Columns.Sum(column => column.Width.Value));
+            Assert.Equal(WpfDataGridLengthUnitType.Pixel, invoicesGrid.Columns[4].Width.UnitType);
+            Assert.Equal(95, invoicesGrid.Columns[4].Width.Value);
 
+            window.Close();
+        });
+    }
+
+    [Fact]
+    public void StudentDetailsFixedSizeLayoutDoesNotNeedScrollBars()
+    {
+        RunOnStaThread(() =>
+        {
+            var viewModel = new StudentOverviewViewModel(
+                new FakeStudentOverviewService([CreateSnapshot("Anna", isActive: true)]),
+                new FakeStudentEditorService(),
+                new FakePlanCatalogService(),
+                new FakeInvoiceWorkflowLauncher(),
+                new FakeUiClock(new DateTimeOffset(2026, 6, 20, 12, 0, 0, TimeSpan.Zero)));
+            var window = new StudentDetailsView(viewModel);
+            try
+            {
+                window.Show();
+                window.UpdateLayout();
+
+                var fieldsScroller = Assert.Single(
+                    FindChildren<WpfScrollViewer>(window),
+                    scrollViewer => scrollViewer.Content is WpfGrid { Name: "StudentDetailsFieldsGrid" });
+                var invoicesGrid = Assert.Single(FindChildren<WpfDataGrid>(window), grid => grid.Name == "InvoicesGrid");
+                var invoicesScroller = Assert.Single(FindVisualChildren<WpfScrollViewer>(invoicesGrid));
+
+                Assert.NotEqual(Visibility.Visible, fieldsScroller.ComputedVerticalScrollBarVisibility);
+                Assert.NotEqual(Visibility.Visible, invoicesScroller.ComputedHorizontalScrollBarVisibility);
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
+    [Fact]
+    public void StudentDetailsRestoresPositionWithoutRestoringOversizedWindowSize()
+    {
+        RunOnStaThread(() =>
+        {
+            var storeDirectory = Path.Combine(
+                Path.GetTempPath(),
+                "MySmallBusinessLedgerLayoutTests",
+                Guid.NewGuid().ToString("N"));
+            var storePath = Path.Combine(storeDirectory, "window-placement.json");
+            WindowPlacementStore.StorePathOverride = storePath;
+            StudentDetailsView? window = null;
+            try
+            {
+                var savedLeft = SystemParameters.VirtualScreenLeft + 100;
+                var savedTop = SystemParameters.VirtualScreenTop + 120;
+                Directory.CreateDirectory(storeDirectory);
+                File.WriteAllText(
+                    storePath,
+                    $$"""
+                      {
+                        "StudentDetailsView": {
+                          "Left": {{savedLeft}},
+                          "Top": {{savedTop}},
+                          "Width": 1400,
+                          "Height": 900
+                        }
+                      }
+                      """);
+                var viewModel = new StudentOverviewViewModel(
+                    new FakeStudentOverviewService([CreateSnapshot("Anna", isActive: true)]),
+                    new FakeStudentEditorService(),
+                    new FakePlanCatalogService(),
+                    new FakeInvoiceWorkflowLauncher(),
+                    new FakeUiClock(new DateTimeOffset(2026, 6, 20, 12, 0, 0, TimeSpan.Zero)));
+
+                window = new StudentDetailsView(viewModel);
+                window.Show();
+
+                Assert.Equal(1080, window.Width);
+                Assert.Equal(735, window.Height);
+                Assert.Equal(savedLeft, window.Left);
+                Assert.Equal(savedTop, window.Top);
+
+                window.Close();
+            }
+            finally
+            {
+                if (window?.IsVisible == true)
+                {
+                    window.Close();
+                }
+
+                WindowPlacementStore.StorePathOverride = null;
+                if (Directory.Exists(storeDirectory))
+                {
+                    Directory.Delete(storeDirectory, recursive: true);
+                }
+            }
+        });
+    }
+
+    [Fact]
+    public void StudentDetailsFieldInputsUseConsistentHeight()
+    {
+        RunOnStaThread(() =>
+        {
+            var viewModel = new StudentOverviewViewModel(
+                new FakeStudentOverviewService([CreateSnapshot("Anna", isActive: true)]),
+                new FakeStudentEditorService(),
+                new FakePlanCatalogService(),
+                new FakeInvoiceWorkflowLauncher(),
+                new FakeUiClock(new DateTimeOffset(2026, 6, 20, 12, 0, 0, TimeSpan.Zero)));
+            var window = new StudentDetailsView(viewModel);
+            window.Show();
+
+            Assert.All(FindChildren<WpfTextBox>(window), textBox => Assert.Equal(24, textBox.Height));
+            Assert.All(FindChildren<WpfComboBox>(window), comboBox => Assert.Equal(24, comboBox.Height));
+            Assert.All(FindChildren<WpfDatePicker>(window), datePicker => Assert.Equal(24, datePicker.Height));
+
+            window.Close();
+        });
+    }
+
+    [Fact]
+    public void StudentDetailsPlanFieldsShareStudentFieldRowRhythm()
+    {
+        RunOnStaThread(() =>
+        {
+            var viewModel = new StudentOverviewViewModel(
+                new FakeStudentOverviewService([CreateSnapshot("Anna", isActive: true)]),
+                new FakeStudentEditorService(),
+                new FakePlanCatalogService(),
+                new FakeInvoiceWorkflowLauncher(),
+                new FakeUiClock(new DateTimeOffset(2026, 6, 20, 12, 0, 0, TimeSpan.Zero)));
+            var window = new StudentDetailsView(viewModel);
+
+            var outerColumns = Assert.Single(FindChildren<WpfGrid>(window), grid => grid.Name == "StudentDetailsOuterColumns");
+            var detailsGrid = Assert.IsType<WpfGrid>(window.FindName("StudentDetailsFieldsGrid"));
+            var priceGroup = Assert.IsType<WpfStackPanel>(window.FindName("PlanPriceWithoutVatGroup"));
+            var lessonsGroup = Assert.IsType<WpfStackPanel>(window.FindName("PlanLessonsGroup"));
+            var durationGroup = Assert.IsType<WpfStackPanel>(window.FindName("PlanDurationGroup"));
+            var studentCountGroup = Assert.IsType<WpfStackPanel>(window.FindName("PlanNumberOfStudentsGroup"));
+            var flexibilityGroup = Assert.IsType<WpfStackPanel>(window.FindName("PlanFlexibilityGroup"));
+            var paymentTermsGroup = Assert.IsType<WpfStackPanel>(window.FindName("PlanPaymentTermsGroup"));
+            var startsOnGroup = Assert.IsType<WpfStackPanel>(window.FindName("PlanStartsOnGroup"));
+            var scheduleHeader = Assert.IsType<WpfTextBlock>(window.FindName("ScheduleHeader"));
+
+            Assert.Equal(550, outerColumns.ColumnDefinitions[0].Width.Value);
+            Assert.Equal(18, outerColumns.ColumnDefinitions[1].Width.Value);
+            Assert.Equal(432, outerColumns.ColumnDefinitions[2].Width.Value);
+            Assert.Equal(280, detailsGrid.ColumnDefinitions[2].Width.Value);
+            Assert.Equal(1, WpfGrid.GetRow(priceGroup));
+            Assert.Equal(2, WpfGrid.GetRow(lessonsGroup));
+            Assert.Equal(3, WpfGrid.GetRow(durationGroup));
+            Assert.Equal(4, WpfGrid.GetRow(studentCountGroup));
+            Assert.Equal(5, WpfGrid.GetRow(flexibilityGroup));
+            Assert.Equal(6, WpfGrid.GetRow(paymentTermsGroup));
+            Assert.Equal(7, WpfGrid.GetRow(startsOnGroup));
+            Assert.True(scheduleHeader.FontSize < 18);
+
+            window.Close();
+        });
+    }
+
+    [Fact]
+    public void StudentDetailsActionsAreBottomLeftWithSaveAndClose()
+    {
+        RunOnStaThread(() =>
+        {
+            var viewModel = new StudentOverviewViewModel(
+                new FakeStudentOverviewService([CreateSnapshot("Anna", isActive: true)]),
+                new FakeStudentEditorService(),
+                new FakePlanCatalogService(),
+                new FakeInvoiceWorkflowLauncher(),
+                new FakeUiClock(new DateTimeOffset(2026, 6, 20, 12, 0, 0, TimeSpan.Zero)));
+            var window = new StudentDetailsView(viewModel);
+
+            var actionHost = Assert.Single(FindChildren<WpfStackPanel>(window), panel => panel.Name == "StudentDetailsBottomActions");
+            var actionButtons = FindChildren<WpfButton>(actionHost).ToArray();
+            var saveButton = Assert.Single(actionButtons, button => button.Content?.ToString() == "Save");
+            var closeButton = Assert.Single(actionButtons, button => button.Content?.ToString() == "Close");
+            var allButtonLabels = FindChildren<WpfButton>(window)
+                .Select(button => button.Content?.ToString() ?? string.Empty)
+                .ToArray();
+            var actionButtonLabels = actionButtons
+                .Select(button => button.Content?.ToString() ?? string.Empty)
+                .ToArray();
+
+            Assert.Equal(HorizontalAlignment.Left, actionHost.HorizontalAlignment);
+            Assert.Equal(new Thickness(0), actionHost.Margin);
+            Assert.Equal(1, WpfGrid.GetRow(actionHost));
+            Assert.Equal(["Save", "Close"], actionButtonLabels);
+            var saveCommandBinding = saveButton.GetBindingExpression(ButtonBase.CommandProperty);
+            Assert.NotNull(saveCommandBinding);
+            Assert.Equal("SaveStudentCommand", saveCommandBinding!.ParentBinding.Path.Path);
+            Assert.Equal(new Thickness(0, 0, 8, 0), saveButton.Margin);
+            Assert.Equal(84, closeButton.MinWidth);
+            Assert.DoesNotContain("Cancel", allButtonLabels);
+
+            window.Close();
+        });
+    }
+
+    [Fact]
+    public void StudentOverviewAndDetailsWindowsShareSelectedStudent()
+    {
+        RunOnStaThread(() =>
+        {
+            var viewModel = new StudentOverviewViewModel(
+                new FakeStudentOverviewService(
+                    [
+                        CreateSnapshot("Anna", isActive: true),
+                        CreateSnapshot("Bo", isActive: true)
+                    ]),
+                new FakeStudentEditorService(),
+                new FakePlanCatalogService(),
+                new FakeInvoiceWorkflowLauncher(),
+                new FakeUiClock(new DateTimeOffset(2026, 6, 20, 12, 0, 0, TimeSpan.Zero)));
+            viewModel.LoadAsync().GetAwaiter().GetResult();
+            var window = new StudentOverviewView(viewModel);
+            var detailsWindow = new StudentDetailsView(viewModel);
+
+            var studentsGrid = Assert.Single(FindChildren<WpfDataGrid>(window), grid => grid.Name == "StudentsGrid");
+            var selectedItemBinding = studentsGrid.GetBindingExpression(WpfDataGrid.SelectedItemProperty);
+            Assert.NotNull(selectedItemBinding);
+            Assert.Equal("SelectedStudent", selectedItemBinding!.ParentBinding.Path.Path);
+            Assert.Equal(BindingMode.TwoWay, selectedItemBinding.ParentBinding.Mode);
+
+            viewModel.SelectStudentAsync(viewModel.Students.Single(student => student.ShortName == "Bo")).GetAwaiter().GetResult();
+
+            Assert.Same(viewModel, detailsWindow.DataContext);
+            Assert.Null(detailsWindow.Owner);
+            Assert.Equal("Bo", viewModel.SelectedStudent?.ShortName);
+            Assert.Equal("Bo Andersen", viewModel.SelectedStudentEditor?.FullName);
+
+            detailsWindow.Close();
             window.Close();
         });
     }
@@ -165,24 +489,6 @@ public sealed class StudentOverviewViewModelTests
     }
 
     [Fact]
-    public async Task CancelStudentEditDiscardsUnsavedChanges()
-    {
-        var viewModel = new StudentOverviewViewModel(
-            new FakeStudentOverviewService([CreateSnapshot("Anna", isActive: true)]),
-            new FakeStudentEditorService(),
-            new FakePlanCatalogService(),
-            new FakeInvoiceWorkflowLauncher(),
-            new FakeUiClock(new DateTimeOffset(2026, 6, 20, 12, 0, 0, TimeSpan.Zero)));
-        await viewModel.LoadAsync();
-
-        viewModel.SelectedStudentEditor!.FullName = "Unsaved";
-
-        await viewModel.CancelStudentEditCommand.ExecuteAsync();
-
-        Assert.Equal("Anna Andersen", viewModel.SelectedStudentEditor.FullName);
-    }
-
-    [Fact]
     public async Task SelectingAnotherStudentPromptsAndSavesChangedStudent()
     {
         var service = new FakeStudentOverviewService(
@@ -242,29 +548,6 @@ public sealed class StudentOverviewViewModelTests
     }
 
     [Fact]
-    public async Task CancelStudentEditPromptsBeforeDiscardingUnsavedChanges()
-    {
-        var interactions = new FakeStudentOverviewInteractionService
-        {
-            NextSaveChangesChoice = StudentEditSaveChangesChoice.Discard
-        };
-        var viewModel = new StudentOverviewViewModel(
-            new FakeStudentOverviewService([CreateSnapshot("Anna", isActive: true)]),
-            new FakeStudentEditorService(),
-            new FakePlanCatalogService(),
-            new FakeInvoiceWorkflowLauncher(),
-            new FakeUiClock(new DateTimeOffset(2026, 6, 20, 12, 0, 0, TimeSpan.Zero)),
-            interactions);
-        await viewModel.LoadAsync();
-        viewModel.SelectedStudentEditor!.FullName = "Unsaved";
-
-        await viewModel.CancelStudentEditCommand.ExecuteAsync();
-
-        Assert.Equal(1, interactions.PromptSaveChangesCount);
-        Assert.Equal("Anna Andersen", viewModel.SelectedStudentEditor?.FullName);
-    }
-
-    [Fact]
     public async Task ClosePromptCanCancelWindowCloseWhenStudentHasUnsavedChanges()
     {
         var interactions = new FakeStudentOverviewInteractionService
@@ -286,6 +569,30 @@ public sealed class StudentOverviewViewModelTests
         Assert.False(canClose);
         Assert.Equal(1, interactions.PromptSaveChangesCount);
         Assert.Equal("Unsaved", viewModel.SelectedStudentEditor?.FullName);
+    }
+
+    [Fact]
+    public async Task DetailWindowCloseDiscardResetsUnsavedEditorWhileListRemainsOpen()
+    {
+        var interactions = new FakeStudentOverviewInteractionService
+        {
+            NextSaveChangesChoice = StudentEditSaveChangesChoice.Discard
+        };
+        var viewModel = new StudentOverviewViewModel(
+            new FakeStudentOverviewService([CreateSnapshot("Anna", isActive: true)]),
+            new FakeStudentEditorService(),
+            new FakePlanCatalogService(),
+            new FakeInvoiceWorkflowLauncher(),
+            new FakeUiClock(new DateTimeOffset(2026, 6, 20, 12, 0, 0, TimeSpan.Zero)),
+            interactions);
+        await viewModel.LoadAsync();
+        viewModel.SelectedStudentEditor!.FullName = "Unsaved";
+
+        var canCloseDetails = await viewModel.PrepareForDetailsWindowCloseAsync();
+
+        Assert.True(canCloseDetails);
+        Assert.Equal(1, interactions.PromptSaveChangesCount);
+        Assert.Equal("Anna Andersen", viewModel.SelectedStudentEditor?.FullName);
     }
 
     [Fact]
@@ -467,6 +774,25 @@ public sealed class StudentOverviewViewModelTests
             {
                 matches.AddRange(FindChildren<T>(dependencyObject));
             }
+        }
+
+        return matches;
+    }
+
+    private static IReadOnlyList<T> FindVisualChildren<T>(DependencyObject root)
+        where T : DependencyObject
+    {
+        var matches = new List<T>();
+        var count = System.Windows.Media.VisualTreeHelper.GetChildrenCount(root);
+        for (var index = 0; index < count; index++)
+        {
+            var child = System.Windows.Media.VisualTreeHelper.GetChild(root, index);
+            if (child is T match)
+            {
+                matches.Add(match);
+            }
+
+            matches.AddRange(FindVisualChildren<T>(child));
         }
 
         return matches;

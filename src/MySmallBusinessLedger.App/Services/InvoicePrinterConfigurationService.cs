@@ -42,6 +42,7 @@ public sealed class InvoicePrinterConfigurationService : IInvoicePrinterConfigur
         var save = await settingsService.SaveAsync(
             snapshot.CompanyProfile with { ConfiguredInvoicePrinterName = selectedPrinterName.Trim() },
             calendarSettings,
+            snapshot.EconomySettings,
             cancellationToken);
         if (!save.Succeeded)
         {

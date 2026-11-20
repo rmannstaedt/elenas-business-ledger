@@ -1,6 +1,7 @@
 using MySmallBusinessLedger.App.Services;
 using MySmallBusinessLedger.Core.Common;
 using MySmallBusinessLedger.Core.Company;
+using MySmallBusinessLedger.Core.Ports;
 using MySmallBusinessLedger.Infrastructure.Persistence;
 
 namespace MySmallBusinessLedger.Tests.App.Services;
@@ -105,21 +106,26 @@ public sealed class InvoicePrinterConfigurationServiceTests
 
         public CalendarSettings? SavedCalendarSettings { get; private set; }
 
+        public EconomySettings? SavedEconomySettings { get; private set; }
+
         public Task<AppSettingsSnapshot> LoadAsync(CancellationToken cancellationToken) =>
             Task.FromResult(Snapshot);
 
         public Task<OperationResult<AppSettingsSnapshot>> SaveAsync(
             CompanyProfile companyProfile,
             CalendarSettings calendarSettings,
+            EconomySettings? economySettings,
             CancellationToken cancellationToken)
         {
             SavedProfile = companyProfile;
             SavedCalendarSettings = calendarSettings;
+            SavedEconomySettings = economySettings;
             return Task.FromResult(OperationResult<AppSettingsSnapshot>.Success(
                 Snapshot with
                 {
                     CompanyProfile = companyProfile,
-                    CalendarSettings = calendarSettings
+                    CalendarSettings = calendarSettings,
+                    EconomySettings = economySettings
                 }));
         }
 

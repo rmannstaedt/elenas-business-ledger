@@ -26,9 +26,13 @@ public sealed class InvoiceLineDisplayModel : ViewModelBase
         }
     }
 
-    public string LessonDateTimeText => Line.LessonDateTime.ToString("dd-MM-yyyy HH:mm", CultureInfo.InvariantCulture);
+    public string LessonDateTimeText => Line.HasKnownLessonTime
+        ? Line.LessonDateTime.ToString("dd-MM-yyyy HH:mm", CultureInfo.InvariantCulture)
+        : Line.LessonDateTime.ToString("dd-MM-yyyy", CultureInfo.InvariantCulture);
 
     public string PlanName => Line.PlanName;
+
+    public string IncludeAutomationName => $"Include lesson {LessonDateTimeText} {PlanName}";
 
     public string PriceWithoutVatText =>
         string.Create(CultureInfo.GetCultureInfo("da-DK"), $"{Line.PriceWithoutVat.Amount:N2} {Line.PriceWithoutVat.Currency}");

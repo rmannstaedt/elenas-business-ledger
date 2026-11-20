@@ -1,5 +1,6 @@
 using MySmallBusinessLedger.Core.Company;
 using MySmallBusinessLedger.Core.Invoices;
+using MySmallBusinessLedger.Core.Lessons;
 using MySmallBusinessLedger.Core.Plans;
 using MySmallBusinessLedger.Core.Students;
 
@@ -43,6 +44,30 @@ public sealed class CalendarSettingsEntity
     public string SelectedCalendarId { get; set; } = string.Empty;
 
     public string GoogleAccountEmail { get; set; } = string.Empty;
+}
+
+public sealed class EconomySettingsEntity
+{
+    public int Id { get; set; }
+
+    public DateOnly FirstApplicationInvoiceMonth { get; set; }
+}
+
+public sealed class EconomyManualMonthOverrideEntity
+{
+    public int Id { get; set; }
+
+    public int Year { get; set; }
+
+    public int Month { get; set; }
+
+    public decimal NetAmount { get; set; }
+
+    public decimal VatAmount { get; set; }
+
+    public DateTimeOffset CreatedAt { get; set; }
+
+    public DateTimeOffset UpdatedAt { get; set; }
 }
 
 public sealed class PlanCatalogEntity
@@ -93,6 +118,8 @@ public sealed class StudentEntity
     public List<StudentPlanPeriodEntity> PlanPeriods { get; } = [];
 
     public List<StudentScheduleEntryEntity> ScheduleEntries { get; } = [];
+
+    public List<LessonEntity> Lessons { get; } = [];
 }
 
 public sealed class StudentPlanPeriodEntity
@@ -221,11 +248,44 @@ public sealed class IssuedInvoiceLineEntity
 
     public string LessonDateTime { get; set; } = string.Empty;
 
+    public bool HasKnownLessonTime { get; set; } = true;
+
     public string PlanName { get; set; } = string.Empty;
 
     public int PlanCatalogId { get; set; }
 
+    public int LessonId { get; set; }
+
+    public LessonEntity Lesson { get; set; } = null!;
+
     public decimal PriceWithoutVatAmount { get; set; }
 
     public string Currency { get; set; } = "DKK";
+}
+
+public sealed class LessonEntity
+{
+    public int Id { get; set; }
+
+    public int StudentId { get; set; }
+
+    public StudentEntity Student { get; set; } = null!;
+
+    public int PlanCatalogId { get; set; }
+
+    public PlanCatalogEntity PlanCatalog { get; set; } = null!;
+
+    public string PlanName { get; set; } = string.Empty;
+
+    public DateTimeOffset StartsAt { get; set; }
+
+    public bool HasKnownStartTime { get; set; } = true;
+
+    public int DurationMinutes { get; set; }
+
+    public LessonState State { get; set; }
+
+    public string? GoogleCalendarEventId { get; set; }
+
+    public int? InvoiceNumber { get; set; }
 }

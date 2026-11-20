@@ -2,6 +2,8 @@ using MySmallBusinessLedger.Core.Common;
 using MySmallBusinessLedger.Core.Lessons;
 using MySmallBusinessLedger.Core.UseCases.Lessons;
 using MySmallBusinessLedger.Infrastructure.Calendar;
+using Google.Apis.Auth.OAuth2;
+using Google.Apis.Auth.OAuth2.Responses;
 using Google.Apis.Calendar.v3;
 using Google.Apis.Calendar.v3.Data;
 using Google.Apis.Util.Store;
@@ -16,6 +18,47 @@ public sealed class GoogleCalendarGatewayTests
         Assert.Equal(
             [CalendarService.Scope.CalendarEventsOwned],
             GoogleCalendarCredentialFactory.RequestedScopes);
+    }
+
+    [Fact]
+    public async Task CredentialFactoryCreatesCalendarServiceFromSavedCredentialWithoutWebAuthorization()
+    {
+        var tokenStore = new InMemoryDataStore();
+        await tokenStore.StoreAsync(
+            "elena@example.test",
+            new TokenResponse
+            {
+                AccessToken = "saved-access-token",
+                RefreshToken = "saved-refresh-token",
+                ExpiresInSeconds = 3600,
+                IssuedUtc = DateTime.UtcNow
+            });
+        var factory = new GoogleCalendarCredentialFactory(
+            new ClientSecrets { ClientId = "client-id", ClientSecret = "client-secret" },
+            tokenStore,
+            "My Small Business Ledger");
+
+        var service = await factory.TryCreateCalendarServiceFromSavedCredentialAsync(
+            "elena@example.test",
+            CancellationToken.None);
+
+        Assert.NotNull(service);
+        Assert.IsType<UserCredential>(service.HttpClientInitializer);
+    }
+
+    [Fact]
+    public async Task CredentialFactoryReturnsNullWhenSavedCredentialIsMissing()
+    {
+        var factory = new GoogleCalendarCredentialFactory(
+            new ClientSecrets { ClientId = "client-id", ClientSecret = "client-secret" },
+            new InMemoryDataStore(),
+            "My Small Business Ledger");
+
+        var service = await factory.TryCreateCalendarServiceFromSavedCredentialAsync(
+            "elena@example.test",
+            CancellationToken.None);
+
+        Assert.Null(service);
     }
 
     [Fact]
@@ -74,7 +117,7 @@ public sealed class GoogleCalendarGatewayTests
 
         var gateway = new GoogleCalendarGateway(client, CreateOptions(defaultLessonDuration: TimeSpan.FromMinutes(45)));
         var result = await gateway.AddLessonAsync(
-            new LessonAddRequest("Anna", new DateTimeOffset(2026, 6, 20, 15, 0, 0, TimeSpan.FromHours(2))),
+            new LessonAddRequest("Anna", new DateTimeOffset(2026, 6, 20, 15, 0, 0, TimeSpan.FromHours(2)), PlanCatalogId: 42),
             new DateOnly(2026, 6, 1),
             CancellationToken.None);
 
@@ -82,7 +125,35 @@ public sealed class GoogleCalendarGatewayTests
         Assert.Equal("$ Anna", client.CreatedSummary);
         Assert.Equal(new DateTimeOffset(2026, 6, 20, 15, 0, 0, TimeSpan.FromHours(2)), client.CreatedStartsAt);
         Assert.Equal(TimeSpan.FromMinutes(45), client.CreatedDuration);
-        Assert.Contains(result.Value!, lesson => lesson.Id == "created");
+        Assert.Equal("created", result.Value!.CreatedLesson.Id);
+        Assert.Contains(result.Value.Lessons, lesson => lesson.Id == "created");
+    }
+
+    [Fact]
+    public async Task AddDateOnlyLessonCreatesMarkedAllDayEventThenRefreshesMonth()
+    {
+        var startsAt = new DateTimeOffset(2026, 6, 20, 0, 0, 0, TimeSpan.FromHours(2));
+        var client = new FakeGoogleCalendarEventClient
+        {
+            Events =
+            [
+                new GoogleCalendarEvent("created", "$ Anna", startsAt, HasKnownStartTime: false)
+            ]
+        };
+
+        var gateway = new GoogleCalendarGateway(client, CreateOptions(defaultLessonDuration: TimeSpan.FromMinutes(45)));
+        var result = await gateway.AddLessonAsync(
+            new LessonAddRequest("Anna", startsAt, PlanCatalogId: 42, HasKnownStartTime: false),
+            new DateOnly(2026, 6, 1),
+            CancellationToken.None);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal("$ Anna", client.CreatedSummary);
+        Assert.Equal(startsAt, client.CreatedStartsAt);
+        Assert.False(client.CreatedHasKnownStartTime);
+        Assert.Equal("created", result.Value!.CreatedLesson.Id);
+        Assert.False(result.Value.CreatedLesson.HasKnownStartTime);
+        Assert.Contains(result.Value.Lessons, lesson => lesson.Id == "created" && !lesson.HasKnownStartTime);
     }
 
     [Fact]
@@ -100,8 +171,8 @@ public sealed class GoogleCalendarGatewayTests
         var gateway = new GoogleCalendarGateway(client, CreateOptions(defaultLessonDuration: TimeSpan.FromMinutes(45)));
         var result = await gateway.PopulateLessonsAsync(
             [
-                new LessonAddRequest("Anna", new DateTimeOffset(2026, 6, 23, 15, 0, 0, TimeSpan.FromHours(2))),
-                new LessonAddRequest("Anna", new DateTimeOffset(2026, 6, 30, 15, 0, 0, TimeSpan.FromHours(2)))
+                new LessonAddRequest("Anna", new DateTimeOffset(2026, 6, 23, 15, 0, 0, TimeSpan.FromHours(2)), PlanCatalogId: 42),
+                new LessonAddRequest("Anna", new DateTimeOffset(2026, 6, 30, 15, 0, 0, TimeSpan.FromHours(2)), PlanCatalogId: 42)
             ],
             new DateOnly(2026, 6, 1),
             CancellationToken.None);
@@ -118,6 +189,29 @@ public sealed class GoogleCalendarGatewayTests
         Assert.Equal(new DateTimeOffset(2026, 6, 1, 0, 0, 0, TimeSpan.FromHours(2)), client.LastListFromInclusive);
         Assert.Equal(new DateTimeOffset(2026, 7, 1, 0, 0, 0, TimeSpan.FromHours(2)), client.LastListToExclusive);
         Assert.Equal(["created-1", "created-2"], result.Value!.Select(lesson => lesson.Id));
+    }
+
+    [Fact]
+    public async Task PopulateLessonsReturnsCreatedLessonFallbacksWhenRefreshFailsAfterCreate()
+    {
+        var client = new FakeGoogleCalendarEventClient
+        {
+            ListException = new InvalidOperationException("refresh failed")
+        };
+
+        var gateway = new GoogleCalendarGateway(client, CreateOptions(defaultLessonDuration: TimeSpan.FromMinutes(45)));
+        var result = await gateway.PopulateLessonsAsync(
+            [
+                new LessonAddRequest("Anna", new DateTimeOffset(2026, 6, 23, 15, 0, 0, TimeSpan.FromHours(2)), PlanCatalogId: 42),
+                new LessonAddRequest("Anna", new DateTimeOffset(2026, 6, 30, 15, 0, 0, TimeSpan.FromHours(2)), PlanCatalogId: 42)
+            ],
+            new DateOnly(2026, 6, 1),
+            CancellationToken.None);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains(result.Errors, error => error.Code == "Calendar.RefreshFailed");
+        Assert.Equal(["created", "created-2"], result.Value!.Select(lesson => lesson.Id));
+        Assert.Equal(2, client.CreatedEvents.Count);
     }
 
     [Fact]
@@ -283,12 +377,41 @@ public sealed class GoogleCalendarGatewayTests
             "primary",
             "$ Anna",
             new DateTimeOffset(2026, 6, 23, 15, 0, 0, TimeSpan.FromHours(2)),
+            hasKnownStartTime: true,
             TimeSpan.FromMinutes(45),
             CancellationToken.None);
 
         Assert.Equal("created", createdId);
         Assert.Equal("Europe/Copenhagen", createdEvent?.Start?.TimeZone);
         Assert.Equal("Europe/Copenhagen", createdEvent?.End?.TimeZone);
+    }
+
+    [Fact]
+    public async Task GoogleCalendarServiceEventClientCreatesAllDayEventsForDateOnlyLessons()
+    {
+        Event? createdEvent = null;
+        var client = new GoogleCalendarServiceEventClient(
+            "Romance Standard Time",
+            "DK",
+            (calendarId, calendarEvent, cancellationToken) =>
+            {
+                createdEvent = calendarEvent;
+                return Task.FromResult(new Event { Id = "created" });
+            });
+
+        var createdId = await client.CreateLessonEventAsync(
+            "primary",
+            "$ Anna",
+            new DateTimeOffset(2026, 6, 23, 0, 0, 0, TimeSpan.FromHours(2)),
+            hasKnownStartTime: false,
+            TimeSpan.FromMinutes(45),
+            CancellationToken.None);
+
+        Assert.Equal("created", createdId);
+        Assert.Equal("2026-06-23", createdEvent?.Start?.Date);
+        Assert.Equal("2026-06-24", createdEvent?.End?.Date);
+        Assert.Null(createdEvent?.Start?.DateTimeDateTimeOffset);
+        Assert.Null(createdEvent?.End?.DateTimeDateTimeOffset);
     }
 
     [Fact]
@@ -317,6 +440,101 @@ public sealed class GoogleCalendarGatewayTests
                 .ToArray();
             var persistedText = System.Text.Encoding.UTF8.GetString(persistedBytes);
             Assert.DoesNotContain("visible-secret-token", persistedText);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task WindowsProtectedFileDataStoreUsesDistinctFilesForDistinctKeysThatEscapeSimilarly()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var directory = Path.Combine(Path.GetTempPath(), "ElenaLedgerTokenTests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+
+        try
+        {
+            IDataStore store = new WindowsProtectedFileDataStore(directory);
+
+            await store.StoreAsync("a%b@example.com", new StoredToken("first-token"));
+            await store.StoreAsync("a_25b@example.com", new StoredToken("second-token"));
+
+            var first = await store.GetAsync<StoredToken>("a%b@example.com");
+            var second = await store.GetAsync<StoredToken>("a_25b@example.com");
+
+            Assert.Equal("first-token", first.AccessToken);
+            Assert.Equal("second-token", second.AccessToken);
+            Assert.Equal(2, Directory.GetFiles(directory).Length);
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task WindowsProtectedFileDataStoreReadsAndMigratesLegacyEscapedTokenFile()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var directory = Path.Combine(Path.GetTempPath(), "ElenaLedgerTokenTests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+
+        try
+        {
+            IDataStore writer = new WindowsProtectedFileDataStore(directory);
+            await writer.StoreAsync("a%b@example.com", new StoredToken("legacy-token"));
+            var hashedFile = Assert.Single(Directory.GetFiles(directory));
+            var legacyFile = Path.Combine(directory, LegacyEscapedFileName("a%b@example.com"));
+            File.Move(hashedFile, legacyFile);
+
+            var store = new WindowsProtectedFileDataStore(directory);
+            var loaded = await store.GetAsync<StoredToken>("a%b@example.com");
+
+            Assert.Equal("legacy-token", loaded.AccessToken);
+            Assert.True(File.Exists(hashedFile));
+            Assert.False(File.Exists(legacyFile));
+        }
+        finally
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task WindowsProtectedFileDataStoreReportsCurrentAndLegacyTokenFilesForKey()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var directory = Path.Combine(Path.GetTempPath(), "ElenaLedgerTokenTests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+
+        try
+        {
+            var store = new WindowsProtectedFileDataStore(directory);
+
+            Assert.False(store.ContainsKey("elena@example.test"));
+
+            await store.StoreAsync("elena@example.test", new StoredToken("current-token"));
+            Assert.True(store.ContainsKey("elena@example.test"));
+
+            var hashedFile = Assert.Single(Directory.GetFiles(directory));
+            var legacyFile = Path.Combine(directory, LegacyEscapedFileName("elena@example.test"));
+            File.Move(hashedFile, legacyFile);
+
+            Assert.True(store.ContainsKey("elena@example.test"));
         }
         finally
         {
@@ -362,6 +580,39 @@ public sealed class GoogleCalendarGatewayTests
 
     private sealed record StoredToken(string AccessToken);
 
+    private static string LegacyEscapedFileName(string key) =>
+        $"{Uri.EscapeDataString(key).Replace("%", "_")}.bin";
+
+    private sealed class InMemoryDataStore : IDataStore
+    {
+        private readonly Dictionary<string, object?> values = [];
+
+        public Task StoreAsync<T>(string key, T value)
+        {
+            values[key] = value;
+            return Task.CompletedTask;
+        }
+
+        public Task DeleteAsync<T>(string key)
+        {
+            values.Remove(key);
+            return Task.CompletedTask;
+        }
+
+        public Task<T> GetAsync<T>(string key)
+        {
+            return Task.FromResult(values.TryGetValue(key, out var value)
+                ? (T)value!
+                : default!);
+        }
+
+        public Task ClearAsync()
+        {
+            values.Clear();
+            return Task.CompletedTask;
+        }
+    }
+
     private sealed class FakeGoogleCalendarEventClient : IGoogleCalendarEventClient
     {
         public IReadOnlyList<GoogleCalendarEvent> Events { get; init; } = [];
@@ -380,6 +631,8 @@ public sealed class GoogleCalendarGatewayTests
 
         public DateTimeOffset? CreatedStartsAt { get; private set; }
 
+        public bool CreatedHasKnownStartTime { get; private set; } = true;
+
         public TimeSpan? CreatedDuration { get; private set; }
 
         public List<CreatedCalendarEvent> CreatedEvents { get; } = [];
@@ -387,6 +640,8 @@ public sealed class GoogleCalendarGatewayTests
         public string? MovedEventId { get; private set; }
 
         public DateTimeOffset? MovedStartsAt { get; private set; }
+
+        public bool MovedHasKnownStartTime { get; private set; } = true;
 
         public string? DeletedEventId { get; private set; }
 
@@ -415,6 +670,7 @@ public sealed class GoogleCalendarGatewayTests
             string calendarId,
             string summary,
             DateTimeOffset startsAt,
+            bool hasKnownStartTime,
             TimeSpan duration,
             CancellationToken cancellationToken)
         {
@@ -425,15 +681,20 @@ public sealed class GoogleCalendarGatewayTests
 
             CreatedSummary = summary;
             CreatedStartsAt = startsAt;
+            CreatedHasKnownStartTime = hasKnownStartTime;
             CreatedDuration = duration;
-            CreatedEvents.Add(new CreatedCalendarEvent(summary, startsAt, duration));
-            return Task.FromResult("created");
+            CreatedEvents.Add(new CreatedCalendarEvent(summary, startsAt, hasKnownStartTime, duration));
+            var id = CreatedEvents.Count == 1
+                ? "created"
+                : $"created-{CreatedEvents.Count}";
+            return Task.FromResult(id);
         }
 
         public Task MoveEventAsync(
             string calendarId,
             string eventId,
             DateTimeOffset startsAt,
+            bool hasKnownStartTime,
             CancellationToken cancellationToken)
         {
             if (WriteException is not null)
@@ -443,6 +704,7 @@ public sealed class GoogleCalendarGatewayTests
 
             MovedEventId = eventId;
             MovedStartsAt = startsAt;
+            MovedHasKnownStartTime = hasKnownStartTime;
             return Task.CompletedTask;
         }
 
@@ -477,5 +739,6 @@ public sealed class GoogleCalendarGatewayTests
     private sealed record CreatedCalendarEvent(
         string Summary,
         DateTimeOffset StartsAt,
+        bool HasKnownStartTime,
         TimeSpan Duration);
 }

@@ -28,33 +28,49 @@ public sealed class WindowsProtectedFileDataStore : IDataStore
         var json = JsonSerializer.Serialize(value);
         var bytes = Encoding.UTF8.GetBytes(json);
         var protectedBytes = ProtectedData.Protect(bytes, Entropy, DataProtectionScope.CurrentUser);
-        File.WriteAllBytes(GetFilePath(key), protectedBytes);
+        File.WriteAllBytes(GetHashedFilePath(key), protectedBytes);
+        DeleteFileIfExists(GetLegacyFilePath(key));
         return Task.CompletedTask;
     }
 
     public Task DeleteAsync<T>(string key)
     {
-        var filePath = GetFilePath(key);
-        if (File.Exists(filePath))
-        {
-            File.Delete(filePath);
-        }
+        DeleteFileIfExists(GetHashedFilePath(key));
+        DeleteFileIfExists(GetLegacyFilePath(key));
 
         return Task.CompletedTask;
     }
 
     public Task<T> GetAsync<T>(string key)
     {
-        var filePath = GetFilePath(key);
+        var filePath = GetHashedFilePath(key);
         if (!File.Exists(filePath))
         {
-            return Task.FromResult(default(T)!);
+            var legacyFilePath = GetLegacyFilePath(key);
+            if (!File.Exists(legacyFilePath))
+            {
+                return Task.FromResult(default(T)!);
+            }
+
+            var legacyValue = Read<T>(legacyFilePath);
+            File.Copy(legacyFilePath, filePath, overwrite: false);
+            File.Delete(legacyFilePath);
+            return Task.FromResult(legacyValue);
         }
 
+        return Task.FromResult(Read<T>(filePath));
+    }
+
+    public bool ContainsKey(string key) =>
+        File.Exists(GetHashedFilePath(key)) ||
+        File.Exists(GetLegacyFilePath(key));
+
+    private static T Read<T>(string filePath)
+    {
         var protectedBytes = File.ReadAllBytes(filePath);
         var bytes = ProtectedData.Unprotect(protectedBytes, Entropy, DataProtectionScope.CurrentUser);
         var json = Encoding.UTF8.GetString(bytes);
-        return Task.FromResult(JsonSerializer.Deserialize<T>(json)!);
+        return JsonSerializer.Deserialize<T>(json)!;
     }
 
     public Task ClearAsync()
@@ -67,9 +83,27 @@ public sealed class WindowsProtectedFileDataStore : IDataStore
         return Task.CompletedTask;
     }
 
-    private string GetFilePath(string key)
+    private string GetHashedFilePath(string key)
     {
-        var safeFileName = Uri.EscapeDataString(key).Replace("%", "_", StringComparison.Ordinal);
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(key));
+        var safeFileName = Convert.ToBase64String(hash)
+            .TrimEnd('=')
+            .Replace('+', '-')
+            .Replace('/', '_');
         return Path.Combine(directoryPath, $"{safeFileName}.bin");
+    }
+
+    private string GetLegacyFilePath(string key)
+    {
+        var safeFileName = Uri.EscapeDataString(key).Replace("%", "_");
+        return Path.Combine(directoryPath, $"{safeFileName}.bin");
+    }
+
+    private static void DeleteFileIfExists(string filePath)
+    {
+        if (File.Exists(filePath))
+        {
+            File.Delete(filePath);
+        }
     }
 }

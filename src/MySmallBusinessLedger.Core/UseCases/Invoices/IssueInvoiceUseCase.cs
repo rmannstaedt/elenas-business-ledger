@@ -34,6 +34,19 @@ public sealed class IssueInvoiceUseCase
         InvoiceDraft draft,
         CancellationToken cancellationToken)
     {
+        var lessonIds = draft.Lines
+            .Select(line => line.LessonId)
+            .ToArray();
+        if (lessonIds.Length != draft.Lines.Count ||
+            lessonIds.Any(lessonId => lessonId <= 0) ||
+            lessonIds.Distinct().Count() != lessonIds.Length)
+        {
+            return OperationResult<IssueInvoiceResult>.Failure(
+                new ValidationError(
+                    "Invoice.LessonIdentityMissing",
+                    "Every invoice line must reference one unique saved lesson."));
+        }
+
         var company = await companyProfileRepository.GetAsync(cancellationToken);
         var totals = draft.CalculateTotals(company);
         var reserve = await invoiceRepository.ReserveInvoiceAsync(draft, totals, cancellationToken);
@@ -43,46 +56,62 @@ public sealed class IssueInvoiceUseCase
         }
 
         var invoiceNumber = reserve.Value!.InvoiceNumber;
+        var publishedPath = reserve.Value.PdfFilePath;
 
-        var stagingPath = await fileStore.CreateStagingPathAsync(draft, invoiceNumber, cancellationToken);
-        if (!stagingPath.Succeeded)
+        if (string.IsNullOrWhiteSpace(publishedPath))
         {
-            return await ReleaseReservationAndFailAsync(invoiceNumber, stagingPath.Errors.ToArray(), cancellationToken);
-        }
+            var stagingPath = await fileStore.CreateStagingPathAsync(draft, invoiceNumber, cancellationToken);
+            if (!stagingPath.Succeeded)
+            {
+                return await ReleaseReservationAndFailAsync(invoiceNumber, stagingPath.Errors.ToArray(), cancellationToken);
+            }
 
-        var write = await pdfWriter.WriteAsync(draft, totals, invoiceNumber, stagingPath.Value!, cancellationToken);
-        if (!write.Succeeded)
-        {
-            return await DiscardStagingReleaseReservationAndFailAsync(
+            var write = await pdfWriter.WriteAsync(draft, totals, invoiceNumber, stagingPath.Value!, cancellationToken);
+            if (!write.Succeeded)
+            {
+                return await DiscardStagingReleaseReservationAndFailAsync(
+                    invoiceNumber,
+                    stagingPath.Value!,
+                    write.Errors.ToArray(),
+                    cancellationToken);
+            }
+
+            var verify = await fileStore.VerifyStagedPdfAsync(stagingPath.Value!, cancellationToken);
+            if (!verify.Succeeded)
+            {
+                return await DiscardStagingReleaseReservationAndFailAsync(
+                    invoiceNumber,
+                    stagingPath.Value!,
+                    verify.Errors.ToArray(),
+                    cancellationToken);
+            }
+
+            var publish = await fileStore.PublishAsync(stagingPath.Value!, draft, invoiceNumber, cancellationToken);
+            if (!publish.Succeeded)
+            {
+                return await DiscardStagingMaybeReleaseReservationAndFailAsync(
+                    invoiceNumber,
+                    stagingPath.Value!,
+                    publish.Errors.ToArray(),
+                    releaseReservation: ShouldReleaseReservationAfterPublishFailure(publish.Errors),
+                    cancellationToken);
+            }
+
+            publishedPath = publish.Value!;
+            var markPublished = await invoiceRepository.MarkInvoicePdfPublishedAsync(
                 invoiceNumber,
-                stagingPath.Value!,
-                write.Errors.ToArray(),
+                publishedPath,
                 cancellationToken);
+            if (!markPublished.Succeeded)
+            {
+                return OperationResult<IssueInvoiceResult>.Failure(markPublished.Errors.ToArray());
+            }
         }
 
-        var verify = await fileStore.VerifyStagedPdfAsync(stagingPath.Value!, cancellationToken);
-        if (!verify.Succeeded)
-        {
-            return await DiscardStagingReleaseReservationAndFailAsync(
-                invoiceNumber,
-                stagingPath.Value!,
-                verify.Errors.ToArray(),
-                cancellationToken);
-        }
-
-        var publish = await fileStore.PublishAsync(stagingPath.Value!, draft, invoiceNumber, cancellationToken);
-        if (!publish.Succeeded)
-        {
-            return await DiscardStagingReleaseReservationAndFailAsync(
-                invoiceNumber,
-                stagingPath.Value!,
-                publish.Errors.ToArray(),
-                cancellationToken);
-        }
-
-        var finalize = await invoiceRepository.FinalizeIssuedInvoiceAsync(
+        var finalize = await invoiceRepository.FinalizeIssuedInvoiceWithLessonLocksAsync(
             invoiceNumber,
-            publish.Value!,
+            publishedPath,
+            lessonIds,
             cancellationToken);
         if (!finalize.Succeeded)
         {
@@ -90,7 +119,7 @@ public sealed class IssueInvoiceUseCase
         }
 
         var print = await printer.PrintAsync(
-            publish.Value!,
+            publishedPath,
             company.ConfiguredInvoicePrinterName,
             cancellationToken);
         var printStatus = print.Succeeded ? InvoicePrintStatus.Printed : InvoicePrintStatus.PrintFailed;
@@ -127,8 +156,26 @@ public sealed class IssueInvoiceUseCase
         IReadOnlyList<ValidationError> errors,
         CancellationToken cancellationToken)
     {
+        return await DiscardStagingMaybeReleaseReservationAndFailAsync(
+            invoiceNumber,
+            stagingPath,
+            errors,
+            releaseReservation: true,
+            cancellationToken);
+    }
+
+    private async Task<OperationResult<IssueInvoiceResult>> DiscardStagingMaybeReleaseReservationAndFailAsync(
+        InvoiceNumber invoiceNumber,
+        string stagingPath,
+        IReadOnlyList<ValidationError> errors,
+        bool releaseReservation,
+        CancellationToken cancellationToken)
+    {
         var discard = await fileStore.DiscardStagingPathAsync(stagingPath, cancellationToken);
-        await invoiceRepository.ReleaseInvoiceReservationAsync(invoiceNumber, cancellationToken);
+        if (releaseReservation)
+        {
+            await invoiceRepository.ReleaseInvoiceReservationAsync(invoiceNumber, cancellationToken);
+        }
 
         if (discard.Succeeded)
         {
@@ -137,4 +184,7 @@ public sealed class IssueInvoiceUseCase
 
         return OperationResult<IssueInvoiceResult>.Failure(errors.Concat(discard.Errors).ToArray());
     }
+
+    private static bool ShouldReleaseReservationAfterPublishFailure(IEnumerable<ValidationError> errors) =>
+        !errors.Any(error => string.Equals(error.Code, "InvoicePdf.FinalFileAlreadyExists", StringComparison.Ordinal));
 }

@@ -13,6 +13,10 @@ public sealed class LedgerDbContext : DbContext
 
     public DbSet<CalendarSettingsEntity> CalendarSettings => Set<CalendarSettingsEntity>();
 
+    public DbSet<EconomySettingsEntity> EconomySettings => Set<EconomySettingsEntity>();
+
+    public DbSet<EconomyManualMonthOverrideEntity> EconomyManualMonthOverrides => Set<EconomyManualMonthOverrideEntity>();
+
     public DbSet<PlanCatalogEntity> PlanCatalog => Set<PlanCatalogEntity>();
 
     public DbSet<StudentEntity> Students => Set<StudentEntity>();
@@ -26,6 +30,8 @@ public sealed class LedgerDbContext : DbContext
     public DbSet<IssuedInvoiceEntity> IssuedInvoices => Set<IssuedInvoiceEntity>();
 
     public DbSet<IssuedInvoiceLineEntity> IssuedInvoiceLines => Set<IssuedInvoiceLineEntity>();
+
+    public DbSet<LessonEntity> Lessons => Set<LessonEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -51,6 +57,17 @@ public sealed class LedgerDbContext : DbContext
             entity.HasKey(settings => settings.Id);
             entity.Property(settings => settings.SelectedCalendarId).HasMaxLength(500).IsRequired();
             entity.Property(settings => settings.GoogleAccountEmail).HasMaxLength(200).IsRequired();
+        });
+
+        modelBuilder.Entity<EconomySettingsEntity>(entity =>
+        {
+            entity.HasKey(settings => settings.Id);
+        });
+
+        modelBuilder.Entity<EconomyManualMonthOverrideEntity>(entity =>
+        {
+            entity.HasKey(manual => manual.Id);
+            entity.HasIndex(manual => new { manual.Year, manual.Month }).IsUnique();
         });
 
         modelBuilder.Entity<PlanCatalogEntity>(entity =>
@@ -94,6 +111,10 @@ public sealed class LedgerDbContext : DbContext
             entity.HasMany(student => student.ScheduleEntries)
                 .WithOne(schedule => schedule.Student)
                 .HasForeignKey(schedule => schedule.StudentId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasMany(student => student.Lessons)
+                .WithOne(lesson => lesson.Student)
+                .HasForeignKey(lesson => lesson.StudentId)
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
@@ -149,9 +170,31 @@ public sealed class LedgerDbContext : DbContext
             entity.HasKey(line => line.Id);
             entity.HasIndex(line => line.LessonDateTime);
             entity.HasIndex(line => line.PlanCatalogId);
+            entity.HasIndex(line => line.LessonId).IsUnique();
             entity.Property(line => line.LessonDateTime).HasMaxLength(40).IsRequired();
+            entity.Property(line => line.HasKnownLessonTime).HasDefaultValue(true);
             entity.Property(line => line.PlanName).HasMaxLength(200).IsRequired();
             entity.Property(line => line.Currency).HasMaxLength(3).IsRequired();
+            entity.HasOne(line => line.Lesson)
+                .WithMany()
+                .HasForeignKey(line => line.LessonId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<LessonEntity>(entity =>
+        {
+            entity.HasKey(lesson => lesson.Id);
+            entity.Property(lesson => lesson.PlanName).HasMaxLength(200).IsRequired();
+            entity.Property(lesson => lesson.HasKnownStartTime).HasDefaultValue(true);
+            entity.Property(lesson => lesson.State).HasConversion<string>().HasMaxLength(50).IsRequired();
+            entity.Property(lesson => lesson.GoogleCalendarEventId).HasMaxLength(500);
+            entity.HasIndex(lesson => lesson.GoogleCalendarEventId).IsUnique();
+            entity.HasIndex(lesson => lesson.StartsAt);
+            entity.HasIndex(lesson => new { lesson.StudentId, lesson.StartsAt });
+            entity.HasOne(lesson => lesson.PlanCatalog)
+                .WithMany()
+                .HasForeignKey(lesson => lesson.PlanCatalogId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
     }
 }

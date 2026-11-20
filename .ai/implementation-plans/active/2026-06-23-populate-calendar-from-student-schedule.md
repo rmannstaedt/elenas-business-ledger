@@ -5,6 +5,8 @@ Created: 2026-06-23
 Last updated: 2026-06-23
 Owner/context: Ruben / My Small Business Ledger WPF pilot
 
+The 2026-11-19 lesson toolbar change extended the current-month range to the whole displayed month. The stages below record the original implementation.
+
 ## Related Docs And Standards
 
 - `AGENTS.md`
@@ -36,7 +38,6 @@ Add a main-window `Populate Calendar` action that creates Google Calendar lesson
 - No local Lessons table.
 - No recurring Google Calendar series; create normal lesson events that match existing lesson behavior.
 - No automatic completion state changes.
-- No seeding of past months.
 
 ## Assumptions
 
@@ -52,7 +53,7 @@ The main window can add a single blank lesson row and save it to Google Calendar
 
 ## Desired End State
 
-The selected student's toolbar includes `Populate Calendar`. For the current month it seeds scheduled occurrences from today inclusive through month end; for a future month it seeds the full month; for a past month it is unavailable and refuses to run. The command writes immediately to Google Calendar, skips exact duplicates, refreshes the dashboard afterward, and reports Google Calendar failures immediately.
+The selected student's toolbar includes `Populate Calendar`. For the current month it seeds scheduled occurrences from today inclusive through month end; for any other displayed month, past or future, it seeds the full month. The command writes immediately to Google Calendar, skips exact duplicates, refreshes the dashboard afterward, and reports Google Calendar failures immediately.
 
 ## Behavior-Preserving Boundary
 
@@ -134,7 +135,7 @@ Tests to add/update:
 
 - Current month starts at today inclusive.
 - Future month seeds full month.
-- Past month fails without writing.
+- Past month seeds the whole displayed month for backfill.
 - No selected/missing student or no schedule fails clearly.
 - Existing exact duplicates are skipped.
 
@@ -247,7 +248,7 @@ Affected files/classes/schemas/commands/UI surfaces:
 Concrete steps:
 
 1. Add `PopulateCalendarCommand`.
-2. Enable for selected student and current/future month; refuse past month defensively.
+2. Enable for selected student and any displayed month; current month starts today, and past/future months seed the full month.
 3. Execute the service, show immediate errors, and refresh dashboard on success.
 4. Keep layout compact and consistent with existing toolbar.
 
@@ -257,7 +258,7 @@ Behavior that must remain unchanged:
 
 Tests to add/update:
 
-- Command availability for current/future/past month.
+- Command availability for selected/no selected student and busy/non-busy state.
 - Successful population calls service and refreshes.
 - Failure leaves current rows and shows error.
 
@@ -376,28 +377,26 @@ Prerequisites/setup:
 
 1. Use a safe Google Calendar account/calendar and test database or test student.
 2. Select a student with at least one saved schedule entry.
-3. Choose a current or future month with few or no lessons for that student.
+3. Choose a current, past, or future month with few or no lessons for that student.
 
 Exact user actions or commands:
 
 1. Start the WPF app.
 2. Select the target student.
-3. Navigate to the current month or a future month.
+3. Navigate to the current month, a past month, or a future month.
 4. Click `Populate Calendar`.
 5. Refresh/open Google Calendar.
 6. Repeat `Populate Calendar` for the same student/month.
-7. Navigate to a past month and inspect the button availability.
+7. Navigate to a past month and confirm backfill remains available.
 
 Expected successful result:
 
-- Current month creates scheduled lessons from today through month end.
-- Future month creates scheduled lessons for the whole month.
+- Every displayed month, including the current month, creates missing scheduled lessons for the whole month.
 - Re-running the command skips exact duplicate same-student same-date/time lessons and does not create duplicates.
 - The main lesson list refreshes to show the created lessons.
 
 Expected failure/safety result, if relevant:
 
-- Past months cannot be seeded.
 - Missing schedule or Google Calendar write failure shows an immediate error.
 - Non-exact conflicts are not detected in v1 and must be resolved manually in Google Calendar.
 
@@ -417,7 +416,7 @@ Cleanup/reset instructions:
 - 2026-06-23:
   - Stage: Planning
   - Files changed: `.ai/implementation-plans/active/2026-06-23-populate-calendar-from-student-schedule.md`
-  - Summary: Planned schedule-based monthly Google Calendar population for selected student, with current/future month rules and exact duplicate skipping.
+  - Summary: Planned schedule-based monthly Google Calendar population for selected student, with current-month and other-displayed-month rules plus exact duplicate skipping.
   - Tests/verification run: Not run; planning only.
   - Results: Ready for documentation-first, test-first implementation.
   - Deviations: None.
@@ -425,7 +424,7 @@ Cleanup/reset instructions:
 - 2026-06-23:
   - Stage: Stages 1-3 - Documentation, Core/App/Infrastructure implementation, and WPF command
   - Files changed: `docs/business-requirements-and-logic.md`, `README.md`, `.ai/project-profile.md`, `.ai/context/HANDOFF.md`, `src/MySmallBusinessLedger.Core/UseCases/Lessons/PopulateCalendarRequest.cs`, `src/MySmallBusinessLedger.Core/UseCases/Lessons/PopulateCalendarResult.cs`, `src/MySmallBusinessLedger.Core/UseCases/Lessons/PopulateCalendarUseCase.cs`, `src/MySmallBusinessLedger.Core/Ports/IGoogleCalendarGateway.cs`, `src/MySmallBusinessLedger.Core/UseCases/Startup/StartupDashboardResult.cs`, `src/MySmallBusinessLedger.Core/UseCases/Startup/StartupDashboardQuery.cs`, `src/MySmallBusinessLedger.App/Services/ILessonEditorService.cs`, `src/MySmallBusinessLedger.App/Services/CoreLessonEditorService.cs`, `src/MySmallBusinessLedger.App/Services/ConfiguredGoogleCalendarGateway.cs`, `src/MySmallBusinessLedger.App/Startup/ApplicationServiceGraph.cs`, `src/MySmallBusinessLedger.App/ViewModels/MainWindowViewModel.cs`, `src/MySmallBusinessLedger.App/MainWindow.xaml`, `src/MySmallBusinessLedger.Infrastructure/Calendar/GoogleCalendarGateway.cs`, `tests/MySmallBusinessLedger.Tests/Core/UseCases/UseCaseTests.cs`, `tests/MySmallBusinessLedger.Tests/Infrastructure/Calendar/GoogleCalendarGatewayTests.cs`, `tests/MySmallBusinessLedger.Tests/App/ViewModels/MainWindowViewModelTests.cs`, `tests/MySmallBusinessLedger.Tests/App/ViewModels/EditorViewModelTests.cs`, and `tests/MySmallBusinessLedger.Tests/App/Services/AppServiceTests.cs`
-  - Summary: Added schedule-based calendar population for selected student/month. Core generates current/future month occurrences from saved schedule entries and skips exact same-student same-date/time duplicates. Infrastructure creates normal marked Google Calendar lesson events with the configured default duration. Main window exposes `Populate Calendar` and refreshes after success.
+  - Summary: Added schedule-based calendar population for selected student/month. Core generates current-month and other-displayed-month occurrences from saved schedule entries and skips exact same-student same-date/time duplicates. Infrastructure creates normal marked Google Calendar lesson events with the configured default duration. Main window exposes `Populate Calendar` and refreshes after success.
   - Tests/verification run: `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter PopulateCalendar -nodeReuse:false`; `dotnet test MySmallBusinessLedger.sln --filter "PopulateCalendar|GoogleCalendarGateway" -nodeReuse:false`; `dotnet test MySmallBusinessLedger.sln --filter MainWindowViewModel -nodeReuse:false`; `dotnet test MySmallBusinessLedger.sln --filter "PopulateCalendar|GoogleCalendarGateway|MainWindowViewModel" -nodeReuse:false`.
   - Results: Core populate slice passed 5/5; combined Core/Calendar slice passed 17/17; MainWindowViewModel passed 30/30; combined feature/UI slice passed 47/47.
   - Deviations: No batch Google API endpoint was introduced; the gateway creates individual normal lesson events in sequence and then refreshes.

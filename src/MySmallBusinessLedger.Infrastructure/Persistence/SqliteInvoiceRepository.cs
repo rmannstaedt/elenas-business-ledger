@@ -23,28 +23,43 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
         CancellationToken cancellationToken)
     {
         await using var context = createContext();
-        var fromKey = ToDateRangeKey(from);
-        var toKeyExclusive = ToDateRangeKey(to.AddDays(1));
-        var lines = await context.IssuedInvoiceLines
-            .FromSqlInterpolated($"""
-                SELECT IssuedInvoiceLines.*
-                FROM IssuedInvoiceLines
-                INNER JOIN IssuedInvoices ON IssuedInvoices.Id = IssuedInvoiceLines.IssuedInvoiceEntityId
-                WHERE IssuedInvoices.IssueStatus = 'Issued'
-                  AND LessonDateTime >= {fromKey}
-                  AND LessonDateTime < {toKeyExclusive}
-                """)
+        var issuedInvoiceLines = await context.IssuedInvoiceLines
             .AsNoTracking()
             .Include(line => line.Invoice)
-            .OrderBy(line => line.LessonDateTime)
-            .Select(line => new InvoiceLessonStatus(
-                line.Invoice.StudentShortName,
-                ParseLessonDateTime(line.LessonDateTime),
-                line.Invoice.PaymentStatus,
-                new InvoiceNumber(line.Invoice.InvoiceNumber)))
+            .Where(line => line.LessonId > 0)
+            .Where(line => line.Invoice.IssueStatus == InvoiceIssueStatus.Issued)
+            .Select(line => new
+            {
+                line.LessonId,
+                line.Invoice.InvoiceNumber,
+                line.Invoice.PaymentStatus
+            })
+            .ToArrayAsync(cancellationToken);
+        var invoiceLinesByLessonId = issuedInvoiceLines
+            .GroupBy(line => line.LessonId)
+            .ToDictionary(group => group.Key, group => group.First());
+        var invoicedLessonIds = invoiceLinesByLessonId.Keys.ToArray();
+
+        var invoicedLessons = await context.Lessons
+            .AsNoTracking()
+            .Include(lesson => lesson.Student)
+            .Where(lesson => invoicedLessonIds.Contains(lesson.Id))
             .ToArrayAsync(cancellationToken);
 
-        return lines;
+        return invoicedLessons
+            .Where(lesson => IsInDateRange(lesson.StartsAt, from, to))
+            .OrderBy(lesson => lesson.StartsAt)
+            .Select(lesson =>
+            {
+                var invoice = invoiceLinesByLessonId[lesson.Id];
+                return new InvoiceLessonStatus(
+                    lesson.Student.ShortName,
+                    lesson.StartsAt,
+                    invoice.PaymentStatus,
+                    new InvoiceNumber(invoice.InvoiceNumber),
+                    lesson.Id);
+            })
+            .ToArray();
     }
 
     public async Task<IReadOnlyList<IssuedInvoiceSummary>> ListInvoicesForStudentAsync(
@@ -54,7 +69,7 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
         await using var context = createContext();
         return await context.IssuedInvoices
             .AsNoTracking()
-            .Where(invoice => invoice.StudentShortName == studentShortName)
+            .Where(invoice => EF.Functions.Collate(invoice.StudentShortName, "NOCASE") == studentShortName)
             .Where(invoice => invoice.IssueStatus == InvoiceIssueStatus.Issued)
             .OrderBy(invoice => invoice.InvoiceNumber)
             .Select(invoice => new IssuedInvoiceSummary(
@@ -71,6 +86,30 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
             .ToArrayAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<EconomyInvoiceRecord>> ListIssuedInvoiceOverviewRowsAsync(
+        int periodYear,
+        CancellationToken cancellationToken)
+    {
+        await using var context = createContext();
+        var yearStart = new DateOnly(periodYear, 1, 1);
+        var nextYearStart = yearStart.AddYears(1);
+        return await context.IssuedInvoices
+            .AsNoTracking()
+            .Where(invoice => invoice.IssueStatus == InvoiceIssueStatus.Issued)
+            .Where(invoice => invoice.PeriodFrom >= yearStart && invoice.PeriodFrom < nextYearStart)
+            .OrderBy(invoice => invoice.InvoiceNumber)
+            .Select(invoice => new EconomyInvoiceRecord(
+                new InvoiceNumber(invoice.InvoiceNumber),
+                invoice.InvoiceDate,
+                new InvoicePeriod(invoice.PeriodFrom, invoice.PeriodTo),
+                invoice.PdfFilePath,
+                new InvoiceTotals(
+                    new MoneyAmount(invoice.TotalWithoutVatAmount, invoice.Currency),
+                    new MoneyAmount(invoice.VatAmount, invoice.Currency),
+                    new MoneyAmount(invoice.TotalAmount, invoice.Currency))))
+            .ToArrayAsync(cancellationToken);
+    }
+
     public async Task<bool> HasInvoiceForStudentInMonthAsync(
         string studentShortName,
         DateOnly month,
@@ -84,7 +123,7 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
             .AnyAsync(
                 invoice =>
                     invoice.IssueStatus == InvoiceIssueStatus.Issued &&
-                    invoice.StudentShortName == studentShortName &&
+                    EF.Functions.Collate(invoice.StudentShortName, "NOCASE") == studentShortName &&
                     invoice.PeriodFrom < nextMonth &&
                     invoice.PeriodTo >= firstDay,
                 cancellationToken);
@@ -101,33 +140,19 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
         return new InvoiceNumber((highest ?? 0) + 1);
     }
 
-    public async Task<OperationResult<IssuedInvoice>> SaveIssuedInvoiceAsync(
-        IssuedInvoice invoice,
-        CancellationToken cancellationToken)
-    {
-        await using var context = createContext();
-        var exists = await context.IssuedInvoices.AnyAsync(
-            storedInvoice => storedInvoice.InvoiceNumber == invoice.InvoiceNumber.Value,
-            cancellationToken);
-
-        if (exists)
-        {
-            return OperationResult<IssuedInvoice>.Failure(
-                invoice,
-                new ValidationError("Invoice.NumberAlreadyExists", "An issued invoice with this number already exists."));
-        }
-
-        context.IssuedInvoices.Add(ToEntity(invoice));
-        await context.SaveChangesAsync(cancellationToken);
-        return OperationResult<IssuedInvoice>.Success(invoice);
-    }
-
     public async Task<OperationResult<IssuedInvoice>> ReserveInvoiceAsync(
         InvoiceDraft draft,
         InvoiceTotals totals,
         CancellationToken cancellationToken)
     {
+        var requestedLessonIds = GetDistinctPositiveLessonIds(draft.Lines.Select(line => line.LessonId));
         await using var context = createContext();
+        var existingReservation = await FindMatchingIssuingInvoiceAsync(context, requestedLessonIds, cancellationToken);
+        if (existingReservation is not null)
+        {
+            return OperationResult<IssuedInvoice>.Success(ToDomain(existingReservation));
+        }
+
         var highest = await context.IssuedInvoices
             .AsNoTracking()
             .Select(invoice => (int?)invoice.InvoiceNumber)
@@ -158,7 +183,86 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
         return OperationResult<IssuedInvoice>.Success(reservedInvoice);
     }
 
-    public async Task<OperationResult<IssuedInvoice>> FinalizeIssuedInvoiceAsync(
+    public async Task<OperationResult<IssuedInvoice>> FinalizeIssuedInvoiceWithLessonLocksAsync(
+        InvoiceNumber invoiceNumber,
+        string pdfFilePath,
+        IReadOnlyList<int> lessonIds,
+        CancellationToken cancellationToken)
+    {
+        var distinctLessonIds = lessonIds
+            .Where(lessonId => lessonId > 0)
+            .Distinct()
+            .Order()
+            .ToArray();
+
+        await using var context = createContext();
+        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+        var invoice = await context.IssuedInvoices
+            .Include(storedInvoice => storedInvoice.Lines)
+            .SingleOrDefaultAsync(
+                storedInvoice =>
+                    storedInvoice.InvoiceNumber == invoiceNumber.Value &&
+                    storedInvoice.IssueStatus == InvoiceIssueStatus.Issuing,
+                cancellationToken);
+
+        if (invoice is null)
+        {
+            return OperationResult<IssuedInvoice>.Failure(
+                new ValidationError("Invoice.NotFound", "The reserved invoice could not be found."));
+        }
+
+        var invoiceLineLessonIds = invoice.Lines
+            .Select(line => line.LessonId)
+            .Distinct()
+            .Order()
+            .ToArray();
+        if (invoiceLineLessonIds.Length == 0 ||
+            invoiceLineLessonIds.Any(lessonId => lessonId <= 0) ||
+            !invoiceLineLessonIds.SequenceEqual(distinctLessonIds))
+        {
+            return OperationResult<IssuedInvoice>.Failure(
+                new ValidationError(
+                    "Invoice.LessonIdentityMismatch",
+                    "The invoice lines do not match the lessons being locked."));
+        }
+
+        var lessons = await context.Lessons
+            .Where(lesson => distinctLessonIds.Contains(lesson.Id))
+            .ToArrayAsync(cancellationToken);
+        if (lessons.Length != distinctLessonIds.Length)
+        {
+            return OperationResult<IssuedInvoice>.Failure(
+                new ValidationError(
+                    "Invoice.LessonNotFound",
+                    "One or more invoice lessons could not be found."));
+        }
+
+        var alreadyLockedLesson = lessons.FirstOrDefault(lesson =>
+            lesson.InvoiceNumber is not null &&
+            lesson.InvoiceNumber != invoiceNumber.Value);
+        if (alreadyLockedLesson is not null)
+        {
+            return OperationResult<IssuedInvoice>.Failure(
+                new ValidationError(
+                    "Invoice.LessonAlreadyInvoiced",
+                    "One or more invoice lessons are already assigned to another invoice."));
+        }
+
+        invoice.PdfFilePath = pdfFilePath;
+        invoice.IssueStatus = InvoiceIssueStatus.Issued;
+        foreach (var lesson in lessons)
+        {
+            // Issued invoice lines are authoritative; this cache supports lock/display queries.
+            lesson.InvoiceNumber = invoiceNumber.Value;
+        }
+
+        await context.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+
+        return OperationResult<IssuedInvoice>.Success(ToDomain(invoice));
+    }
+
+    public async Task<OperationResult<IssuedInvoice>> MarkInvoicePdfPublishedAsync(
         InvoiceNumber invoiceNumber,
         string pdfFilePath,
         CancellationToken cancellationToken)
@@ -178,8 +282,16 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
                 new ValidationError("Invoice.NotFound", "The reserved invoice could not be found."));
         }
 
+        if (!string.IsNullOrWhiteSpace(invoice.PdfFilePath) &&
+            !string.Equals(invoice.PdfFilePath, pdfFilePath, StringComparison.OrdinalIgnoreCase))
+        {
+            return OperationResult<IssuedInvoice>.Failure(
+                new ValidationError(
+                    "Invoice.PublishedPathConflict",
+                    "The reserved invoice already points to a different published PDF."));
+        }
+
         invoice.PdfFilePath = pdfFilePath;
-        invoice.IssueStatus = InvoiceIssueStatus.Issued;
         await context.SaveChangesAsync(cancellationToken);
 
         return OperationResult<IssuedInvoice>.Success(ToDomain(invoice));
@@ -197,6 +309,11 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
                 cancellationToken);
 
         if (invoice is null)
+        {
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(invoice.PdfFilePath))
         {
             return;
         }
@@ -332,8 +449,10 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
             entity.Lines.Add(new IssuedInvoiceLineEntity
             {
                 LessonDateTime = FormatLessonDateTime(line.LessonDateTime),
+                HasKnownLessonTime = line.HasKnownLessonTime,
                 PlanName = line.PlanName,
                 PlanCatalogId = line.PlanCatalogId,
+                LessonId = line.LessonId,
                 PriceWithoutVatAmount = line.PriceWithoutVat.Amount,
                 Currency = line.PriceWithoutVat.Currency
             });
@@ -351,7 +470,9 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
                 ParseLessonDateTime(line.LessonDateTime),
                 line.PlanName,
                 new MoneyAmount(line.PriceWithoutVatAmount, line.Currency),
-                line.PlanCatalogId))
+                line.PlanCatalogId,
+                line.HasKnownLessonTime,
+                line.LessonId))
             .ToArray();
 
         var pdfFilePath = entity.IssueStatus == InvoiceIssueStatus.Issuing &&
@@ -390,6 +511,41 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
     private static DateTimeOffset ParseLessonDateTime(string lessonDateTime) =>
         DateTimeOffset.ParseExact(lessonDateTime, "O", CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
 
-    private static string ToDateRangeKey(DateOnly date) =>
-        date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+    private static bool IsInDateRange(DateTimeOffset startsAt, DateOnly from, DateOnly to)
+    {
+        var date = DateOnly.FromDateTime(startsAt.DateTime);
+        return date >= from && date <= to;
+    }
+
+    private static int[] GetDistinctPositiveLessonIds(IEnumerable<int> lessonIds) =>
+        lessonIds
+            .Where(lessonId => lessonId > 0)
+            .Distinct()
+            .Order()
+            .ToArray();
+
+    private static async Task<IssuedInvoiceEntity?> FindMatchingIssuingInvoiceAsync(
+        LedgerDbContext context,
+        IReadOnlyList<int> requestedLessonIds,
+        CancellationToken cancellationToken)
+    {
+        if (requestedLessonIds.Count == 0)
+        {
+            return null;
+        }
+
+        var issuingInvoices = await context.IssuedInvoices
+            .Include(invoice => invoice.Lines)
+            .Where(invoice => invoice.IssueStatus == InvoiceIssueStatus.Issuing)
+            .OrderBy(invoice => invoice.InvoiceNumber)
+            .ToArrayAsync(cancellationToken);
+
+        return issuingInvoices.FirstOrDefault(invoice =>
+            invoice.Lines
+                .Select(line => line.LessonId)
+                .Where(lessonId => lessonId > 0)
+                .Distinct()
+                .Order()
+                .SequenceEqual(requestedLessonIds));
+    }
 }

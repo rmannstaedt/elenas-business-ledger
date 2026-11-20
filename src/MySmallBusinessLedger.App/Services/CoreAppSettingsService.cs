@@ -11,6 +11,7 @@ public sealed class CoreAppSettingsService : IAppSettingsService
 {
     private readonly ICompanyProfileRepository companyProfileRepository;
     private readonly SqliteCalendarSettingsRepository calendarSettingsRepository;
+    private readonly IEconomyRepository? economyRepository;
     private readonly AppPaths appPaths;
     private readonly GoogleOAuthClientConfigurationProvider googleOAuthClientConfigurationProvider;
     private readonly GoogleCalendarClientFactory? googleCalendarClientFactory;
@@ -19,13 +20,15 @@ public sealed class CoreAppSettingsService : IAppSettingsService
     public CoreAppSettingsService(
         ICompanyProfileRepository companyProfileRepository,
         SqliteCalendarSettingsRepository calendarSettingsRepository,
-        string appDataPath)
+        string appDataPath,
+        IEconomyRepository? economyRepository = null)
         : this(
             companyProfileRepository,
             calendarSettingsRepository,
             AppPaths.FromAppDataFolder(appDataPath),
             new GoogleOAuthClientConfigurationProvider(GoogleOAuthClientConfigurationProvider.CreateDefaultConfigurationPath()),
             googleCalendarClientFactory: null,
+            economyRepository: economyRepository,
             printerCatalog: new WindowsPrinterCatalog())
     {
     }
@@ -36,10 +39,12 @@ public sealed class CoreAppSettingsService : IAppSettingsService
         AppPaths appPaths,
         GoogleOAuthClientConfigurationProvider googleOAuthClientConfigurationProvider,
         GoogleCalendarClientFactory? googleCalendarClientFactory = null,
+        IEconomyRepository? economyRepository = null,
         IPrinterCatalog? printerCatalog = null)
     {
         this.companyProfileRepository = companyProfileRepository;
         this.calendarSettingsRepository = calendarSettingsRepository;
+        this.economyRepository = economyRepository;
         this.appPaths = appPaths;
         this.googleOAuthClientConfigurationProvider = googleOAuthClientConfigurationProvider;
         this.googleCalendarClientFactory = googleCalendarClientFactory;
@@ -59,21 +64,39 @@ public sealed class CoreAppSettingsService : IAppSettingsService
         }
 
         var calendarSettings = await calendarSettingsRepository.GetAsync(cancellationToken);
+        var economySettings = economyRepository is null
+            ? null
+            : await economyRepository.GetSettingsAsync(cancellationToken);
         var printerNames = await LoadPrinterNamesAsync(cancellationToken);
-        return CreateSnapshot(companyProfile, calendarSettings, printerNames);
+        return CreateSnapshot(companyProfile, calendarSettings, economySettings, printerNames);
     }
 
     public async Task<OperationResult<AppSettingsSnapshot>> SaveAsync(
         CompanyProfile companyProfile,
         CalendarSettings calendarSettings,
+        EconomySettings? economySettings,
         CancellationToken cancellationToken)
     {
         try
         {
+            if (economySettings is not null && economyRepository is null)
+            {
+                return OperationResult<AppSettingsSnapshot>.Failure(
+                    new ValidationError("Settings.EconomySettingsUnavailable", "Economy settings cannot be saved."));
+            }
+
             await companyProfileRepository.SaveAsync(companyProfile, cancellationToken);
             await calendarSettingsRepository.SaveAsync(calendarSettings, cancellationToken);
+            if (economySettings is not null)
+            {
+                await economyRepository!.SaveSettingsAsync(economySettings, cancellationToken);
+            }
+
+            var currentEconomySettings = economyRepository is null
+                ? economySettings
+                : await economyRepository.GetSettingsAsync(cancellationToken);
             return OperationResult<AppSettingsSnapshot>.Success(
-                CreateSnapshot(companyProfile, calendarSettings));
+                CreateSnapshot(companyProfile, calendarSettings, currentEconomySettings));
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -107,7 +130,7 @@ public sealed class CoreAppSettingsService : IAppSettingsService
 
         try
         {
-            var configuredClient = await googleCalendarClientFactory.CreateAsync(calendarSettings, cancellationToken);
+            var configuredClient = await googleCalendarClientFactory.CreateForConnectionAsync(calendarSettings, cancellationToken);
             if (configuredClient is null)
             {
                 return OperationResult<bool>.Failure(
@@ -151,15 +174,17 @@ public sealed class CoreAppSettingsService : IAppSettingsService
     private AppSettingsSnapshot CreateSnapshot(
         CompanyProfile? companyProfile,
         CalendarSettings? calendarSettings,
+        EconomySettings? economySettings,
         IReadOnlyList<string>? availablePrinterNames = null) =>
         new(
             companyProfile,
             calendarSettings,
             googleOAuthClientConfigurationProvider.Load().Status,
+            economySettings,
             appPaths.AppDataFolderPath,
             appPaths.DatabasePath,
             appPaths.GoogleTokenFolderPath,
-            HasGoogleAuthorizationTokens(),
+            HasGoogleAuthorizationTokens(calendarSettings),
             availablePrinterNames ?? []);
 
     private async Task<IReadOnlyList<string>> LoadPrinterNamesAsync(CancellationToken cancellationToken)
@@ -174,13 +199,16 @@ public sealed class CoreAppSettingsService : IAppSettingsService
         }
     }
 
-    private bool HasGoogleAuthorizationTokens()
+    private bool HasGoogleAuthorizationTokens(CalendarSettings? calendarSettings)
     {
-        if (!Directory.Exists(appPaths.GoogleTokenFolderPath))
+        if (calendarSettings is null ||
+            string.IsNullOrWhiteSpace(calendarSettings.GoogleAccountEmail) ||
+            !Directory.Exists(appPaths.GoogleTokenFolderPath))
         {
             return false;
         }
 
-        return Directory.EnumerateFiles(appPaths.GoogleTokenFolderPath).Any();
+        var tokenStore = new Infrastructure.Calendar.WindowsProtectedFileDataStore(appPaths.GoogleTokenFolderPath);
+        return tokenStore.ContainsKey(calendarSettings.GoogleAccountEmail);
     }
 }

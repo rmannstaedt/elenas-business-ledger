@@ -123,7 +123,9 @@ public sealed record InvoicePdfDocumentModel(
 
     private static IReadOnlyList<string> CreateIncludedLessons(IReadOnlyList<InvoiceLineDraft> orderedLines) =>
         orderedLines
-            .Select(line => line.LessonDateTime.ToString("dd-MM-yyyy HH:mm", CultureInfo.InvariantCulture))
+            .Select(line => line.HasKnownLessonTime
+                ? line.LessonDateTime.ToString("dd-MM-yyyy HH:mm", CultureInfo.InvariantCulture)
+                : line.LessonDateTime.ToString("dd-MM-yyyy", CultureInfo.InvariantCulture))
             .ToArray();
 
     private static string FormatPeriod(InvoicePeriod period)

@@ -9,18 +9,26 @@ public interface IInvoiceRepository
 
     Task<IReadOnlyList<IssuedInvoiceSummary>> ListInvoicesForStudentAsync(string studentShortName, CancellationToken cancellationToken);
 
+    Task<IReadOnlyList<EconomyInvoiceRecord>> ListIssuedInvoiceOverviewRowsAsync(
+        int periodYear,
+        CancellationToken cancellationToken);
+
     Task<bool> HasInvoiceForStudentInMonthAsync(string studentShortName, DateOnly month, CancellationToken cancellationToken);
 
     Task<InvoiceNumber> GetNextInvoiceNumberAsync(CancellationToken cancellationToken);
-
-    Task<OperationResult<IssuedInvoice>> SaveIssuedInvoiceAsync(IssuedInvoice invoice, CancellationToken cancellationToken);
 
     Task<OperationResult<IssuedInvoice>> ReserveInvoiceAsync(
         InvoiceDraft draft,
         InvoiceTotals totals,
         CancellationToken cancellationToken);
 
-    Task<OperationResult<IssuedInvoice>> FinalizeIssuedInvoiceAsync(
+    Task<OperationResult<IssuedInvoice>> FinalizeIssuedInvoiceWithLessonLocksAsync(
+        InvoiceNumber invoiceNumber,
+        string pdfFilePath,
+        IReadOnlyList<int> lessonIds,
+        CancellationToken cancellationToken);
+
+    Task<OperationResult<IssuedInvoice>> MarkInvoicePdfPublishedAsync(
         InvoiceNumber invoiceNumber,
         string pdfFilePath,
         CancellationToken cancellationToken);

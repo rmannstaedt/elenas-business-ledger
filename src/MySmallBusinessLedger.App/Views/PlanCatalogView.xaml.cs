@@ -6,16 +6,36 @@ namespace MySmallBusinessLedger.App.Views;
 
 public partial class PlanCatalogView : Window
 {
+    private bool closeWasConfirmed;
+
     public PlanCatalogView(PlanCatalogViewModel viewModel)
     {
         InitializeComponent();
         DataContext = viewModel;
         WindowPlacementStore.Attach(this, nameof(PlanCatalogView));
-        DataGridColumnWidthStore.Attach(PlansGrid, nameof(PlanCatalogView) + ".PlansGrid");
+        GridWidthStore.Attach(this, nameof(PlanCatalogView), [PlansGrid]);
+        Closing += OnClosing;
     }
 
     private void OnClose(object sender, RoutedEventArgs e)
     {
         Close();
+    }
+
+    private async void OnClosing(object? sender, System.ComponentModel.CancelEventArgs e)
+    {
+        if (closeWasConfirmed || DataContext is not PlanCatalogViewModel viewModel)
+        {
+            return;
+        }
+
+        e.Cancel = true;
+        if (!await viewModel.PrepareForCloseAsync())
+        {
+            return;
+        }
+
+        closeWasConfirmed = true;
+        _ = Dispatcher.BeginInvoke(new Action(Close));
     }
 }

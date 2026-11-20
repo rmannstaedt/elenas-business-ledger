@@ -7,6 +7,7 @@ using MySmallBusinessLedger.Core.Money;
 using MySmallBusinessLedger.Core.UseCases.Invoices;
 using MySmallBusinessLedger.App.Views;
 using System.Windows;
+using System.Windows.Automation;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -144,6 +145,54 @@ public sealed class InvoiceViewModelTests
     }
 
     [Fact]
+    public async Task PreviewRefusesDismissWhileInvoiceIssueIsRunning()
+    {
+        var issueCompletion = new TaskCompletionSource<OperationResult<IssueInvoiceResult>>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var service = new FakeInvoiceWorkflowService { IssueCompletion = issueCompletion };
+        var viewModel = new InvoicePreviewViewModel(service, CreatePreview());
+
+        var printTask = viewModel.PrintInvoiceCommand.ExecuteAsync();
+        await EventuallyAsync(() => service.IssueCalled && viewModel.IsBusy);
+
+        var canDismiss = await viewModel.RequestDismissAsync();
+
+        Assert.False(canDismiss);
+        Assert.Contains("still being written and printed", viewModel.ErrorMessage, StringComparison.Ordinal);
+
+        issueCompletion.SetResult(OperationResult<IssueInvoiceResult>.Success(
+            new IssueInvoiceResult(CreateIssuedInvoice(), PrintSucceeded: true, [])));
+        await printTask;
+    }
+
+    [Fact]
+    public async Task PreviewPromptsWhenInvoiceIssueRunsLongerThanPromptDelay()
+    {
+        var issueCompletion = new TaskCompletionSource<OperationResult<IssueInvoiceResult>>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var promptCount = 0;
+        var service = new FakeInvoiceWorkflowService { IssueCompletion = issueCompletion };
+        var viewModel = new InvoicePreviewViewModel(
+            service,
+            CreatePreview(),
+            confirmContinueWaitingAsync: _ =>
+            {
+                promptCount++;
+                return Task.FromResult(true);
+            },
+            extendedIssueWaitPromptDelay: TimeSpan.FromMilliseconds(10));
+
+        var printTask = viewModel.PrintInvoiceCommand.ExecuteAsync();
+
+        await EventuallyAsync(() => promptCount > 0);
+
+        issueCompletion.SetResult(OperationResult<IssueInvoiceResult>.Success(
+            new IssueInvoiceResult(CreateIssuedInvoice(), PrintSucceeded: true, [])));
+        await printTask;
+        Assert.True(viewModel.WasIssued);
+    }
+
+    [Fact]
     public async Task PreviewDoesNotIssueWhenPrinterSetupIsDeclined()
     {
         var service = new FakeInvoiceWorkflowService
@@ -181,6 +230,30 @@ public sealed class InvoiceViewModelTests
                 PumpUntil(() => !viewModel.Lines[0].IsIncluded);
 
                 Assert.False(viewModel.Lines[0].IsIncluded);
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
+    [Fact]
+    public void PreviewIncludeCheckboxHasLessonSpecificAccessibleName()
+    {
+        RunOnStaThread(() =>
+        {
+            var viewModel = new InvoicePreviewViewModel(new FakeInvoiceWorkflowService(), CreatePreview());
+            var window = new InvoicePreviewView(viewModel);
+            try
+            {
+                window.Show();
+                PumpUntil(() => FindVisualChildren<WpfCheckBox>(window).Count == 1);
+                var includeCheckBox = Assert.Single(FindVisualChildren<WpfCheckBox>(window));
+
+                Assert.Equal(
+                    "Include lesson 16-06-2026 15:00 Standard",
+                    AutomationProperties.GetName(includeCheckBox));
             }
             finally
             {
@@ -281,7 +354,9 @@ public sealed class InvoiceViewModelTests
                 .Select((amount, index) => new InvoiceLineDraft(
                     new DateTimeOffset(2026, 6, 16 + index, 15, 0, 0, TimeSpan.Zero),
                     "Standard",
-                    Money.Dkk(amount)))
+                    Money.Dkk(amount),
+                    planCatalogId: 7,
+                    lessonId: 100 + index))
                 .ToArray(),
             priceAdjustment: null);
 
@@ -405,6 +480,8 @@ public sealed class InvoiceViewModelTests
         public OperationResult<IssueInvoiceResult> IssueResult { get; init; } =
             OperationResult<IssueInvoiceResult>.Failure(new ValidationError("Test.NotConfigured", "Issue not configured."));
 
+        public TaskCompletionSource<OperationResult<IssueInvoiceResult>>? IssueCompletion { get; init; }
+
         public OperationResult<ReprintInvoiceResult> ReprintResult { get; init; } =
             OperationResult<ReprintInvoiceResult>.Failure(new ValidationError("Test.NotConfigured", "Reprint not configured."));
 
@@ -424,6 +501,11 @@ public sealed class InvoiceViewModelTests
         public Task<OperationResult<IssueInvoiceResult>> IssueAsync(InvoiceDraft draft, CancellationToken cancellationToken)
         {
             IssueCalled = true;
+            if (IssueCompletion is not null)
+            {
+                return IssueCompletion.Task;
+            }
+
             return Task.FromResult(IssueResult);
         }
 
@@ -435,5 +517,21 @@ public sealed class InvoiceViewModelTests
 
         public Task<IssuedInvoice?> GetIssuedInvoiceAsync(InvoiceNumber invoiceNumber, CancellationToken cancellationToken) =>
             Task.FromResult<IssuedInvoice?>(CreateIssuedInvoice());
+    }
+
+    private static async Task EventuallyAsync(Func<bool> condition)
+    {
+        var deadline = DateTimeOffset.UtcNow.AddSeconds(5);
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            if (condition())
+            {
+                return;
+            }
+
+            await Task.Delay(20);
+        }
+
+        Assert.True(condition());
     }
 }

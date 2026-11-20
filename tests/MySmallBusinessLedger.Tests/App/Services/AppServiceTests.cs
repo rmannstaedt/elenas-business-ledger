@@ -8,6 +8,7 @@ using MySmallBusinessLedger.Core.Ports;
 using MySmallBusinessLedger.Core.Time;
 using MySmallBusinessLedger.Core.UseCases.Lessons;
 using MySmallBusinessLedger.Core.UseCases.Startup;
+using MySmallBusinessLedger.Infrastructure.Calendar;
 using MySmallBusinessLedger.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -22,7 +23,8 @@ public sealed class AppServiceTests
             new EmptyStudentRepository(),
             new ThrowingCalendarGateway("Google Calendar is not configured."),
             new EmptyInvoiceRepository(),
-            new FixedClock());
+            new FixedClock(),
+            new EmptyLessonRepository());
         var service = new CoreStartupDashboardService(query);
 
         var result = await service.LoadAsync(new DateOnly(2026, 6, 1), null, CancellationToken.None);
@@ -41,7 +43,7 @@ public sealed class AppServiceTests
             TimeSpan.FromHours(1));
 
         var result = await gateway.AddLessonAsync(
-            new LessonAddRequest("Anna", new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.Zero)),
+            new LessonAddRequest("Anna", new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.Zero), PlanCatalogId: 42),
             new DateOnly(2026, 6, 1),
             CancellationToken.None);
 
@@ -50,7 +52,7 @@ public sealed class AppServiceTests
     }
 
     [Fact]
-    public async Task AppSettingsServiceReportsSavedGoogleAuthorizationWhenTokenFolderContainsFiles()
+    public async Task AppSettingsServiceDoesNotReportSavedGoogleAuthorizationWhenOnlyUnrelatedTokenFilesExist()
     {
         using var database = await TestDatabase.CreateAsync();
         using var appData = new TemporaryDirectory();
@@ -68,7 +70,106 @@ public sealed class AppServiceTests
 
         var snapshot = await service.LoadAsync(CancellationToken.None);
 
+        Assert.False(snapshot.HasGoogleAuthorizationTokens);
+    }
+
+    [Fact]
+    public async Task AppSettingsServiceReportsSavedGoogleAuthorizationForConfiguredAccountToken()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        using var database = await TestDatabase.CreateAsync();
+        using var appData = new TemporaryDirectory();
+        var appPaths = AppPaths.FromAppDataFolder(appData.Path);
+        var calendarSettingsRepository = new SqliteCalendarSettingsRepository(database.CreateContext);
+        await calendarSettingsRepository.SaveAsync(
+            new CalendarSettings("primary", "elena@example.test"),
+            CancellationToken.None);
+        var tokenStore = new WindowsProtectedFileDataStore(appPaths.GoogleTokenFolderPath);
+        await tokenStore.StoreAsync("elena@example.test", new StoredToken("saved-token"));
+        var service = new CoreAppSettingsService(
+            new SqliteCompanyProfileRepository(database.CreateContext),
+            calendarSettingsRepository,
+            appPaths,
+            new GoogleOAuthClientConfigurationProvider(Path.Combine(appData.Path, "missing-google-oauth-client.json")));
+
+        var snapshot = await service.LoadAsync(CancellationToken.None);
+
         Assert.True(snapshot.HasGoogleAuthorizationTokens);
+    }
+
+    [Fact]
+    public async Task AppSettingsServiceReportsSavedGoogleAuthorizationForConfiguredAccountLegacyToken()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        using var database = await TestDatabase.CreateAsync();
+        using var appData = new TemporaryDirectory();
+        var appPaths = AppPaths.FromAppDataFolder(appData.Path);
+        var calendarSettingsRepository = new SqliteCalendarSettingsRepository(database.CreateContext);
+        await calendarSettingsRepository.SaveAsync(
+            new CalendarSettings("primary", "elena@example.test"),
+            CancellationToken.None);
+        var tokenStore = new WindowsProtectedFileDataStore(appPaths.GoogleTokenFolderPath);
+        await tokenStore.StoreAsync("elena@example.test", new StoredToken("saved-token"));
+        var hashedFile = Assert.Single(Directory.GetFiles(appPaths.GoogleTokenFolderPath));
+        File.Move(
+            hashedFile,
+            Path.Combine(appPaths.GoogleTokenFolderPath, LegacyEscapedFileName("elena@example.test")));
+        var service = new CoreAppSettingsService(
+            new SqliteCompanyProfileRepository(database.CreateContext),
+            calendarSettingsRepository,
+            appPaths,
+            new GoogleOAuthClientConfigurationProvider(Path.Combine(appData.Path, "missing-google-oauth-client.json")));
+
+        var snapshot = await service.LoadAsync(CancellationToken.None);
+
+        Assert.True(snapshot.HasGoogleAuthorizationTokens);
+    }
+
+    [Fact]
+    public async Task AppSettingsServiceLoadsAndSavesEconomySettings()
+    {
+        using var database = await TestDatabase.CreateAsync();
+        using var appData = new TemporaryDirectory();
+        var appPaths = AppPaths.FromAppDataFolder(appData.Path);
+        var economyRepository = new SqliteEconomyRepository(database.CreateContext);
+        await economyRepository.SaveSettingsAsync(
+            new EconomySettings(new DateOnly(2026, 7, 15)),
+            CancellationToken.None);
+        var service = new CoreAppSettingsService(
+            new SqliteCompanyProfileRepository(database.CreateContext),
+            new SqliteCalendarSettingsRepository(database.CreateContext),
+            appPaths,
+            new GoogleOAuthClientConfigurationProvider(Path.Combine(appData.Path, "missing-google-oauth-client.json")),
+            economyRepository: economyRepository);
+
+        var snapshot = await service.LoadAsync(CancellationToken.None);
+        var save = await service.SaveAsync(
+            CompanyProfile.Create(
+                "Maple Key Studio",
+                "Musikvej 1",
+                "12345678",
+                "elena@example.test",
+                cvr: null,
+                vatRegistrationDate: null,
+                vatStatus: VatStatus.NotRegistered,
+                invoiceFolderPath: @"C:\Invoices"),
+            new CalendarSettings("primary", "elena@example.test"),
+            new EconomySettings(new DateOnly(2026, 8, 20)),
+            CancellationToken.None);
+        var savedEconomySettings = await economyRepository.GetSettingsAsync(CancellationToken.None);
+
+        Assert.Equal(new DateOnly(2026, 7, 1), snapshot.EconomySettings?.FirstApplicationInvoiceMonth);
+        Assert.True(save.Succeeded);
+        Assert.Equal(new DateOnly(2026, 8, 1), save.Value?.EconomySettings?.FirstApplicationInvoiceMonth);
+        Assert.Equal(new DateOnly(2026, 8, 1), savedEconomySettings?.FirstApplicationInvoiceMonth);
     }
 
     private sealed class EmptyStudentRepository : IStudentRepository
@@ -94,14 +195,16 @@ public sealed class AppServiceTests
         public Task<IReadOnlyList<IssuedInvoiceSummary>> ListInvoicesForStudentAsync(string studentShortName, CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<IssuedInvoiceSummary>>([]);
 
+        public Task<IReadOnlyList<EconomyInvoiceRecord>> ListIssuedInvoiceOverviewRowsAsync(
+            int periodYear,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<EconomyInvoiceRecord>>([]);
+
         public Task<bool> HasInvoiceForStudentInMonthAsync(string studentShortName, DateOnly month, CancellationToken cancellationToken) =>
             Task.FromResult(false);
 
         public Task<InvoiceNumber> GetNextInvoiceNumberAsync(CancellationToken cancellationToken) =>
             Task.FromResult(new InvoiceNumber(1));
-
-        public Task<OperationResult<IssuedInvoice>> SaveIssuedInvoiceAsync(IssuedInvoice invoice, CancellationToken cancellationToken) =>
-            Task.FromResult(OperationResult<IssuedInvoice>.Success(invoice));
 
         public Task<OperationResult<IssuedInvoice>> ReserveInvoiceAsync(
             InvoiceDraft draft,
@@ -116,12 +219,20 @@ public sealed class AppServiceTests
                 printedAt: null,
                 lastPrintError: null)));
 
-        public Task<OperationResult<IssuedInvoice>> FinalizeIssuedInvoiceAsync(
+        public Task<OperationResult<IssuedInvoice>> FinalizeIssuedInvoiceWithLessonLocksAsync(
+            InvoiceNumber invoiceNumber,
+            string pdfFilePath,
+            IReadOnlyList<int> lessonIds,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(OperationResult<IssuedInvoice>.Failure(
+                new ValidationError("Invoice.NotConfigured", "Invoice finalization is not configured.")));
+
+        public Task<OperationResult<IssuedInvoice>> MarkInvoicePdfPublishedAsync(
             InvoiceNumber invoiceNumber,
             string pdfFilePath,
             CancellationToken cancellationToken) =>
             Task.FromResult(OperationResult<IssuedInvoice>.Failure(
-                new ValidationError("Invoice.NotConfigured", "Invoice finalization is not configured.")));
+                new ValidationError("Invoice.NotConfigured", "Invoice PDF publication is not configured.")));
 
         public Task ReleaseInvoiceReservationAsync(InvoiceNumber invoiceNumber, CancellationToken cancellationToken) =>
             Task.CompletedTask;
@@ -148,13 +259,69 @@ public sealed class AppServiceTests
             Task.CompletedTask;
     }
 
+    private sealed class EmptyLessonRepository : ILessonRepository
+    {
+        public Task<LessonRecord> SaveAsync(LessonRecord lesson, CancellationToken cancellationToken) =>
+            Task.FromResult(lesson);
+
+        public Task<IReadOnlyList<LessonRecord>> ListForStudentMonthAsync(
+            string studentShortName,
+            DateOnly month,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<LessonRecord>>([]);
+
+        public Task<IReadOnlyList<LessonRecord>> ListForWindowAsync(
+            DateOnly from,
+            DateOnly to,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<LessonRecord>>([]);
+
+        public Task<LessonRecord?> UpdatePlanAsync(
+            int lessonId,
+            int planCatalogId,
+            string planName,
+            int durationMinutes,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<LessonRecord?>(null);
+
+        public Task<LessonRecord?> UpdateUninvoicedTimingByGoogleCalendarEventIdAsync(
+            string googleCalendarEventId,
+            DateTimeOffset startsAt,
+            bool hasKnownStartTime,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<LessonRecord?>(null);
+
+        public Task<LessonRecord?> UpdateUninvoicedStateByGoogleCalendarEventIdAsync(
+            string googleCalendarEventId,
+            LessonState state,
+            CancellationToken cancellationToken) =>
+            Task.FromResult<LessonRecord?>(null);
+
+        public Task<bool> DeleteUninvoicedByGoogleCalendarEventIdAsync(
+            string googleCalendarEventId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(false);
+
+        public Task DeleteUninvoicedAsync(IReadOnlyList<int> lessonIds, CancellationToken cancellationToken) =>
+            Task.CompletedTask;
+    }
+
     private sealed class ThrowingCalendarGateway(string message) : IGoogleCalendarGateway
     {
         public Task<IReadOnlyList<CalendarLesson>> ListLessonsAsync(DateOnly from, DateOnly to, CancellationToken cancellationToken) =>
             throw new InvalidOperationException(message);
 
-        public Task<OperationResult<IReadOnlyList<CalendarLesson>>> AddLessonAsync(LessonAddRequest request, DateOnly refreshMonth, CancellationToken cancellationToken) =>
-            Task.FromResult(OperationResult<IReadOnlyList<CalendarLesson>>.Failure(new ValidationError("Calendar.NotConfigured", message)));
+        public Task<OperationResult<LessonAddResult>> AddLessonAsync(LessonAddRequest request, DateOnly refreshMonth, CancellationToken cancellationToken) =>
+            Task.FromResult(OperationResult<LessonAddResult>.Failure(
+                new LessonAddResult(
+                    new CalendarLesson(
+                        string.Empty,
+                        request.StudentShortName,
+                        request.StartsAt,
+                        LessonState.Planned,
+                        request.HasKnownStartTime),
+                    []),
+                new ValidationError("Calendar.NotConfigured", message)));
 
         public Task<OperationResult<IReadOnlyList<CalendarLesson>>> PopulateLessonsAsync(
             IReadOnlyList<LessonAddRequest> requests,
@@ -223,4 +390,9 @@ public sealed class AppServiceTests
             Directory.Delete(Path, recursive: true);
         }
     }
+
+    private sealed record StoredToken(string AccessToken);
+
+    private static string LegacyEscapedFileName(string key) =>
+        $"{Uri.EscapeDataString(key).Replace("%", "_")}.bin";
 }

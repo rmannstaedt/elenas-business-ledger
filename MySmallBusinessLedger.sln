@@ -52,6 +52,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "completed", "completed", "{
 		.ai\implementation-plans\completed\2026-06-20-student-overview-embedded-editing.md = .ai\implementation-plans\completed\2026-06-20-student-overview-embedded-editing.md
 		.ai\implementation-plans\completed\2026-06-22-ef-migrations-and-startup-bootstrapper.md = .ai\implementation-plans\completed\2026-06-22-ef-migrations-and-startup-bootstrapper.md
 		.ai\implementation-plans\completed\2026-06-23-code-review-fixes.md = .ai\implementation-plans\completed\2026-06-23-code-review-fixes.md
+		.ai\implementation-plans\completed\2026-06-27-economy-overview.md = .ai\implementation-plans\completed\2026-06-27-economy-overview.md
+		.ai\implementation-plans\completed\2026-06-28-single-file-inno-installer.md = .ai\implementation-plans\completed\2026-06-28-single-file-inno-installer.md
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "superseded", "superseded", "{7B75D393-B154-4442-B737-F037C97782AF}"

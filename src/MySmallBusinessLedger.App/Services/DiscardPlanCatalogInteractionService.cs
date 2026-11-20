@@ -7,4 +7,10 @@ public sealed class DiscardPlanCatalogInteractionService : IPlanCatalogInteracti
         cancellationToken.ThrowIfCancellationRequested();
         return Task.FromResult(PlanCatalogAddPlanChoice.Discard);
     }
+
+    public Task<PlanCatalogAddPlanChoice> PromptClosePlanSaveChangesAsync(CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Task.FromResult(PlanCatalogAddPlanChoice.Discard);
+    }
 }

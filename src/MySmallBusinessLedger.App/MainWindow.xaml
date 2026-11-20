@@ -228,6 +228,24 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <Style x:Key="LessonPlanComboBoxStyle" TargetType="{x:Type ComboBox}">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Foreground" Value="{Binding Foreground, RelativeSource={RelativeSource AncestorType=DataGridCell}}" />
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="Padding" Value="4,0" />
+            <Setter Property="VerticalAlignment" Value="Stretch" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Style.Triggers>
+                <Trigger Property="IsEnabled" Value="False">
+                    <Setter Property="Opacity" Value="0.55" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
     </Window.Resources>
 
     <DockPanel Background="#F6F7F9">
@@ -235,6 +253,8 @@
             <MenuItem Header="_Application">
                 <MenuItem Header="_Settings"
                           Command="{Binding OpenSettingsCommand}" />
+                <MenuItem Header="About My Small Business Ledger"
+                          Command="{Binding OpenAboutCommand}" />
             </MenuItem>
             <MenuItem Header="_Student">
                 <MenuItem Header="_Manage Students"
@@ -244,10 +264,15 @@
                 <MenuItem Header="_Manage Plans"
                           Command="{Binding OpenManagePlansCommand}" />
             </MenuItem>
+            <MenuItem Header="_Economy">
+                <MenuItem Header="_Overview"
+                          Command="{Binding OpenEconomyOverviewCommand}" />
+            </MenuItem>
         </Menu>
 
         <Grid x:Name="RootGrid"
-              Margin="20">
+              Margin="20"
+              SizeChanged="OnDashboardSizeChanged">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto" />
                 <RowDefinition Height="Auto" />
@@ -361,6 +386,12 @@
                 <StackPanel Grid.Column="1"
                             Orientation="Horizontal"
                             VerticalAlignment="Center">
+                    <Button Content="Student Details"
+                            Command="{Binding OpenStudentDetailsCommand}"
+                            MinWidth="124"
+                            Height="34"
+                            Margin="0,0,8,0"
+                            AutomationProperties.Name="Open student details" />
                     <Button Content="Open Calendar"
                             Command="{Binding OpenCalendarCommand}"
                             MinWidth="112"
@@ -409,14 +440,12 @@
 
             <Grid Grid.Row="2">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="8" />
-                    <ColumnDefinition Width="*" MinWidth="300" />
+                    <ColumnDefinition x:Name="LessonsPaneColumn" Width="640" MinWidth="420" />
+                    <ColumnDefinition x:Name="PaneDividerColumn" Width="8" />
+                    <ColumnDefinition x:Name="InvoicesPaneColumn" Width="*" MinWidth="300" />
                 </Grid.ColumnDefinitions>
 
                 <Grid Grid.Column="0"
-                      Width="528"
-                      HorizontalAlignment="Left"
                       AutomationProperties.Name="Lessons pane">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
@@ -445,13 +474,15 @@
                         </StackPanel>
                     </Grid>
 
-                    <DataGrid Grid.Row="1"
+                    <DataGrid x:Name="LessonsGrid"
+                              Grid.Row="1"
                               ItemsSource="{Binding Lessons}"
                               SelectedItem="{Binding SelectedLesson, Mode=TwoWay}"
                               AutoGenerateColumns="False"
                               CanUserAddRows="False"
                               CanUserDeleteRows="False"
                               CanUserReorderColumns="False"
+                              CanUserResizeRows="False"
                               IsReadOnly="False"
                               BorderBrush="#8EA6C3"
                               BorderThickness="1"
@@ -528,6 +559,19 @@
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>
+                            <DataGridTemplateColumn Header="Plan" Width="112">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <ComboBox ItemsSource="{Binding DataContext.PlanOptions, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                                  DisplayMemberPath="Name"
+                                                  SelectedValuePath="PlanCatalogId"
+                                                  SelectedValue="{Binding PlanCatalogId, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                  IsEnabled="{Binding CanEditPlan}"
+                                                  Style="{StaticResource LessonPlanComboBoxStyle}"
+                                                  AutomationProperties.Name="Lesson plan" />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
                             <DataGridTemplateColumn Header="State"
                                                     HeaderStyle="{StaticResource CenteredColumnHeaderStyle}"
                                                     Width="118">
@@ -582,22 +626,37 @@
                     </DataGrid>
                 </Grid>
 
+                <GridSplitter Grid.Column="1"
+                              Width="8"
+                              HorizontalAlignment="Stretch"
+                              VerticalAlignment="Stretch"
+                              Background="Transparent"
+                              Cursor="SizeWE"
+                              Focusable="False"
+                              ShowsPreview="False"
+                              AutomationProperties.Name="Resize lessons and invoices" />
+
                 <Grid Grid.Column="2">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
 
-                    <TextBlock Text="Student Invoices"
-                               FontSize="18"
-                               FontWeight="SemiBold"
-                               Margin="0,0,0,10" />
-                    <DataGrid Grid.Row="1"
+                    <Grid Height="32"
+                          Margin="0,0,0,10">
+                        <TextBlock Text="Student Invoices"
+                                   FontSize="18"
+                                   FontWeight="SemiBold"
+                                   VerticalAlignment="Center" />
+                    </Grid>
+                    <DataGrid x:Name="InvoicesGrid"
+                              Grid.Row="1"
                               ItemsSource="{Binding Invoices}"
                               SelectedItem="{Binding SelectedInvoice, Mode=TwoWay}"
                               AutoGenerateColumns="False"
                               CanUserAddRows="False"
                               CanUserDeleteRows="False"
+                              CanUserResizeRows="False"
                               CellStyle="{StaticResource InvoiceTableCellStyle}"
                               IsReadOnly="True"
                               HeadersVisibility="Column"

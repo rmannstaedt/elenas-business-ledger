@@ -9,7 +9,7 @@ public interface IGoogleCalendarGateway
 {
     Task<IReadOnlyList<CalendarLesson>> ListLessonsAsync(DateOnly from, DateOnly to, CancellationToken cancellationToken);
 
-    Task<OperationResult<IReadOnlyList<CalendarLesson>>> AddLessonAsync(
+    Task<OperationResult<LessonAddResult>> AddLessonAsync(
         LessonAddRequest request,
         DateOnly refreshMonth,
         CancellationToken cancellationToken);

@@ -10,4 +10,8 @@ public sealed record DashboardLesson(
     LessonState State,
     bool IsInvoiced,
     PaymentStatus? PaymentStatus,
-    InvoiceNumber? InvoiceNumber = null);
+    InvoiceNumber? InvoiceNumber = null,
+    int PlanCatalogId = 0,
+    string PlanName = "",
+    int LocalLessonId = 0,
+    bool HasKnownStartTime = true);

@@ -16,10 +16,14 @@ internal sealed class ApplicationBootstrapper
         Directory.CreateDirectory(appPaths.AppDataFolderPath);
 
         var createContext = SqliteLedgerDbContextFactory.Create(appPaths.DatabasePath);
-        await new LedgerDatabaseMigrator(createContext).MigrateAsync(cancellationToken);
+        var migrationWarnings = await new LedgerDatabaseMigrator(createContext).MigrateAsync(cancellationToken);
 
         var services = ApplicationServiceGraph.Create(appPaths, createContext);
         var warnings = await RunStartupJobsAsync(services, cancellationToken);
+        warnings = migrationWarnings
+            .Select(warning => new ApplicationStartupWarning(warning.Title, warning.Message))
+            .Concat(warnings)
+            .ToList();
         var viewModel = CreateMainWindowViewModel(services);
 
         return new ApplicationStartupResult(new MainWindow(viewModel), warnings);
@@ -50,7 +54,9 @@ internal sealed class ApplicationBootstrapper
                 services.StudentRepository,
                 services.CalendarGateway,
                 services.InvoiceRepository,
-                services.SystemClock)),
+                services.SystemClock,
+                lessonRepository: services.LessonRepository,
+                planCatalogRepository: services.PlanCatalogRepository)),
             new CoreInvoicePaymentStatusService(new ToggleInvoicePaymentStatusUseCase(services.InvoiceRepository)),
             new MessageBoxConfirmationService(),
             new ExternalBrowserCalendarLauncher(services.CalendarSettingsRepository.GetAsync),
@@ -62,10 +68,17 @@ internal sealed class ApplicationBootstrapper
                 services.SystemClock),
             new LessonEditorWindowLauncher(services.LessonEditorService),
             services.LessonEditorService,
-            new CoreLessonStateService(new ToggleLessonStateUseCase(services.CalendarGateway)),
+            new CoreLessonStateService(new ToggleLessonStateUseCase(services.CalendarGateway, services.LessonRepository)),
             services.InvoiceWorkflowLauncher,
             new ShellInvoicePdfLauncher(),
             new SettingsWindowLauncher(services.SettingsService),
             new PlanCatalogWindowLauncher(services.PlanCatalogService),
+            new EconomyOverviewWindowLauncher(
+                services.EconomyOverviewService,
+                new WindowsEconomyOverviewExportDialog(),
+                new EconomyOverviewCsvFileService(new EconomyOverviewCsvFormatter()),
+                new ShellInvoicePdfLauncher(),
+                services.SystemClock),
+            new AboutDialogLauncher(),
             services.SystemClock);
 }

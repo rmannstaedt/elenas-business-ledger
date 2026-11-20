@@ -1,8 +1,11 @@
 using MySmallBusinessLedger.App.Services;
 using MySmallBusinessLedger.App.ViewModels;
+using MySmallBusinessLedger.Core.Calendar;
 using MySmallBusinessLedger.Core.Common;
 using MySmallBusinessLedger.Core.Invoices;
 using MySmallBusinessLedger.Core.Lessons;
+using MySmallBusinessLedger.Core.Plans;
+using MySmallBusinessLedger.Core.Students;
 using MySmallBusinessLedger.Core.UseCases.Lessons;
 using MySmallBusinessLedger.Core.UseCases.Startup;
 using System.Windows;
@@ -15,14 +18,21 @@ using System.Windows.Threading;
 using WpfButton = System.Windows.Controls.Button;
 using WpfBorder = System.Windows.Controls.Border;
 using WpfCalendar = System.Windows.Controls.Calendar;
+using WpfComboBox = System.Windows.Controls.ComboBox;
 using WpfDataGrid = System.Windows.Controls.DataGrid;
 using WpfDataGridGridLinesVisibility = System.Windows.Controls.DataGridGridLinesVisibility;
 using WpfDataGridLengthUnitType = System.Windows.Controls.DataGridLengthUnitType;
 using WpfDataGridTemplateColumn = System.Windows.Controls.DataGridTemplateColumn;
 using WpfDataGridTextColumn = System.Windows.Controls.DataGridTextColumn;
+using WpfDataGridColumnHeader = System.Windows.Controls.Primitives.DataGridColumnHeader;
+using WpfDragCompletedEventArgs = System.Windows.Controls.Primitives.DragCompletedEventArgs;
+using WpfDragDeltaEventArgs = System.Windows.Controls.Primitives.DragDeltaEventArgs;
+using WpfDragStartedEventArgs = System.Windows.Controls.Primitives.DragStartedEventArgs;
 using WpfGrid = System.Windows.Controls.Grid;
+using WpfGridSplitter = System.Windows.Controls.GridSplitter;
 using WpfListBox = System.Windows.Controls.ListBox;
 using WpfMenuItem = System.Windows.Controls.MenuItem;
+using WpfThumb = System.Windows.Controls.Primitives.Thumb;
 using AppMainWindow = MySmallBusinessLedger.App.MainWindow;
 
 namespace MySmallBusinessLedger.Tests.App.ViewModels;
@@ -40,6 +50,28 @@ public sealed class MainWindowViewModelTests
             Assert.Equal("My Small Business Ledger", window.Title);
             Assert.Same(viewModel, window.DataContext);
             Assert.NotNull(window.Content);
+
+            window.Close();
+        });
+    }
+
+    [Fact]
+    public void ApplicationMenuShowsSettingsAndAbout()
+    {
+        RunOnStaThread(() =>
+        {
+            var viewModel = CreateViewModel();
+            var window = new AppMainWindow(viewModel);
+
+            var applicationMenu = Assert.Single(FindChildren<WpfMenuItem>(window), item => item.Header?.ToString() == "_Application");
+            var applicationActions = applicationMenu.Items
+                .OfType<WpfMenuItem>()
+                .Select(item => item.Header?.ToString())
+                .Where(header => header is not null)
+                .Cast<string>()
+                .ToArray();
+
+            Assert.Equal(["_Settings", "About My Small Business Ledger"], applicationActions);
 
             window.Close();
         });
@@ -64,6 +96,157 @@ public sealed class MainWindowViewModelTests
             Assert.Equal(["_Manage Students"], studentActions);
 
             window.Close();
+        });
+    }
+
+    [Fact]
+    public void EconomyMenuShowsOverview()
+    {
+        RunOnStaThread(() =>
+        {
+            var viewModel = CreateViewModel();
+            var window = new AppMainWindow(viewModel);
+
+            var economyMenu = Assert.Single(FindChildren<WpfMenuItem>(window), item => item.Header?.ToString() == "_Economy");
+            var economyActions = economyMenu.Items
+                .OfType<WpfMenuItem>()
+                .Select(item => item.Header?.ToString())
+                .Where(header => header is not null)
+                .Cast<string>()
+                .ToArray();
+
+            Assert.Equal(["_Overview"], economyActions);
+
+            window.Close();
+        });
+    }
+
+    [Fact]
+    public void MainWindowStudentDetailsButtonOpensDetailsForCurrentStudent()
+    {
+        RunOnStaThread(() =>
+        {
+            var studentOverview = new FakeStudentOverviewLauncher();
+            var viewModel = CreateViewModel(studentOverviewLauncher: studentOverview);
+            var window = new AppMainWindow(viewModel);
+            try
+            {
+                window.Show();
+                PumpUntil(() => !viewModel.IsBusy && viewModel.CurrentStudentShortName == "Anna");
+
+                var detailsButton = FindButton(window, "Open student details");
+                InvokeButton(detailsButton);
+                PumpUntil(() => studentOverview.DetailsWereShown);
+
+                Assert.Equal("Anna", studentOverview.InitialDetailsSelectedStudentShortName);
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
+    [Fact]
+    public void MainWindowAlignsLessonAndInvoiceTablesAndExposesPaneSplitter()
+    {
+        RunOnStaThread(() =>
+        {
+            var viewModel = CreateViewModel();
+            var window = new AppMainWindow(viewModel);
+            try
+            {
+                window.Show();
+                PumpUntil(() => !viewModel.IsBusy && viewModel.Lessons.Count == 1);
+
+                var lessonGrid = Assert.Single(
+                    FindVisualChildren<WpfDataGrid>(window),
+                    grid => AutomationProperties.GetName(grid) == "Lesson list");
+                var invoiceGrid = Assert.Single(
+                    FindVisualChildren<WpfDataGrid>(window),
+                    grid => AutomationProperties.GetName(grid) == "Student invoices");
+                var splitter = Assert.Single(
+                    FindVisualChildren<WpfGridSplitter>(window),
+                    candidate => AutomationProperties.GetName(candidate) == "Resize lessons and invoices");
+
+                var lessonTop = lessonGrid.TranslatePoint(new Point(0, 0), window).Y;
+                var invoiceTop = invoiceGrid.TranslatePoint(new Point(0, 0), window).Y;
+                Assert.InRange(Math.Abs(lessonTop - invoiceTop), 0, 1);
+                Assert.False(splitter.Focusable);
+                Assert.Equal(Cursors.SizeWE, splitter.Cursor);
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
+    [Fact]
+    public void MainWindowRestoresResizedColumnsAndDividerWhenReopened()
+    {
+        RunOnStaThread(() =>
+        {
+            const double windowWidth = 1480;
+            var firstWindow = new AppMainWindow(CreateViewModel()) { Width = windowWidth, ShowActivated = false };
+            double planWidth;
+            double lessonPaneWidth;
+            double[] invoiceColumnWidths;
+            try
+            {
+                firstWindow.Show();
+                PumpUntil(() => firstWindow.LessonsGrid.IsLoaded && firstWindow.InvoicesGrid.IsLoaded);
+
+                ResizeColumn(firstWindow.LessonsGrid, "Plan", 110);
+                DragHorizontally(Assert.Single(FindVisualChildren<WpfGridSplitter>(firstWindow)), 110);
+                firstWindow.UpdateLayout();
+                ResizeColumn(firstWindow.InvoicesGrid, "Date", 35);
+                firstWindow.UpdateLayout();
+
+                planWidth = firstWindow.LessonsGrid.Columns.Single(column => Equals(column.Header, "Plan")).ActualWidth;
+                lessonPaneWidth = firstWindow.LessonsPaneColumn.ActualWidth;
+                invoiceColumnWidths = firstWindow.InvoicesGrid.Columns.Select(column => column.ActualWidth).ToArray();
+                Assert.InRange(planWidth, 221, 223);
+                Assert.InRange(lessonPaneWidth, 749, 751);
+                Assert.True(invoiceColumnWidths[1] > invoiceColumnWidths[0]);
+            }
+            finally
+            {
+                firstWindow.Close();
+            }
+
+            var reopened = new AppMainWindow(CreateViewModel()) { ShowActivated = false };
+            try
+            {
+                reopened.Show();
+                reopened.Width = windowWidth;
+                reopened.UpdateLayout();
+                PumpUntil(() => reopened.LessonsGrid.IsLoaded && reopened.InvoicesGrid.IsLoaded);
+
+                var planColumn = reopened.LessonsGrid.Columns.Single(column => Equals(column.Header, "Plan"));
+                Assert.InRange(planColumn.ActualWidth, planWidth - 1, planWidth + 1);
+                Assert.InRange(reopened.LessonsPaneColumn.ActualWidth, lessonPaneWidth - 1, lessonPaneWidth + 1);
+                for (var index = 0; index < invoiceColumnWidths.Length; index++)
+                {
+                    var column = reopened.InvoicesGrid.Columns[index];
+                    Assert.True(column.Width.IsStar);
+                    Assert.InRange(column.ActualWidth, invoiceColumnWidths[index] - 1, invoiceColumnWidths[index] + 1);
+                }
+
+                reopened.Width = reopened.MinWidth;
+                reopened.UpdateLayout();
+                Assert.True(reopened.LessonsPaneColumn.ActualWidth < lessonPaneWidth);
+                Assert.True(reopened.InvoicesGrid.ActualWidth >= reopened.InvoicesPaneColumn.MinWidth - 1);
+                Assert.InRange(planColumn.ActualWidth, planWidth - 1, planWidth + 1);
+
+                reopened.Width = windowWidth;
+                reopened.UpdateLayout();
+                Assert.InRange(reopened.LessonsPaneColumn.ActualWidth, lessonPaneWidth - 1, lessonPaneWidth + 1);
+            }
+            finally
+            {
+                reopened.Close();
+            }
         });
     }
 
@@ -579,9 +762,10 @@ public sealed class MainWindowViewModelTests
                     .Select(column => column.Header?.ToString() ?? string.Empty)
                     .ToArray();
 
-                Assert.Equal(["Date", "Time", "State", "Invoiced", "Paid", string.Empty], headers);
+                Assert.Equal(["Date", "Time", "Plan", "State", "Invoiced", "Paid", string.Empty], headers);
                 Assert.Equal(WpfDataGridGridLinesVisibility.All, lessonGrid.GridLinesVisibility);
                 Assert.True(lessonGrid.CanUserResizeColumns);
+                Assert.False(lessonGrid.CanUserResizeRows);
                 Assert.False(lessonGrid.CanUserReorderColumns);
 
                 var dateButton = Assert.Single(
@@ -595,6 +779,16 @@ public sealed class MainWindowViewModelTests
                 var stateColumn = Assert.IsType<WpfDataGridTemplateColumn>(
                     lessonGrid.Columns.Single(column => column.Header?.ToString() == "State"));
                 Assert.Same(centeredHeaderStyle, stateColumn.HeaderStyle);
+
+                Assert.IsType<WpfDataGridTemplateColumn>(
+                    lessonGrid.Columns.Single(column => column.Header?.ToString() == "Plan"));
+                var lessonPlanCombo = Assert.Single(
+                    FindVisualChildren<WpfComboBox>(lessonGrid),
+                    comboBox => AutomationProperties.GetName(comboBox) == "Lesson plan");
+                Assert.Equal(new Thickness(0), lessonPlanCombo.BorderThickness);
+                Assert.Equal(new Thickness(0), lessonPlanCombo.Margin);
+                Assert.Equal(VerticalAlignment.Stretch, lessonPlanCombo.VerticalAlignment);
+                Assert.True(double.IsNaN(lessonPlanCombo.Height));
 
                 var invoicedColumn = Assert.IsType<WpfDataGridTextColumn>(
                     lessonGrid.Columns.Single(column => column.Header?.ToString() == "Invoiced"));
@@ -617,13 +811,15 @@ public sealed class MainWindowViewModelTests
                 var lessonsPane = Assert.Single(
                     FindVisualChildren<WpfGrid>(window),
                     grid => AutomationProperties.GetName(grid) == "Lessons pane");
-                Assert.Equal(528, lessonsPane.Width);
+                Assert.True(double.IsNaN(lessonsPane.Width));
+                Assert.InRange(lessonsPane.ActualWidth, 630, 650);
 
                 var invoiceGrid = Assert.Single(
                     FindVisualChildren<WpfDataGrid>(window),
                     grid => AutomationProperties.GetName(grid) == "Student invoices");
                 Assert.All(invoiceGrid.Columns, column => Assert.Equal(WpfDataGridLengthUnitType.Star, column.Width.UnitType));
                 Assert.Equal(36, invoiceGrid.RowHeight);
+                Assert.False(invoiceGrid.CanUserResizeRows);
                 Assert.Equal([56, 84, 88, 70, 112], invoiceGrid.Columns.Select(column => column.MinWidth).ToArray());
 
                 var invoiceStatusStyle = Assert.IsType<Style>(window.FindResource("InvoiceStatusButtonStyle"));
@@ -690,6 +886,64 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public void AddLessonButtonSavesStudentDefaultsAndSelectsTheCreatedLessonAtAnOccupiedTime()
+    {
+        RunOnStaThread(() =>
+        {
+            var startsAt = new DateTimeOffset(2026, 6, 16, 14, 30, 0, TimeSpan.FromHours(2));
+            var existingLesson = new CalendarLesson("existing-lesson", "Anna", startsAt);
+            var createdLesson = new CalendarLesson("new-lesson", "Anna", startsAt);
+            var lessonEditor = new FakeLessonEditorService
+            {
+                AddResult = OperationResult<LessonAddResult>.Success(new LessonAddResult(createdLesson, [existingLesson, createdLesson]))
+            };
+            var assignedPlan = new Plan("Assigned plan", 350m, LessonsPerWeek.One, 60,
+                PlanFlexibility.MoveOrCancelByAgreement, 1, startsAt, planCatalogId: 77);
+            var existingRow = new DashboardLesson(existingLesson.Id, "Anna", startsAt, LessonState.Planned,
+                IsInvoiced: false, PaymentStatus: null, PlanCatalogId: 42, PlanName: "Other plan", LocalLessonId: 10);
+            var dashboard = new FakeDashboardService
+            {
+                LessonDefaults = new DashboardStudentLessonDefaults("Anna",
+                    [new(DayOfWeek.Monday, new TimeOnly(16, 0)), new(DayOfWeek.Tuesday, new TimeOnly(14, 30))],
+                    [new(assignedPlan, new DateOnly(2026, 6, 1), null)]),
+                PlanOptions = [new(42, "Other plan"), new(77, assignedPlan.Name)],
+                DashboardLessons = [existingRow],
+                DashboardLessonsAfterFirstLoad =
+                [
+                    existingRow,
+                    existingRow with { Id = createdLesson.Id, LocalLessonId = 11, PlanCatalogId = 77, PlanName = assignedPlan.Name }
+                ],
+                StudentNavigationEntries = [new("Anna", startsAt)]
+            };
+            var viewModel = CreateViewModel(dashboard: dashboard, lessonEditorService: lessonEditor,
+                clock: new FakeUiClock(startsAt), lessonTimeZone: TimeZoneInfo.FindSystemTimeZoneById("Romance Standard Time"));
+            var window = new AppMainWindow(viewModel);
+            try
+            {
+                window.Show();
+                PumpUntil(() => !viewModel.IsBusy && viewModel.Lessons.Count == 1);
+
+                RaisePreviewLeftClick(FindButton(window, "Add Lesson"));
+                PumpUntil(() => !viewModel.IsBusy && viewModel.Lessons.Count == 2);
+
+                Assert.Equal(1, lessonEditor.AddCount);
+                Assert.Equal(new LessonAddRequest("Anna", startsAt, 77), lessonEditor.LastAddRequest);
+                var selected = Assert.IsType<LessonDisplayModel>(viewModel.SelectedLesson);
+                Assert.Equal(createdLesson.Id, selected.Id);
+                Assert.Equal("Tuesday 16-06", selected.StartsOnDateText);
+                Assert.Equal("14:30", selected.StartsAtTimeText);
+                Assert.Equal(assignedPlan.Name, selected.PlanName);
+                Assert.False(selected.IsDraft);
+                Assert.True(selected.CanEditPlan);
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
+    [Fact]
     public void AddLessonButtonPreviewClickWorksAfterStudentNavigation()
     {
         RunOnStaThread(() =>
@@ -729,7 +983,7 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
-    public void AddLessonButtonPreviewClickWorksWhileActivationRefreshIsPending()
+    public void AddLessonButtonPreviewClickCancelsPendingActivationRefresh()
     {
         RunOnStaThread(() =>
         {
@@ -739,6 +993,9 @@ public sealed class MainWindowViewModelTests
             var clock = new FakeUiClock(new DateTimeOffset(2026, 6, 16, 12, 0, 0, TimeSpan.Zero));
             var dashboard = new FakeDashboardService
             {
+                LessonState = LessonState.Planned,
+                LessonIsInvoiced = false,
+                LessonPaymentStatus = null,
                 BeforeReturnAsync = _ =>
                 {
                     loadCount++;
@@ -751,6 +1008,122 @@ public sealed class MainWindowViewModelTests
                     return allowActivationRefreshToFinish.Task;
                 }
             };
+            var viewModel = CreateViewModel(
+                dashboard: dashboard,
+                clock: clock);
+
+            var window = new AppMainWindow(viewModel);
+            try
+            {
+                window.Show();
+                PumpUntil(() => !viewModel.IsBusy && viewModel.Lessons.Count == 1);
+                clock.Now = clock.Now.AddSeconds(11);
+
+                InvokeActivated(window);
+                var addLessonButton = FindButton(window, "Add Lesson");
+                RaisePreviewLeftClick(window);
+                RaisePreviewLeftClick(addLessonButton);
+
+                Assert.True(viewModel.SelectedLesson?.IsDraft);
+                Assert.Equal(2, viewModel.Lessons.Count);
+
+                PumpDispatcher(DispatcherPriority.ApplicationIdle);
+                Assert.False(activationRefreshStarted.Task.IsCompleted);
+            }
+            finally
+            {
+                allowActivationRefreshToFinish.TrySetResult();
+                window.Close();
+            }
+        });
+    }
+
+    [Fact]
+    public void ActivationRefreshDoesNotDisableTheFirstReactivationCommandClick()
+    {
+        RunOnStaThread(() =>
+        {
+            var activationRefreshStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var allowRefreshToFinish = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var loadCount = 0;
+            var clock = new FakeUiClock(new DateTimeOffset(2026, 6, 16, 12, 0, 0, TimeSpan.Zero));
+            MainWindowViewModel? viewModel = null;
+            var dashboard = new FakeDashboardService
+            {
+                LessonState = LessonState.Planned,
+                LessonIsInvoiced = false,
+                LessonPaymentStatus = null,
+                BeforeReturnAsync = _ =>
+                {
+                    loadCount++;
+                    if (loadCount != 2 || viewModel?.DisplayMonth != new DateOnly(2026, 6, 1))
+                    {
+                        return Task.CompletedTask;
+                    }
+
+                    activationRefreshStarted.SetResult();
+                    return allowRefreshToFinish.Task;
+                }
+            };
+            viewModel = CreateViewModel(dashboard: dashboard, clock: clock);
+
+            var window = new AppMainWindow(viewModel);
+            try
+            {
+                window.Show();
+                PumpUntil(() => !viewModel.IsBusy && viewModel.Lessons.Count == 1);
+                clock.Now = clock.Now.AddSeconds(11);
+
+                InvokeActivated(window);
+                var previousMonthButton = FindButton(window, "Previous month");
+                RaisePreviewLeftClick(window);
+                PumpDispatcher(DispatcherPriority.Background);
+
+                Assert.False(activationRefreshStarted.Task.IsCompleted);
+                Assert.True(viewModel.PreviousMonthCommand.CanExecute(null));
+
+                var previousMonthTask = ((MySmallBusinessLedger.App.Commands.AsyncRelayCommand)previousMonthButton.Command)
+                    .ExecuteAsync(previousMonthButton.CommandParameter);
+                PumpUntil(() => previousMonthTask.IsCompleted);
+                previousMonthTask.GetAwaiter().GetResult();
+                PumpDispatcher(DispatcherPriority.ApplicationIdle);
+
+                Assert.Equal(new DateOnly(2026, 5, 1), viewModel.DisplayMonth);
+            }
+            finally
+            {
+                allowRefreshToFinish.TrySetResult();
+                window.Close();
+            }
+        });
+    }
+
+    [Fact]
+    public void ActivationRefreshDoesNotClosePickerOpenedByTheFirstReactivationClick()
+    {
+        RunOnStaThread(() =>
+        {
+            var activationRefreshStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var allowRefreshToFinish = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var loadCount = 0;
+            var clock = new FakeUiClock(new DateTimeOffset(2026, 6, 16, 12, 0, 0, TimeSpan.Zero));
+            var dashboard = new FakeDashboardService
+            {
+                LessonState = LessonState.Planned,
+                LessonIsInvoiced = false,
+                LessonPaymentStatus = null,
+                BeforeReturnAsync = _ =>
+                {
+                    loadCount++;
+                    if (loadCount != 2)
+                    {
+                        return Task.CompletedTask;
+                    }
+
+                    activationRefreshStarted.SetResult();
+                    return allowRefreshToFinish.Task;
+                }
+            };
             var viewModel = CreateViewModel(dashboard: dashboard, clock: clock);
 
             var window = new AppMainWindow(viewModel);
@@ -761,18 +1134,17 @@ public sealed class MainWindowViewModelTests
                 clock.Now = clock.Now.AddSeconds(11);
 
                 InvokeActivated(window);
-                RaisePreviewLeftClick(FindButton(window, "Add Lesson"));
+                var dateButton = FindButton(window, "Open lesson date selector");
+                RaisePreviewLeftClick(window);
+                RaisePreviewLeftClick(dateButton);
+                PumpDispatcher(DispatcherPriority.ApplicationIdle);
 
-                Assert.True(viewModel.SelectedLesson?.IsDraft);
-                Assert.Equal(2, viewModel.Lessons.Count);
-
-                PumpUntil(() => activationRefreshStarted.Task.IsCompleted);
-                allowActivationRefreshToFinish.SetResult();
-                PumpUntil(() => !viewModel.IsBusy);
+                Assert.False(activationRefreshStarted.Task.IsCompleted);
+                Assert.IsType<WpfBorder>(dateButton.Tag);
             }
             finally
             {
-                allowActivationRefreshToFinish.TrySetResult();
+                allowRefreshToFinish.TrySetResult();
                 window.Close();
             }
         });
@@ -813,6 +1185,18 @@ public sealed class MainWindowViewModelTests
         await viewModel.PreviousMonthCommand.ExecuteAsync();
 
         Assert.Equal(new DateOnly(2026, 6, 1), dashboard.LastMonth);
+    }
+
+    [Fact]
+    public async Task AddLessonDefaultsDraftDateToFirstDayOfDisplayedNonCurrentMonth()
+    {
+        var viewModel = CreateViewModel(clock: new FakeUiClock(new DateTimeOffset(2026, 6, 26, 12, 0, 0, TimeSpan.Zero)));
+        await viewModel.LoadAsync();
+        await viewModel.NextMonthCommand.ExecuteAsync();
+
+        await viewModel.AddLessonCommand.ExecuteAsync();
+
+        Assert.Equal(new DateTime(2026, 7, 1), viewModel.SelectedLesson?.StartsOnDate);
     }
 
     [Fact]
@@ -860,6 +1244,61 @@ public sealed class MainWindowViewModelTests
 
         var lesson = Assert.Single(viewModel.Lessons);
         Assert.Equal("july", lesson.Id);
+    }
+
+    [Fact]
+    public void FirstPreviousStudentClickStartsFromTodaysDisplayedLesson()
+    {
+        RunOnStaThread(() =>
+        {
+            var earlierMonth = new DateTimeOffset(2026, 5, 28, 15, 0, 0, TimeSpan.FromHours(2));
+            var previousLesson = new DateTimeOffset(2026, 6, 13, 14, 0, 0, TimeSpan.FromHours(2));
+            var currentLesson = new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.FromHours(2));
+            var lastLesson = new DateTimeOffset(2026, 6, 30, 15, 0, 0, TimeSpan.FromHours(2));
+            var dashboard = new FakeDashboardService
+            {
+                StudentShortNames = ["Anna", "Bo"],
+                StudentNavigationEntries =
+                [
+                    new("Anna", earlierMonth),
+                    new("Bo", previousLesson),
+                    new("Anna", currentLesson),
+                    new("Anna", lastLesson)
+                ],
+                DashboardLessons =
+                [
+                    new("anna-earlier-month", "Anna", earlierMonth, LessonState.Completed, false, null),
+                    new("anna-today", "Anna", currentLesson, LessonState.Planned, false, null),
+                    new("anna-last", "Anna", lastLesson, LessonState.Planned, false, null)
+                ],
+                DashboardLessonsAfterFirstLoad =
+                [
+                    new("bo-previous", "Bo", previousLesson, LessonState.Completed, false, null)
+                ]
+            };
+            var viewModel = CreateViewModel(dashboard: dashboard,
+                clock: new FakeUiClock(currentLesson.AddHours(1)),
+                lessonTimeZone: TimeZoneInfo.FindSystemTimeZoneById("Romance Standard Time"));
+            var window = new AppMainWindow(viewModel);
+            try
+            {
+                window.Show();
+                PumpUntil(() => !viewModel.IsBusy && viewModel.CurrentStudentShortName == "Anna");
+                Assert.Equal("anna-today", viewModel.SelectedLesson?.Id);
+                Assert.Same(viewModel.SelectedLesson, window.LessonsGrid.SelectedItem);
+
+                InvokeButton(FindButton(window, "Previous student"));
+                PumpUntil(() => !viewModel.IsBusy && viewModel.CurrentStudentShortName == "Bo");
+
+                Assert.Equal("bo-previous", viewModel.SelectedLesson?.Id);
+                Assert.Same(viewModel.SelectedLesson, window.LessonsGrid.SelectedItem);
+                Assert.Equal(new DateOnly(2026, 6, 1), viewModel.DisplayMonth);
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
     }
 
     [Fact]
@@ -1197,13 +1636,15 @@ public sealed class MainWindowViewModelTests
     public async Task SettingsRefreshesDashboardAfterSave()
     {
         var dashboard = new FakeDashboardService();
-        var settings = new FakeSettingsLauncher { NextResult = true };
+        var settings = new FakeSettingsLauncher { NextResult = new SettingsDialogResult(true, IsAdminMode: true) };
         var viewModel = CreateViewModel(dashboard: dashboard, settingsLauncher: settings);
         await viewModel.LoadAsync();
 
         await viewModel.OpenSettingsCommand.ExecuteAsync();
 
         Assert.True(settings.WasShown);
+        Assert.False(settings.InitialAdminMode);
+        Assert.True(viewModel.IsAdminMode);
         Assert.Equal(2, dashboard.LoadCount);
     }
 
@@ -1216,6 +1657,42 @@ public sealed class MainWindowViewModelTests
         await viewModel.OpenManagePlansCommand.ExecuteAsync();
 
         Assert.True(planCatalog.WasShown);
+    }
+
+    [Fact]
+    public async Task EconomyOverviewCommandOpensEconomyOverview()
+    {
+        var economyOverview = new FakeEconomyOverviewLauncher();
+        var viewModel = CreateViewModel(economyOverviewLauncher: economyOverview);
+
+        await viewModel.OpenEconomyOverviewCommand.ExecuteAsync();
+
+        Assert.True(economyOverview.WasShown);
+        Assert.False(economyOverview.LastAdminMode);
+        viewModel.IsAdminMode = true;
+
+        await viewModel.OpenEconomyOverviewCommand.ExecuteAsync();
+
+        Assert.True(economyOverview.LastAdminMode);
+    }
+
+    [Fact]
+    public async Task AboutCommandShowsAboutDialog()
+    {
+        var aboutDialog = new FakeAboutDialogLauncher();
+        var viewModel = CreateViewModel(aboutDialogLauncher: aboutDialog);
+
+        await viewModel.OpenAboutCommand.ExecuteAsync();
+
+        Assert.True(aboutDialog.WasShown);
+    }
+
+    [Fact]
+    public void ApplicationInfoUsesAppAssemblyVersion()
+    {
+        Assert.Equal("1.31", ApplicationInfo.Version);
+        Assert.Contains("My Small Business Ledger", ApplicationInfo.AboutText);
+        Assert.Contains("Version 1.31", ApplicationInfo.AboutText);
     }
 
     [Fact]
@@ -1232,6 +1709,22 @@ public sealed class MainWindowViewModelTests
         Assert.Equal("Anna", studentOverview.InitialSelectedStudentShortName);
         Assert.Equal("Bo", dashboard.LastSelectedStudentShortName);
         Assert.Equal("Bo", viewModel.CurrentStudentShortName);
+        Assert.Equal(2, dashboard.LoadCount);
+    }
+
+    [Fact]
+    public async Task StudentDetailsCommandRefreshesDashboardForCurrentStudentAfterClose()
+    {
+        var dashboard = new FakeDashboardService { StudentShortNames = ["Anna", "Bo"] };
+        var studentOverview = new FakeStudentOverviewLauncher();
+        var viewModel = CreateViewModel(dashboard: dashboard, studentOverviewLauncher: studentOverview);
+        await viewModel.LoadAsync();
+
+        await viewModel.OpenStudentDetailsCommand.ExecuteAsync();
+
+        Assert.True(studentOverview.DetailsWereShown);
+        Assert.Equal("Anna", studentOverview.InitialDetailsSelectedStudentShortName);
+        Assert.Equal("Anna", dashboard.LastSelectedStudentShortName);
         Assert.Equal(2, dashboard.LoadCount);
     }
 
@@ -1368,9 +1861,60 @@ public sealed class MainWindowViewModelTests
         var draft = viewModel.Lessons[1];
         Assert.True(draft.IsDraft);
         Assert.Equal("Anna", draft.StudentShortName);
-        Assert.Null(draft.StartsOnDate);
+        Assert.Equal(new DateTime(2026, 6, 16), draft.StartsOnDate);
         Assert.Equal(string.Empty, draft.StartsAtTimeText);
         Assert.True(draft.CanEdit);
+    }
+
+    [Fact]
+    public async Task AddLessonWithoutActivePlanShowsClearPrerequisiteMessage()
+    {
+        var viewModel = CreateViewModel(
+            dashboard: new FakeDashboardService
+            {
+                LessonState = LessonState.Planned,
+                LessonIsInvoiced = false,
+                LessonPaymentStatus = null,
+                PlanOptions = []
+            });
+        await viewModel.LoadAsync();
+
+        await viewModel.AddLessonCommand.ExecuteAsync();
+
+        Assert.DoesNotContain(viewModel.Lessons, lesson => lesson.IsDraft);
+        Assert.Equal("Create or publish an active plan first.", viewModel.ErrorMessage);
+    }
+
+    [Fact]
+    public async Task AddedDraftLessonAllowsPlanSelectionBeforeAutosaveCompletes()
+    {
+        var lessonEditor = new FakeLessonEditorService();
+        var viewModel = CreateViewModel(
+            dashboard: new FakeDashboardService
+            {
+                LessonState = LessonState.Planned,
+                LessonIsInvoiced = false,
+                LessonPaymentStatus = null,
+                PlanOptions =
+                [
+                    new DashboardPlanOption(42, "Standard"),
+                    new DashboardPlanOption(77, "Proevetime")
+                ]
+            },
+            lessonEditorService: lessonEditor);
+        await viewModel.LoadAsync();
+
+        await viewModel.AddLessonCommand.ExecuteAsync();
+        var draft = viewModel.SelectedLesson!;
+
+        Assert.True(draft.IsDraft);
+        Assert.True(draft.CanEditPlan);
+
+        draft.PlanCatalogId = 77;
+
+        Assert.Null(lessonEditor.LastPlanLessonId);
+        Assert.Null(lessonEditor.LastPlanCatalogId);
+        Assert.Equal(77, draft.PlanCatalogId);
     }
 
     [Fact]
@@ -1382,7 +1926,8 @@ public sealed class MainWindowViewModelTests
 
         var options = viewModel.Lessons[0].TimeOptions;
 
-        Assert.Equal("08:00", options.First());
+        Assert.Equal(LessonDisplayModel.NoTimeOptionText, options.First());
+        Assert.Equal("08:00", options.Skip(1).First());
         Assert.Equal("20:00", options.Last());
         Assert.DoesNotContain("07:45", options);
         Assert.DoesNotContain("20:15", options);
@@ -1391,23 +1936,86 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public async Task DatedDraftLessonSortsIntoLessonListAndRemainsSelected()
     {
+        var dashboard = new FakeDashboardService
+        {
+            LessonState = LessonState.Planned,
+            LessonIsInvoiced = false,
+            LessonPaymentStatus = null,
+            DashboardLessonsAfterFirstLoad =
+            [
+                new DashboardLesson(
+                    "new-lesson",
+                    "Anna",
+                    new DateTimeOffset(2026, 6, 15, 14, 0, 0, TimeSpan.FromHours(2)),
+                    LessonState.Planned,
+                    IsInvoiced: false,
+                    PaymentStatus: null,
+                    LocalLessonId: 19)
+            ]
+        };
         var viewModel = CreateViewModel(
-            dashboard: new FakeDashboardService { LessonState = LessonState.Planned, LessonIsInvoiced = false, LessonPaymentStatus = null },
+            dashboard: dashboard,
             lessonTimeZone: TimeZoneInfo.FindSystemTimeZoneById("Romance Standard Time"));
         await viewModel.LoadAsync();
         await viewModel.AddLessonCommand.ExecuteAsync();
         var draft = viewModel.SelectedLesson!;
 
+        draft.PlanCatalogId = 42;
         draft.StartsAtTimeText = "14:00";
         draft.StartsOnDate = new DateTime(2026, 6, 15);
 
-        Assert.Same(draft, viewModel.Lessons[0]);
-        Assert.Same(draft, viewModel.SelectedLesson);
-        Assert.Equal("Monday 15-06", draft.StartsOnDateText);
+        await EventuallyAsync(() => viewModel.SelectedLesson?.Id == "new-lesson");
+        var selectedLesson = viewModel.SelectedLesson!;
+        Assert.Same(selectedLesson, viewModel.Lessons[0]);
+        Assert.Equal("Monday 15-06", selectedLesson.StartsOnDateText);
+        Assert.True(selectedLesson.CanEditPlan);
     }
 
     [Fact]
     public async Task CompleteDraftLessonAutosavesWhenDateAndTimeAreSet()
+    {
+        var lessonEditor = new FakeLessonEditorService();
+        var dashboard = new FakeDashboardService
+        {
+            LessonState = LessonState.Planned,
+            LessonIsInvoiced = false,
+            LessonPaymentStatus = null,
+            DashboardLessonsAfterFirstLoad =
+            [
+                new DashboardLesson(
+                    "new-lesson",
+                    "Anna",
+                    new DateTimeOffset(2026, 6, 15, 14, 0, 0, TimeSpan.FromHours(2)),
+                    LessonState.Planned,
+                    IsInvoiced: false,
+                    PaymentStatus: null,
+                    LocalLessonId: 19)
+            ]
+        };
+        var viewModel = CreateViewModel(
+            dashboard: dashboard,
+            lessonEditorService: lessonEditor,
+            lessonTimeZone: TimeZoneInfo.FindSystemTimeZoneById("Romance Standard Time"));
+        await viewModel.LoadAsync();
+        await viewModel.AddLessonCommand.ExecuteAsync();
+        var draft = viewModel.SelectedLesson!;
+
+        draft.PlanCatalogId = 42;
+        draft.StartsOnDate = new DateTime(2026, 6, 15);
+        draft.StartsAtTimeText = "14:00";
+
+        await EventuallyAsync(() => lessonEditor.AddWasCalled);
+        Assert.Equal("Anna", lessonEditor.LastAddRequest?.StudentShortName);
+        Assert.Equal(new DateTimeOffset(2026, 6, 15, 14, 0, 0, TimeSpan.FromHours(2)), lessonEditor.LastAddRequest?.StartsAt);
+        Assert.Equal(42, lessonEditor.LastAddRequest?.PlanCatalogId);
+        Assert.True(lessonEditor.LastAddRequest?.HasKnownStartTime == true);
+        Assert.False(draft.IsDraft);
+        await EventuallyAsync(() => viewModel.SelectedLesson?.Id == "new-lesson");
+        Assert.True(viewModel.SelectedLesson!.CanEditPlan);
+    }
+
+    [Fact]
+    public async Task DateOnlyDraftLessonWaitsForPlanBeforeAutosaving()
     {
         var lessonEditor = new FakeLessonEditorService();
         var viewModel = CreateViewModel(
@@ -1419,13 +2027,208 @@ public sealed class MainWindowViewModelTests
         var draft = viewModel.SelectedLesson!;
 
         draft.StartsOnDate = new DateTime(2026, 6, 15);
-        draft.StartsAtTimeText = "14:00";
+        await Task.Delay(350, TestContext.Current.CancellationToken);
+
+        Assert.False(lessonEditor.AddWasCalled);
+        Assert.True(draft.IsDraft);
+        Assert.False(viewModel.HasError);
+    }
+
+    [Fact]
+    public async Task PlanSelectedAfterDraftDateAutosavesLesson()
+    {
+        var lessonEditor = new FakeLessonEditorService();
+        var dashboard = new FakeDashboardService
+        {
+            LessonState = LessonState.Planned,
+            LessonIsInvoiced = false,
+            LessonPaymentStatus = null,
+            PlanOptions =
+            [
+                new DashboardPlanOption(42, "Standard")
+            ],
+            DashboardLessonsAfterFirstLoad =
+            [
+                new DashboardLesson(
+                    "new-lesson",
+                    "Anna",
+                    new DateTimeOffset(2026, 6, 15, 0, 0, 0, TimeSpan.FromHours(2)),
+                    LessonState.Planned,
+                    IsInvoiced: false,
+                    PaymentStatus: null,
+                    PlanCatalogId: 42,
+                    PlanName: "Standard",
+                    LocalLessonId: 19,
+                    HasKnownStartTime: false)
+            ]
+        };
+        var viewModel = CreateViewModel(
+            dashboard: dashboard,
+            lessonEditorService: lessonEditor,
+            lessonTimeZone: TimeZoneInfo.FindSystemTimeZoneById("Romance Standard Time"));
+        await viewModel.LoadAsync();
+        await viewModel.AddLessonCommand.ExecuteAsync();
+        var draft = viewModel.SelectedLesson!;
+
+        draft.StartsOnDate = new DateTime(2026, 6, 15);
+        draft.PlanCatalogId = 42;
 
         await EventuallyAsync(() => lessonEditor.AddWasCalled);
         Assert.Equal("Anna", lessonEditor.LastAddRequest?.StudentShortName);
-        Assert.Equal(new DateTimeOffset(2026, 6, 15, 14, 0, 0, TimeSpan.FromHours(2)), lessonEditor.LastAddRequest?.StartsAt);
-        Assert.False(draft.IsDraft);
-        Assert.Same(draft, viewModel.SelectedLesson);
+        Assert.Equal(new DateTimeOffset(2026, 6, 15, 0, 0, 0, TimeSpan.FromHours(2)), lessonEditor.LastAddRequest?.StartsAt);
+        Assert.Equal(42, lessonEditor.LastAddRequest?.PlanCatalogId);
+        Assert.True(lessonEditor.LastAddRequest?.HasKnownStartTime == false);
+        await EventuallyAsync(() => viewModel.SelectedLesson?.Id == "new-lesson");
+    }
+
+    [Fact]
+    public async Task UnmatchedCalendarAddRefreshReplacesDraftWithSingleSelectedPlanLesson()
+    {
+        var startsAt = new DateTimeOffset(2026, 6, 15, 0, 0, 0, TimeSpan.FromHours(2));
+        var lessonEditor = new FakeLessonEditorService
+        {
+            AddResult = OperationResult<LessonAddResult>.Success(new LessonAddResult(
+                new CalendarLesson("new-lesson", "Anna", startsAt, HasKnownStartTime: false),
+                [new CalendarLesson("different-lesson", "Anna", startsAt.AddDays(1), HasKnownStartTime: false)]))
+        };
+        var dashboard = new FakeDashboardService
+        {
+            LessonState = LessonState.Planned,
+            LessonIsInvoiced = false,
+            LessonPaymentStatus = null,
+            PlanOptions =
+            [
+                new DashboardPlanOption(42, "Standard"),
+                new DashboardPlanOption(77, "Proevetime")
+            ],
+            DashboardLessonsAfterFirstLoad =
+            [
+                new DashboardLesson(
+                    "new-lesson",
+                    "Anna",
+                    startsAt,
+                    LessonState.Planned,
+                    IsInvoiced: false,
+                    PaymentStatus: null,
+                    PlanCatalogId: 77,
+                    PlanName: "Proevetime",
+                    LocalLessonId: 19,
+                    HasKnownStartTime: false)
+            ]
+        };
+        var viewModel = CreateViewModel(
+            dashboard: dashboard,
+            lessonEditorService: lessonEditor,
+            lessonTimeZone: TimeZoneInfo.FindSystemTimeZoneById("Romance Standard Time"));
+        await viewModel.LoadAsync();
+        await viewModel.AddLessonCommand.ExecuteAsync();
+        var draft = viewModel.SelectedLesson!;
+
+        draft.StartsOnDate = startsAt.Date;
+        draft.PlanCatalogId = 77;
+
+        await EventuallyAsync(() => lessonEditor.AddWasCalled);
+        var lesson = Assert.Single(viewModel.Lessons, lesson => lesson.Id == "new-lesson");
+        Assert.False(lesson.IsDraft);
+        Assert.Equal(77, lessonEditor.LastAddRequest?.PlanCatalogId);
+        Assert.Null(lessonEditor.LastPlanLessonId);
+        Assert.Null(lessonEditor.LastPlanCatalogId);
+        Assert.Equal(77, lesson.PlanCatalogId);
+        Assert.Equal("Proevetime", lesson.PlanName);
+        Assert.Same(lesson, viewModel.SelectedLesson);
+    }
+
+    [Fact]
+    public async Task PlanSelectedOnDraftLessonIsAppliedAfterDraftAutosaves()
+    {
+        var lessonEditor = new FakeLessonEditorService();
+        var dashboard = new FakeDashboardService
+        {
+            LessonState = LessonState.Planned,
+            LessonIsInvoiced = false,
+            LessonPaymentStatus = null,
+            PlanOptions =
+            [
+                new DashboardPlanOption(42, "Standard"),
+                new DashboardPlanOption(77, "Proevetime")
+            ],
+            DashboardLessonsAfterFirstLoad =
+            [
+                new DashboardLesson(
+                    "new-lesson",
+                    "Anna",
+                    new DateTimeOffset(2026, 6, 15, 0, 0, 0, TimeSpan.FromHours(2)),
+                    LessonState.Planned,
+                    IsInvoiced: false,
+                    PaymentStatus: null,
+                    PlanCatalogId: 77,
+                    PlanName: "Proevetime",
+                    LocalLessonId: 19,
+                    HasKnownStartTime: false)
+            ]
+        };
+        var viewModel = CreateViewModel(
+            dashboard: dashboard,
+            lessonEditorService: lessonEditor,
+            lessonTimeZone: TimeZoneInfo.FindSystemTimeZoneById("Romance Standard Time"));
+        await viewModel.LoadAsync();
+        await viewModel.AddLessonCommand.ExecuteAsync();
+        var draft = viewModel.SelectedLesson!;
+
+        draft.PlanCatalogId = 77;
+        draft.StartsOnDate = new DateTime(2026, 6, 15);
+
+        await EventuallyAsync(() => lessonEditor.AddWasCalled);
+        Assert.Equal(77, lessonEditor.LastAddRequest?.PlanCatalogId);
+        Assert.Null(lessonEditor.LastPlanLessonId);
+        Assert.Null(lessonEditor.LastPlanCatalogId);
+        Assert.Equal("Proevetime", viewModel.SelectedLesson!.PlanName);
+        Assert.False(viewModel.HasError);
+    }
+
+    [Fact]
+    public async Task DateOnlyDraftLessonAutosavesAndRemainsDateOnlyAfterRefresh()
+    {
+        var lessonEditor = new FakeLessonEditorService();
+        var dashboard = new FakeDashboardService
+        {
+            LessonState = LessonState.Planned,
+            LessonIsInvoiced = false,
+            LessonPaymentStatus = null,
+            DashboardLessonsAfterFirstLoad =
+            [
+                new DashboardLesson(
+                    "new-lesson",
+                    "Anna",
+                    new DateTimeOffset(2026, 6, 15, 0, 0, 0, TimeSpan.FromHours(2)),
+                    LessonState.Planned,
+                    IsInvoiced: false,
+                    PaymentStatus: null,
+                    LocalLessonId: 19,
+                    HasKnownStartTime: false)
+            ]
+        };
+        var viewModel = CreateViewModel(
+            dashboard: dashboard,
+            lessonEditorService: lessonEditor,
+            lessonTimeZone: TimeZoneInfo.FindSystemTimeZoneById("Romance Standard Time"));
+        await viewModel.LoadAsync();
+        await viewModel.AddLessonCommand.ExecuteAsync();
+        var draft = viewModel.SelectedLesson!;
+
+        draft.PlanCatalogId = 42;
+        draft.StartsOnDate = new DateTime(2026, 6, 15);
+
+        await EventuallyAsync(() => lessonEditor.AddWasCalled);
+        Assert.Equal("Anna", lessonEditor.LastAddRequest?.StudentShortName);
+        Assert.Equal(new DateTimeOffset(2026, 6, 15, 0, 0, 0, TimeSpan.FromHours(2)), lessonEditor.LastAddRequest?.StartsAt);
+        Assert.Equal(42, lessonEditor.LastAddRequest?.PlanCatalogId);
+        Assert.True(lessonEditor.LastAddRequest?.HasKnownStartTime == false);
+        await EventuallyAsync(() => viewModel.SelectedLesson?.Id == "new-lesson");
+        var selectedLesson = viewModel.SelectedLesson!;
+        Assert.False(selectedLesson.HasKnownStartTime);
+        Assert.Equal(string.Empty, selectedLesson.StartsAtTimeText);
+        Assert.True(selectedLesson.CanEditPlan);
     }
 
     [Fact]
@@ -1442,6 +2245,7 @@ public sealed class MainWindowViewModelTests
         var availabilityChanged = false;
         viewModel.ToggleLessonStateCommand.CanExecuteChanged += (_, _) => availabilityChanged = true;
 
+        draft.PlanCatalogId = 42;
         draft.StartsOnDate = new DateTime(2026, 6, 15);
         draft.StartsAtTimeText = "14:00";
 
@@ -1461,7 +2265,6 @@ public sealed class MainWindowViewModelTests
         await viewModel.LoadAsync();
         await viewModel.AddLessonCommand.ExecuteAsync();
         var draft = viewModel.SelectedLesson!;
-        draft.StartsOnDate = new DateTime(2026, 6, 1);
         clock.Now = clock.Now.AddSeconds(11);
 
         await viewModel.RefreshAfterActivationAsync();
@@ -1491,14 +2294,14 @@ public sealed class MainWindowViewModelTests
 
         Assert.Equal("Anna", lessonEditor.LastPopulateStudentShortName);
         Assert.Equal(new DateOnly(2026, 6, 1), lessonEditor.LastPopulateDisplayMonth);
-        Assert.Equal(new DateOnly(2026, 6, 16), lessonEditor.LastPopulateToday);
         Assert.Equal(2, dashboard.LoadCount);
         Assert.False(viewModel.HasError);
     }
 
     [Fact]
-    public async Task PopulateCalendarCommandIsUnavailableForPastMonths()
+    public async Task PopulateCalendarCommandCanPopulatePastMonthsForBackfill()
     {
+        var lessonEditor = new FakeLessonEditorService();
         var viewModel = CreateViewModel(
             dashboard: new FakeDashboardService
             {
@@ -1506,12 +2309,18 @@ public sealed class MainWindowViewModelTests
                 LessonIsInvoiced = false,
                 LessonPaymentStatus = null
             },
+            lessonEditorService: lessonEditor,
             clock: new FakeUiClock(new DateTimeOffset(2026, 6, 16, 12, 0, 0, TimeSpan.FromHours(2))));
         await viewModel.LoadAsync();
 
         await viewModel.PreviousMonthCommand.ExecuteAsync();
 
-        Assert.False(viewModel.PopulateCalendarCommand.CanExecute(null));
+        Assert.True(viewModel.PopulateCalendarCommand.CanExecute(null));
+
+        await viewModel.PopulateCalendarCommand.ExecuteAsync();
+
+        Assert.Equal("Anna", lessonEditor.LastPopulateStudentShortName);
+        Assert.Equal(new DateOnly(2026, 5, 1), lessonEditor.LastPopulateDisplayMonth);
     }
 
     [Fact]
@@ -1573,6 +2382,7 @@ public sealed class MainWindowViewModelTests
         await viewModel.LoadAsync();
         await viewModel.AddLessonCommand.ExecuteAsync();
         var draft = Assert.Single(viewModel.Lessons, lesson => lesson.IsDraft);
+        draft.PlanCatalogId = 42;
         draft.StartsOnDate = new DateTime(2026, 1, 15);
         draft.StartsAtTimeText = "15:30";
 
@@ -1594,6 +2404,7 @@ public sealed class MainWindowViewModelTests
         await viewModel.LoadAsync();
         await viewModel.AddLessonCommand.ExecuteAsync();
         var draft = viewModel.Lessons[1];
+        draft.PlanCatalogId = 42;
         draft.StartsOnDate = new DateTime(2026, 6, 24);
         draft.StartsAtTimeText = "15:30";
 
@@ -1603,6 +2414,106 @@ public sealed class MainWindowViewModelTests
         Assert.Equal("Anna", lessonEditor.LastAddRequest?.StudentShortName);
         Assert.Equal(new DateTimeOffset(2026, 6, 24, 15, 30, 0, TimeSpan.FromHours(2)), lessonEditor.LastAddRequest?.StartsAt);
         Assert.False(draft.IsDraft);
+        Assert.False(viewModel.HasError);
+    }
+
+    [Fact]
+    public async Task ChangingUninvoicedLessonPlanSavesLocalPlanSelection()
+    {
+        var lessonEditor = new FakeLessonEditorService();
+        var viewModel = CreateViewModel(
+            dashboard: new FakeDashboardService
+            {
+                LessonState = LessonState.Planned,
+                LessonIsInvoiced = false,
+                LessonPaymentStatus = null,
+                DashboardLessons =
+                [
+                    new DashboardLesson(
+                        "lesson-1",
+                        "Anna",
+                        new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.FromHours(2)),
+                        LessonState.Planned,
+                        IsInvoiced: false,
+                        PaymentStatus: null,
+                        PlanCatalogId: 42,
+                        PlanName: "Standard",
+                        LocalLessonId: 9)
+                ],
+                PlanOptions =
+                [
+                    new DashboardPlanOption(42, "Standard"),
+                    new DashboardPlanOption(77, "Proevetime")
+                ]
+            },
+            lessonEditorService: lessonEditor);
+        await viewModel.LoadAsync();
+
+        viewModel.Lessons[0].PlanCatalogId = 77;
+
+        await EventuallyAsync(() => lessonEditor.LastPlanLessonId == 9);
+        Assert.Equal(77, lessonEditor.LastPlanCatalogId);
+        Assert.Equal("Proevetime", viewModel.Lessons[0].PlanName);
+        Assert.False(viewModel.HasError);
+    }
+
+    [Fact]
+    public async Task RapidLessonPlanChangesPersistLatestSelection()
+    {
+        var firstSaveStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseFirstSave = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var lessonEditor = new FakeLessonEditorService
+        {
+            UpdatePlanAsyncFunc = async (lessonId, planCatalogId) =>
+            {
+                if (planCatalogId == 77)
+                {
+                    firstSaveStarted.SetResult();
+                    await releaseFirstSave.Task;
+                }
+
+                return CreateLessonRecord(lessonId, planCatalogId);
+            }
+        };
+        var viewModel = CreateViewModel(
+            dashboard: new FakeDashboardService
+            {
+                LessonState = LessonState.Planned,
+                LessonIsInvoiced = false,
+                LessonPaymentStatus = null,
+                DashboardLessons =
+                [
+                    new DashboardLesson(
+                        "lesson-1",
+                        "Anna",
+                        new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.FromHours(2)),
+                        LessonState.Planned,
+                        IsInvoiced: false,
+                        PaymentStatus: null,
+                        PlanCatalogId: 42,
+                        PlanName: "Standard",
+                        LocalLessonId: 9)
+                ],
+                PlanOptions =
+                [
+                    new DashboardPlanOption(42, "Standard"),
+                    new DashboardPlanOption(77, "Proevetime"),
+                    new DashboardPlanOption(88, "Premium")
+                ]
+            },
+            lessonEditorService: lessonEditor);
+        await viewModel.LoadAsync();
+
+        viewModel.Lessons[0].PlanCatalogId = 77;
+        await firstSaveStarted.Task;
+        viewModel.Lessons[0].PlanCatalogId = 88;
+        releaseFirstSave.SetResult();
+
+        await EventuallyAsync(() => lessonEditor.PlanCatalogIds.Count >= 2);
+
+        Assert.Equal([77, 88], lessonEditor.PlanCatalogIds);
+        Assert.Equal(88, viewModel.Lessons[0].PlanCatalogId);
+        Assert.Equal("Premium", viewModel.Lessons[0].PlanName);
         Assert.False(viewModel.HasError);
     }
 
@@ -1623,6 +2534,8 @@ public sealed class MainWindowViewModelTests
             new FakeInvoicePdfLauncher(),
             new FakeSettingsLauncher(),
             new FakePlanCatalogLauncher(),
+            new FakeEconomyOverviewLauncher(),
+            new FakeAboutDialogLauncher(),
             new FakeUiClock(new DateTimeOffset(2026, 6, 16, 12, 0, 0, TimeSpan.Zero)));
         await viewModel.LoadAsync();
 
@@ -1774,6 +2687,8 @@ public sealed class MainWindowViewModelTests
         FakeInvoicePdfLauncher? invoicePdfLauncher = null,
         FakeSettingsLauncher? settingsLauncher = null,
         FakePlanCatalogLauncher? planCatalogLauncher = null,
+        FakeEconomyOverviewLauncher? economyOverviewLauncher = null,
+        FakeAboutDialogLauncher? aboutDialogLauncher = null,
         FakeUiClock? clock = null,
         TimeZoneInfo? lessonTimeZone = null) =>
         new(
@@ -1789,6 +2704,8 @@ public sealed class MainWindowViewModelTests
             invoicePdfLauncher ?? new FakeInvoicePdfLauncher(),
             settingsLauncher ?? new FakeSettingsLauncher(),
             planCatalogLauncher ?? new FakePlanCatalogLauncher(),
+            economyOverviewLauncher ?? new FakeEconomyOverviewLauncher(),
+            aboutDialogLauncher ?? new FakeAboutDialogLauncher(),
             clock ?? new FakeUiClock(new DateTimeOffset(2026, 6, 16, 12, 0, 0, TimeSpan.Zero)),
             lessonTimeZone);
 
@@ -1797,9 +2714,30 @@ public sealed class MainWindowViewModelTests
         Exception? exception = null;
         var thread = new Thread(() =>
         {
+            var dispatcher = Dispatcher.CurrentDispatcher;
+            SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(dispatcher));
             try
             {
-                action();
+                var preferenceDirectory = Directory.CreateTempSubdirectory("LedgerMainWindowTests-");
+                var windowPath = Path.Combine(preferenceDirectory.FullName, "windows.json");
+                var gridPath = Path.Combine(preferenceDirectory.FullName, "grids.json");
+                var previousWindowPath = WindowPlacementStore.StorePathOverride;
+                var previousGridPath = GridWidthStore.StorePathOverride;
+                WindowPlacementStore.StorePathOverride = windowPath;
+                GridWidthStore.StorePathOverride = gridPath;
+                try
+                {
+                    action();
+                }
+                finally
+                {
+                    dispatcher.InvokeShutdown();
+                    GridWidthStore.StorePathOverride = previousGridPath;
+                    WindowPlacementStore.StorePathOverride = previousWindowPath;
+                    File.Delete(windowPath);
+                    File.Delete(gridPath);
+                    preferenceDirectory.Delete();
+                }
             }
             catch (Exception ex)
             {
@@ -1897,6 +2835,20 @@ public sealed class MainWindowViewModelTests
         ((IInvokeProvider)peer.GetPattern(PatternInterface.Invoke)).Invoke();
     }
 
+    private static void ResizeColumn(WpfDataGrid grid, string headerText, double horizontalChange)
+    {
+        var header = Assert.Single(FindVisualChildren<WpfDataGridColumnHeader>(grid), item => Equals(item.Content, headerText));
+        var gripper = Assert.IsType<WpfThumb>(header.Template.FindName("PART_RightHeaderGripper", header));
+        DragHorizontally(gripper, horizontalChange);
+    }
+
+    private static void DragHorizontally(WpfThumb thumb, double horizontalChange)
+    {
+        thumb.RaiseEvent(new WpfDragStartedEventArgs(0, 0) { RoutedEvent = WpfThumb.DragStartedEvent });
+        thumb.RaiseEvent(new WpfDragDeltaEventArgs(horizontalChange, 0) { RoutedEvent = WpfThumb.DragDeltaEvent });
+        thumb.RaiseEvent(new WpfDragCompletedEventArgs(horizontalChange, 0, false) { RoutedEvent = WpfThumb.DragCompletedEvent });
+    }
+
     private static void InvokeActivated(AppMainWindow window)
     {
         var method = typeof(AppMainWindow).GetMethod(
@@ -1947,6 +2899,12 @@ public sealed class MainWindowViewModelTests
 
         public IReadOnlyList<DashboardLesson>? DashboardLessons { get; init; }
 
+        public IReadOnlyList<DashboardLesson>? DashboardLessonsAfterFirstLoad { get; init; }
+
+        public IReadOnlyList<DashboardPlanOption>? PlanOptions { get; init; }
+
+        public DashboardStudentLessonDefaults? LessonDefaults { get; init; }
+
         public OperationResult<StartupDashboardResult>? NextResult { get; set; }
 
         public LessonState LessonState { get; init; } = LessonState.Completed;
@@ -1984,11 +2942,14 @@ public sealed class MainWindowViewModelTests
                 await BeforeReturnAsync(selectedStudentShortName);
             }
 
+            var dashboardLessons = LoadCount > 1 && DashboardLessonsAfterFirstLoad is not null
+                ? DashboardLessonsAfterFirstLoad
+                : DashboardLessons;
             var result = NextResult ?? OperationResult<StartupDashboardResult>.Success(
                 new StartupDashboardResult(
                     currentStudent,
                     StudentShortNames,
-                    DashboardLessons ??
+                    dashboardLessons ??
                     [
                             new DashboardLesson(
                                 "lesson-1",
@@ -2015,7 +2976,9 @@ public sealed class MainWindowViewModelTests
                         .Select((shortName, index) => new DashboardStudentNavigationEntry(
                             shortName,
                             new DateTimeOffset(2026, 6, 16, 15, index, 0, TimeSpan.FromHours(2))))
-                        .ToArray()));
+                        .ToArray(),
+                    PlanOptions ?? [new DashboardPlanOption(42, "Standard")],
+                    LessonDefaults));
 
             NextResult = null;
             return result;
@@ -2114,7 +3077,11 @@ public sealed class MainWindowViewModelTests
     {
         public bool WasShown { get; private set; }
 
+        public bool DetailsWereShown { get; private set; }
+
         public string? InitialSelectedStudentShortName { get; private set; }
+
+        public string? InitialDetailsSelectedStudentShortName { get; private set; }
 
         public string? SelectedStudentShortName { get; init; }
 
@@ -2162,6 +3129,15 @@ public sealed class MainWindowViewModelTests
 
             return SelectedStudentShortName;
         }
+
+        public Task<string?> ShowStudentDetailsAsync(
+            string? selectedStudentShortName,
+            CancellationToken cancellationToken)
+        {
+            DetailsWereShown = true;
+            InitialDetailsSelectedStudentShortName = selectedStudentShortName;
+            return Task.FromResult(SelectedStudentShortName ?? selectedStudentShortName);
+        }
     }
 
     private sealed class FakeLessonEditorLauncher : ILessonEditorLauncher
@@ -2192,7 +3168,9 @@ public sealed class MainWindowViewModelTests
 
     private sealed class FakeLessonEditorService : ILessonEditorService
     {
-        public bool AddWasCalled { get; private set; }
+        public bool AddWasCalled => AddCount > 0;
+
+        public int AddCount { get; private set; }
 
         public bool EditWasCalled { get; private set; }
 
@@ -2206,33 +3184,45 @@ public sealed class MainWindowViewModelTests
 
         public DateOnly? LastPopulateDisplayMonth { get; private set; }
 
-        public DateOnly? LastPopulateToday { get; private set; }
+        public int? LastPlanLessonId { get; private set; }
+
+        public int? LastPlanCatalogId { get; private set; }
+
+        public List<int> PlanCatalogIds { get; } = [];
+
+        public Func<int, int, Task<LessonRecord>>? UpdatePlanAsyncFunc { get; init; }
 
         public Func<Task>? BeforeDeleteReturnAsync { get; set; }
+
+        public OperationResult<LessonAddResult>? AddResult { get; init; }
 
         public OperationResult<PopulateCalendarResult> PopulateResult { get; init; } =
             OperationResult<PopulateCalendarResult>.Success(new PopulateCalendarResult(2, 0, []));
 
-        public Task<OperationResult<IReadOnlyList<MySmallBusinessLedger.Core.Calendar.CalendarLesson>>> AddAsync(
+        public Task<OperationResult<LessonAddResult>> AddAsync(
             MySmallBusinessLedger.Core.UseCases.Lessons.LessonAddRequest request,
             DateOnly refreshMonth,
             CancellationToken cancellationToken)
         {
-            AddWasCalled = true;
+            AddCount++;
             LastAddRequest = request;
-            return Task.FromResult(OperationResult<IReadOnlyList<MySmallBusinessLedger.Core.Calendar.CalendarLesson>>.Success(
-                [new MySmallBusinessLedger.Core.Calendar.CalendarLesson("new-lesson", request.StudentShortName, request.StartsAt)]));
+            if (AddResult is not null)
+            {
+                return Task.FromResult(AddResult);
+            }
+
+            var createdLesson = new CalendarLesson(
+                "new-lesson", request.StudentShortName, request.StartsAt, HasKnownStartTime: request.HasKnownStartTime);
+            return Task.FromResult(OperationResult<LessonAddResult>.Success(new LessonAddResult(createdLesson, [createdLesson])));
         }
 
         public Task<OperationResult<PopulateCalendarResult>> PopulateCalendarAsync(
             string studentShortName,
             DateOnly displayMonth,
-            DateOnly today,
             CancellationToken cancellationToken)
         {
             LastPopulateStudentShortName = studentShortName;
             LastPopulateDisplayMonth = displayMonth;
-            LastPopulateToday = today;
             return Task.FromResult(PopulateResult);
         }
 
@@ -2259,7 +3249,41 @@ public sealed class MainWindowViewModelTests
 
             return OperationResult<IReadOnlyList<MySmallBusinessLedger.Core.Calendar.CalendarLesson>>.Success([]);
         }
+
+        public async Task<OperationResult<LessonRecord>> UpdatePlanAsync(
+            int lessonId,
+            int planCatalogId,
+            CancellationToken cancellationToken)
+        {
+            LastPlanLessonId = lessonId;
+            LastPlanCatalogId = planCatalogId;
+            PlanCatalogIds.Add(planCatalogId);
+            if (UpdatePlanAsyncFunc is not null)
+            {
+                return OperationResult<LessonRecord>.Success(await UpdatePlanAsyncFunc(lessonId, planCatalogId));
+            }
+
+            return OperationResult<LessonRecord>.Success(CreateLessonRecord(lessonId, planCatalogId));
+        }
     }
+
+    private static LessonRecord CreateLessonRecord(int lessonId, int planCatalogId) =>
+        new(
+            lessonId,
+            StudentId: 1,
+            StudentShortName: "Anna",
+            PlanCatalogId: planCatalogId,
+            PlanName: planCatalogId switch
+            {
+                77 => "Proevetime",
+                88 => "Premium",
+                _ => "Standard"
+            },
+            StartsAt: new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.FromHours(2)),
+            DurationMinutes: 60,
+            State: LessonState.Planned,
+            GoogleCalendarEventId: "lesson-1",
+            InvoiceNumber: null);
 
     private sealed class FakeLessonStateService : ILessonStateService
     {
@@ -2327,13 +3351,16 @@ public sealed class MainWindowViewModelTests
 
     private sealed class FakeSettingsLauncher : ISettingsLauncher
     {
-        public bool NextResult { get; init; }
+        public SettingsDialogResult NextResult { get; init; } = new(false, false);
 
         public bool WasShown { get; private set; }
 
-        public Task<bool> ShowSettingsAsync(CancellationToken cancellationToken)
+        public bool InitialAdminMode { get; private set; }
+
+        public Task<SettingsDialogResult> ShowSettingsAsync(bool isAdminMode, CancellationToken cancellationToken)
         {
             WasShown = true;
+            InitialAdminMode = isAdminMode;
             return Task.FromResult(NextResult);
         }
     }
@@ -2343,6 +3370,31 @@ public sealed class MainWindowViewModelTests
         public bool WasShown { get; private set; }
 
         public Task ShowPlanCatalogAsync(CancellationToken cancellationToken)
+        {
+            WasShown = true;
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class FakeEconomyOverviewLauncher : IEconomyOverviewLauncher
+    {
+        public bool WasShown { get; private set; }
+
+        public bool LastAdminMode { get; private set; }
+
+        public Task ShowEconomyOverviewAsync(bool isAdminMode, CancellationToken cancellationToken)
+        {
+            WasShown = true;
+            LastAdminMode = isAdminMode;
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class FakeAboutDialogLauncher : IAboutDialogLauncher
+    {
+        public bool WasShown { get; private set; }
+
+        public Task ShowAboutAsync(CancellationToken cancellationToken)
         {
             WasShown = true;
             return Task.CompletedTask;

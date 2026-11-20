@@ -19,4 +19,6 @@ public interface IInvoiceFileStore
         CancellationToken cancellationToken);
 
     Task<OperationResult<string>> DiscardStagingPathAsync(string stagingPath, CancellationToken cancellationToken);
+
+    Task<OperationResult<string>> DiscardPublishedPathAsync(string publishedPath, CancellationToken cancellationToken);
 }

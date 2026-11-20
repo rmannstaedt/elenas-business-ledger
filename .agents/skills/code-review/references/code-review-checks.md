@@ -11,6 +11,7 @@ Check for:
 - null handling, invalid-input behavior, missing guards, and incorrect default handling;
 - mismatches between names, contracts, return values, docs, tests, and actual behavior;
 - unclear preconditions, postconditions, invariants, ownership, or lifetime expectations;
+- mismatches between the source a command mutates and the source later used by billing, reporting, audit, permissions, previews, exports, synchronization, destructive actions, or UI refresh;
 - off-by-one, empty collection, duplicate, missing, already-exists, permission-denied, locked, unavailable, malformed, unsupported, unknown, and future-value cases;
 - incorrect state transitions, missing state validation, invalid repeated execution, and hidden lifecycle ordering requirements;
 - idempotency problems where work may be retried, resumed, repeated, cancelled, timed out, crashed, or partially completed;
@@ -62,6 +63,42 @@ Check for:
 - overly broad NuGet dependencies for a small task;
 - public XML docs that promise behavior the implementation does not provide.
 
+## Timing, Ordering, Scheduling, and Machine-Speed Checks
+
+Apply whenever correctness, completion, stability, retries, UI realization, external readiness, or tests depend on elapsed time or scheduled work.
+
+Search the relevant scope for fixed and configurable timing mechanisms, including:
+
+- `Thread.Sleep`, finite `Task.Delay`, timers, polling loops, `SpinWait`, `WaitAsync`, `WaitForExit`, and cancellation sources created with a timeout;
+- hard-coded connection, process, network, startup, shutdown, retry, lease, debounce, and command timeouts;
+- bounded retry or stabilization counts, dispatcher/scheduler priorities, render/layout passes, event-loop turns, and one-shot deferred callbacks;
+- clock reads, timestamp-difference sleeps, wall-clock deadlines, and assumptions about timer or filesystem timestamp resolution;
+- tests with fixed sleeps, short observation windows, hard deadlines, or performance thresholds.
+
+For every occurrence, determine:
+
+- whether it is deliberate UX behavior, a performance budget, a safety circuit breaker, or an implicit proof that asynchronous work has completed;
+- what observable state, event, predicate, acknowledgement, generation/version, or durable record actually proves completion;
+- whether late or out-of-order work can occur after the code or test has declared success, stability, cancellation, failure, or disposal;
+- whether a slower or busier machine, remote desktop, large dataset, cold service, slow disk/network, virtualization, debugger, or loaded CI runner changes correctness rather than merely latency;
+- whether retries or dispatcher passes are paced by elapsed time or by event-loop opportunities, and whether the bounded count can be exhausted before the required condition becomes true;
+- whether timeout expiry is distinguished truthfully from user cancellation, external failure, retry exhaustion, and partial success;
+- whether stale operations are cancelled, versioned, or prevented from overwriting newer state;
+- whether configured timeouts are appropriate for the deployment environment and remain cancellable;
+- whether performance thresholds are isolated from functional tests and documented against representative hardware.
+
+Report fixed timing as a correctness finding when success depends on “enough time probably passed” or “enough scheduler passes probably ran.” Prefer state/event-driven completion, explicit acknowledgements, generation tokens, or predicate-based waiting. Retain a timeout or attempt cap only as a cancellation, diagnostic, or failure boundary—not as proof that the operation succeeded.
+
+Treat tests with special care:
+
+- a fixed wait before a positive assertion can false-fail on a slower system;
+- a fixed observation window before a negative or stability assertion can false-pass when the forbidden or regressive event occurs later;
+- polling with a deadline is more adaptive than a fixed sleep, but its upper bound can still create hardware-dependent failures;
+- replace timing-based proof with observable completion or quiescence signals where feasible;
+- centralize unavoidable test timeouts, use a monotonic clock, make environment scaling explicit, and keep performance regression tests separate from functional correctness.
+
+Do not report ordinary debounce intervals, tooltip durations, intentional simulation delays, or documented performance budgets as correctness bugs merely because they are numeric. Verify their guards, cancellation, stale-result handling, configurability, and classification.
+
 ## Contract and API Checks
 
 A contract includes names, signatures, nullability, exceptions, result models, comments, XML docs, tests, and caller assumptions.
@@ -97,6 +134,72 @@ Check whether:
 - versioning and future extension have been considered for durable or externally visible contracts.
 
 If a contract permits unsafe, ambiguous, misleading, or under-specified implementation, report it as a contract weakness even if the current implementation happens to work.
+
+## Domain Identity, Lineage, And Reference Integrity
+
+Apply when code touches durable business data, financial records, audit history, external-system synchronization, invoices, payments, imports, exports, reports, PDFs, database-backed state, or any workflow where one row's state must not be applied to another row.
+
+Check whether:
+
+- every durable business entity has a stable identity where later state or references depend on it;
+- names, titles, dates, times, prices, amounts, filenames, formatted strings, and other descriptive values are not used as identity unless the domain guarantees uniqueness and immutability;
+- natural keys have documented semantics, validation, persistence constraints, and tests for edit/collision cases;
+- state such as invoiced, paid, completed, printed, issued, finalized, reconciled, imported, exported, credited, refunded, voided, locked, or deleted is attached to the exact durable entity it belongs to;
+- financial, tax, billing, payment, issued-document, or audit state is never applied through fuzzy matching, "first match", same date/time, same display name, same amount, or same filename;
+- references and snapshots are both present when needed: references for ownership/lineage, snapshots for historical display;
+- identity survives every transformation: UI model -> command/request -> domain model -> draft/final record -> persistence entity -> query/read model -> report/export/PDF;
+- repository queries join/filter by stable identity rather than reconstructing relationships from display fields;
+- EF entities, domain models, DTOs, migrations, and generated artifacts agree on required identity fields;
+- default, null, empty, or zero IDs cannot silently become accepted finalized state;
+- missing, stale, deleted, or ambiguous references fail safe and visibly instead of falling back to broad matching;
+- external-system IDs are scoped to the external system boundary and mapped to local durable IDs when local audit/billing state matters;
+- later external edits cannot rewrite locked or already-issued local business state unless an explicit corrective workflow allows it;
+- user-visible successful mutations update the durable/source-of-truth records that later consequential workflows actually read;
+- refresh, reconciliation, cache invalidation, startup repair, cleanup jobs, or background sync are recovery fallbacks and not the sole correctness mechanism for immediately user-triggered mutations;
+- generated reports, PDFs, logs, and exports preserve enough lineage to diagnose exactly which source rows were used;
+- migrations preserve identity/lineage when real durable history exists, or the breaking reset is explicit and approved;
+- tests include duplicate descriptive values, such as same name/date/time/category/amount or same customer/date/amount, where those duplicates are plausible in the domain;
+- tests prove newly created rows cannot inherit billing/payment/completion/audit state from unrelated old rows.
+
+Failure scenarios to actively look for:
+
+- a draft carries an ID but the issued/final record drops it;
+- a repository projects status by date/time/name instead of source ID;
+- a UI read model treats a local cached display value as proof of issued/payment state;
+- a migration introduces a new identity field but leaves old rows indistinguishable without a documented reset/backfill policy;
+- a cleanup or reset removes parent rows while child rows keep stale status markers;
+- an external file/account/item is deleted and recreated, causing local state to attach to the new item by description.
+- a command updates visible/UI/read-model state and one backing source, but the next billing/report/export/audit/permission/destructive workflow reads a different stale backing source;
+- an external item, generated artifact, queue message, cache entry, search index, or read model is treated as updated merely because local state or UI state changed;
+- tests cover the mutating command and downstream reader independently but not the sequence `mutate -> immediately read through downstream workflow`.
+
+Treat identity weakness as Critical when money, tax, invoice, payment, credit, receipt, audit, finalization, destructive action, or user/account ownership can attach to the wrong durable entity.
+
+## Authoritative Read/Write And Projection Consistency
+
+Apply when the same logical entity or workflow state exists in more than one representation: UI state, read models, caches, external systems, databases, queues, generated artifacts, search indexes, reports, exports, previews, or logs.
+
+Build a small matrix for high-risk paths:
+
+- command or operation;
+- source(s) it mutates;
+- UI/read-model state it changes;
+- source used by the next consequential reader;
+- cleanup, refresh, reconciliation, retry, or recovery path;
+- failure window between mutation, durable write, visible success, and downstream read.
+
+Check whether:
+
+- a successful command updates the source that downstream workflows actually query before returning success;
+- a UI row disappearing, status label changing, toast appearing, or command returning success is not used as proof that durable state changed;
+- later preview/report/export/billing/audit/permission/destructive/sync workflows cannot immediately observe stale state after the command;
+- cache/read-model/search-index invalidation is either synchronous enough for the next consequential read or the stale read is blocked/marked stale;
+- generated artifacts and previews are built from the same authoritative source that the mutation updated, or stale artifacts are invalidated;
+- external-system mutation failures and local persistence failures cannot leave the UI claiming success while later local readers use old state;
+- reconciliation and cleanup are retained as recovery paths but are not required for ordinary immediate correctness;
+- tests exercise command-then-reader scenarios, including partial failure between sources.
+
+Treat split-source drift as Critical when money, audit, permissions, destructive action, legal/tax output, or finalized artifacts can use stale or contradictory state. Treat it as High when user-visible state can contradict durable state in ways likely to cause wrong decisions.
 
 ## Local Design and SOLID Checks
 
@@ -169,6 +272,10 @@ Apply only when relevant.
 Check whether:
 
 - transactions, concurrency tokens, unique constraints, ordering, idempotency, retries, and partial failure are handled correctly;
+- stable business references use explicit IDs or enforced natural keys rather than mutable descriptive fields;
+- queries that apply state join by the exact durable source identity and not by display names, formatted dates, amounts, filenames, or text;
+- write paths and read paths agree on which table, projection, cache, artifact, or queue owns the current state used by consequential workflows;
+- finalized financial/audit rows contain the references needed to prove lineage plus snapshots needed for historical display;
 - migration code can lose data, mishandle existing rows, break rollback assumptions, or silently change durable meaning;
 - EF Core tracking/no-tracking, context lifetime, lazy loading, query composition, and transaction boundaries are intentional;
 - queries can cause N+1 roundtrips, unbounded result sets, client-side evaluation, missing indexes, or avoidable table scans in realistic workloads;
@@ -199,12 +306,17 @@ Apply only when relevant.
 Check whether:
 
 - UI state remains typed, truthful, and stable;
+- every route that can mutate an editable model has been identified: two-way or one-way-to-source bindings and their update triggers, validation/converters, event handlers, commands, behaviors, selection/current-item synchronization, collection-view state, and deferred callbacks;
+- framework-generated or programmatic selection, current-item, focus, validation, `DataContext`, or `ItemsSource` changes are prevented from masquerading as user edits;
+- controls and item sources with different lifetimes do not share mutable selection/current-item state across records, windows, dialogs, sessions, or reused view models;
 - late or out-of-order data can regress visible state or overwrite current selection;
 - UI code starts doing backend execution, persistence, verification, migration, or workflow ownership;
 - dangerous, destructive, partial, skipped, failed, cancelled, unauthorized, or unverified states are visible before and after action;
 - command availability, cancellation, progress, disabled reasons, and errors are understandable;
 - UI thread remains responsive;
 - WPF collection and property notifications occur on the appropriate thread;
+- WPF editable selectors deliberately control `ComboBox.Text`, `SelectedItem`/`SelectedValue`, `IsSynchronizedWithCurrentItem`, default `ICollectionView` current position, and source-update timing when an item source is shared or a record context can change;
+- deferred dispatcher work captures or validates the exact record/view-model identity it was scheduled for before it writes, restores focus, or commits a value;
 - binding failures, converter behavior, validation errors, and accessibility names are considered;
 - tests cover ViewModel state transitions, stale update handling, command availability, and critical UI workflows.
 
@@ -231,6 +343,7 @@ Check whether tests cover behavior at the level where risk lives:
 - failure, exception, cancellation, timeout, retry, resume, partial success, and repeated-run paths;
 - boundary tests for serialization, persistence, paths, network, database, CLI, UI, and external APIs;
 - integration or scenario tests when behavior crosses important layers;
+- producer-transition-observer lifecycle scenarios for unintended mutation or state leakage, such as edit and save record A, open record B, verify untouched fields, discard/close, reopen B, and verify again;
 - characterization tests before risky refactoring;
 - tests proving false success, hidden partial failure, and misleading durable state cannot occur.
 

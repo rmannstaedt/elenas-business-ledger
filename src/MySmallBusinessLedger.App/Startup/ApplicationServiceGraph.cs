@@ -1,5 +1,6 @@
 using MySmallBusinessLedger.App.Services;
 using MySmallBusinessLedger.Core.Ports;
+using MySmallBusinessLedger.Core.UseCases.Economy;
 using MySmallBusinessLedger.Core.UseCases.Invoices;
 using MySmallBusinessLedger.Core.UseCases.Lessons;
 using MySmallBusinessLedger.Core.UseCases.Startup;
@@ -18,13 +19,16 @@ internal sealed class ApplicationServiceGraph
     private ApplicationServiceGraph(
         AppPaths appPaths,
         IStudentRepository studentRepository,
+        ILessonRepository lessonRepository,
         IInvoiceRepository invoiceRepository,
+        IEconomyRepository economyRepository,
         ICompanyProfileRepository companyProfileRepository,
         SqliteCalendarSettingsRepository calendarSettingsRepository,
         IPlanCatalogRepository planCatalogRepository,
         IPlanCatalogService planCatalogService,
         IStudentEditorService studentEditorService,
         IStudentOverviewService studentOverviewService,
+        IEconomyOverviewService economyOverviewService,
         ILessonEditorService lessonEditorService,
         IInvoiceWorkflowService invoiceWorkflowService,
         IInvoiceWorkflowLauncher invoiceWorkflowLauncher,
@@ -34,13 +38,16 @@ internal sealed class ApplicationServiceGraph
     {
         AppPaths = appPaths;
         StudentRepository = studentRepository;
+        LessonRepository = lessonRepository;
         InvoiceRepository = invoiceRepository;
+        EconomyRepository = economyRepository;
         CompanyProfileRepository = companyProfileRepository;
         CalendarSettingsRepository = calendarSettingsRepository;
         PlanCatalogRepository = planCatalogRepository;
         PlanCatalogService = planCatalogService;
         StudentEditorService = studentEditorService;
         StudentOverviewService = studentOverviewService;
+        EconomyOverviewService = economyOverviewService;
         LessonEditorService = lessonEditorService;
         InvoiceWorkflowService = invoiceWorkflowService;
         InvoiceWorkflowLauncher = invoiceWorkflowLauncher;
@@ -53,7 +60,11 @@ internal sealed class ApplicationServiceGraph
 
     public IStudentRepository StudentRepository { get; }
 
+    public ILessonRepository LessonRepository { get; }
+
     public IInvoiceRepository InvoiceRepository { get; }
+
+    public IEconomyRepository EconomyRepository { get; }
 
     public ICompanyProfileRepository CompanyProfileRepository { get; }
 
@@ -66,6 +77,8 @@ internal sealed class ApplicationServiceGraph
     public IStudentEditorService StudentEditorService { get; }
 
     public IStudentOverviewService StudentOverviewService { get; }
+
+    public IEconomyOverviewService EconomyOverviewService { get; }
 
     public ILessonEditorService LessonEditorService { get; }
 
@@ -82,7 +95,9 @@ internal sealed class ApplicationServiceGraph
     public static ApplicationServiceGraph Create(AppPaths appPaths, Func<LedgerDbContext> createContext)
     {
         var studentRepository = new SqliteStudentRepository(createContext);
+        var lessonRepository = new SqliteLessonRepository(createContext);
         var invoiceRepository = new SqliteInvoiceRepository(createContext);
+        var economyRepository = new SqliteEconomyRepository(createContext);
         var companyProfileRepository = new SqliteCompanyProfileRepository(createContext);
         var calendarSettingsRepository = new SqliteCalendarSettingsRepository(createContext);
         var planCatalogRepository = new SqlitePlanCatalogRepository(createContext);
@@ -103,14 +118,25 @@ internal sealed class ApplicationServiceGraph
             DefaultLessonDuration);
         var studentEditorService = new CoreStudentEditorService(studentRepository);
         var studentOverviewService = new CoreStudentOverviewService(studentRepository, invoiceRepository);
+        var economyOverviewService = new CoreEconomyOverviewService(
+            new EconomyOverviewQuery(invoiceRepository, economyRepository),
+            economyRepository,
+            invoiceRepository);
         var lessonEditorService = new CoreLessonEditorService(
-            new AddLessonUseCase(calendarGateway),
-            new EditLessonUseCase(calendarGateway),
-            new DeleteLessonUseCase(calendarGateway),
-            new PopulateCalendarUseCase(studentRepository, calendarGateway, TimeZoneInfo.Local));
+            new AddLessonUseCase(calendarGateway, studentRepository, planCatalogRepository, lessonRepository),
+            new EditLessonUseCase(calendarGateway, lessonRepository),
+            new DeleteLessonUseCase(calendarGateway, lessonRepository),
+            new PopulateCalendarUseCase(studentRepository, calendarGateway, TimeZoneInfo.Local, lessonRepository),
+            new UpdateLessonPlanUseCase(lessonRepository, planCatalogRepository));
         var invoiceWorkflowService = new CoreInvoiceWorkflowService(
-            new InvoiceCandidateSelectionUseCase(studentRepository, calendarGateway, invoiceRepository),
-            new InvoicePreviewUseCase(studentRepository, companyProfileRepository, calendarGateway),
+            new InvoiceCandidateSelectionUseCase(
+                studentRepository,
+                lessonRepository),
+            new InvoicePreviewUseCase(
+                studentRepository,
+                companyProfileRepository,
+                lessonRepository,
+                planCatalogRepository),
             companyProfileRepository,
             invoiceRepository,
             new QuestPdfInvoicePdfWriter(),
@@ -121,7 +147,8 @@ internal sealed class ApplicationServiceGraph
             calendarSettingsRepository,
             appPaths,
             googleOAuthClientConfigurationProvider,
-            googleCalendarClientFactory);
+            googleCalendarClientFactory,
+            economyRepository);
         var printerConfigurationService = new InvoicePrinterConfigurationService(
             settingsService,
             new WindowsInvoicePrinterSelectionDialog());
@@ -133,13 +160,16 @@ internal sealed class ApplicationServiceGraph
         return new ApplicationServiceGraph(
             appPaths,
             studentRepository,
+            lessonRepository,
             invoiceRepository,
+            economyRepository,
             companyProfileRepository,
             calendarSettingsRepository,
             planCatalogRepository,
             planCatalogService,
             studentEditorService,
             studentOverviewService,
+            economyOverviewService,
             lessonEditorService,
             invoiceWorkflowService,
             invoiceWorkflowLauncher,

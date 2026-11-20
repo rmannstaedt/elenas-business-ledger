@@ -80,12 +80,14 @@
                 </StackPanel>
             </Grid>
 
-            <DataGrid Grid.Row="2"
+            <DataGrid x:Name="InvoiceLinesGrid"
+                      Grid.Row="2"
                       ItemsSource="{Binding Lines}"
                       AutoGenerateColumns="False"
                       IsReadOnly="True"
                       CanUserAddRows="False"
                       CanUserDeleteRows="False"
+                      CanUserResizeRows="False"
                       HeadersVisibility="Column"
                       GridLinesVisibility="Horizontal">
                 <DataGrid.Columns>

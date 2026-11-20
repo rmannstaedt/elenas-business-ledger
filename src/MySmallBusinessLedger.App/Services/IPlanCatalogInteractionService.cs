@@ -10,4 +10,6 @@ public enum PlanCatalogAddPlanChoice
 public interface IPlanCatalogInteractionService
 {
     Task<PlanCatalogAddPlanChoice> PromptAddPlanSaveChangesAsync(CancellationToken cancellationToken);
+
+    Task<PlanCatalogAddPlanChoice> PromptClosePlanSaveChangesAsync(CancellationToken cancellationToken);
 }

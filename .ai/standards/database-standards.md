@@ -12,6 +12,7 @@ Database rules are optional for projects without a database. Do not introduce a 
 - Make migrations intentional, reviewable, and reversible or recoverable when practical.
 - Prefer correctness and data integrity over clever query abstraction.
 - Do not hide partial failure as success.
+- Use stable identities and explicit relationships for durable business state; do not rely on mutable descriptive fields for financial, audit, or cross-record references.
 - Do not let persistence models leak into UI or domain code unless the project profile explicitly chooses an active-record style.
 
 ## Ownership
@@ -41,6 +42,37 @@ When using EF Core:
 - Configure required fields, max lengths, indexes, uniqueness, cascade behavior, precision, and conversions intentionally.
 - Do not rely on database defaults for business meaning unless the domain/application contract says so.
 - Convert EF entities to application/domain models before safety-sensitive behavior when entities are persistence-shaped.
+
+## Identity, lineage, and durable references
+
+Database schemas are part of the domain-data integrity contract. When rows represent durable business data, review whether the schema can prove which exact entity each row refers to.
+
+Use explicit stable references for:
+
+- invoice lines, payments, credits, receipts, tax/VAT calculations, accounting exports, and issued documents;
+- local rows mapped to external-system rows;
+- imported/exported/reconciled records;
+- completed, locked, finalized, printed, paid, or deleted state;
+- historical plan/catalog/customer/student/account relationships.
+
+Database-backed durable references should normally be represented by primary keys, foreign keys, unique alternate keys, or explicit immutable IDs. A descriptive compound match such as name plus date/time plus amount is not enough unless it is a documented, validated, constrained, immutable natural key.
+
+When historical output must remain stable, store both:
+
+- the stable reference needed for ownership, joins, locking, corrections, and audit lineage;
+- the snapshot fields needed to display what was issued or agreed to at the time.
+
+Review database code for:
+
+- status queries that join by exact source identity rather than date/name/text similarity;
+- required reference columns that are nullable or default to `0` in finalized records;
+- missing indexes for identity-based lookup paths;
+- missing uniqueness constraints where the domain depends on uniqueness;
+- migrations that add identity columns but leave existing durable rows ambiguous;
+- cleanup/reset operations that remove parent records while leaving child rows with misleading stale references;
+- EF projections or DTO mappings that drop IDs needed by downstream workflows.
+
+If a database change allows financial, billing, tax, payment, audit, or finalized state to attach to the wrong row, treat it as a Critical review finding.
 
 ## SQL guidance
 
@@ -74,6 +106,7 @@ When using SQLite:
 - For desktop apps, decide whether migration happens automatically, on first launch, during install/update, or under user/admin control.
 - Record schema version where the technology does not already provide it.
 - Test migrations from the oldest supported version when real deployments exist.
+- For identity/lineage changes, test duplicate descriptive values and stale/missing reference cases, not only happy-path round trips.
 
 ## Transactions and consistency
 
@@ -122,10 +155,13 @@ Before accepting a database change, ask:
 
 - Is the database concern active in the project profile?
 - Is persistence logic in the owning layer?
+- Are durable business relationships represented by stable identities or enforced natural keys?
+- Are references and snapshots both stored where history and exact lineage both matter?
 - Does the migration preserve real data or explicitly document a breaking/destructive change?
 - Are transaction boundaries explicit and appropriate?
 - Are queries parameterized and scoped?
 - Are large result sets bounded or streamed?
 - Are concurrency conflicts handled truthfully?
+- Can state such as invoiced, paid, completed, printed, issued, reconciled, or deleted attach to the wrong row through descriptive matching?
 - Are database errors reported without exposing secrets?
 - Were relevant migration/data-access tests run or clearly reported as not run?

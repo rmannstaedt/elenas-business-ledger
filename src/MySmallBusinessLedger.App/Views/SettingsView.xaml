@@ -198,10 +198,27 @@
                     <TextBox Text="{Binding AppDataFolderPath, Mode=OneWay}"
                              IsReadOnly="True"
                              Margin="0,3,0,8" />
+                    <GroupBox Header="Economy"
+                              Grid.Column="2"
+                              Style="{StaticResource SettingsGroupBoxStyle}"
+                              Margin="0,12,0,12">
+                        <StackPanel>
+                            <CheckBox Content="Admin Mode"
+                                      IsChecked="{Binding IsAdminMode}"
+                                      Margin="0,0,0,8"
+                                      ToolTip="Session-only mode for editing legacy economy month totals." />
+                            <StackPanel Visibility="{Binding ShowEconomyAdministration, Converter={StaticResource BooleanToVisibilityConverter}}">
+                                <TextBlock Text="First application month" />
+                                <DatePicker SelectedDate="{Binding FirstApplicationInvoiceMonthDate, UpdateSourceTrigger=PropertyChanged}"
+                                            Margin="0,3,0,0"
+                                            AutomationProperties.Name="First application-backed invoice month" />
+                            </StackPanel>
+                        </StackPanel>
+                    </GroupBox>
                     <GroupBox Header="VAT"
                               Grid.Column="2"
                               Style="{StaticResource SettingsGroupBoxStyle}"
-                              Margin="0,56,0,12">
+                              Margin="0,0,0,12">
                         <StackPanel>
                             <CheckBox Content="VAT registered"
                                       IsChecked="{Binding IsVatRegistered}"

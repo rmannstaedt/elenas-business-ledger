@@ -261,7 +261,9 @@ public sealed class InvoiceInfrastructureTests
                 new InvoiceLineDraft(
                     new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.FromHours(2)),
                     "Standard",
-                    Money.Dkk(400m))
+                    Money.Dkk(400m),
+                    planCatalogId: 7,
+                    lessonId: 101)
             ],
             priceAdjustment: null);
     }
@@ -293,7 +295,9 @@ public sealed class InvoiceInfrastructureTests
             dates.Select(date => new InvoiceLineDraft(
                 date,
                 "Tilbud 2 - 2026: 2 lektioner/uge",
-                Money.Dkk(350m))).ToArray(),
+                Money.Dkk(350m),
+                planCatalogId: 7,
+                lessonId: date.Day)).ToArray(),
             priceAdjustment: null,
             period: new InvoicePeriod(new DateOnly(2026, 6, 1), new DateOnly(2026, 6, 30)));
     }
@@ -327,7 +331,9 @@ public sealed class InvoiceInfrastructureTests
             dates.Select(date => new InvoiceLineDraft(
                 date,
                 "Tilbud 2 - 2026: 2 lektioner/uge",
-                Money.Dkk(350m))).ToArray(),
+                Money.Dkk(350m),
+                planCatalogId: 7,
+                lessonId: date.Day)).ToArray(),
             priceAdjustment: null,
             period: new InvoicePeriod(new DateOnly(2026, 7, 1), new DateOnly(2026, 7, 31)));
     }

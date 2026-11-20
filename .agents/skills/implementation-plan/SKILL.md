@@ -87,6 +87,7 @@ A persistent plan should include:
 - non-goals;
 - assumptions;
 - current problem/current state;
+- relevant state lifetimes, identities, and mutation paths when the defect involves stale state, unintended edits, reused UI, caches, background work, or deferred callbacks;
 - desired end state;
 - behavior-preserving boundary;
 - intentional behavior changes;
@@ -155,6 +156,10 @@ Consider:
 - performance/resource checks for realistic workloads.
 
 Build success alone is not enough for safety-sensitive, security, persistence/artifact, service/job, database, migration, verification, or UI behavior changes.
+
+When a regression depends on prior state or an action sequence, define a producer-transition-observer scenario: the action that creates the state, the navigation/reuse/restart boundary, and the later observation that must remain correct. For unintended UI edits, include save and discard/reopen paths and verify the persisted model as well as displayed values.
+
+If the decisive scenario cannot be automated, make the exact manual scenario mandatory and keep artifact/release status separate from implementation status. Packaging may be completed when requested, but the artifact remains an unverified candidate until the required scenario has been exercised; creating an installer or obtaining a clean build is not evidence that the behavioral regression is fixed.
 
 ## Follow-On Skills
 

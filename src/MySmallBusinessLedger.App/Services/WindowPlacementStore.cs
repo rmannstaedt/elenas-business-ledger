@@ -1,5 +1,6 @@
 using System.IO;
 using System.Text.Json;
+using System.Threading;
 using System.Windows;
 
 namespace MySmallBusinessLedger.App.Services;
@@ -7,15 +8,24 @@ namespace MySmallBusinessLedger.App.Services;
 public static class WindowPlacementStore
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
-    private static readonly string StorePath = AppPaths.CreateDefault().WindowPlacementPath;
+    private static readonly string DefaultStorePath = AppPaths.CreateDefault().WindowPlacementPath;
+    private static readonly AsyncLocal<string?> StorePathOverrideSlot = new();
 
-    public static void Attach(Window window, string key)
+    internal static string? StorePathOverride
     {
-        window.SourceInitialized += (_, _) => Restore(window, key);
+        get => StorePathOverrideSlot.Value;
+        set => StorePathOverrideSlot.Value = value;
+    }
+
+    private static string StorePath => StorePathOverride ?? DefaultStorePath;
+
+    public static void Attach(Window window, string key, bool rememberSize = true)
+    {
+        window.SourceInitialized += (_, _) => Restore(window, key, rememberSize);
         window.Closing += (_, _) => Save(window, key);
     }
 
-    private static void Restore(Window window, string key)
+    private static void Restore(Window window, string key, bool rememberSize)
     {
         var placements = LoadPlacements();
         if (!placements.TryGetValue(key, out var placement))
@@ -29,8 +39,12 @@ public static class WindowPlacementStore
         var virtualHeight = SystemParameters.VirtualScreenHeight;
 
         window.WindowStartupLocation = WindowStartupLocation.Manual;
-        window.Width = Math.Clamp(placement.Width, window.MinWidth, virtualWidth);
-        window.Height = Math.Clamp(placement.Height, window.MinHeight, virtualHeight);
+        if (rememberSize)
+        {
+            window.Width = Math.Clamp(placement.Width, window.MinWidth, virtualWidth);
+            window.Height = Math.Clamp(placement.Height, window.MinHeight, virtualHeight);
+        }
+
         window.Left = Math.Clamp(placement.Left, virtualLeft, virtualLeft + virtualWidth - window.Width);
         window.Top = Math.Clamp(placement.Top, virtualTop, virtualTop + virtualHeight - window.Height);
     }
@@ -52,8 +66,17 @@ public static class WindowPlacementStore
 
         var placements = LoadPlacements();
         placements[key] = new WindowPlacement(window.Left, window.Top, window.Width, window.Height);
-        Directory.CreateDirectory(Path.GetDirectoryName(StorePath)!);
-        File.WriteAllText(StorePath, JsonSerializer.Serialize(placements, JsonOptions));
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(StorePath)!);
+            File.WriteAllText(StorePath, JsonSerializer.Serialize(placements, JsonOptions));
+        }
+        catch (IOException)
+        {
+        }
+        catch (UnauthorizedAccessException)
+        {
+        }
     }
 
     private static Dictionary<string, WindowPlacement> LoadPlacements()

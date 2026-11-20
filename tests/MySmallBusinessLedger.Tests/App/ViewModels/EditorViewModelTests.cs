@@ -2,6 +2,7 @@ using MySmallBusinessLedger.App.Services;
 using MySmallBusinessLedger.App.ViewModels;
 using MySmallBusinessLedger.Core.Calendar;
 using MySmallBusinessLedger.Core.Common;
+using MySmallBusinessLedger.Core.Lessons;
 using MySmallBusinessLedger.Core.Plans;
 using MySmallBusinessLedger.Core.Students;
 using MySmallBusinessLedger.Core.UseCases.Lessons;
@@ -397,16 +398,17 @@ public sealed class EditorViewModelTests
         public OperationResult<IReadOnlyList<CalendarLesson>> EditResult { get; init; } =
             OperationResult<IReadOnlyList<CalendarLesson>>.Success([]);
 
-        public Task<OperationResult<IReadOnlyList<CalendarLesson>>> AddAsync(
+        public Task<OperationResult<LessonAddResult>> AddAsync(
             LessonAddRequest request,
             DateOnly refreshMonth,
             CancellationToken cancellationToken) =>
-            Task.FromResult(OperationResult<IReadOnlyList<CalendarLesson>>.Success([]));
+            Task.FromResult(OperationResult<LessonAddResult>.Success(new LessonAddResult(
+                new CalendarLesson("created", request.StudentShortName, request.StartsAt, HasKnownStartTime: request.HasKnownStartTime),
+                [])));
 
         public Task<OperationResult<PopulateCalendarResult>> PopulateCalendarAsync(
             string studentShortName,
             DateOnly displayMonth,
-            DateOnly today,
             CancellationToken cancellationToken) =>
             Task.FromResult(OperationResult<PopulateCalendarResult>.Success(new PopulateCalendarResult(0, 0, [])));
 
@@ -425,6 +427,13 @@ public sealed class EditorViewModelTests
             DateOnly refreshMonth,
             CancellationToken cancellationToken) =>
             Task.FromResult(OperationResult<IReadOnlyList<CalendarLesson>>.Success([]));
+
+        public Task<OperationResult<LessonRecord>> UpdatePlanAsync(
+            int lessonId,
+            int planCatalogId,
+            CancellationToken cancellationToken) =>
+            Task.FromResult(OperationResult<LessonRecord>.Failure(
+                new ValidationError("Test.NotImplemented", "This fake does not update lesson plans.")));
     }
 
 }

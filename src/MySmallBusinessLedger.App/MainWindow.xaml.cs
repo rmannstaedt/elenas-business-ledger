@@ -17,6 +17,7 @@ public partial class MainWindow : Window
 
     private bool hasLoaded;
     private bool activationRefreshQueued;
+    private bool activationRefreshCanceledByUserInput;
     private Border? openLessonDatePanel;
     private Button? openLessonDateTarget;
     private Border? openLessonTimePanel;
@@ -27,6 +28,7 @@ public partial class MainWindow : Window
         InitializeComponent();
         DataContext = viewModel;
         WindowPlacementStore.Attach(this, nameof(MainWindow));
+        GridWidthStore.Attach(this, nameof(MainWindow), [LessonsGrid, InvoicesGrid], LessonsPaneColumn);
         Closed += OnClosed;
         if (Application.Current is { } application)
         {
@@ -35,6 +37,16 @@ public partial class MainWindow : Window
     }
 
     private MainWindowViewModel ViewModel => (MainWindowViewModel)DataContext;
+
+    private void OnDashboardSizeChanged(object sender, SizeChangedEventArgs e)
+    {
+        if (e.WidthChanged)
+        {
+            LessonsPaneColumn.MaxWidth = Math.Max(
+                LessonsPaneColumn.MinWidth,
+                e.NewSize.Width - PaneDividerColumn.Width.Value - InvoicesPaneColumn.MinWidth);
+        }
+    }
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {
@@ -55,19 +67,24 @@ public partial class MainWindow : Window
         }
 
         activationRefreshQueued = true;
+        activationRefreshCanceledByUserInput = false;
         Dispatcher.BeginInvoke(
             new Action(async () =>
             {
                 try
                 {
-                    await ViewModel.RefreshAfterActivationAsync();
+                    if (!activationRefreshCanceledByUserInput)
+                    {
+                        await ViewModel.RefreshAfterActivationAsync();
+                    }
                 }
                 finally
                 {
                     activationRefreshQueued = false;
+                    activationRefreshCanceledByUserInput = false;
                 }
             }),
-            DispatcherPriority.Background);
+            DispatcherPriority.ApplicationIdle);
     }
 
     private async void OnInvoiceDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
@@ -85,6 +102,11 @@ public partial class MainWindow : Window
 
     private void OnWindowPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
+        if (activationRefreshQueued)
+        {
+            activationRefreshCanceledByUserInput = true;
+        }
+
         var source = e.OriginalSource as DependencyObject;
         CloseOpenLessonDatePanelIfOutside(source);
         CloseOpenLessonTimePanelIfOutside(source);
@@ -440,7 +462,7 @@ public partial class MainWindow : Window
             MinWidth = width,
             Width = width,
             SelectedItem = string.IsNullOrWhiteSpace(lesson.StartsAtTimeText)
-                ? null
+                ? LessonDisplayModel.NoTimeOptionText
                 : lesson.StartsAtTimeText
         };
         timeList.SelectionChanged += OnLessonTimeSelectionChanged;
@@ -497,7 +519,9 @@ public partial class MainWindow : Window
             return;
         }
 
-        lesson.StartsAtTimeText = selectedTime;
+        lesson.StartsAtTimeText = selectedTime == LessonDisplayModel.NoTimeOptionText
+            ? string.Empty
+            : selectedTime;
         CloseOpenLessonTimePanel();
         await ViewModel.SaveLessonCommand.ExecuteAsync(lesson);
     }
