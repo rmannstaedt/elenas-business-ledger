@@ -78,13 +78,13 @@ public sealed record InvoicePdfDocumentModel(
             RegexOptions.CultureInvariant);
         if (!match.Success)
         {
-            return new InvoicePdfServiceText($"Klaverundervisning - {planName}", string.Empty);
+            return new InvoicePdfServiceText($"Undervisning - {planName}", string.Empty);
         }
 
         var detail = match.Groups["detail"].Value
             .Replace("/uge", " pr. uge", StringComparison.Ordinal);
         return new InvoicePdfServiceText(
-            $"Klaverundervisning - {match.Groups["title"].Value}",
+            $"Undervisning - {match.Groups["title"].Value}",
             $"Individuel undervisning, {detail}");
     }
 

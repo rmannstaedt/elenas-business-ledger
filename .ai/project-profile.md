@@ -6,7 +6,7 @@ Working name: Elena's Business Ledger
 
 A Windows app for managing student lessons, invoices, and payments.
 
-Current app version: 1.31
+Current app version: 1.3.2
 
 Internal namespace/project prefix:
 ElenasBusinessLedger
@@ -17,7 +17,7 @@ Target framework: .NET 11. IDE builds require Visual Studio 18.12 or later.
 Platform: Windows desktop
 UI: WPF
 Architecture: local-first desktop app
-Installer/distribution: single-file Inno Setup installer with a self-contained .NET 11 build for Windows x64. The `scripts\build-installer.ps1` script creates `artifacts\installer\ElenasBusinessLedger-1.31.0-Setup.exe`. The per-user installer installs to `%LOCALAPPDATA%\Programs\MySmallBusinessLedger`, creates a Start menu shortcut, offers an optional desktop shortcut, has no auto-update behavior, and must preserve `%APPDATA%\visualtech.dk\MySmallBusinessLedger` during install, replacement, and uninstall.
+Installer/distribution: single-file Inno Setup installer with a self-contained .NET 11 build for Windows x64. The `scripts\build-installer.ps1` script creates `artifacts\installer\ElenasBusinessLedger-1.3.2-Setup.exe`. The per-user installer installs to `%LOCALAPPDATA%\Programs\MySmallBusinessLedger`, creates a Start menu shortcut, offers an optional desktop shortcut, has no auto-update behavior, and must preserve `%APPDATA%\visualtech.dk\MySmallBusinessLedger` during install, replacement, and uninstall.
 
 ## Solution shape
 
@@ -39,7 +39,7 @@ Student plan periods: stored with a required catalog plan identity plus copied c
 Issued invoice lines: stored with the exact local lesson identity, catalog plan identity for lineage, plus issued-time plan name and price snapshots for durable invoice display/PDF output; issued invoice company snapshots include the bank account, MobilePay account, and payment instructions used at issue time; old invoice display must use the stored invoice snapshot, not current catalog names or derived rename history; schema upgrades skip legacy invoice-line rows that cannot be safely tied to a saved local lesson, show a startup warning, and keep invoice headers plus safely linkable lines rather than inventing lesson identity
 Invoice PDFs: stored as files, not BLOBs
 Invoice number and PDF filename display: invoice numbers are formatted with at least three digits, and final PDF filenames use `Invoice <invoice number> <period> - <student full name>.pdf`, for example `Invoice 001 Juni 2026 - Mira Vale.pdf`
-Invoice PDF generation: QuestPDF; Danish invoice PDFs use a toner-light header with `studio.example.test`, show the invoice period/month, group lesson services by issued plan and price, list all included lessons in a clear indented lesson area that stays in one column through 10 lessons and uses two columns above 10 lessons, use `CVR` for the CVR label, include configured bank/MobilePay account lines and payment instructions when present, keep the invoice to one page, and add a plan cut-over note when a single invoice covers a mid-month plan change
+Invoice PDF generation: QuestPDF; Danish invoice PDFs use a toner-light header, show the invoice period/month, group lesson services by issued plan and price, list all included lessons in a clear indented lesson area that stays in one column through 10 lessons and uses two columns above 10 lessons, use `CVR` for the CVR label, include configured bank/MobilePay account lines and payment instructions when present, keep the invoice to one page, and add a plan cut-over note when a single invoice covers a mid-month plan change
 Invoice VAT calculation: VAT applicability is based on the invoice period start date, not the invoice issue/print date
 Economy Overview reporting: available from `Economy > Overview`; reads `Issued` SQLite invoice rows, stored invoice totals, a stored first application-backed invoice month, and explicit legacy manual month overrides, not stored PDF files; filters by invoice period start year, groups displayed month totals by invoice period start month/quarter, shows invoice number/PDF filename/net/VAT/total, shows selected-year plus four-prior-year totals, leaves month/quarter/year amount cells blank where no displayed total exists, exports one sectioned machine-friendly CSV with a `Source` column, and opens the stored PDF on invoice-row double-click. Manual month overrides are DKK-only replacement net/VAT totals before the cut-over month; they do not create invoice rows, invoice numbers, lesson rows, or PDFs. The cut-over controls where manual editing is allowed, not whether real issued invoices remain visible; issued invoices before the cut-over display read-only unless the same month also has a manual override. Mixed manual/application-backed months must fail visibly instead of being silently combined or hidden. Blocking economy data errors keep returned overview rows visible and disable export; Admin Mode keeps manual save/cancel actions available when overview rows are visible so invalid manual overrides can be removed. Saving manual totals persists only editable legacy manual months and clears stale manual overrides for months backed by issued invoices.
 Invoice PDF safety: reserve invoice metadata as `Issuing`, write to staging, verify PDF bytes, publish without overwriting, record the published path on the `Issuing` row, finalize the invoice as `Issued`, then request print; staging/write/verify/publish failures before final PDF publication must discard any staged PDF and release the reserved number so retries do not skip invoice numbers; after final PDF publication, finalization failure must preserve the `Issuing` reservation and published path for retry/support recovery, leave normal invoice lists hidden from the in-progress invoice, and avoid printing
@@ -49,11 +49,11 @@ Google Calendar selected calendar/account label: stored in SQLite app settings; 
 Runtime app data folder: `%APPDATA%\visualtech.dk\MySmallBusinessLedger`
 Runtime SQLite database path: `%APPDATA%\visualtech.dk\MySmallBusinessLedger\ledger.db`
 Runtime startup/composition: `App.xaml.cs` delegates database migration, service graph creation, startup jobs, and main-window construction to App-layer startup/bootstrapper classes
-Publisher Google OAuth Desktop client configuration: local/release file `src\ElenasBusinessLedger.App\Configuration\google-oauth-client.json`, copied to app output under `Configuration\google-oauth-client.json` when present; the real file is ignored by Git and the committed template is `src\ElenasBusinessLedger.App\Configuration\google-oauth-client.template.json`
+Publisher Google OAuth Desktop client configuration: local/release file `src\ElenasBusinessLedger.App\Configuration\google-oauth-client.json`, copied to app output under `Configuration\google-oauth-client.json` when present; the real file is ignored by Git. See the [setup guide](../docs/setup.md#set-up-a-google-oauth-client).
 Google OAuth protected token folder: `%APPDATA%\visualtech.dk\MySmallBusinessLedger\GoogleTokens`
 Window placement file path: `%APPDATA%\visualtech.dk\MySmallBusinessLedger\window-placement.json`
 Grid column width file path: `%APPDATA%\visualtech.dk\MySmallBusinessLedger\grid-column-widths.json`
-Backup: no automated backup in version 1.31; keep persistence design compatible with later manual backup/export
+Backup: no automated backup in version 1.3.2; keep persistence design compatible with later manual backup/export
 
 ## External integrations
 

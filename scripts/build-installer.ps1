@@ -11,7 +11,7 @@ $projectPath = Join-Path $repoRoot "src\ElenasBusinessLedger.App\ElenasBusinessL
 $innoScriptPath = Join-Path $repoRoot "installer\ElenasBusinessLedger.iss"
 $publishDir = Join-Path $repoRoot "artifacts\publish\ElenasBusinessLedger\$Runtime"
 $installerDir = Join-Path $repoRoot "artifacts\installer"
-$installerFileName = "ElenasBusinessLedger-1.31.0-Setup.exe"
+$installerFileName = "ElenasBusinessLedger-1.3.2-Setup.exe"
 $installerPath = Join-Path $installerDir $installerFileName
 
 if (-not (Test-Path -LiteralPath $InnoSetupCompiler)) {
