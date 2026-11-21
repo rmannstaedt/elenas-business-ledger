@@ -1,4 +1,6 @@
-# My Small Business Ledger
+# Elena's Business Ledger
+
+A Windows app for managing student lessons, invoices, and payments.
 
 This repository contains a small local-first ledger application for independent piano teachers.
 
@@ -16,12 +18,12 @@ Primary goal:
 
 ```text
 src/
-  MySmallBusinessLedger.App
-  MySmallBusinessLedger.Core
-  MySmallBusinessLedger.Infrastructure
+  ElenasBusinessLedger.App
+  ElenasBusinessLedger.Core
+  ElenasBusinessLedger.Infrastructure
 
 tests/
-  MySmallBusinessLedger.Tests
+  ElenasBusinessLedger.Tests
 ```
 
 ## Build and test
@@ -29,8 +31,8 @@ tests/
 The Ledger builds with the .NET 11 SDK and uses EF Core 11. IDE builds require Visual Studio 18.12 or later.
 
 ```powershell
-dotnet build MySmallBusinessLedger.sln -nodeReuse:false
-dotnet test MySmallBusinessLedger.sln -nodeReuse:false
+dotnet build ElenasBusinessLedger.sln -nodeReuse:false
+dotnet test ElenasBusinessLedger.sln -nodeReuse:false
 ```
 
 ## Build the installer
@@ -44,12 +46,12 @@ powershell -ExecutionPolicy Bypass -File scripts\build-installer.ps1
 The script publishes a self-contained .NET 11 Release build and creates the installer at the following path.
 
 ```text
-artifacts\installer\MySmallBusinessLedger-1.31.0-Setup.exe
+artifacts\installer\ElenasBusinessLedger-1.31.0-Setup.exe
 ```
 
-Inno Setup 6 must be installed at `C:\Program Files (x86)\Inno Setup 6\ISCC.exe`, or pass `-InnoSetupCompiler` to the script. If the release installer should include Google Calendar sign-in support, place the real publisher OAuth Desktop JSON at `src\MySmallBusinessLedger.App\Configuration\google-oauth-client.json` before building; that file remains ignored by Git.
+Inno Setup 6 must be installed at `C:\Program Files (x86)\Inno Setup 6\ISCC.exe`, or pass `-InnoSetupCompiler` to the script. If the release installer should include Google Calendar sign-in support, place the real publisher OAuth Desktop JSON at `src\ElenasBusinessLedger.App\Configuration\google-oauth-client.json` before building; that file remains ignored by Git.
 
-The installer installs per-user under `%LOCALAPPDATA%\Programs\MySmallBusinessLedger`, creates a Start menu shortcut, and offers an optional desktop shortcut. It installs only this version and does not auto-update. Later installers use the same application identity and install location so they replace application files without deleting runtime data. Install, upgrade, and uninstall must leave `%APPDATA%\visualtech.dk\MySmallBusinessLedger` intact, including `ledger.db`, Settings data, Google token files, window placement, and grid column widths.
+The installer installs per-user under `%LOCALAPPDATA%\Programs\MySmallBusinessLedger`, creates a Start menu shortcut, and offers an optional desktop shortcut. It installs only this version and does not auto-update. Later installers use the same application identity and install location so they replace application files without deleting runtime data. The installer replaces the original Windows launcher in place so existing shortcuts open the renamed app. Install, upgrade, and uninstall must leave `%APPDATA%\visualtech.dk\MySmallBusinessLedger` intact, including `ledger.db`, Settings data, Google token files, window placement, and grid column widths.
 
 The installer is not code-signed in version 1.31, so Windows SmartScreen may warn before running it.
 
@@ -58,7 +60,7 @@ The installer is not code-signed in version 1.31, so Windows SmartScreen may war
 Run the WPF app from Visual Studio or with:
 
 ```powershell
-dotnet run --project src\MySmallBusinessLedger.App\MySmallBusinessLedger.App.csproj
+dotnet run --project src\ElenasBusinessLedger.App\ElenasBusinessLedger.App.csproj
 ```
 
 On first setup, open `Application > Settings` and configure:
@@ -66,7 +68,7 @@ On first setup, open `Application > Settings` and configure:
 - company name, address, VAT status, bank registration/account number, MobilePay account, invoice folder, invoice printer, and invoice payment instructions selected from fixed terms or custom text; the invoice folder can be typed or selected with Browse, and the remembered printer can be selected, typed, changed, or cleared;
 - Google calendar and account label/email. The calendar defaults to `primary`, which means the main calendar of the Google account used at sign-in.
 
-The app uses the publisher Google sign-in configuration bundled with the application. For local development, put the real Desktop OAuth JSON at `src\MySmallBusinessLedger.App\Configuration\google-oauth-client.json`; the file is intentionally ignored by Git and copied to the app output when present. Use `Application > Settings > Connect Google Calendar` to authorize the configured Google account in the browser. Startup/dashboard refreshes reuse saved local authorization only and do not open browser consent; if authorization is missing, reconnect from Settings. Settings reports whether Google authorization token files are saved locally for the configured account; use `Forget Google sign-in` to clear local authorization and force a fresh browser consent flow.
+The app uses the publisher Google sign-in configuration bundled with the application. For local development, put the real Desktop OAuth JSON at `src\ElenasBusinessLedger.App\Configuration\google-oauth-client.json`; the file is intentionally ignored by Git and copied to the app output when present. Use `Application > Settings > Connect Google Calendar` to authorize the configured Google account in the browser. Startup/dashboard refreshes reuse saved local authorization only and do not open browser consent; if authorization is missing, reconnect from Settings. Settings reports whether Google authorization token files are saved locally for the configured account; use `Forget Google sign-in` to clear local authorization and force a fresh browser consent flow.
 
 Google OAuth access/refresh tokens are stored with Windows user data protection, under collision-resistant hashed token-key filenames. Legacy escaped token filenames are still read and migrated to hashed filenames on successful token lookup.
 
@@ -99,7 +101,7 @@ The main window can populate Google Calendar from the selected student's saved s
 - Runtime data is stored under `%APPDATA%\visualtech.dk\MySmallBusinessLedger`.
 - The WPF app now uses real SQLite/Core/Calendar-backed services; if Google Calendar is not configured or authorization is missing, the dashboard reports that instead of showing sample lesson rows or opening browser OAuth unexpectedly.
 - Company and Google Calendar account setup, connection, authorization reset, the durable first application-backed invoice month, and session-only Economy Overview Admin Mode are available from `Application > Settings`; Admin Mode is always off at startup and must be explicitly saved for the current session.
-- The app version is visible from `Application > About My Small Business Ledger`.
+- The app version is visible from `Application > About Elena's Business Ledger`.
 - Plan catalog management is available from `Plan > Manage Plans`; only Active catalog plans are assignable to students.
 - Student overview management is available from `Student > Manage Students`; it opens coordinated Students and Student Details windows, supports selected-student/plan/schedule editing with Save in the details window and an unsaved-change prompt on Close, mirrors student selection into the main window immediately and on close, and preserves copied plan commercial-term snapshots and issued invoices unless edited student data is saved. The main window `Student Details` button opens the same details window for the currently displayed student.
 - Economy overview reporting is available from `Economy > Overview`; it uses issued SQLite invoice totals and explicit pre-cut-over manual month overrides by invoice period year, not PDF parsing, and exports one sectioned CSV with invoice, month, quarter, and year rows plus a source/provenance column.

@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\ElenasBusinessLedger.Core\ElenasBusinessLedger.Core.csproj" />
+    <ProjectReference Include="..\ElenasBusinessLedger.Infrastructure\ElenasBusinessLedger.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="Configuration\google-oauth-client.json" CopyToOutputDirectory="PreserveNewest" Condition="Exists('Configuration\google-oauth-client.json')" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net11.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <Product>Elena's Business Ledger</Product>
+    <AssemblyTitle>Elena's Business Ledger</AssemblyTitle>
+    <Description>A Windows app for managing student lessons, invoices, and payments.</Description>
+    <Version>1.31.0</Version>
+    <AssemblyVersion>1.31.0.0</AssemblyVersion>
+    <FileVersion>1.31.0.0</FileVersion>
+    <InformationalVersion>1.31</InformationalVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+  </PropertyGroup>
+
+</Project>

@@ -79,16 +79,16 @@ Add `Student > Manage Students`, opening a WPF student overview window with:
 
 ## Affected Files And Surfaces
 
-- `src/MySmallBusinessLedger.Core/Ports/IStudentRepository.cs`
-- `src/MySmallBusinessLedger.Infrastructure/Persistence/SqliteStudentRepository.cs`
+- `src/ElenasBusinessLedger.Core/Ports/IStudentRepository.cs`
+- `src/ElenasBusinessLedger.Infrastructure/Persistence/SqliteStudentRepository.cs`
 - New App service interfaces/classes for student overview and launcher.
-- `src/MySmallBusinessLedger.App/Services/IStudentOverviewLauncher.cs`
+- `src/ElenasBusinessLedger.App/Services/IStudentOverviewLauncher.cs`
 - New App display models and ViewModel.
 - New WPF view/code-behind.
-- `src/MySmallBusinessLedger.App/MainWindow.xaml`
-- `src/MySmallBusinessLedger.App/ViewModels/MainWindowViewModel.cs`
-- `src/MySmallBusinessLedger.App/App.xaml.cs`
-- Tests under `tests/MySmallBusinessLedger.Tests/App/ViewModels/` and `tests/MySmallBusinessLedger.Tests/Infrastructure/Persistence/`.
+- `src/ElenasBusinessLedger.App/MainWindow.xaml`
+- `src/ElenasBusinessLedger.App/ViewModels/MainWindowViewModel.cs`
+- `src/ElenasBusinessLedger.App/App.xaml.cs`
+- Tests under `tests/ElenasBusinessLedger.Tests/App/ViewModels/` and `tests/ElenasBusinessLedger.Tests/Infrastructure/Persistence/`.
 - Docs/context updates.
 
 ## Risks And Mitigations
@@ -119,7 +119,7 @@ Steps:
 Verification:
 
 ```powershell
-dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~SqlitePersistenceTests|FullyQualifiedName~StudentOverview" -nodeReuse:false
+dotnet test tests\ElenasBusinessLedger.Tests\ElenasBusinessLedger.Tests.csproj --filter "FullyQualifiedName~SqlitePersistenceTests|FullyQualifiedName~StudentOverview" -nodeReuse:false
 ```
 
 ### Stage 2: ViewModel, Launcher, And Window
@@ -137,7 +137,7 @@ Steps:
 Verification:
 
 ```powershell
-dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~StudentOverview" -nodeReuse:false
+dotnet test tests\ElenasBusinessLedger.Tests\ElenasBusinessLedger.Tests.csproj --filter "FullyQualifiedName~StudentOverview" -nodeReuse:false
 ```
 
 ### Stage 3: Main Menu Wiring, Docs, And Full Verification
@@ -155,8 +155,8 @@ Steps:
 Verification:
 
 ```powershell
-dotnet build MySmallBusinessLedger.sln -nodeReuse:false
-dotnet test MySmallBusinessLedger.sln -nodeReuse:false
+dotnet build ElenasBusinessLedger.sln -nodeReuse:false
+dotnet test ElenasBusinessLedger.sln -nodeReuse:false
 ```
 
 ### Stage 4: Split Student List And Details Windows
@@ -170,12 +170,12 @@ Goal:
 
 Affected files/classes/schemas/commands/UI surfaces:
 
-- `src/MySmallBusinessLedger.App/Views/StudentOverviewView.xaml`
-- `src/MySmallBusinessLedger.App/Views/StudentOverviewView.xaml.cs`
-- New `src/MySmallBusinessLedger.App/Views/StudentDetailsView.xaml`
-- New `src/MySmallBusinessLedger.App/Views/StudentDetailsView.xaml.cs`
-- `src/MySmallBusinessLedger.App/Services/StudentOverviewWindowLauncher.cs`
-- `tests/MySmallBusinessLedger.Tests/App/ViewModels/StudentOverviewViewModelTests.cs`
+- `src/ElenasBusinessLedger.App/Views/StudentOverviewView.xaml`
+- `src/ElenasBusinessLedger.App/Views/StudentOverviewView.xaml.cs`
+- New `src/ElenasBusinessLedger.App/Views/StudentDetailsView.xaml`
+- New `src/ElenasBusinessLedger.App/Views/StudentDetailsView.xaml.cs`
+- `src/ElenasBusinessLedger.App/Services/StudentOverviewWindowLauncher.cs`
+- `tests/ElenasBusinessLedger.Tests/App/ViewModels/StudentOverviewViewModelTests.cs`
 - README/project-profile/docs references to embedded student management behavior.
 
 Concrete steps:
@@ -204,9 +204,9 @@ Tests to add/update:
 Verification commands/manual checks:
 
 ```powershell
-dotnet test MySmallBusinessLedger.sln --filter "FullyQualifiedName~StudentOverviewViewModelTests" -nodeReuse:false
-dotnet build MySmallBusinessLedger.sln -nodeReuse:false
-dotnet test MySmallBusinessLedger.sln -nodeReuse:false
+dotnet test ElenasBusinessLedger.sln --filter "FullyQualifiedName~StudentOverviewViewModelTests" -nodeReuse:false
+dotnet build ElenasBusinessLedger.sln -nodeReuse:false
+dotnet test ElenasBusinessLedger.sln -nodeReuse:false
 ```
 
 Risks:
@@ -244,11 +244,11 @@ Goal:
 
 Affected files/classes/schemas/commands/UI surfaces:
 
-- `src/MySmallBusinessLedger.App/MainWindow.xaml`
-- `src/MySmallBusinessLedger.App/ViewModels/MainWindowViewModel.cs`
-- `src/MySmallBusinessLedger.App/Services/IStudentOverviewLauncher.cs`
-- `src/MySmallBusinessLedger.App/Services/StudentOverviewWindowLauncher.cs`
-- `tests/MySmallBusinessLedger.Tests/App/ViewModels/MainWindowViewModelTests.cs`
+- `src/ElenasBusinessLedger.App/MainWindow.xaml`
+- `src/ElenasBusinessLedger.App/ViewModels/MainWindowViewModel.cs`
+- `src/ElenasBusinessLedger.App/Services/IStudentOverviewLauncher.cs`
+- `src/ElenasBusinessLedger.App/Services/StudentOverviewWindowLauncher.cs`
+- `tests/ElenasBusinessLedger.Tests/App/ViewModels/MainWindowViewModelTests.cs`
 
 Concrete steps:
 
@@ -261,9 +261,9 @@ Concrete steps:
 Verification:
 
 ```powershell
-dotnet test MySmallBusinessLedger.sln --filter "FullyQualifiedName~MainWindowViewModelTests" -nodeReuse:false
-dotnet build MySmallBusinessLedger.sln -nodeReuse:false
-dotnet test MySmallBusinessLedger.sln -nodeReuse:false
+dotnet test ElenasBusinessLedger.sln --filter "FullyQualifiedName~MainWindowViewModelTests" -nodeReuse:false
+dotnet build ElenasBusinessLedger.sln -nodeReuse:false
+dotnet test ElenasBusinessLedger.sln -nodeReuse:false
 ```
 
 Runner may continue automatically after this stage: yes.
@@ -301,13 +301,13 @@ Expected result: Student overview supports list/detail/current-plan/invoices and
   - Stage: Stages 1-3 implementation
   - Files changed: Core student repository port, SQLite student repository, App student overview service/launcher/viewmodel/view, main-window menu/composition, focused tests, README, business requirements, project profile, handoff, and this plan.
   - Summary: Added `Student > Manage Students` with all-student listing, selected student details, current assigned plan snapshot, invoice list with existing viewer double-click, add/edit through the existing Student editor, safe activate/deactivate, and remembered window/grid state.
-  - Tests/verification run: `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~StudentOverview|FullyQualifiedName~StudentsCanBeListedIncludingInactiveStudents|FullyQualifiedName~ManageStudentsCommand" -nodeReuse:false`; `dotnet build MySmallBusinessLedger.sln -nodeReuse:false`; `dotnet test MySmallBusinessLedger.sln -nodeReuse:false`.
+  - Tests/verification run: `dotnet test tests\ElenasBusinessLedger.Tests\ElenasBusinessLedger.Tests.csproj --filter "FullyQualifiedName~StudentOverview|FullyQualifiedName~StudentsCanBeListedIncludingInactiveStudents|FullyQualifiedName~ManageStudentsCommand" -nodeReuse:false`; `dotnet build ElenasBusinessLedger.sln -nodeReuse:false`; `dotnet test ElenasBusinessLedger.sln -nodeReuse:false`.
   - Results: Focused tests passed 7/7; full build passed with 0 warnings and 0 errors; full solution tests passed 168/168.
 - 2026-06-27:
   - Stage: Stage 4 split-window redesign
   - Files changed: Student overview/list window, new student details window, student overview launcher, student overview ViewModel close helper, focused WPF/ViewModel tests, README, project profile, business requirements, handoff, and this plan.
   - Summary: Split Manage Students into a Students list window and a separate Student Details window sharing one `StudentOverviewViewModel`; selecting a student updates the details state, invoice double-click remains in the details window, and the details Close button is centered on its bottom row.
-  - Tests/verification run: `dotnet test MySmallBusinessLedger.sln --filter "FullyQualifiedName~StudentOverviewViewModelTests" -nodeReuse:false`; `dotnet build MySmallBusinessLedger.sln -nodeReuse:false`; `dotnet test MySmallBusinessLedger.sln -nodeReuse:false`.
+  - Tests/verification run: `dotnet test ElenasBusinessLedger.sln --filter "FullyQualifiedName~StudentOverviewViewModelTests" -nodeReuse:false`; `dotnet build ElenasBusinessLedger.sln -nodeReuse:false`; `dotnet test ElenasBusinessLedger.sln -nodeReuse:false`.
   - Results: Focused tests passed 18/18; full build passed with 0 warnings and 0 errors; full solution tests passed 346/346.
   - Deviations: Details-window close discards unsaved shared editor changes explicitly when the list remains open, avoiding hidden unsaved state after a details-only close.
   - Risks/open questions: Final visual/manual user test is still required.
@@ -315,20 +315,20 @@ Expected result: Student overview supports list/detail/current-plan/invoices and
   - Stage: Stage 4 placement fix
   - Files changed: Student overview launcher and focused WPF/ViewModel tests.
   - Summary: Made Manage Students explicitly close Student Details through its normal close path after a confirmed list-window close, preserving Student Details placement.
-  - Tests/verification run: `dotnet test MySmallBusinessLedger.sln --filter "FullyQualifiedName~StudentOverviewViewModelTests" -nodeReuse:false`; `dotnet build MySmallBusinessLedger.sln -nodeReuse:false`; `dotnet test MySmallBusinessLedger.sln -nodeReuse:false`.
+  - Tests/verification run: `dotnet test ElenasBusinessLedger.sln --filter "FullyQualifiedName~StudentOverviewViewModelTests" -nodeReuse:false`; `dotnet build ElenasBusinessLedger.sln -nodeReuse:false`; `dotnet test ElenasBusinessLedger.sln -nodeReuse:false`.
   - Results: Focused tests passed 18/18; full build passed with 0 warnings and 0 errors; full solution tests passed 346/346.
   - Risks/open questions: Manual confirmation should close Manage Students first, reopen, and verify Student Details returns to its last position.
 - 2026-06-27:
   - Stage: Stage 4 focus-order fix
   - Files changed: Student overview launcher and this plan.
   - Summary: Made Student Details an owned window of Manage Students once Manage Students is shown, so Windows keeps the details window above its list owner without delayed reactivation or visible z-order shuffling.
-  - Tests/verification run: `dotnet test MySmallBusinessLedger.sln --filter "FullyQualifiedName~StudentOverviewViewModelTests" -nodeReuse:false`; `dotnet build MySmallBusinessLedger.sln -nodeReuse:false`; `dotnet test MySmallBusinessLedger.sln --filter "FullyQualifiedName~StudentOverviewViewModelTests.StudentOverviewAndDetailsWindowsShareSelectedStudent" -nodeReuse:false`; `dotnet test MySmallBusinessLedger.sln -nodeReuse:false`.
+  - Tests/verification run: `dotnet test ElenasBusinessLedger.sln --filter "FullyQualifiedName~StudentOverviewViewModelTests" -nodeReuse:false`; `dotnet build ElenasBusinessLedger.sln -nodeReuse:false`; `dotnet test ElenasBusinessLedger.sln --filter "FullyQualifiedName~StudentOverviewViewModelTests.StudentOverviewAndDetailsWindowsShareSelectedStudent" -nodeReuse:false`; `dotnet test ElenasBusinessLedger.sln -nodeReuse:false`.
   - Results: Focused student overview tests passed 18/18; build passed with 0 warnings and 0 errors; full test suite had one transient WPF XAML parse failure, the failing test passed in isolation, and the full rerun passed 346/346.
   - Risks/open questions: Manual confirmation should click students in the list and verify Student Details stays naturally above Manage Students without a visible yank.
 - 2026-06-27:
   - Stage: Stage 5 main-window Student Details shortcut
   - Files changed: Main window XAML, main-window ViewModel, student overview launcher/interface, focused WPF/ViewModel tests, README, project profile, business requirements, handoff, and this plan.
   - Summary: Added a main-window `Student Details` button that opens the existing `StudentDetailsView` for the currently displayed student, reusing the same student overview/details ViewModel setup and refreshing the dashboard around the final selected student after close.
-  - Tests/verification run: `dotnet test MySmallBusinessLedger.sln --filter "FullyQualifiedName~MainWindowViewModelTests" -nodeReuse:false`; `dotnet build MySmallBusinessLedger.sln -nodeReuse:false`; `dotnet test MySmallBusinessLedger.sln -nodeReuse:false`.
+  - Tests/verification run: `dotnet test ElenasBusinessLedger.sln --filter "FullyQualifiedName~MainWindowViewModelTests" -nodeReuse:false`; `dotnet build ElenasBusinessLedger.sln -nodeReuse:false`; `dotnet test ElenasBusinessLedger.sln -nodeReuse:false`.
   - Results: Focused main-window tests passed 82/82; full build passed with 0 warnings and 0 errors; full solution tests passed 348/348.
   - Risks/open questions: Manual confirmation should click the new main-window `Student Details` button and verify it opens the expected student.

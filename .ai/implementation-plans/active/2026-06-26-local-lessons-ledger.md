@@ -3,7 +3,7 @@
 Status: Active
 Created: 2026-06-26
 Last updated: 2026-06-26
-Owner/context: My Small Business Ledger; local-first WPF app for piano lesson invoicing and audit-safe lesson records.
+Owner/context: Elena's Business Ledger; local-first WPF app for piano lesson invoicing and audit-safe lesson records.
 
 ## Related Docs And Standards
 
@@ -93,10 +93,10 @@ The following must remain unchanged unless this plan explicitly says otherwise:
 
 ## Affected Files, Projects, Commands, Docs, Schemas, Or Artifacts
 
-- `src/MySmallBusinessLedger.Core`: lesson records, lesson repository port, startup dashboard query, invoice preview/candidate use cases, lesson add/edit/delete use cases.
-- `src/MySmallBusinessLedger.Infrastructure`: EF entities, `LedgerDbContext`, migrations, SQLite lesson repository, Google Calendar gateway integration.
-- `src/MySmallBusinessLedger.App`: main window ViewModel/display model/XAML, app composition, lesson editor service contracts.
-- `tests/MySmallBusinessLedger.Tests`: core use-case tests, infrastructure persistence/calendar tests, WPF ViewModel/UI tests.
+- `src/ElenasBusinessLedger.Core`: lesson records, lesson repository port, startup dashboard query, invoice preview/candidate use cases, lesson add/edit/delete use cases.
+- `src/ElenasBusinessLedger.Infrastructure`: EF entities, `LedgerDbContext`, migrations, SQLite lesson repository, Google Calendar gateway integration.
+- `src/ElenasBusinessLedger.App`: main window ViewModel/display model/XAML, app composition, lesson editor service contracts.
+- `tests/ElenasBusinessLedger.Tests`: core use-case tests, infrastructure persistence/calendar tests, WPF ViewModel/UI tests.
 - `docs/business-requirements-and-logic.md`, `README.md`, `.ai/project-profile.md` after implementation.
 
 ## Risks And Mitigations
@@ -151,7 +151,7 @@ Tests to add/update:
 
 Verification commands/manual checks:
 
-- `dotnet test MySmallBusinessLedger.sln --filter "FullyQualifiedName~SqlitePersistenceTests" -nodeReuse:false`
+- `dotnet test ElenasBusinessLedger.sln --filter "FullyQualifiedName~SqlitePersistenceTests" -nodeReuse:false`
 
 Risks:
 
@@ -207,7 +207,7 @@ Tests to add/update:
 
 Verification commands/manual checks:
 
-- `dotnet test MySmallBusinessLedger.sln --filter "FullyQualifiedName~UseCaseTests|FullyQualifiedName~GoogleCalendarGatewayTests" -nodeReuse:false`
+- `dotnet test ElenasBusinessLedger.sln --filter "FullyQualifiedName~UseCaseTests|FullyQualifiedName~GoogleCalendarGatewayTests" -nodeReuse:false`
 
 Risks:
 
@@ -261,7 +261,7 @@ Tests to add/update:
 
 Verification commands/manual checks:
 
-- `dotnet test MySmallBusinessLedger.sln --filter "FullyQualifiedName~Invoice" -nodeReuse:false`
+- `dotnet test ElenasBusinessLedger.sln --filter "FullyQualifiedName~Invoice" -nodeReuse:false`
 
 Risks:
 
@@ -317,7 +317,7 @@ Tests to add/update:
 
 Verification commands/manual checks:
 
-- `dotnet test MySmallBusinessLedger.sln --filter "FullyQualifiedName~MainWindowViewModelTests" -nodeReuse:false`
+- `dotnet test ElenasBusinessLedger.sln --filter "FullyQualifiedName~MainWindowViewModelTests" -nodeReuse:false`
 
 Risks:
 
@@ -371,8 +371,8 @@ Tests to add/update:
 
 Verification commands/manual checks:
 
-- `dotnet build MySmallBusinessLedger.sln -nodeReuse:false`
-- `dotnet test MySmallBusinessLedger.sln -nodeReuse:false`
+- `dotnet build ElenasBusinessLedger.sln -nodeReuse:false`
+- `dotnet test ElenasBusinessLedger.sln -nodeReuse:false`
 
 Risks:
 
@@ -433,9 +433,9 @@ Tests to add/update:
 
 Verification commands/manual checks:
 
-- `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~UseCaseTests" -nodeReuse:false`
-- `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~SqlitePersistenceTests" -nodeReuse:false`
-- `dotnet test MySmallBusinessLedger.sln -nodeReuse:false`
+- `dotnet test tests\ElenasBusinessLedger.Tests\ElenasBusinessLedger.Tests.csproj --filter "FullyQualifiedName~UseCaseTests" -nodeReuse:false`
+- `dotnet test tests\ElenasBusinessLedger.Tests\ElenasBusinessLedger.Tests.csproj --filter "FullyQualifiedName~SqlitePersistenceTests" -nodeReuse:false`
+- `dotnet test ElenasBusinessLedger.sln -nodeReuse:false`
 
 Risks:
 
@@ -464,8 +464,8 @@ Runner may continue automatically after this stage: yes.
 
 - TDD for new persistence, reconciliation, invoice, and UI behavior.
 - Targeted test filters per stage.
-- Full `dotnet build MySmallBusinessLedger.sln -nodeReuse:false`.
-- Full `dotnet test MySmallBusinessLedger.sln -nodeReuse:false`.
+- Full `dotnet build ElenasBusinessLedger.sln -nodeReuse:false`.
+- Full `dotnet test ElenasBusinessLedger.sln -nodeReuse:false`.
 - Manual UI test for Add Lesson date default, Plan dropdown editability, invoice lock behavior, and adding a later same-month lesson after issuing an invoice.
 
 ## Follow-On Review And Documentation
@@ -544,7 +544,7 @@ Cleanup/reset instructions:
   - Stage: 1-4 implementation
   - Files changed: Core lesson model/repository/use cases, SQLite Lessons entity/repository/migration, startup dashboard reconciliation, invoice candidate/preview/issue flow, main-window lesson grid/view model/service wiring, use-case/persistence/WPF tests.
   - Summary: Added durable local Lessons rows, reconciled uninvoiced calendar lessons into local records, kept invoiced lessons locked against later calendar edits/deletes, switched invoice candidate/preview/issue flow to local uninvoiced lessons, added Plan column/dropdown for uninvoiced local lessons, and defaulted Add Lesson in non-current months to the first day of the displayed month.
-  - Tests/verification run: `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj -nodeReuse:false` with `MSBL_RUN_UI_TESTS=1`; `dotnet build MySmallBusinessLedger.sln -nodeReuse:false`; `dotnet test MySmallBusinessLedger.sln -nodeReuse:false` with `MSBL_RUN_UI_TESTS=1`
+  - Tests/verification run: `dotnet test tests\ElenasBusinessLedger.Tests\ElenasBusinessLedger.Tests.csproj -nodeReuse:false` with `MSBL_RUN_UI_TESTS=1`; `dotnet build ElenasBusinessLedger.sln -nodeReuse:false`; `dotnet test ElenasBusinessLedger.sln -nodeReuse:false` with `MSBL_RUN_UI_TESTS=1`
   - Results: build passed with 0 warnings; solution tests passed, 289 tests
   - Deviations: newly autosaved draft rows become fully plan-editable after immediate dashboard reconciliation/refresh because the Google Calendar add response does not carry a local lesson id.
   - Risks/open questions: local plan metadata is still not mirrored visibly into Google Calendar for v1.
@@ -552,13 +552,13 @@ Cleanup/reset instructions:
   - Stage: Optional lesson time support
   - Files changed: Core lesson/calendar/invoice models, Google Calendar event client/gateway, SQLite lesson/invoice-line schema, main-window lesson display/save flow, invoice date display, requirements/context docs, ViewModel/calendar tests.
   - Summary: Made lesson time optional. Date-only lessons save as Google Calendar all-day events, persist known-time state locally, remain selected after reconciliation, become plan-editable after immediate refresh, and display/print without fake midnight times. Draft autosave is debounced so quick date-then-time edits save the intended timed lesson instead of prematurely saving all-day.
-  - Tests/verification run: `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj -nodeReuse:false --filter "FullyQualifiedName~MainWindowViewModelTests"`; `dotnet test MySmallBusinessLedger.sln -nodeReuse:false`
+  - Tests/verification run: `dotnet test tests\ElenasBusinessLedger.Tests\ElenasBusinessLedger.Tests.csproj -nodeReuse:false --filter "FullyQualifiedName~MainWindowViewModelTests"`; `dotnet test ElenasBusinessLedger.sln -nodeReuse:false`
   - Results: main-window tests passed, 70 tests; solution tests passed, 293 tests
 - 2026-06-26:
   - Stage: Startup regression hardening
   - Files changed: `StartupDashboardQuery`, `UseCaseTests`
   - Summary: Prevented calendar entries for unknown/inactive students from being selected or reconciled into local Lessons rows, avoiding invalid local `StudentId` persistence on startup.
-  - Tests/verification run: `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~UseCaseTests.StartupDashboardIgnoresCalendarLessonsWithoutKnownActiveStudentWhenUsingLocalLessonLedger" -nodeReuse:false`; `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~UseCaseTests.StartupDashboard" -nodeReuse:false`
+  - Tests/verification run: `dotnet test tests\ElenasBusinessLedger.Tests\ElenasBusinessLedger.Tests.csproj --filter "FullyQualifiedName~UseCaseTests.StartupDashboardIgnoresCalendarLessonsWithoutKnownActiveStudentWhenUsingLocalLessonLedger" -nodeReuse:false`; `dotnet test tests\ElenasBusinessLedger.Tests\ElenasBusinessLedger.Tests.csproj --filter "FullyQualifiedName~UseCaseTests.StartupDashboard" -nodeReuse:false`
   - Results: passed
   - Deviations: none
   - Risks/open questions: none
@@ -566,7 +566,7 @@ Cleanup/reset instructions:
   - Stage: Immediate local ledger mutation regression fix
   - Files changed: lesson mutation use cases, `ILessonRepository`, `SqliteLessonRepository`, app composition, use-case/persistence tests, README, project profile, business requirements, handoff context, and this plan.
   - Summary: Delete, edit, planned/completed toggle, and Populate Calendar now update exact uninvoiced local SQLite lesson rows before reporting success, so invoice preview no longer depends on a later refresh to observe app-driven lesson changes. Populate Calendar also preserves created event ids and saves local rows when Google Calendar creation succeeds but the post-create refresh fails.
-  - Tests/verification run: `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~UseCaseTests" -nodeReuse:false`; `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~SqlitePersistenceTests" -nodeReuse:false`; `dotnet test tests\MySmallBusinessLedger.Tests\MySmallBusinessLedger.Tests.csproj --filter "FullyQualifiedName~GoogleCalendarGatewayTests" -nodeReuse:false`; `dotnet test MySmallBusinessLedger.sln -nodeReuse:false`; `dotnet build MySmallBusinessLedger.sln -nodeReuse:false`; `git diff --check`
+  - Tests/verification run: `dotnet test tests\ElenasBusinessLedger.Tests\ElenasBusinessLedger.Tests.csproj --filter "FullyQualifiedName~UseCaseTests" -nodeReuse:false`; `dotnet test tests\ElenasBusinessLedger.Tests\ElenasBusinessLedger.Tests.csproj --filter "FullyQualifiedName~SqlitePersistenceTests" -nodeReuse:false`; `dotnet test tests\ElenasBusinessLedger.Tests\ElenasBusinessLedger.Tests.csproj --filter "FullyQualifiedName~GoogleCalendarGatewayTests" -nodeReuse:false`; `dotnet test ElenasBusinessLedger.sln -nodeReuse:false`; `dotnet build ElenasBusinessLedger.sln -nodeReuse:false`; `git diff --check`
   - Results: use-case tests passed 71/71; SQLite persistence tests passed 38/38; Google Calendar gateway tests passed 22/22; solution tests passed 361/361; solution build passed with 0 warnings and 0 errors; diff check passed with only CRLF normalization warnings.
   - Deviations: none
   - Risks/open questions: none
