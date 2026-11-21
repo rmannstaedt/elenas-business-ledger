@@ -16,7 +16,8 @@ public interface IInvoiceWorkflowService
         DateOnly invoiceDate,
         DateOnly from,
         DateOnly to,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken,
+        int? studentId = null);
 
     Task<OperationResult<InvoiceTotals>> CalculateTotalsAsync(
         InvoiceDraft draft,
@@ -30,6 +31,14 @@ public interface IInvoiceWorkflowService
     Task<OperationResult<ReprintInvoiceResult>> ReprintAsync(
         InvoiceNumber invoiceNumber,
         CancellationToken cancellationToken);
+
+    Task<IssuedInvoice?> GetOldestPendingAsync(CancellationToken cancellationToken);
+
+    Task<OperationResult<IssueInvoiceResult>> ResumeAsync(
+        InvoiceNumber invoiceNumber, CancellationToken cancellationToken);
+
+    Task<OperationResult<InvoiceNumber>> DiscardPendingAsync(
+        IssuedInvoice invoice, CancellationToken cancellationToken);
 
     Task<IssuedInvoice?> GetIssuedInvoiceAsync(
         InvoiceNumber invoiceNumber,

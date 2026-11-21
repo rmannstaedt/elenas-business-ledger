@@ -130,7 +130,8 @@ public sealed class InvoiceViewModelTests
                 new IssueInvoiceResult(
                     CreateIssuedInvoice(),
                     PrintSucceeded: false,
-                    [new ValidationError("InvoicePrinter.PrintRequestFailed", "The invoice PDF was saved, but the print request failed.")]))
+                    [new ValidationError("InvoicePrinter.PrintRequestFailed", "The invoice PDF was saved, but the print request failed.")])),
+            ReprintResult = OperationResult<ReprintInvoiceResult>.Success(new ReprintInvoiceResult(CreateIssuedInvoice(), true, []))
         };
         var viewModel = new InvoicePreviewViewModel(service, CreatePreview());
         var closeRequested = false;
@@ -142,6 +143,10 @@ public sealed class InvoiceViewModelTests
         Assert.True(viewModel.WasIssued);
         Assert.False(closeRequested);
         Assert.Equal("The invoice PDF was saved, but the print request failed.", viewModel.ErrorMessage);
+        Assert.False(viewModel.CanEditDraft);
+        await viewModel.PrintInvoiceCommand.ExecuteAsync();
+        Assert.Equal(CreateIssuedInvoice().InvoiceNumber, service.ReprintInvoiceNumber);
+        Assert.True(closeRequested);
     }
 
     [Fact]
@@ -492,7 +497,7 @@ public sealed class InvoiceViewModelTests
         public Task<OperationResult<InvoiceCandidateSelectionResult>> LoadCandidatesAsync(DateOnly date, DateTimeOffset now, CancellationToken cancellationToken) =>
             Task.FromResult(Candidates);
 
-        public Task<OperationResult<InvoicePreviewResult>> CreatePreviewAsync(string studentShortName, DateOnly invoiceDate, DateOnly from, DateOnly to, CancellationToken cancellationToken) =>
+        public Task<OperationResult<InvoicePreviewResult>> CreatePreviewAsync(string studentShortName, DateOnly invoiceDate, DateOnly from, DateOnly to, CancellationToken cancellationToken, int? studentId = null) =>
             Task.FromResult(OperationResult<InvoicePreviewResult>.Success(CreatePreview()));
 
         public Task<OperationResult<InvoiceTotals>> CalculateTotalsAsync(InvoiceDraft draft, CancellationToken cancellationToken) =>
@@ -509,6 +514,15 @@ public sealed class InvoiceViewModelTests
 
             return Task.FromResult(IssueResult);
         }
+
+        public Task<IssuedInvoice?> GetOldestPendingAsync(CancellationToken cancellationToken) =>
+            Task.FromResult<IssuedInvoice?>(null);
+
+        public Task<OperationResult<IssueInvoiceResult>> ResumeAsync(InvoiceNumber invoiceNumber, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
+        public Task<OperationResult<InvoiceNumber>> DiscardPendingAsync(IssuedInvoice invoice, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
 
         public Task<OperationResult<ReprintInvoiceResult>> ReprintAsync(InvoiceNumber invoiceNumber, CancellationToken cancellationToken)
         {

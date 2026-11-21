@@ -25,6 +25,7 @@ public sealed class InvoicePreviewViewModel : ViewModelBase
     private string? errorMessage;
     private bool isBusy;
     private bool isChoosingRecovery;
+    private InvoiceNumber? issuedInvoiceNumber;
 
     public InvoicePreviewViewModel(
         IInvoiceWorkflowService invoiceWorkflowService,
@@ -131,7 +132,11 @@ public sealed class InvoicePreviewViewModel : ViewModelBase
         }
     }
 
-    public bool WasIssued { get; private set; }
+    public bool WasIssued => issuedInvoiceNumber is not null;
+
+    public string PrintActionText => WasIssued ? "Reprint invoice" : "Save & Print Invoice";
+
+    public bool CanEditDraft => !WasIssued;
 
     public AsyncRelayCommand PrintInvoiceCommand { get; }
 
@@ -173,6 +178,12 @@ public sealed class InvoicePreviewViewModel : ViewModelBase
         IsBusy = true;
         try
         {
+            if (issuedInvoiceNumber is { } number)
+            {
+                await ReprintAsync(number);
+                return;
+            }
+
             var draft = BuildDraft(showErrors: true);
             if (draft is null)
             {
@@ -193,8 +204,11 @@ public sealed class InvoicePreviewViewModel : ViewModelBase
                 return;
             }
 
-            WasIssued = true;
-            if (!issue.Value!.PrintSucceeded)
+            issuedInvoiceNumber = issue.Value!.Invoice.InvoiceNumber;
+            OnPropertyChanged(nameof(WasIssued));
+            OnPropertyChanged(nameof(PrintActionText));
+            OnPropertyChanged(nameof(CanEditDraft));
+            if (!issue.Value.PrintSucceeded || issue.Value.PrintErrors.Count > 0)
             {
                 ErrorMessage = issue.Value.PrintErrors.FirstOrDefault()?.Message ??
                     "The invoice PDF was saved, but the print request failed.";
@@ -208,6 +222,27 @@ public sealed class InvoicePreviewViewModel : ViewModelBase
         {
             IsBusy = false;
         }
+    }
+
+    private async Task ReprintAsync(InvoiceNumber number)
+    {
+        if (ensureInvoicePrinterConfiguredAsync is not null &&
+            !await ensureInvoicePrinterConfiguredAsync(CancellationToken.None))
+        {
+            ErrorMessage = "Choose an invoice printer before printing the invoice.";
+            return;
+        }
+
+        var result = await invoiceWorkflowService.ReprintAsync(number, CancellationToken.None);
+        if (!result.Succeeded || !result.Value!.PrintSucceeded)
+        {
+            ErrorMessage = result.Errors.FirstOrDefault()?.Message ?? result.Value?.PrintErrors.FirstOrDefault()?.Message
+                ?? "The invoice is issued. The reprint request failed.";
+            return;
+        }
+
+        ErrorMessage = null;
+        CloseRequested?.Invoke(this, true);
     }
 
     private async Task<OperationResult<IssueInvoiceResult>> IssueWithExtendedWaitPromptAsync(InvoiceDraft draft)

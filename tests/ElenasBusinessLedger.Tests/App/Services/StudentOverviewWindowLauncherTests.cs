@@ -243,8 +243,11 @@ public sealed class StudentOverviewWindowLauncherTests
         public Task<bool> ShowWriteInvoiceAsync(
             DateOnly displayMonth,
             string? initialStudentShortName,
-            CancellationToken cancellationToken) =>
+            CancellationToken cancellationToken,
+            int? studentId = null) =>
             Task.FromResult(false);
+
+        public Task<bool> ShowResumeInvoiceAsync(CancellationToken cancellationToken) => Task.FromResult(false);
 
         public Task ShowInvoiceViewerAsync(InvoiceNumber invoiceNumber, CancellationToken cancellationToken) =>
             Task.CompletedTask;

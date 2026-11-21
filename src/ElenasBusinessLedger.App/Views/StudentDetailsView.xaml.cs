@@ -15,7 +15,9 @@ public partial class StudentDetailsView : Window
         InitializeComponent();
         DataContext = viewModel;
         WindowPlacementStore.Attach(this, nameof(StudentDetailsView), rememberSize: false);
+        viewModel.DetailsCloseRequested += OnDetailsCloseRequested;
         Closing += OnClosing;
+        Closed += (_, _) => viewModel.DetailsCloseRequested -= OnDetailsCloseRequested;
     }
 
     public void CloseWithoutPrompt()
@@ -36,14 +38,22 @@ public partial class StudentDetailsView : Window
         }
     }
 
-    private void OnClose(object sender, RoutedEventArgs e)
-    {
-        Close();
-    }
+    private void OnDetailsCloseRequested(object? sender, EventArgs e) => CloseWithoutPrompt();
 
     private async void OnClosing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
-        if (closeWasConfirmed || DataContext is not StudentOverviewViewModel viewModel || !viewModel.HasUnsavedStudentChanges)
+        if (closeWasConfirmed || DataContext is not StudentOverviewViewModel viewModel)
+        {
+            return;
+        }
+
+        if (viewModel.IsBusy)
+        {
+            e.Cancel = true;
+            return;
+        }
+
+        if (!viewModel.HasUnsavedStudentChanges)
         {
             return;
         }

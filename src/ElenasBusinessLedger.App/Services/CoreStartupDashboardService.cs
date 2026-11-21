@@ -15,11 +15,12 @@ public sealed class CoreStartupDashboardService : IStartupDashboardService
     public async Task<OperationResult<StartupDashboardResult>> LoadAsync(
         DateOnly month,
         string? selectedStudentShortName,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        int? studentId = null)
     {
         try
         {
-            return await query.ExecuteAsync(month, selectedStudentShortName, cancellationToken);
+            return await query.ExecuteAsync(month, selectedStudentShortName, cancellationToken, studentId);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

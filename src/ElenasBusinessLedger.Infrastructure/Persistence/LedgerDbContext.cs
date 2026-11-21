@@ -195,6 +195,7 @@ public sealed class LedgerDbContext : DbContext
             entity.Property(lesson => lesson.GoogleCalendarEventId).HasMaxLength(500);
             entity.HasIndex(lesson => lesson.GoogleCalendarEventId).IsUnique();
             entity.Property(lesson => lesson.InvoiceNumber).IsConcurrencyToken();
+            entity.Property(lesson => lesson.PendingCalendarMutation).HasConversion<string>().IsConcurrencyToken();
             entity.HasIndex(lesson => lesson.StartsAt);
             entity.HasIndex(lesson => new { lesson.StudentId, lesson.StartsAt });
             entity.HasOne(lesson => lesson.PlanCatalog)

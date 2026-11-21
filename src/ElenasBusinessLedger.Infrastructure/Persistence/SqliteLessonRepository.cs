@@ -1,4 +1,6 @@
 using System.Globalization;
+using ElenasBusinessLedger.Core.Calendar;
+using ElenasBusinessLedger.Core.Common;
 using ElenasBusinessLedger.Core.Invoices;
 using ElenasBusinessLedger.Core.Lessons;
 using ElenasBusinessLedger.Core.Ports;
@@ -15,9 +17,77 @@ public sealed class SqliteLessonRepository : ILessonRepository
         this.createContext = createContext;
     }
 
+    public async Task<OperationResult<bool>> ClaimCalendarMutationAsync(
+        string eventId, CalendarMutationKind kind, CancellationToken cancellationToken)
+    {
+        await using var context = createContext();
+        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+        var lesson = await context.Lessons.SingleOrDefaultAsync(candidate => candidate.GoogleCalendarEventId == eventId, cancellationToken);
+        if (lesson is null)
+        {
+            return OperationResult<bool>.Failure(new ValidationError("Lesson.NotFound", "Refresh the dashboard before changing this lesson."));
+        }
+
+        if (lesson.PendingCalendarMutation is not null)
+        {
+            return OperationResult<bool>.Failure(new ValidationError("Lesson.CalendarChangePending",
+                "A calendar change for this lesson needs review. Check the appointment before making another change."));
+        }
+
+        if (lesson.InvoiceNumber is not null || await context.IssuedInvoiceLines.AnyAsync(line => line.LessonId == lesson.Id, cancellationToken))
+        {
+            return OperationResult<bool>.Failure(new ValidationError("Lesson.InvoiceReservation",
+                "This lesson belongs to an issued or pending invoice. Resolve any pending invoice before changing it."));
+        }
+
+        lesson.PendingCalendarMutation = kind;
+        await context.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return OperationResult<bool>.Success(true);
+    }
+
+    public async Task ClearCalendarMutationAsync(string eventId, CalendarMutationKind kind, CancellationToken cancellationToken)
+    {
+        await using var context = createContext();
+        await context.Lessons.Where(lesson => lesson.GoogleCalendarEventId == eventId && lesson.PendingCalendarMutation == kind)
+            .ExecuteUpdateAsync(setters => setters.SetProperty(lesson => lesson.PendingCalendarMutation, (CalendarMutationKind?)null),
+                cancellationToken);
+    }
+
+    public async Task<OperationResult<bool>> ResolveCalendarMutationAsync(
+        string eventId, CalendarLesson? observed, CancellationToken cancellationToken)
+    {
+        await using var context = createContext();
+        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+        var lesson = await context.Lessons.SingleOrDefaultAsync(candidate => candidate.GoogleCalendarEventId == eventId, cancellationToken);
+        if (lesson is null || lesson.PendingCalendarMutation is null || lesson.InvoiceNumber is not null ||
+            await context.IssuedInvoiceLines.AnyAsync(line => line.LessonId == lesson.Id, cancellationToken))
+        {
+            return OperationResult<bool>.Failure(new ValidationError("Lesson.ReviewChanged",
+                "The lesson changed before review could finish. Refresh the dashboard."));
+        }
+
+        if (observed is null)
+        {
+            context.Lessons.Remove(lesson);
+        }
+        else
+        {
+            lesson.StartsAt = observed.StartsAt;
+            lesson.HasKnownStartTime = observed.HasKnownStartTime;
+            lesson.State = observed.State;
+            lesson.PendingCalendarMutation = null;
+        }
+
+        await context.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return OperationResult<bool>.Success(true);
+    }
+
     public async Task<LessonRecord> SaveAsync(LessonRecord lesson, CancellationToken cancellationToken)
     {
         await using var context = createContext();
+        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
         var entity = lesson.Id > 0
             ? await context.Lessons.Include(storedLesson => storedLesson.Student)
                 .SingleOrDefaultAsync(storedLesson => storedLesson.Id == lesson.Id, cancellationToken)
@@ -34,8 +104,8 @@ public sealed class SqliteLessonRepository : ILessonRepository
             context.Lessons.Add(entity);
         }
 
-        if (entity.Id > 0 && await context.IssuedInvoiceLines.AnyAsync(
-            line => line.LessonId == entity.Id && line.Invoice.IssueStatus == InvoiceIssueStatus.Issued, cancellationToken))
+        if (entity.Id > 0 && (entity.PendingCalendarMutation is not null ||
+            await context.IssuedInvoiceLines.AnyAsync(line => line.LessonId == entity.Id, cancellationToken)))
         {
             return ToDomain(entity);
         }
@@ -57,13 +127,15 @@ public sealed class SqliteLessonRepository : ILessonRepository
             .Include(storedLesson => storedLesson.Student)
             .SingleAsync(storedLesson => storedLesson.Id == entity.Id, cancellationToken);
 
+        await transaction.CommitAsync(cancellationToken);
         return ToDomain(saved);
     }
 
     public async Task<IReadOnlyList<LessonRecord>> ListForStudentMonthAsync(
         string studentShortName,
         DateOnly month,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        int? studentId = null)
     {
         var firstDay = new DateOnly(month.Year, month.Month, 1);
         var from = firstDay.ToDateTime(TimeOnly.MinValue);
@@ -76,7 +148,7 @@ public sealed class SqliteLessonRepository : ILessonRepository
             .FromSql($"""SELECT * FROM "Lessons" WHERE "StartsAt" >= {fromText} AND "StartsAt" < {toExclusiveText}""")
             .AsNoTracking()
             .Include(lesson => lesson.Student)
-            .Where(lesson => lesson.Student.ShortName == studentShortName)
+            .Where(lesson => studentId == null ? lesson.Student.ShortName == studentShortName : lesson.StudentId == studentId)
             .ToArrayAsync(cancellationToken);
 
         return lessons
@@ -118,10 +190,12 @@ public sealed class SqliteLessonRepository : ILessonRepository
         CancellationToken cancellationToken)
     {
         await using var context = createContext();
+        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
         var lesson = await context.Lessons
             .Include(storedLesson => storedLesson.Student)
             .SingleOrDefaultAsync(storedLesson => storedLesson.Id == lessonId, cancellationToken);
-        if (lesson is null || lesson.InvoiceNumber is not null)
+        if (lesson is null || lesson.InvoiceNumber is not null || lesson.PendingCalendarMutation is not null ||
+            await context.IssuedInvoiceLines.AnyAsync(line => line.LessonId == lessonId, cancellationToken))
         {
             return null;
         }
@@ -131,7 +205,7 @@ public sealed class SqliteLessonRepository : ILessonRepository
         lesson.DurationMinutes = durationMinutes;
 
         await context.SaveChangesAsync(cancellationToken);
-
+        await transaction.CommitAsync(cancellationToken);
         return ToDomain(lesson);
     }
 
@@ -155,6 +229,7 @@ public sealed class SqliteLessonRepository : ILessonRepository
 
         lesson.StartsAt = startsAt;
         lesson.HasKnownStartTime = hasKnownStartTime;
+        lesson.PendingCalendarMutation = null;
 
         await context.SaveChangesAsync(cancellationToken);
 
@@ -179,6 +254,7 @@ public sealed class SqliteLessonRepository : ILessonRepository
         }
 
         lesson.State = state;
+        lesson.PendingCalendarMutation = null;
 
         await context.SaveChangesAsync(cancellationToken);
 
@@ -233,7 +309,8 @@ public sealed class SqliteLessonRepository : ILessonRepository
             entity.State,
             entity.GoogleCalendarEventId,
             entity.InvoiceNumber is null ? null : new InvoiceNumber(entity.InvoiceNumber.Value),
-            entity.HasKnownStartTime);
+            entity.HasKnownStartTime,
+            entity.PendingCalendarMutation);
 
     private static string FormatSqliteDatePrefix(DateOnly date) =>
         date.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);

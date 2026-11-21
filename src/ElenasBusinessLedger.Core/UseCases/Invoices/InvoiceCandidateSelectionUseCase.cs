@@ -1,5 +1,6 @@
 using ElenasBusinessLedger.Core.Common;
 using ElenasBusinessLedger.Core.Ports;
+using ElenasBusinessLedger.Core.Students;
 
 namespace ElenasBusinessLedger.Core.UseCases.Invoices;
 
@@ -27,7 +28,7 @@ public sealed class InvoiceCandidateSelectionUseCase
         var students = await studentRepository.ListActiveStudentsAsync(cancellationToken);
         var lessons = await lessonRepository.ListForWindowAsync(date, date, cancellationToken);
         var eligibleLessons = lessons
-            .Where(lesson => lesson.InvoiceNumber is null)
+            .Where(lesson => lesson.InvoiceNumber is null && lesson.PendingCalendarMutation is null)
             .OrderBy(lesson => lesson.StartsAt)
             .ToArray();
         var candidates = eligibleLessons
@@ -57,6 +58,12 @@ public sealed class InvoiceCandidateSelectionUseCase
         return OperationResult<InvoiceCandidateSelectionResult>.Success(new InvoiceCandidateSelectionResult(
             candidates,
             allStudents,
-            preselected));
+            preselected,
+            students.Select(student => new StudentChoice(student.Id, student.Student.ShortName)).ToArray(),
+            eligibleLessons.Where(lesson => lesson.StudentId > 0)
+                .DistinctBy(lesson => lesson.StudentId)
+                .Select(lesson => new StudentChoice(lesson.StudentId, lesson.StudentShortName))
+                .OrderBy(student => student.ShortName, StringComparer.Ordinal).ToArray(),
+            eligibleLessons.FirstOrDefault(lesson => lesson.StudentShortName == preselected)?.StudentId));
     }
 }

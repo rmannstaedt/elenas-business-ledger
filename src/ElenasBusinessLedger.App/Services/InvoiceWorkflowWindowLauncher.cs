@@ -25,14 +25,16 @@ public sealed class InvoiceWorkflowWindowLauncher : IInvoiceWorkflowLauncher
     public async Task<bool> ShowWriteInvoiceAsync(
         DateOnly displayMonth,
         string? initialStudentShortName,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        int? studentId = null)
     {
         var today = DateOnly.FromDateTime(clock.Now.DateTime);
         var candidateViewModel = new InvoiceCandidateDialogViewModel(
             invoiceWorkflowService,
             today,
             clock.Now,
-            initialStudentShortName);
+            initialStudentShortName,
+            studentId);
         await candidateViewModel.LoadAsync();
 
         var candidateWindow = new InvoiceCandidateDialog(candidateViewModel)
@@ -53,7 +55,8 @@ public sealed class InvoiceWorkflowWindowLauncher : IInvoiceWorkflowLauncher
             today,
             month,
             month.AddMonths(1).AddDays(-1),
-            cancellationToken);
+            cancellationToken,
+            candidateViewModel.SelectedStudent?.StudentId is > 0 ? candidateViewModel.SelectedStudent.StudentId : null);
 
         if (!preview.Succeeded)
         {
@@ -72,7 +75,64 @@ public sealed class InvoiceWorkflowWindowLauncher : IInvoiceWorkflowLauncher
             Owner = Application.Current?.MainWindow
         };
 
-        return previewWindow.ShowDialog() == true && previewViewModel.WasIssued;
+        previewWindow.ShowDialog();
+        return previewViewModel.WasIssued;
+    }
+
+    public async Task<bool> ShowResumeInvoiceAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var invoice = await invoiceWorkflowService.GetOldestPendingAsync(cancellationToken);
+            if (invoice is null)
+            {
+                ShowWarning("There is no pending invoice.");
+                return false;
+            }
+
+            var canDiscard = invoice.Publication is null && invoice.PdfFilePath is null;
+            var selection = new PendingInvoiceRecovery(invoice, RequestedDraft: null, invoice.Totals, CanRevise: false);
+            var dialog = new InvoiceRecoveryDialog(selection, directRecovery: true, canDiscard)
+            {
+                Owner = Application.Current?.MainWindow,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner
+            };
+            dialog.ShowDialog();
+            if (dialog.Choice == InvoiceRecoveryChoice.Discard)
+            {
+                var result = await invoiceWorkflowService.DiscardPendingAsync(invoice, cancellationToken);
+                if (!result.Succeeded)
+                {
+                    ShowWarning(result.Errors[0].Message);
+                }
+
+                return false;
+            }
+
+            if (dialog.Choice != InvoiceRecoveryChoice.Resume || !await EnsureInvoicePrinterConfiguredAsync(cancellationToken))
+            {
+                return false;
+            }
+
+            var issued = await invoiceWorkflowService.ResumeAsync(invoice.InvoiceNumber, cancellationToken);
+            if (!issued.Succeeded)
+            {
+                ShowWarning(issued.Errors[0].Message);
+                return false;
+            }
+
+            if (!issued.Value!.PrintSucceeded || issued.Value.PrintErrors.Count > 0)
+            {
+                ShowWarning(issued.Value.PrintErrors.FirstOrDefault()?.Message ?? "The invoice was saved, but printing failed.");
+            }
+
+            return true;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            ShowWarning(ex.Message);
+            return false;
+        }
     }
 
     public async Task ShowInvoiceViewerAsync(InvoiceNumber invoiceNumber, CancellationToken cancellationToken)

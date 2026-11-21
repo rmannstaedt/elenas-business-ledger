@@ -1,6 +1,7 @@
 using System.Data;
 using System.Data.Common;
 using System.Globalization;
+using ElenasBusinessLedger.Core.Students;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
@@ -22,7 +23,37 @@ public sealed class LedgerDatabaseMigrator
         await using var context = createContext();
         await BackUpBeforeUpgradeAsync(context, cancellationToken);
         await context.Database.MigrateAsync(cancellationToken);
-        return await ReadAndClearMigrationWarningsAsync(context, cancellationToken);
+        var warnings = (await ReadAndClearMigrationWarningsAsync(context, cancellationToken)).ToList();
+        var numbers = await context.IssuedInvoices.AsNoTracking()
+            .OrderBy(invoice => invoice.InvoiceNumber).Select(invoice => invoice.InvoiceNumber)
+            .ToArrayAsync(cancellationToken);
+        var previous = 0L;
+        var gaps = new List<string>();
+        foreach (var number in numbers)
+        {
+            if (number > previous + 1)
+            {
+                gaps.Add(number == previous + 2 ? $"{previous + 1:D3}" : $"{previous + 1:D3}–{number - 1:D3}");
+            }
+            previous = number;
+        }
+
+        if (gaps.Count > 0)
+        {
+            warnings.Add(new LedgerMigrationWarning("Historical invoice numbering gaps",
+                $"Missing invoice numbers in the existing ledger: {string.Join(", ", gaps)}. Existing invoices were preserved."));
+        }
+
+        var shortNames = await context.Students.AsNoTracking().Select(student => student.ShortName).ToArrayAsync(cancellationToken);
+        var ambiguous = shortNames.GroupBy(StudentShortNameKey.From).Where(group => group.Count() > 1)
+            .Select(group => string.Join(" / ", group.Order(StringComparer.Ordinal))).ToArray();
+        if (ambiguous.Length > 0)
+        {
+            warnings.Add(new LedgerMigrationWarning("Conflicting student short names",
+                $"Rename duplicate short names in Manage Students so calendar titles identify one student. Conflicts: {string.Join(", ", ambiguous)}."));
+        }
+
+        return warnings;
     }
 
     private static async Task BackUpBeforeUpgradeAsync(LedgerDbContext context, CancellationToken cancellationToken)

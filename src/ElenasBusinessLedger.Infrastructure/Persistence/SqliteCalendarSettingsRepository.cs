@@ -24,9 +24,17 @@ public sealed class SqliteCalendarSettingsRepository
             : new CalendarSettings(entity.SelectedCalendarId, entity.GoogleAccountEmail);
     }
 
+    public SqliteAppSettingsWriter CreateSettingsWriter() => new(createContext);
+
     public async Task SaveAsync(CalendarSettings settings, CancellationToken cancellationToken)
     {
         await using var context = createContext();
+        await SetAsync(context, settings, cancellationToken);
+        await context.SaveChangesAsync(cancellationToken);
+    }
+
+    internal static async Task SetAsync(LedgerDbContext context, CalendarSettings settings, CancellationToken cancellationToken)
+    {
         var entity = await context.CalendarSettings
             .SingleOrDefaultAsync(storedSettings => storedSettings.Id == SingletonId, cancellationToken);
 
@@ -38,7 +46,5 @@ public sealed class SqliteCalendarSettingsRepository
 
         entity.SelectedCalendarId = settings.SelectedCalendarId;
         entity.GoogleAccountEmail = settings.GoogleAccountEmail;
-
-        await context.SaveChangesAsync(cancellationToken);
     }
 }

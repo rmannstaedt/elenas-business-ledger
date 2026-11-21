@@ -24,7 +24,18 @@ public partial class StudentOverviewView : Window
 
     private async void OnClosing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
-        if (closeWasConfirmed || DataContext is not StudentOverviewViewModel viewModel || !viewModel.HasUnsavedStudentChanges)
+        if (closeWasConfirmed || DataContext is not StudentOverviewViewModel viewModel)
+        {
+            return;
+        }
+
+        if (viewModel.IsBusy)
+        {
+            e.Cancel = true;
+            return;
+        }
+
+        if (!viewModel.HasUnsavedStudentChanges)
         {
             return;
         }

@@ -36,7 +36,9 @@ public sealed class AddLessonUseCase
                 new ValidationError("Lesson.PlanRequired", "A lesson plan is required."));
         }
 
-        var student = await studentRepository.GetByShortNameAsync(request.StudentShortName, cancellationToken);
+        var student = request.StudentId is { } id
+            ? await studentRepository.GetByIdAsync(id, cancellationToken)
+            : await studentRepository.GetByShortNameAsync(request.StudentShortName, cancellationToken);
         if (student is null)
         {
             return OperationResult<LessonAddResult>.Failure(
@@ -56,6 +58,7 @@ public sealed class AddLessonUseCase
                 new ValidationError("Lesson.PlanNotAssignable", "The selected plan cannot be assigned to a lesson."));
         }
 
+        request = request with { StudentShortName = student.Student.ShortName };
         var addResult = await calendarGateway.AddLessonAsync(request, refreshMonth, cancellationToken);
         if (addResult.Value is not { } calendarResult || string.IsNullOrWhiteSpace(calendarResult.CreatedLesson.Id))
         {

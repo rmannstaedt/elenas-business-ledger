@@ -17,6 +17,41 @@ public sealed class UpdateLessonPlanUseCase
         this.planCatalogRepository = planCatalogRepository;
     }
 
+    public async Task<OperationResult<LessonRecord>> LinkAsync(
+        LessonRecord observed, int planCatalogId, CancellationToken cancellationToken)
+    {
+        if (observed.StudentId <= 0 || string.IsNullOrWhiteSpace(observed.GoogleCalendarEventId))
+        {
+            return OperationResult<LessonRecord>.Failure(new ValidationError(
+                "Lesson.CalendarLinkMissing", "Refresh the dashboard so the appointment and its student can be identified."));
+        }
+
+        var linked = await lessonRepository.ListByGoogleCalendarEventIdsAsync([observed.GoogleCalendarEventId], cancellationToken);
+        var existing = linked.SingleOrDefault();
+        if (existing is not null)
+        {
+            return existing.StudentId == observed.StudentId
+                ? await ExecuteAsync(existing.Id, planCatalogId, cancellationToken)
+                : OperationResult<LessonRecord>.Failure(new ValidationError(
+                    "Lesson.CalendarLinkChanged", "The appointment is already linked to another student."));
+        }
+
+        var plan = await planCatalogRepository.GetAsync(planCatalogId, cancellationToken);
+        if (plan is null || !plan.CanBeAssigned)
+        {
+            return OperationResult<LessonRecord>.Failure(new ValidationError(
+                "Lesson.PlanNotAssignable", "Choose an active plan for the appointment."));
+        }
+
+        var saved = await lessonRepository.SaveAsync(observed with
+        {
+            PlanCatalogId = plan.Id,
+            PlanName = plan.Name,
+            DurationMinutes = plan.DurationMinutes
+        }, cancellationToken);
+        return OperationResult<LessonRecord>.Success(saved);
+    }
+
     public async Task<OperationResult<LessonRecord>> ExecuteAsync(
         int lessonId,
         int planCatalogId,
@@ -44,7 +79,7 @@ public sealed class UpdateLessonPlanUseCase
         if (lesson is null)
         {
             return OperationResult<LessonRecord>.Failure(
-                new ValidationError("Lesson.PlanLocked", "Invoiced lessons cannot have their plan changed."));
+                new ValidationError("Lesson.PlanLocked", "A lesson with a pending invoice or calendar change cannot have its plan changed."));
         }
 
         return OperationResult<LessonRecord>.Success(lesson);

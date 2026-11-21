@@ -21,7 +21,7 @@ In **Application > Settings**, enter **Maple Key Studio** as the company name, *
 1. Open **Student > Manage Students** and choose **Add student**.
 2. Enter **Mira** as the short name and **Mira Vale** as the full name. Use **42 Sample Lane**, **Example City**, and `mira@example.test` for the fictional contact details. Choose **Standard** as the age bracket and keep **Active** checked.
 3. Choose **Piano 60 min** under **Active plan**. Set **Starts on** to the first day of the lesson month or another day on or before the first lesson. Under **Schedule**, set one weekly slot, such as Wednesday at **16:00**.
-4. Choose **Save**, then close the student windows. The main window should now show Mira as the selected student.
+4. Choose **Save**, then close **Manage Students**. If you are using the v1.3.2 installer, also close **Student Details**. The main window should now show Mira as the selected student.
 
 ## 4. Schedule and complete one lesson
 

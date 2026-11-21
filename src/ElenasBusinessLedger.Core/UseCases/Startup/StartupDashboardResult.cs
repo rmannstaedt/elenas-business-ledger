@@ -1,4 +1,5 @@
 using ElenasBusinessLedger.Core.Invoices;
+using ElenasBusinessLedger.Core.Students;
 
 namespace ElenasBusinessLedger.Core.UseCases.Startup;
 
@@ -10,4 +11,6 @@ public sealed record StartupDashboardResult(
     bool CurrentStudentHasSchedule,
     IReadOnlyList<DashboardStudentNavigationEntry> StudentNavigationEntries,
     IReadOnlyList<DashboardPlanOption>? PlanOptions = null,
-    DashboardStudentLessonDefaults? LessonDefaults = null);
+    DashboardStudentLessonDefaults? LessonDefaults = null,
+    int? CurrentStudentId = null,
+    IReadOnlyList<StudentChoice>? StudentChoices = null);

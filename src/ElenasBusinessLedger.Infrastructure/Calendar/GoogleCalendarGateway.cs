@@ -107,34 +107,45 @@ public sealed class GoogleCalendarGateway : IGoogleCalendarGateway
         }
     }
 
-    public async Task<OperationResult<IReadOnlyList<CalendarLesson>>> PopulateLessonsAsync(
-        IReadOnlyList<LessonAddRequest> requests,
-        DateOnly refreshMonth,
+    public Task<OperationResult<IReadOnlyList<CalendarLesson>>> PopulateLessonsAsync(
+        IReadOnlyList<LessonAddRequest> requests, DateOnly refreshMonth, CancellationToken cancellationToken) =>
+        PopulateWithReceiptsAsync(requests, refreshMonth, (_, _, _) => Task.FromResult<ValidationError?>(null), cancellationToken);
+
+    public async Task<OperationResult<IReadOnlyList<CalendarLesson>>> PopulateWithReceiptsAsync(
+        IReadOnlyList<LessonAddRequest> requests, DateOnly refreshMonth,
+        Func<int, CalendarLesson, CancellationToken, Task<ValidationError?>> saveReceipt,
         CancellationToken cancellationToken)
     {
         var createdLessons = new List<CalendarLesson>();
-        try
+        for (var index = 0; index < requests.Count; index++)
         {
-            foreach (var request in requests)
+            var request = requests[index];
+            string createdLessonId;
+            try
             {
-                var createdLessonId = await eventClient.CreateLessonEventAsync(
+                createdLessonId = await eventClient.CreateLessonEventAsync(
                     options.CalendarId,
                     $"$ {request.StudentShortName}",
                     request.StartsAt,
                     request.HasKnownStartTime,
                     options.DefaultLessonDuration,
                     cancellationToken);
-                createdLessons.Add(CreateCalendarLesson(
-                    createdLessonId,
-                    request.StudentShortName,
-                    request.StartsAt,
-                    LessonState.Planned,
-                    request.HasKnownStartTime));
             }
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            return CalendarUpdateFailure();
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                return OperationResult<IReadOnlyList<CalendarLesson>>.Failure(createdLessons.ToArray(), new ValidationError(
+                    "Calendar.UpdateFailed", "Google Calendar did not confirm the remaining appointments. The acknowledged appointments have been saved."));
+            }
+
+            var created = CreateCalendarLesson(createdLessonId, request.StudentShortName, request.StartsAt,
+                LessonState.Planned, request.HasKnownStartTime);
+            var error = await saveReceipt(index, created, cancellationToken);
+            if (error is not null)
+            {
+                return OperationResult<IReadOnlyList<CalendarLesson>>.Failure(createdLessons.ToArray(), error);
+            }
+
+            createdLessons.Add(created);
         }
 
         return await RefreshAfterSuccessfulPopulateAsync(refreshMonth, createdLessons, cancellationToken);
@@ -145,26 +156,10 @@ public sealed class GoogleCalendarGateway : IGoogleCalendarGateway
         DateOnly refreshMonth,
         CancellationToken cancellationToken)
     {
-        if (GetExternalId(request.LessonId) is not { } eventId)
-        {
-            return WrongCalendar<IReadOnlyList<CalendarLesson>>();
-        }
-
-        try
-        {
-            await eventClient.MoveEventAsync(
-                options.CalendarId,
-                eventId,
-                request.StartsAt,
-                request.HasKnownStartTime,
-                cancellationToken);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            return CalendarUpdateFailure();
-        }
-
-        return await RefreshAfterSuccessfulWriteAsync(refreshMonth, cancellationToken);
+        var receipt = await UpdateWithoutRefreshAsync(request, refreshMonth, cancellationToken);
+        return receipt.State == CalendarWriteState.Acknowledged
+            ? await RefreshAfterSuccessfulWriteAsync(refreshMonth, cancellationToken)
+            : OperationResult<IReadOnlyList<CalendarLesson>>.Failure(receipt.Errors.ToArray());
     }
 
     public async Task<OperationResult<IReadOnlyList<CalendarLesson>>> DeleteLessonAsync(
@@ -172,21 +167,38 @@ public sealed class GoogleCalendarGateway : IGoogleCalendarGateway
         DateOnly refreshMonth,
         CancellationToken cancellationToken)
     {
+        var receipt = await DeleteWithoutRefreshAsync(lessonId, refreshMonth, cancellationToken);
+        return receipt.State == CalendarWriteState.Acknowledged
+            ? await RefreshAfterSuccessfulWriteAsync(refreshMonth, cancellationToken)
+            : OperationResult<IReadOnlyList<CalendarLesson>>.Failure(receipt.Errors.ToArray());
+    }
+
+    public Task<CalendarWriteReceipt> UpdateWithoutRefreshAsync(
+        LessonEditRequest request, DateOnly refreshMonth, CancellationToken cancellationToken) =>
+        WriteEventAsync(request.LessonId, eventId => eventClient.MoveEventAsync(options.CalendarId, eventId,
+            request.StartsAt, request.HasKnownStartTime, cancellationToken));
+
+    public Task<CalendarWriteReceipt> DeleteWithoutRefreshAsync(
+        string lessonId, DateOnly refreshMonth, CancellationToken cancellationToken) =>
+        WriteEventAsync(lessonId, eventId => eventClient.DeleteEventAsync(options.CalendarId, eventId, cancellationToken));
+
+    private async Task<CalendarWriteReceipt> WriteEventAsync(string lessonId, Func<string, Task> write)
+    {
         if (GetExternalId(lessonId) is not { } eventId)
         {
-            return WrongCalendar<IReadOnlyList<CalendarLesson>>();
+            return new(CalendarWriteState.Rejected, WrongCalendar<bool>().Errors);
         }
 
         try
         {
-            await eventClient.DeleteEventAsync(options.CalendarId, eventId, cancellationToken);
+            await write(eventId);
+            return new(CalendarWriteState.Acknowledged, []);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            return CalendarUpdateFailure();
+            return new(CalendarWriteState.Uncertain, [new ValidationError(
+                "Calendar.UpdateFailed", "Google Calendar did not confirm the change. Check the calendar before invoicing or retrying.")]);
         }
-
-        return await RefreshAfterSuccessfulWriteAsync(refreshMonth, cancellationToken);
     }
 
     public async Task<OperationResult<LessonState>> UpdateLessonStateAsync(

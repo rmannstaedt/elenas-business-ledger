@@ -8,6 +8,9 @@ public interface IConfirmationService
         InvoiceDisplayModel invoice,
         CancellationToken cancellationToken);
 
+    Task<bool> ConfirmCalendarRemovalAsync(LessonDisplayModel lesson, CancellationToken cancellationToken) =>
+        Task.FromResult(false);
+
     Task<bool> ConfirmDeleteLessonAsync(
         LessonDisplayModel lesson,
         CancellationToken cancellationToken);

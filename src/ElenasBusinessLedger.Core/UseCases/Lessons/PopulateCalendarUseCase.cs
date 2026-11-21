@@ -31,7 +31,9 @@ public sealed class PopulateCalendarUseCase
         CancellationToken cancellationToken)
     {
         var firstOfDisplayMonth = new DateOnly(request.DisplayMonth.Year, request.DisplayMonth.Month, 1);
-        var student = await studentRepository.GetByShortNameAsync(request.StudentShortName, cancellationToken);
+        var student = request.StudentId is { } id
+            ? await studentRepository.GetByIdAsync(id, cancellationToken)
+            : await studentRepository.GetByShortNameAsync(request.StudentShortName, cancellationToken);
         if (student is null)
         {
             return OperationResult<PopulateCalendarResult>.Failure(new ValidationError(
@@ -49,7 +51,7 @@ public sealed class PopulateCalendarUseCase
         var studentShortName = student.Student.ShortName;
         var lastOfDisplayMonth = firstOfDisplayMonth.AddMonths(1).AddDays(-1);
         var existingLessons = await calendarGateway.ListLessonsAsync(firstOfDisplayMonth, lastOfDisplayMonth, cancellationToken);
-        var localLessons = await lessonRepository.ListForStudentMonthAsync(studentShortName, firstOfDisplayMonth, cancellationToken);
+        var localLessons = await lessonRepository.ListForStudentMonthAsync(studentShortName, firstOfDisplayMonth, cancellationToken, request.StudentId);
         var linkedLessons = await lessonRepository.ListByGoogleCalendarEventIdsAsync(
             existingLessons.Select(lesson => lesson.Id).Distinct(StringComparer.Ordinal).ToArray(),
             cancellationToken);
@@ -95,105 +97,54 @@ public sealed class PopulateCalendarUseCase
                 existingLessons));
         }
 
-        var populate = await calendarGateway.PopulateLessonsAsync(
+        var savedCount = 0;
+        var populate = await calendarGateway.PopulateWithReceiptsAsync(
             requestsToCreate.Select(candidate => candidate.Request).ToArray(),
             firstOfDisplayMonth,
+            SaveReceiptAsync,
             cancellationToken);
-        if (!populate.Succeeded)
+        var result = new PopulateCalendarResult(savedCount, skippedDuplicates, populate.Value ?? []);
+        return populate.Succeeded
+            ? OperationResult<PopulateCalendarResult>.Success(result)
+            : OperationResult<PopulateCalendarResult>.Failure(result, populate.Errors.ToArray());
+
+        async Task<ValidationError?> SaveReceiptAsync(int index, CalendarLesson created, CancellationToken token)
         {
-            if (populate.Value is { Count: > 0 })
+            var candidate = requestsToCreate[index];
+            try
             {
-                var saveFailure = await TrySaveCreatedLessonsAsync(
-                    student.Id,
-                    requestsToCreate,
-                    populate.Value,
-                    cancellationToken);
-                var errors = new List<ValidationError>(populate.Errors);
-                if (saveFailure is not null)
-                {
-                    errors.Add(saveFailure);
-                }
-
-                return OperationResult<PopulateCalendarResult>.Failure(
-                    new PopulateCalendarResult(
-                        requestsToCreate.Length,
-                        skippedDuplicates,
-                        populate.Value),
-                    errors.ToArray());
-            }
-
-            return OperationResult<PopulateCalendarResult>.Failure(populate.Errors.ToArray());
-        }
-
-        var localSaveFailure = await TrySaveCreatedLessonsAsync(
-            student.Id,
-            requestsToCreate,
-            populate.Value!,
-            cancellationToken);
-        if (localSaveFailure is not null)
-        {
-            return OperationResult<PopulateCalendarResult>.Failure(
-                new PopulateCalendarResult(
-                    requestsToCreate.Length,
-                    skippedDuplicates,
-                    populate.Value!),
-                localSaveFailure);
-        }
-
-        return OperationResult<PopulateCalendarResult>.Success(new PopulateCalendarResult(
-            requestsToCreate.Length,
-            skippedDuplicates,
-            populate.Value!));
-    }
-
-    private async Task<ValidationError?> TrySaveCreatedLessonsAsync(
-        int studentId,
-        IReadOnlyList<ScheduledLessonCandidate> candidates,
-        IReadOnlyList<CalendarLesson> refreshedLessons,
-        CancellationToken cancellationToken)
-    {
-        try
-        {
-            foreach (var candidate in candidates)
-            {
-                var createdLesson = refreshedLessons.FirstOrDefault(lesson =>
-                    string.Equals(
-                        lesson.StudentShortName,
-                        candidate.Request.StudentShortName,
-                        StringComparison.OrdinalIgnoreCase) &&
-                    lesson.StartsAt == candidate.Request.StartsAt &&
-                    lesson.HasKnownStartTime == candidate.Request.HasKnownStartTime);
-                if (createdLesson is null)
-                {
-                    return new ValidationError(
-                        "Lesson.LocalSaveFailed",
-                        "Google Calendar was populated, but the created lesson could not be matched for local billing ledger save. Refresh Calendar and check the lesson list before invoicing.");
-                }
-
                 await lessonRepository.SaveAsync(
                     new LessonRecord(
                         Id: 0,
-                        StudentId: studentId,
-                        StudentShortName: candidate.Request.StudentShortName,
+                        StudentId: student.Id,
+                        StudentShortName: studentShortName,
                         PlanCatalogId: candidate.Plan.PlanCatalogId,
                         PlanName: candidate.Plan.Name,
                         StartsAt: candidate.Request.StartsAt,
                         DurationMinutes: candidate.Plan.DurationMinutes,
-                        State: createdLesson.State,
-                        GoogleCalendarEventId: createdLesson.Id,
+                        State: created.State,
+                        GoogleCalendarEventId: created.Id,
                         InvoiceNumber: null,
                         HasKnownStartTime: candidate.Request.HasKnownStartTime),
-                    cancellationToken);
+                    token);
+                savedCount++;
+                return null;
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                var saved = await lessonRepository.ListByGoogleCalendarEventIdsAsync([created.Id], token);
+                if (saved.Any(lesson => lesson.StudentId == student.Id && lesson.PlanCatalogId == candidate.Plan.PlanCatalogId))
+                {
+                    savedCount++;
+                    return null;
+                }
+
+                var cleanup = await calendarGateway.DeleteWithoutRefreshAsync(created.Id, firstOfDisplayMonth, token);
+                return new ValidationError("Lesson.LocalSaveFailed", cleanup.State == CalendarWriteState.Acknowledged
+                    ? "The new appointment could not be saved to the billing ledger and was removed from Google Calendar."
+                    : "The new appointment could not be saved to the billing ledger. Check the exact appointment in Google Calendar before retrying.");
             }
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            return new ValidationError(
-                "Lesson.LocalSaveFailed",
-                "Google Calendar was populated, but the local billing ledger could not be updated. Refresh Calendar and check the lesson list before invoicing.");
-        }
-
-        return null;
     }
 
     private IEnumerable<DateTimeOffset> CreateScheduledStarts(

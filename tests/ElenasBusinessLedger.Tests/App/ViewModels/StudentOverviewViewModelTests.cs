@@ -1,3 +1,4 @@
+using ElenasBusinessLedger.App.Commands;
 using ElenasBusinessLedger.App.Services;
 using ElenasBusinessLedger.App.ViewModels;
 using ElenasBusinessLedger.App.Views;
@@ -341,7 +342,7 @@ public sealed class StudentOverviewViewModelTests
     }
 
     [Fact]
-    public void StudentDetailsActionsAreBottomLeftWithSaveAndClose()
+    public void StudentDetailsActionsAreBottomLeftWithSaveAndCancel()
     {
         RunOnStaThread(() =>
         {
@@ -356,10 +357,7 @@ public sealed class StudentOverviewViewModelTests
             var actionHost = Assert.Single(FindChildren<WpfStackPanel>(window), panel => panel.Name == "StudentDetailsBottomActions");
             var actionButtons = FindChildren<WpfButton>(actionHost).ToArray();
             var saveButton = Assert.Single(actionButtons, button => button.Content?.ToString() == "Save");
-            var closeButton = Assert.Single(actionButtons, button => button.Content?.ToString() == "Close");
-            var allButtonLabels = FindChildren<WpfButton>(window)
-                .Select(button => button.Content?.ToString() ?? string.Empty)
-                .ToArray();
+            var cancelButton = Assert.Single(actionButtons, button => button.Content?.ToString() == "Cancel");
             var actionButtonLabels = actionButtons
                 .Select(button => button.Content?.ToString() ?? string.Empty)
                 .ToArray();
@@ -367,15 +365,77 @@ public sealed class StudentOverviewViewModelTests
             Assert.Equal(HorizontalAlignment.Left, actionHost.HorizontalAlignment);
             Assert.Equal(new Thickness(0), actionHost.Margin);
             Assert.Equal(1, WpfGrid.GetRow(actionHost));
-            Assert.Equal(["Save", "Close"], actionButtonLabels);
+            Assert.Equal(["Save", "Cancel"], actionButtonLabels);
             var saveCommandBinding = saveButton.GetBindingExpression(ButtonBase.CommandProperty);
             Assert.NotNull(saveCommandBinding);
             Assert.Equal("SaveStudentCommand", saveCommandBinding!.ParentBinding.Path.Path);
             Assert.Equal(new Thickness(0, 0, 8, 0), saveButton.Margin);
-            Assert.Equal(84, closeButton.MinWidth);
-            Assert.DoesNotContain("Cancel", allButtonLabels);
+            Assert.Equal(84, cancelButton.MinWidth);
+            Assert.Equal("CancelStudentCommand", cancelButton.GetBindingExpression(ButtonBase.CommandProperty)!.ParentBinding.Path.Path);
 
             window.Close();
+        });
+    }
+
+    [Theory]
+    [InlineData("Save", false, false)]
+    [InlineData("Save", true, false)]
+    [InlineData("Cancel", false, false)]
+    [InlineData("Cancel", false, true)]
+    public void StudentDetailsActionsCloseOnlyWhenSavedOrCancelled(string action, bool saveFails, bool newStudent)
+    {
+        RunOnStaThread(() =>
+        {
+            var interactions = new FakeStudentOverviewInteractionService();
+            var editor = new FakeStudentEditorService { SaveFails = saveFails };
+            var viewModel = new StudentOverviewViewModel(
+                new FakeStudentOverviewService([CreateSnapshot("Anna", isActive: true)]),
+                editor,
+                new FakePlanCatalogService(),
+                new FakeInvoiceWorkflowLauncher(),
+                new FakeUiClock(new DateTimeOffset(2026, 6, 20, 12, 0, 0, TimeSpan.Zero)),
+                interactions);
+            viewModel.LoadAsync().GetAwaiter().GetResult();
+            if (newStudent)
+            {
+                viewModel.AddStudentCommand.ExecuteAsync().GetAwaiter().GetResult();
+            }
+
+            viewModel.SelectedStudentEditor!.FullName = "Unsaved edit";
+            var storePath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"Ledger-StudentDetails-{Guid.NewGuid():N}.json");
+            WindowPlacementStore.StorePathOverride = storePath;
+            var window = new StudentDetailsView(viewModel);
+            try
+            {
+                window.Show();
+                var button = Assert.Single(FindChildren<WpfButton>(window), candidate => Equals(candidate.Content, action));
+                Assert.IsType<AsyncRelayCommand>(button.Command).ExecuteAsync().GetAwaiter().GetResult();
+
+                Assert.Equal(saveFails, window.IsVisible);
+                Assert.Equal(0, interactions.PromptSaveChangesCount);
+                Assert.Equal("Anna", viewModel.SelectedStudent?.ShortName);
+                if (action == "Save")
+                {
+                    Assert.Equal("Unsaved edit", editor.LastRequest?.FullName);
+                }
+                else
+                {
+                    Assert.Null(editor.LastRequest);
+                    Assert.Equal("Anna Andersen", viewModel.SelectedStudentEditor?.FullName);
+                }
+
+                if (saveFails)
+                {
+                    Assert.Equal("Unsaved edit", viewModel.SelectedStudentEditor?.FullName);
+                    Assert.Equal("Student could not be saved.", viewModel.SelectedStudentEditor?.ErrorMessage);
+                }
+            }
+            finally
+            {
+                window.CloseWithoutPrompt();
+                WindowPlacementStore.StorePathOverride = null;
+                System.IO.File.Delete(storePath);
+            }
         });
     }
 
@@ -845,6 +905,8 @@ public sealed class StudentOverviewViewModelTests
     {
         public string SavedShortName { get; init; } = "Anna";
 
+        public bool SaveFails { get; init; }
+
         public SaveStudentRequest? LastRequest { get; private set; }
 
         public Task<StudentEditorSnapshot?> LoadAsync(string shortName, CancellationToken cancellationToken) =>
@@ -853,7 +915,9 @@ public sealed class StudentOverviewViewModelTests
         public Task<OperationResult<string>> SaveAsync(SaveStudentRequest request, CancellationToken cancellationToken)
         {
             LastRequest = request;
-            return Task.FromResult(OperationResult<string>.Success(SavedShortName));
+            return Task.FromResult(SaveFails
+                ? OperationResult<string>.Failure(new ValidationError("Student.SaveFailed", "Student could not be saved."))
+                : OperationResult<string>.Success(SavedShortName));
         }
     }
 
@@ -920,8 +984,11 @@ public sealed class StudentOverviewViewModelTests
         public Task<bool> ShowWriteInvoiceAsync(
             DateOnly displayMonth,
             string? initialStudentShortName,
-            CancellationToken cancellationToken) =>
+            CancellationToken cancellationToken,
+            int? studentId = null) =>
             Task.FromResult(false);
+
+        public Task<bool> ShowResumeInvoiceAsync(CancellationToken cancellationToken) => Task.FromResult(false);
 
         public Task ShowInvoiceViewerAsync(InvoiceNumber invoiceNumber, CancellationToken cancellationToken)
         {

@@ -301,5 +301,7 @@ public sealed class LessonEntity
 
     public string? GoogleCalendarEventId { get; set; }
 
+    public CalendarMutationKind? PendingCalendarMutation { get; set; }
+
     public int? InvoiceNumber { get; set; }
 }

@@ -1,15 +1,28 @@
+using ElenasBusinessLedger.Core.Common;
 using ElenasBusinessLedger.Core.Lessons;
 
 namespace ElenasBusinessLedger.Core.Ports;
 
 public interface ILessonRepository
 {
+    Task<OperationResult<bool>> ClaimCalendarMutationAsync(
+        string eventId, CalendarMutationKind kind, CancellationToken cancellationToken) =>
+        Task.FromResult(OperationResult<bool>.Success(true));
+
+    Task ClearCalendarMutationAsync(string eventId, CalendarMutationKind kind, CancellationToken cancellationToken) =>
+        Task.CompletedTask;
+
+    Task<OperationResult<bool>> ResolveCalendarMutationAsync(
+        string eventId, ElenasBusinessLedger.Core.Calendar.CalendarLesson? observed, CancellationToken cancellationToken) =>
+        Task.FromResult(OperationResult<bool>.Failure(new ValidationError("Lesson.ReviewUnavailable", "Calendar review is unavailable.")));
+
     Task<LessonRecord> SaveAsync(LessonRecord lesson, CancellationToken cancellationToken);
 
     Task<IReadOnlyList<LessonRecord>> ListForStudentMonthAsync(
         string studentShortName,
         DateOnly month,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken,
+        int? studentId = null);
 
     Task<IReadOnlyList<LessonRecord>> ListForWindowAsync(
         DateOnly from,

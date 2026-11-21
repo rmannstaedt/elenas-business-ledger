@@ -56,11 +56,12 @@ public sealed class CoreInvoiceWorkflowService : IInvoiceWorkflowService
         DateOnly invoiceDate,
         DateOnly from,
         DateOnly to,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        int? studentId = null)
     {
         try
         {
-            return await previewUseCase.CreateAsync(studentShortName, invoiceDate, from, to, cancellationToken);
+            return await previewUseCase.CreateAsync(studentShortName, invoiceDate, from, to, cancellationToken, studentId);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -108,6 +109,28 @@ public sealed class CoreInvoiceWorkflowService : IInvoiceWorkflowService
         {
             return OperationResult<IssueInvoiceResult>.Failure(
                 new ValidationError("Invoice.IssueFailed", ex.Message));
+        }
+    }
+
+    public Task<IssuedInvoice?> GetOldestPendingAsync(CancellationToken cancellationToken) =>
+        invoiceRepository.GetOldestPendingAsync(cancellationToken);
+
+    public Task<OperationResult<InvoiceNumber>> DiscardPendingAsync(IssuedInvoice invoice, CancellationToken cancellationToken) =>
+        invoiceRepository.DiscardPendingAsync(invoice, cancellationToken);
+
+    public async Task<OperationResult<IssueInvoiceResult>> ResumeAsync(
+        InvoiceNumber invoiceNumber, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var company = await companyProfileRepository.GetAsync(cancellationToken);
+            var fileStore = new LocalInvoiceFileStore(new InvoiceFileStoreOptions(company.InvoiceFolderPath));
+            var useCase = new IssueInvoiceUseCase(companyProfileRepository, invoiceRepository, fileStore, pdfWriter, printer, clock);
+            return await useCase.ResumeAsync(invoiceNumber, cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return OperationResult<IssueInvoiceResult>.Failure(new ValidationError("Invoice.ResumeFailed", ex.Message));
         }
     }
 

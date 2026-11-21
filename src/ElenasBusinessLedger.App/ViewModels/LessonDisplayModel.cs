@@ -39,6 +39,9 @@ public sealed class LessonDisplayModel : ViewModelBase
     {
         id = lesson.Id;
         StudentShortName = lesson.StudentShortName;
+        StudentId = lesson.StudentId;
+        NeedsCalendarReview = lesson.NeedsCalendarReview;
+        NeedsPlan = lesson.NeedsPlan;
         this.lessonTimeZone = lessonTimeZone ?? TimeZoneInfo.Local;
         startsOnDate = lesson.StartsAt.Date;
         startsAtTimeText = lesson.HasKnownStartTime
@@ -60,10 +63,12 @@ public sealed class LessonDisplayModel : ViewModelBase
         TimeZoneInfo lessonTimeZone,
         DateTime? startsOnDate,
         TimeOnly? startsAt,
-        DashboardPlanOption? plan)
+        DashboardPlanOption? plan,
+        int? studentId)
     {
         id = $"draft-{Guid.NewGuid():N}";
         StudentShortName = studentShortName;
+        StudentId = studentId;
         this.lessonTimeZone = lessonTimeZone;
         this.startsOnDate = startsOnDate;
         startsAtTimeText = startsAt?.ToString("HH:mm", CultureInfo.InvariantCulture) ?? string.Empty;
@@ -81,12 +86,15 @@ public sealed class LessonDisplayModel : ViewModelBase
         TimeZoneInfo lessonTimeZone,
         DateTime? startsOnDate = null,
         TimeOnly? startsAt = null,
-        DashboardPlanOption? plan = null) =>
-        new(studentShortName, lessonTimeZone, startsOnDate, startsAt, plan);
+        DashboardPlanOption? plan = null,
+        int? studentId = null) =>
+        new(studentShortName, lessonTimeZone, startsOnDate, startsAt, plan, studentId);
 
     public string Id => id;
 
     public string StudentShortName { get; }
+
+    public int? StudentId { get; }
 
     public int LocalLessonId { get; private set; }
 
@@ -167,11 +175,15 @@ public sealed class LessonDisplayModel : ViewModelBase
 
     public InvoiceNumber? InvoiceNumber { get; }
 
-    public bool CanEdit => (IsDraft || State == LessonState.Planned) && !IsInvoiced;
+    public bool NeedsCalendarReview { get; }
 
-    public bool CanEditPlan => CanEdit && (IsDraft || LocalLessonId > 0);
+    public bool NeedsPlan { get; private set; }
 
-    public bool CanToggleState => !IsDraft && !IsInvoiced;
+    public bool CanEdit => (IsDraft || State == LessonState.Planned) && !IsInvoiced && !NeedsCalendarReview && !NeedsPlan;
+
+    public bool CanEditPlan => NeedsPlan && !IsInvoiced || CanEdit && (IsDraft || LocalLessonId > 0);
+
+    public bool CanToggleState => !IsDraft && !IsInvoiced && !NeedsPlan;
 
     public bool HasDateTimeChange => HasDateOrTimeChange();
     public bool HasKnownStartTime => !string.IsNullOrWhiteSpace(StartsAtTimeText);
@@ -198,7 +210,7 @@ public sealed class LessonDisplayModel : ViewModelBase
         ? date.ToString("dddd dd-MM", CultureInfo.InvariantCulture)
         : string.Empty;
 
-    public string StateText => State == LessonState.Completed ? "Completed" : "Planned";
+    public string StateText => NeedsCalendarReview ? "Review needed" : NeedsPlan ? "Plan needed" : State == LessonState.Completed ? "Completed" : "Planned";
 
     public int PlanCatalogId
     {
@@ -212,7 +224,7 @@ public sealed class LessonDisplayModel : ViewModelBase
         private set => SetProperty(ref planName, value);
     }
 
-    public string StateToggleToolTip => State == LessonState.Completed
+    public string StateToggleToolTip => NeedsCalendarReview ? "Review pending calendar change" : State == LessonState.Completed
         ? "Mark lesson as planned"
         : "Mark lesson as completed";
 
@@ -252,6 +264,16 @@ public sealed class LessonDisplayModel : ViewModelBase
 
     public void AcceptPlanChange(LessonRecord lesson)
     {
+        if (NeedsPlan)
+        {
+            LocalLessonId = lesson.Id;
+            NeedsPlan = false;
+            OnPropertyChanged(nameof(NeedsPlan));
+            OnPropertyChanged(nameof(CanEdit));
+            OnPropertyChanged(nameof(CanEditPlan));
+            OnPropertyChanged(nameof(CanToggleState));
+            OnPropertyChanged(nameof(StateText));
+        }
         planCatalogId = lesson.PlanCatalogId;
         PlanName = lesson.PlanName;
         OnPropertyChanged(nameof(PlanCatalogId));

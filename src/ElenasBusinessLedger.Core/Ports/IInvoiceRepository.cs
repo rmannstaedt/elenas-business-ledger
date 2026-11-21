@@ -54,6 +54,11 @@ public interface IInvoiceRepository
 
     Task<IssuedInvoice?> GetIssuingInvoiceAsync(InvoiceNumber invoiceNumber, CancellationToken cancellationToken);
 
+    Task<IssuedInvoice?> GetOldestPendingAsync(CancellationToken cancellationToken);
+
+    Task<OperationResult<InvoiceNumber>> DiscardPendingAsync(
+        IssuedInvoice savedInvoice, CancellationToken cancellationToken);
+
     Task<PaymentStatus> GetPaymentStatusAsync(InvoiceNumber invoiceNumber, CancellationToken cancellationToken);
 
     Task SavePaymentStatusAsync(InvoiceNumber invoiceNumber, PaymentStatus paymentStatus, CancellationToken cancellationToken);

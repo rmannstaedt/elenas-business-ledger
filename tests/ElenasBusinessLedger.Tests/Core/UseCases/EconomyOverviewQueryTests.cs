@@ -379,6 +379,12 @@ public sealed class EconomyOverviewQueryTests
             CancellationToken cancellationToken) =>
             throw new NotImplementedException();
 
+        public Task<IssuedInvoice?> GetOldestPendingAsync(CancellationToken cancellationToken) =>
+            Task.FromResult<IssuedInvoice?>(null);
+
+        public Task<OperationResult<InvoiceNumber>> DiscardPendingAsync(
+            IssuedInvoice savedInvoice, CancellationToken cancellationToken) => throw new NotSupportedException();
+
         public Task<IssuedInvoice?> GetIssuingInvoiceAsync(
             InvoiceNumber invoiceNumber,
             CancellationToken cancellationToken) =>

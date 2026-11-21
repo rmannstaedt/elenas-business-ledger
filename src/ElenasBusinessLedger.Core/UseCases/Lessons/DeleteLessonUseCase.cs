@@ -1,5 +1,6 @@
 using ElenasBusinessLedger.Core.Calendar;
 using ElenasBusinessLedger.Core.Common;
+using ElenasBusinessLedger.Core.Lessons;
 using ElenasBusinessLedger.Core.Ports;
 
 namespace ElenasBusinessLedger.Core.UseCases.Lessons;
@@ -22,10 +23,20 @@ public sealed class DeleteLessonUseCase
         DateOnly refreshMonth,
         CancellationToken cancellationToken)
     {
-        var calendarResult = await calendarGateway.DeleteLessonAsync(lessonId, refreshMonth, cancellationToken);
-        if (!calendarResult.Succeeded)
+        var claimed = await lessonRepository.ClaimCalendarMutationAsync(lessonId, CalendarMutationKind.Delete, cancellationToken);
+        if (!claimed.Succeeded)
         {
-            return calendarResult;
+            return OperationResult<IReadOnlyList<CalendarLesson>>.Failure(claimed.Errors.ToArray());
+        }
+
+        var calendarResult = await calendarGateway.DeleteWithoutRefreshAsync(lessonId, refreshMonth, cancellationToken);
+        if (calendarResult.State != CalendarWriteState.Acknowledged)
+        {
+            if (calendarResult.State == CalendarWriteState.Rejected)
+            {
+                await lessonRepository.ClearCalendarMutationAsync(lessonId, CalendarMutationKind.Delete, cancellationToken);
+            }
+            return OperationResult<IReadOnlyList<CalendarLesson>>.Failure(calendarResult.Errors.ToArray());
         }
 
         try
@@ -35,15 +46,15 @@ public sealed class DeleteLessonUseCase
                 cancellationToken);
             if (!deleted)
             {
-                return LocalLedgerFailure(calendarResult.Value!);
+                return LocalLedgerFailure(calendarResult.RefreshedLessons ?? []);
             }
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            return LocalLedgerFailure(calendarResult.Value!);
+            return LocalLedgerFailure(calendarResult.RefreshedLessons ?? []);
         }
 
-        return calendarResult;
+        return await calendarResult.RefreshAsync(calendarGateway, refreshMonth, cancellationToken);
     }
 
     private static OperationResult<IReadOnlyList<CalendarLesson>> LocalLedgerFailure(

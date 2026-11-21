@@ -14,4 +14,7 @@ public sealed record DashboardLesson(
     int PlanCatalogId = 0,
     string PlanName = "",
     int LocalLessonId = 0,
-    bool HasKnownStartTime = true);
+    bool HasKnownStartTime = true,
+    int? StudentId = null,
+    bool NeedsCalendarReview = false,
+    bool NeedsPlan = false);

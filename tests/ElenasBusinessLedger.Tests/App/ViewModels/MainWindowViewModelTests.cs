@@ -1370,6 +1370,37 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task SwitchingBetweenStudentsWithConflictingLabelsPreservesEachDraftById()
+    {
+        var first = new StudentChoice(1, "Mira");
+        var second = new StudentChoice(2, "mira");
+        var dashboard = new FakeDashboardService { NextResult = ForStudent(first) };
+        var viewModel = CreateViewModel(dashboard: dashboard);
+        await viewModel.LoadAsync();
+        await viewModel.AddLessonCommand.ExecuteAsync();
+        var firstDraft = Assert.Single(viewModel.Lessons);
+
+        dashboard.NextResult = ForStudent(second);
+        await viewModel.SelectStudentCommand.ExecuteAsync(second);
+        Assert.Empty(viewModel.Lessons);
+        await viewModel.AddLessonCommand.ExecuteAsync();
+        var secondDraft = Assert.Single(viewModel.Lessons);
+
+        dashboard.NextResult = ForStudent(first);
+        await viewModel.SelectStudentCommand.ExecuteAsync(first);
+        Assert.Same(firstDraft, Assert.Single(viewModel.Lessons));
+        dashboard.NextResult = ForStudent(second);
+        await viewModel.SelectStudentCommand.ExecuteAsync(second);
+        Assert.Same(secondDraft, Assert.Single(viewModel.Lessons));
+
+        OperationResult<StartupDashboardResult> ForStudent(StudentChoice student) =>
+            OperationResult<StartupDashboardResult>.Success(new StartupDashboardResult(
+                student.ShortName, [first.ShortName, second.ShortName], [], [], false, [],
+                [new DashboardPlanOption(42, "Standard")], CurrentStudentId: student.StudentId,
+                StudentChoices: [first, second]));
+    }
+
+    [Fact]
     public async Task StudentDropdownSelectionRefreshesDashboardWithoutSelectingLesson()
     {
         var dashboard = new FakeDashboardService { StudentShortNames = ["Bo", "Anna"] };
@@ -2127,7 +2158,7 @@ public sealed class MainWindowViewModelTests
         draft.StartsOnDate = startsAt.Date;
         draft.PlanCatalogId = 77;
 
-        await EventuallyAsync(() => lessonEditor.AddWasCalled);
+        await EventuallyAsync(() => viewModel.SelectedLesson is { Id: "new-lesson", LocalLessonId: 19 } && !viewModel.IsBusy);
         var lesson = Assert.Single(viewModel.Lessons, lesson => lesson.Id == "new-lesson");
         Assert.False(lesson.IsDraft);
         Assert.Equal(77, lessonEditor.LastAddRequest?.PlanCatalogId);
@@ -2926,7 +2957,7 @@ public sealed class MainWindowViewModelTests
         public Task<OperationResult<StartupDashboardResult>> LoadAsync(
             DateOnly month,
             string? selectedStudentShortName,
-            CancellationToken cancellationToken) =>
+            CancellationToken cancellationToken, int? studentId = null) =>
             LoadCoreAsync(month, selectedStudentShortName);
 
         private async Task<OperationResult<StartupDashboardResult>> LoadCoreAsync(
@@ -3219,7 +3250,8 @@ public sealed class MainWindowViewModelTests
         public Task<OperationResult<PopulateCalendarResult>> PopulateCalendarAsync(
             string studentShortName,
             DateOnly displayMonth,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            int? studentId = null)
         {
             LastPopulateStudentShortName = studentShortName;
             LastPopulateDisplayMonth = displayMonth;
@@ -3324,12 +3356,15 @@ public sealed class MainWindowViewModelTests
         public Task<bool> ShowWriteInvoiceAsync(
             DateOnly displayMonth,
             string? initialStudentShortName,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            int? studentId = null)
         {
             WriteWasShown = true;
             LastWriteInitialStudentShortName = initialStudentShortName;
             return Task.FromResult(NextWriteResult);
         }
+
+        public Task<bool> ShowResumeInvoiceAsync(CancellationToken cancellationToken) => Task.FromResult(false);
 
         public Task ShowInvoiceViewerAsync(InvoiceNumber invoiceNumber, CancellationToken cancellationToken)
         {

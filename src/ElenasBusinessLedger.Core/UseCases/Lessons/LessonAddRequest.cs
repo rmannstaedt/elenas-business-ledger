@@ -4,4 +4,5 @@ public sealed record LessonAddRequest(
     string StudentShortName,
     DateTimeOffset StartsAt,
     int PlanCatalogId,
-    bool HasKnownStartTime = true);
+    bool HasKnownStartTime = true,
+    int? StudentId = null);

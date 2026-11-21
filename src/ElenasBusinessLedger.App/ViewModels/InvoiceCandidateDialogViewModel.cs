@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using ElenasBusinessLedger.App.Commands;
 using ElenasBusinessLedger.App.Services;
+using ElenasBusinessLedger.Core.Students;
 
 namespace ElenasBusinessLedger.App.ViewModels;
 
@@ -10,6 +11,8 @@ public sealed class InvoiceCandidateDialogViewModel : ViewModelBase
     private readonly DateOnly date;
     private readonly DateTimeOffset now;
     private readonly string? initialStudentShortName;
+    private readonly int? initialStudentId;
+    private StudentChoice? selectedStudent;
     private string? selectedStudentShortName;
     private string? errorMessage;
 
@@ -17,12 +20,14 @@ public sealed class InvoiceCandidateDialogViewModel : ViewModelBase
         IInvoiceWorkflowService invoiceWorkflowService,
         DateOnly date,
         DateTimeOffset now,
-        string? initialStudentShortName = null)
+        string? initialStudentShortName = null,
+        int? initialStudentId = null)
     {
         this.invoiceWorkflowService = invoiceWorkflowService;
         this.date = date;
         this.now = now;
         this.initialStudentShortName = initialStudentShortName;
+        this.initialStudentId = initialStudentId;
 
         ConfirmCommand = new AsyncRelayCommand(ConfirmAsync, () => SelectedStudentShortName is not null);
     }
@@ -30,6 +35,22 @@ public sealed class InvoiceCandidateDialogViewModel : ViewModelBase
     public ObservableCollection<string> CandidateStudentShortNames { get; } = [];
 
     public ObservableCollection<string> AllStudentShortNames { get; } = [];
+
+    public ObservableCollection<StudentChoice> CandidateChoices { get; } = [];
+
+    public ObservableCollection<StudentChoice> StudentChoices { get; } = [];
+
+    public StudentChoice? SelectedStudent
+    {
+        get => selectedStudent;
+        set
+        {
+            if (value is not null && SetProperty(ref selectedStudent, value))
+            {
+                SelectedStudentShortName = value.ShortName;
+            }
+        }
+    }
 
     public string? SelectedStudentShortName
     {
@@ -84,10 +105,38 @@ public sealed class InvoiceCandidateDialogViewModel : ViewModelBase
             AllStudentShortNames.Add(shortName);
         }
 
-        SelectedStudentShortName = PreferredInitialStudent(result.Value.AllStudentShortNames)
+        CandidateChoices.Clear();
+        StudentChoices.Clear();
+        foreach (var choice in (result.Value.StudentChoices ?? []).Where(choice => choice.StudentId > 0))
+        {
+            StudentChoices.Add(choice);
+        }
+        foreach (var choice in result.Value.CandidateChoices ?? [])
+        {
+            CandidateChoices.Add(choice);
+        }
+
+        SelectedStudent = StudentChoices.FirstOrDefault(choice => choice.StudentId == initialStudentId)
+            ?? StudentChoices.Concat(CandidateChoices).FirstOrDefault(choice => choice.StudentId == result.Value.PreselectedStudentId)
+            ?? CandidateChoices.FirstOrDefault() ?? StudentChoices.FirstOrDefault();
+        if (SelectedStudent is null)
+        {
+            SelectedStudentShortName = PreferredInitialStudent(result.Value.AllStudentShortNames)
             ?? result.Value.PreselectedStudentShortName
             ?? CandidateStudentShortNames.FirstOrDefault()
-            ?? AllStudentShortNames.FirstOrDefault();
+                ?? AllStudentShortNames.FirstOrDefault();
+            foreach (var shortName in CandidateStudentShortNames)
+            {
+                CandidateChoices.Add(new StudentChoice(0, shortName));
+            }
+            foreach (var shortName in AllStudentShortNames)
+            {
+                StudentChoices.Add(new StudentChoice(0, shortName));
+            }
+            SelectedStudent = StudentChoices.Concat(CandidateChoices)
+                .FirstOrDefault(choice => choice.ShortName == SelectedStudentShortName);
+        }
+
         ErrorMessage = null;
     }
 

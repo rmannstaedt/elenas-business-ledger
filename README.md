@@ -40,6 +40,6 @@ Install Inno Setup 6, then run this from the repository root.
 powershell -ExecutionPolicy Bypass -File .\scripts\build-installer.ps1
 ```
 
-The script publishes a self-contained Windows x64 build and writes `artifacts\installer\ElenasBusinessLedger-1.3.2-Setup.exe`. It uses `C:\Program Files (x86)\Inno Setup 6\ISCC.exe` by default. Pass `-InnoSetupCompiler` to use a different compiler path. The script rebuilds the installer output directory, so archive any earlier installers you want to retain before running it.
+The script publishes a self-contained Windows x64 build and writes `artifacts\installer\ElenasBusinessLedger-1.3.2-Setup.exe`. It uses `C:\Program Files (x86)\Inno Setup 6\ISCC.exe` by default. Pass `-InnoSetupCompiler` to use a different compiler path. Each build stages its files separately. A successful build replaces only the installer with the same filename after Inno Setup produces a nonempty candidate. A failed build leaves the previous installer in place.
 
 To bundle Google sign-in for your build, place a Desktop OAuth client file in the app project before packaging. See [Set up a Google OAuth client](docs/setup.md#set-up-a-google-oauth-client) for the exact file location and Google Cloud steps.

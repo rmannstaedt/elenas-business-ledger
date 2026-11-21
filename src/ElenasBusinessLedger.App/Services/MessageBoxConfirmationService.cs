@@ -61,6 +61,15 @@ public sealed class MessageBoxConfirmationService : IConfirmationService
         return Task.FromResult(result == MessageBoxResult.Yes);
     }
 
+    public Task<bool> ConfirmCalendarRemovalAsync(LessonDisplayModel lesson, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var answer = MessageBox.Show(
+            $"Check the original calendar for the lesson for {lesson.StudentShortName} on {lesson.StartsAtText}, including moved appointments. Close any other copy of the Ledger before continuing. Have you confirmed the appointment was removed?",
+            "Review calendar change", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
+        return Task.FromResult(answer == MessageBoxResult.Yes);
+    }
+
     public Task<bool> ConfirmDeleteLessonAsync(
         LessonDisplayModel lesson,
         CancellationToken cancellationToken)

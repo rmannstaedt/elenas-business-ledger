@@ -18,6 +18,11 @@ public sealed class SqliteEconomyRepository : IEconomyRepository
     public async Task<EconomySettings?> GetSettingsAsync(CancellationToken cancellationToken)
     {
         await using var context = createContext();
+        return await ReadSettingsAsync(context, cancellationToken);
+    }
+
+    internal static async Task<EconomySettings?> ReadSettingsAsync(LedgerDbContext context, CancellationToken cancellationToken)
+    {
         var settings = await context.EconomySettings
             .AsNoTracking()
             .SingleOrDefaultAsync(entity => entity.Id == SingletonSettingsId, cancellationToken);
@@ -48,9 +53,15 @@ public sealed class SqliteEconomyRepository : IEconomyRepository
     public async Task SaveSettingsAsync(EconomySettings settings, CancellationToken cancellationToken)
     {
         await using var context = createContext();
+        await SetSettingsAndRemoveObsoleteOverridesAsync(context, settings, cancellationToken);
+        await context.SaveChangesAsync(cancellationToken);
+    }
+
+    internal static async Task SetSettingsAndRemoveObsoleteOverridesAsync(
+        LedgerDbContext context, EconomySettings settings, CancellationToken cancellationToken)
+    {
         await SaveSettingsAsync(context, settings, cancellationToken);
         await RemoveManualOverridesOnOrAfterCutOverAsync(context, settings.FirstApplicationInvoiceMonth, cancellationToken);
-        await context.SaveChangesAsync(cancellationToken);
     }
 
     public async Task SaveManualMonthOverridesAsync(

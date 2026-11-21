@@ -11,6 +11,7 @@ public sealed class CoreAppSettingsService : IAppSettingsService
 {
     private readonly ICompanyProfileRepository companyProfileRepository;
     private readonly SqliteCalendarSettingsRepository calendarSettingsRepository;
+    private readonly SqliteAppSettingsWriter settingsWriter;
     private readonly IEconomyRepository? economyRepository;
     private readonly AppPaths appPaths;
     private readonly GoogleOAuthClientConfigurationProvider googleOAuthClientConfigurationProvider;
@@ -44,6 +45,7 @@ public sealed class CoreAppSettingsService : IAppSettingsService
     {
         this.companyProfileRepository = companyProfileRepository;
         this.calendarSettingsRepository = calendarSettingsRepository;
+        settingsWriter = calendarSettingsRepository.CreateSettingsWriter();
         this.economyRepository = economyRepository;
         this.appPaths = appPaths;
         this.googleOAuthClientConfigurationProvider = googleOAuthClientConfigurationProvider;
@@ -85,16 +87,7 @@ public sealed class CoreAppSettingsService : IAppSettingsService
                     new ValidationError("Settings.EconomySettingsUnavailable", "Economy settings cannot be saved."));
             }
 
-            await companyProfileRepository.SaveAsync(companyProfile, cancellationToken);
-            await calendarSettingsRepository.SaveAsync(calendarSettings, cancellationToken);
-            if (economySettings is not null)
-            {
-                await economyRepository!.SaveSettingsAsync(economySettings, cancellationToken);
-            }
-
-            var currentEconomySettings = economyRepository is null
-                ? economySettings
-                : await economyRepository.GetSettingsAsync(cancellationToken);
+            var currentEconomySettings = await settingsWriter.SaveAsync(companyProfile, calendarSettings, economySettings, cancellationToken);
             return OperationResult<AppSettingsSnapshot>.Success(
                 CreateSnapshot(companyProfile, calendarSettings, currentEconomySettings));
         }

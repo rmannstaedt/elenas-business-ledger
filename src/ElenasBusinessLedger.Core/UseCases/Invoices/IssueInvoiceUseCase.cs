@@ -68,6 +68,27 @@ public sealed class IssueInvoiceUseCase
             savedInvoice = recovery.Value!;
         }
 
+        return await PublishAndPrintAsync(savedInvoice, company.ConfiguredInvoicePrinterName, cancellationToken);
+    }
+
+    public async Task<OperationResult<IssueInvoiceResult>> ResumeAsync(
+        InvoiceNumber invoiceNumber, CancellationToken cancellationToken)
+    {
+        var pending = await invoiceRepository.GetOldestPendingAsync(cancellationToken);
+        if (pending is null || pending.InvoiceNumber != invoiceNumber || pending.SnapshotRevision is null ||
+            (pending.Publication is null && pending.Lines.Count == 0))
+        {
+            return OperationResult<IssueInvoiceResult>.Failure(new ValidationError(
+                "Invoice.PendingNeedsReview", "This reservation changed or requires review of the original invoice details."));
+        }
+
+        var company = await companyProfileRepository.GetAsync(cancellationToken);
+        return await PublishAndPrintAsync(pending, company.ConfiguredInvoicePrinterName, cancellationToken);
+    }
+
+    private async Task<OperationResult<IssueInvoiceResult>> PublishAndPrintAsync(
+        IssuedInvoice savedInvoice, string printerName, CancellationToken cancellationToken)
+    {
         if (savedInvoice.Publication is null)
         {
             var prepare = await PreparePublicationAsync(savedInvoice, cancellationToken);
@@ -99,34 +120,52 @@ public sealed class IssueInvoiceUseCase
         var finalize = await invoiceRepository.FinalizeIssuedInvoiceWithLessonLocksAsync(
             invoiceNumber,
             publishedPath,
-            lessonIds,
+            savedInvoice.Lines.Select(line => line.LessonId).ToArray(),
             cancellationToken);
         if (!finalize.Succeeded)
         {
             return OperationResult<IssueInvoiceResult>.Failure(finalize.Errors.ToArray());
         }
 
-        var print = await printer.PrintAsync(
-            publishedPath,
-            company.ConfiguredInvoicePrinterName,
-            cancellationToken);
-        var printStatus = print.Succeeded ? InvoicePrintStatus.Printed : InvoicePrintStatus.PrintFailed;
-        var printStatusUpdate = await invoiceRepository.UpdatePrintStatusAsync(
-            invoiceNumber,
-            printStatus,
-            print.Succeeded ? clock.Now : null,
-            print.Succeeded ? null : print.Errors.FirstOrDefault()?.Message,
-            cancellationToken);
-
-        if (!printStatusUpdate.Succeeded)
+        var issued = finalize.Value!;
+        OperationResult<string> print;
+        try
         {
-            return OperationResult<IssueInvoiceResult>.Failure(printStatusUpdate.Errors.ToArray());
+            cancellationToken.ThrowIfCancellationRequested();
+            print = await printer.PrintAsync(publishedPath, printerName, cancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            print = OperationResult<string>.Failure(new ValidationError("InvoicePrint.Cancelled",
+                "The invoice was issued. The print request was interrupted."));
+        }
+        catch (Exception ex)
+        {
+            print = OperationResult<string>.Failure(new ValidationError("InvoicePrint.Failed", ex.Message));
         }
 
-        return OperationResult<IssueInvoiceResult>.Success(new IssueInvoiceResult(
-            printStatusUpdate.Value!,
-            print.Succeeded,
-            print.Errors));
+        var warnings = print.Errors.ToList();
+        try
+        {
+            var update = await invoiceRepository.UpdatePrintStatusAsync(
+                invoiceNumber,
+                print.Succeeded ? InvoicePrintStatus.Printed : InvoicePrintStatus.PrintFailed,
+                print.Succeeded ? clock.Now : null,
+                print.Succeeded ? null : print.Errors.FirstOrDefault()?.Message,
+                CancellationToken.None);
+            if (update.Succeeded)
+            {
+                return OperationResult<IssueInvoiceResult>.Success(new IssueInvoiceResult(update.Value!, print.Succeeded, warnings));
+            }
+
+            warnings.AddRange(update.Errors);
+        }
+        catch (Exception ex)
+        {
+            warnings.Add(new ValidationError("InvoicePrint.StatusSaveFailed", $"The invoice was issued. Its print status could not be saved. {ex.Message}"));
+        }
+
+        return OperationResult<IssueInvoiceResult>.Success(new IssueInvoiceResult(issued, print.Succeeded, warnings));
     }
 
     private async Task<OperationResult<IssuedInvoice>> ResolvePendingInvoiceAsync(

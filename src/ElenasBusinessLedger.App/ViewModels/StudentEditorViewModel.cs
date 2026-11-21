@@ -346,6 +346,7 @@ public sealed class StudentEditorViewModel : ViewModelBase
 
     private async Task SaveAsync()
     {
+        WasSaved = false;
         var request = CreateRequest();
         if (request is null)
         {

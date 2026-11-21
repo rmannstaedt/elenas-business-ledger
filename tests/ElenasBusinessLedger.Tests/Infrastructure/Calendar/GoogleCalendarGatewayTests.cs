@@ -37,6 +37,29 @@ public sealed class GoogleCalendarGatewayTests
     }
 
     [Fact]
+    public async Task PopulatePersistsAnAcknowledgedEventBeforeTheNextCreateFails()
+    {
+        var client = new FakeGoogleCalendarEventClient { FailCreateNumber = 2 };
+        var gateway = new GoogleCalendarGateway(client, new GoogleCalendarGatewayOptions("trial", TimeZoneInfo.Utc, TimeSpan.FromHours(1)));
+        var date = new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.Zero);
+        var receipts = new List<(int Index, string EventId)>();
+        var result = await gateway.PopulateWithReceiptsAsync(
+            [new LessonAddRequest("Mira", date, 1), new LessonAddRequest("Mira", date.AddDays(7), 2)],
+            new DateOnly(2026, 6, 1),
+            (index, created, _) =>
+            {
+                Assert.Single(client.CreatedEvents);
+                receipts.Add((index, created.Id));
+                return Task.FromResult<ValidationError?>(null);
+            },
+            TestContext.Current.CancellationToken);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal((0, "created"), Assert.Single(receipts));
+        Assert.Equal("created", Assert.Single(result.Value!).Id);
+    }
+
+    [Fact]
     public void CredentialFactoryRequestsOwnedCalendarEventScopeOnly()
     {
         Assert.Equal(
@@ -643,6 +666,8 @@ public sealed class GoogleCalendarGatewayTests
 
         public Exception? WriteException { get; init; }
 
+        public int? FailCreateNumber { get; init; }
+
         public Exception? ListException { get; init; }
 
         public string? LastListCalendarId { get; private set; }
@@ -701,6 +726,11 @@ public sealed class GoogleCalendarGatewayTests
             if (WriteException is not null)
             {
                 throw WriteException;
+            }
+
+            if (CreatedEvents.Count + 1 == FailCreateNumber)
+            {
+                throw new InvalidOperationException("Simulated calendar failure");
             }
 
             CreatedSummary = summary;

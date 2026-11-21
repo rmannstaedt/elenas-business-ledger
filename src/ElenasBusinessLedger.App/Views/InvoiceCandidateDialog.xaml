@@ -51,8 +51,8 @@
                        FontWeight="SemiBold"
                        Margin="0,0,0,8" />
             <ListBox Grid.Row="1"
-                     ItemsSource="{Binding CandidateStudentShortNames}"
-                     SelectedItem="{Binding SelectedStudentShortName}"
+                     ItemsSource="{Binding CandidateChoices}"
+                     SelectedItem="{Binding SelectedStudent}"
                      MinHeight="80" />
 
             <TextBlock Grid.Row="2"
@@ -61,8 +61,8 @@
                        FontWeight="SemiBold"
                        Margin="0,14,0,8" />
             <ListBox Grid.Row="3"
-                     ItemsSource="{Binding AllStudentShortNames}"
-                     SelectedItem="{Binding SelectedStudentShortName}"
+                     ItemsSource="{Binding StudentChoices}"
+                     SelectedItem="{Binding SelectedStudent}"
                      MinHeight="80" />
         </Grid>
     </DockPanel>

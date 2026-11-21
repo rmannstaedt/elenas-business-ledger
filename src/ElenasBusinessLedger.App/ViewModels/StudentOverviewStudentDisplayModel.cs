@@ -1,4 +1,5 @@
 using ElenasBusinessLedger.App.Services;
+using ElenasBusinessLedger.Core.Students;
 
 namespace ElenasBusinessLedger.App.ViewModels;
 
@@ -12,6 +13,8 @@ public sealed class StudentOverviewStudentDisplayModel : ViewModelBase
     public StudentOverviewSnapshot Snapshot { get; private set; }
 
     public string ShortName => Snapshot.Student.ShortName;
+
+    public StudentChoice Choice => new(Snapshot.Record.Id, ShortName);
 
     public string FullName => Snapshot.Student.FullName;
 

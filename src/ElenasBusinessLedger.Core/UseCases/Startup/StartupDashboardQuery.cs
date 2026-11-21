@@ -5,6 +5,7 @@ using ElenasBusinessLedger.Core.Lessons;
 using ElenasBusinessLedger.Core.Plans;
 using ElenasBusinessLedger.Core.Ports;
 using ElenasBusinessLedger.Core.Time;
+using ElenasBusinessLedger.Core.Students;
 
 namespace ElenasBusinessLedger.Core.UseCases.Startup;
 
@@ -39,18 +40,16 @@ public sealed class StartupDashboardQuery
     public async Task<OperationResult<StartupDashboardResult>> ExecuteAsync(
         DateOnly selectedMonth,
         string? selectedStudentShortName,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        int? selectedStudentId = null)
     {
         var from = selectedMonth.AddMonths(-1).WithDay(1);
         var to = selectedMonth.AddMonths(2).WithDay(1).AddDays(-1);
         var students = await studentRepository.ListActiveStudentsAsync(cancellationToken);
         var calendarLessons = await calendarGateway.ListLessonsAsync(from, to, cancellationToken);
-        var activeStudentShortNames = students
-            .GroupBy(student => student.Student.ShortName, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(
-                group => group.Key,
-                group => group.First().Student.ShortName,
-                StringComparer.OrdinalIgnoreCase);
+        var studentsById = students.Where(student => student.Id > 0).ToDictionary(student => student.Id);
+        var uniqueNames = students.GroupBy(student => StudentShortNameKey.From(student.Student.ShortName))
+            .Where(group => group.Count() == 1).ToDictionary(group => group.Key, group => group.Single());
         var eventIds = calendarLessons
             .SelectMany(lesson => lesson.LegacyEventId is { } rawId ? [lesson.Id, rawId] : new[] { lesson.Id })
             .Distinct(StringComparer.Ordinal)
@@ -74,17 +73,23 @@ public sealed class StartupDashboardQuery
                 local = legacy;
             }
 
-            if (activeStudentShortNames.TryGetValue(local?.StudentShortName ?? calendar.StudentShortName, out var shortName))
+            var owner = local is { StudentId: > 0 }
+                ? studentsById.GetValueOrDefault(local.StudentId)
+                    ?? students.FirstOrDefault(student => student.Id <= 0 && student.Student.ShortName == local.StudentShortName)
+                : uniqueNames.GetValueOrDefault(StudentShortNameKey.From(local?.StudentShortName ?? calendar.StudentShortName));
+            if (owner is not null)
             {
-                known.Add((calendar with { StudentShortName = shortName }, local));
+                known.Add((calendar with { StudentShortName = owner.Student.ShortName, StudentId = owner.Id > 0 ? owner.Id : null }, local));
             }
         }
 
         var knownCalendarLessons = known.Select(match => match.Calendar).ToArray();
-        var currentStudent = selectedStudentShortName is not null &&
-                             activeStudentShortNames.TryGetValue(selectedStudentShortName, out var canonicalSelectedStudent)
-            ? canonicalSelectedStudent
-            : PickCurrentStudent(knownCalendarLessons, students);
+        var selectedStudent = (selectedStudentId is { } selectedId
+                ? studentsById.GetValueOrDefault(selectedId)
+                : selectedStudentShortName is null ? null
+                    : uniqueNames.GetValueOrDefault(StudentShortNameKey.From(selectedStudentShortName)))
+            ?? PickCurrentStudent(knownCalendarLessons, students);
+        var currentStudent = selectedStudent?.Student.ShortName;
 
         var lessonStatuses = await invoiceRepository.ListLessonStatusesAsync(
             from, to, cancellationToken, localLinks.Select(lesson => lesson.Id).ToArray());
@@ -97,7 +102,7 @@ public sealed class StartupDashboardQuery
         var representedLocalLessonIds = new HashSet<int>();
         foreach (var (lesson, localLesson) in known.OrderBy(match => match.Calendar.StartsAt))
         {
-            if (!MatchesCurrentStudent(lesson.StudentShortName, currentStudent))
+            if (!MatchesCurrentStudent(lesson.StudentShortName, lesson.StudentId, selectedStudent))
             {
                 continue;
             }
@@ -118,21 +123,19 @@ public sealed class StartupDashboardQuery
         // Only an explicit lesson deletion removes a billing record.
 
         foreach (var localLesson in localLessons
-            .Where(lesson => statusByLessonId.ContainsKey(lesson.Id))
+            .Where(lesson => statusByLessonId.ContainsKey(lesson.Id) || lesson.PendingCalendarMutation is not null)
             .Where(lesson => !representedLocalLessonIds.Contains(lesson.Id))
-            .Where(lesson => MatchesCurrentStudent(lesson.StudentShortName, currentStudent)))
+            .Where(lesson => MatchesCurrentStudent(lesson.StudentShortName, lesson.StudentId, selectedStudent)))
         {
             var invoiceStatus = statusByLessonId.GetValueOrDefault(localLesson.Id);
             dashboardLessons.Add(CreateDashboardLesson(localLesson, invoiceStatus));
         }
 
         var lessons = dashboardLessons
-            .Where(lesson => MatchesCurrentStudent(lesson.StudentShortName, currentStudent))
+            .Where(lesson => MatchesCurrentStudent(lesson.StudentShortName, lesson.StudentId, selectedStudent))
             .OrderBy(lesson => lesson.StartsAt)
             .ToArray();
 
-        var selectedStudent = students.FirstOrDefault(student =>
-            string.Equals(student.Student.ShortName, currentStudent, StringComparison.OrdinalIgnoreCase));
         var invoices = selectedStudent is null
             ? []
             : await invoiceRepository.ListInvoicesForStudentAsync(selectedStudent.Id, cancellationToken);
@@ -156,7 +159,9 @@ public sealed class StartupDashboardQuery
                 selectedStudent?.Schedule.Count > 0,
                 studentNavigationEntries,
                 planOptions,
-                lessonDefaults));
+                lessonDefaults,
+                selectedStudent is { Id: > 0 } ? selectedStudent.Id : null,
+                students.Select(student => new StudentChoice(student.Id, student.Student.ShortName)).ToArray()));
     }
 
     private async Task<DashboardLesson> ReconcileCalendarLessonAsync(
@@ -182,7 +187,7 @@ public sealed class StartupDashboardQuery
                 InvoiceNumber = null
             };
 
-        if (record != localLesson)
+        if (record.PlanCatalogId > 0 && record != localLesson)
         {
             record = await lessonRepository.SaveAsync(record, cancellationToken);
         }
@@ -208,7 +213,10 @@ public sealed class StartupDashboardQuery
             record.PlanCatalogId,
             record.PlanName,
             record.Id,
-            record.HasKnownStartTime);
+            record.HasKnownStartTime,
+            record.StudentId > 0 ? record.StudentId : null,
+            record.PendingCalendarMutation is not null,
+            record.PlanCatalogId <= 0);
     }
 
     private async Task<IReadOnlyList<DashboardPlanOption>> CreatePlanOptionsAsync(
@@ -238,7 +246,8 @@ public sealed class StartupDashboardQuery
         IReadOnlyList<StudentRecord> students)
     {
         var student = students.FirstOrDefault(student =>
-            string.Equals(student.Student.ShortName, calendarLesson.StudentShortName, StringComparison.OrdinalIgnoreCase));
+            calendarLesson.StudentId is { } studentId ? student.Id == studentId :
+                string.Equals(student.Student.ShortName, calendarLesson.StudentShortName, StringComparison.Ordinal));
         var lessonDate = DateOnly.FromDateTime(calendarLesson.StartsAt.DateTime);
         var plan = student is null
             ? null
@@ -258,15 +267,13 @@ public sealed class StartupDashboardQuery
             HasKnownStartTime: calendarLesson.HasKnownStartTime);
     }
 
-    private string? PickCurrentStudent(IReadOnlyList<CalendarLesson> calendarLessons, IReadOnlyList<StudentRecord> students)
+    private StudentRecord? PickCurrentStudent(IReadOnlyList<CalendarLesson> calendarLessons, IReadOnlyList<StudentRecord> students)
     {
         var now = clock.Now;
-        return calendarLessons
-            .Where(lesson => lesson.StartsAt.Date == now.Date)
-            .OrderBy(lesson => Math.Abs((lesson.StartsAt - now).Ticks))
-            .Select(lesson => lesson.StudentShortName)
-            .FirstOrDefault() ??
-            students.FirstOrDefault()?.Student.ShortName;
+        var nearest = calendarLessons.Where(lesson => lesson.StartsAt.Date == now.Date)
+            .MinBy(lesson => Math.Abs((lesson.StartsAt - now).Ticks));
+        return nearest is null ? students.FirstOrDefault() :
+            students.FirstOrDefault(student => MatchesCurrentStudent(nearest.StudentShortName, nearest.StudentId, student));
     }
 
     private IReadOnlyList<DashboardStudentNavigationEntry> CreateStudentNavigationEntries(
@@ -284,7 +291,7 @@ public sealed class StartupDashboardQuery
         var scheduledEntries = calendarLessons
             .Where(lesson => activeStudentShortNames.Contains(lesson.StudentShortName))
             .Where(lesson => IsInDateWindow(lesson.StartsAt, navigationFrom, navigationTo))
-            .Select(lesson => new DashboardStudentNavigationEntry(lesson.StudentShortName, lesson.StartsAt))
+            .Select(lesson => new DashboardStudentNavigationEntry(lesson.StudentShortName, lesson.StartsAt, StudentId: lesson.StudentId))
             .OrderBy(entry => entry.StartsAt)
             .ThenBy(entry => entry.StudentShortName, StringComparer.OrdinalIgnoreCase)
             .ToArray();
@@ -298,7 +305,8 @@ public sealed class StartupDashboardQuery
                 .Select(startsAt => new DashboardStudentNavigationEntry(
                     student.Student.ShortName,
                     startsAt,
-                    HasCalendarLesson: false)))
+                    HasCalendarLesson: false,
+                    StudentId: student.Id > 0 ? student.Id : null)))
             .ToArray();
 
         return OrderNavigationEntries(defaultEntries);
@@ -317,9 +325,10 @@ public sealed class StartupDashboardQuery
         return date >= from && date <= to;
     }
 
-    private static bool MatchesCurrentStudent(string studentShortName, string? currentStudent) =>
-        currentStudent is null ||
-        string.Equals(studentShortName, currentStudent, StringComparison.OrdinalIgnoreCase);
+    private static bool MatchesCurrentStudent(string shortName, int? studentId, StudentRecord? selected) =>
+        selected is null || (studentId is > 0 && selected.Id > 0
+            ? studentId == selected.Id
+            : string.Equals(shortName, selected.Student.ShortName, StringComparison.OrdinalIgnoreCase));
 
     private IEnumerable<DateTimeOffset> CreateScheduledStarts(
         IReadOnlyList<ElenasBusinessLedger.Core.Students.StudentScheduleEntry> schedule,

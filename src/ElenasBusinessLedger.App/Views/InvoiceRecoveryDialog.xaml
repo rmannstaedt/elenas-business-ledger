@@ -21,6 +21,8 @@
                         Padding="12,6" Margin="0,0,8,0" />
                 <Button x:Name="ReviseButton" Content="_Use current preview" Click="OnRevise"
                         Padding="12,6" Margin="0,0,8,0" />
+                <Button x:Name="DiscardButton" Content="_Discard reservation" Click="OnDiscard"
+                        Visibility="Collapsed" Padding="12,6" Margin="0,0,8,0" />
                 <Button Content="Cancel" IsCancel="True" IsDefault="True" MinWidth="80" Padding="12,6" />
             </StackPanel>
         </StackPanel>

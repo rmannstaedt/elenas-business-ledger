@@ -30,6 +30,12 @@ public sealed class SqliteCompanyProfileRepository : ICompanyProfileRepository
     public async Task SaveAsync(CompanyProfile profile, CancellationToken cancellationToken)
     {
         await using var context = createContext();
+        await SetAsync(context, profile, cancellationToken);
+        await context.SaveChangesAsync(cancellationToken);
+    }
+
+    internal static async Task SetAsync(LedgerDbContext context, CompanyProfile profile, CancellationToken cancellationToken)
+    {
         var entity = await context.CompanyProfiles.SingleOrDefaultAsync(
             storedProfile => storedProfile.Id == SingletonId,
             cancellationToken);
@@ -53,8 +59,6 @@ public sealed class SqliteCompanyProfileRepository : ICompanyProfileRepository
         entity.BankRegistrationNumber = profile.BankRegistrationNumber;
         entity.BankAccountNumber = profile.BankAccountNumber;
         entity.MobilePayAccount = profile.MobilePayAccount;
-
-        await context.SaveChangesAsync(cancellationToken);
     }
 
     private static CompanyProfile ToDomain(CompanyProfileEntity entity) =>

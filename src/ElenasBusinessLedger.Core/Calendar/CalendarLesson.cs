@@ -8,4 +8,5 @@ public sealed record CalendarLesson(
     DateTimeOffset StartsAt,
     LessonState State = LessonState.Planned,
     bool HasKnownStartTime = true,
-    string? LegacyEventId = null);
+    string? LegacyEventId = null,
+    int? StudentId = null);

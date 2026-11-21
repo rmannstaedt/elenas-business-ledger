@@ -36,9 +36,19 @@ public sealed class ToggleLessonStateUseCase
             ? LessonState.Completed
             : LessonState.Planned;
 
+        var claimed = await lessonRepository.ClaimCalendarMutationAsync(lessonId, CalendarMutationKind.ChangeState, cancellationToken);
+        if (!claimed.Succeeded)
+        {
+            return OperationResult<LessonState>.Failure(currentState, claimed.Errors.ToArray());
+        }
+
         var calendarResult = await calendarGateway.UpdateLessonStateAsync(lessonId, nextState, cancellationToken);
         if (!calendarResult.Succeeded)
         {
+            if (calendarResult.Errors.Any(error => error.Code is "Calendar.ScopeMismatch" or "Calendar.NotConfigured"))
+            {
+                await lessonRepository.ClearCalendarMutationAsync(lessonId, CalendarMutationKind.ChangeState, cancellationToken);
+            }
             return calendarResult;
         }
 

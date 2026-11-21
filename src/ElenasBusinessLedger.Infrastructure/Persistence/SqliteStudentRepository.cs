@@ -44,6 +44,17 @@ public sealed class SqliteStudentRepository : IStudentRepository
         return students.Select(ToDomain).ToArray();
     }
 
+    public async Task<StudentRecord?> GetByIdAsync(int studentId, CancellationToken cancellationToken)
+    {
+        await using var context = createContext();
+        var student = await context.Students.AsNoTracking()
+            .Include(entity => entity.PlanPeriods)
+            .ThenInclude(plan => plan.PlanCatalog)
+            .Include(entity => entity.ScheduleEntries)
+            .SingleOrDefaultAsync(entity => entity.Id == studentId, cancellationToken);
+        return student is null ? null : ToDomain(student);
+    }
+
     public async Task<StudentRecord?> GetByShortNameAsync(string shortName, CancellationToken cancellationToken)
     {
         await using var context = createContext();
@@ -60,6 +71,7 @@ public sealed class SqliteStudentRepository : IStudentRepository
     public async Task<OperationResult<StudentRecord>> SaveAsync(StudentRecord student, CancellationToken cancellationToken)
     {
         await using var context = createContext();
+        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
         var entityQuery = context.Students
             .Include(storedStudent => storedStudent.PlanPeriods)
             .Include(storedStudent => storedStudent.ScheduleEntries);
@@ -72,6 +84,19 @@ public sealed class SqliteStudentRepository : IStudentRepository
         {
             return OperationResult<StudentRecord>.Failure(
                 new ValidationError("Student.NotFound", "Student was not found."));
+        }
+
+        var nameChanged = entity is null || !string.Equals(entity.ShortName, student.Student.ShortName, StringComparison.Ordinal);
+        if (nameChanged)
+        {
+            var names = await context.Students.AsNoTracking().Where(other => other.Id != student.Id)
+                .Select(other => other.ShortName).ToArrayAsync(cancellationToken);
+            var requestedKey = StudentShortNameKey.From(student.Student.ShortName);
+            if (names.Any(name => StudentShortNameKey.From(name) == requestedKey))
+            {
+                return OperationResult<StudentRecord>.Failure(new ValidationError(
+                    "Student.ShortNameInUse", "Another student already uses this short name. Choose a distinct short name."));
+            }
         }
 
         if (entity is null)
@@ -119,6 +144,7 @@ public sealed class SqliteStudentRepository : IStudentRepository
         }
 
         await context.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
         return OperationResult<StudentRecord>.Success(ToDomain(entity));
     }
 

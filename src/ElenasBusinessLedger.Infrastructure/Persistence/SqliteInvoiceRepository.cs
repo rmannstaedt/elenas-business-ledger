@@ -149,9 +149,17 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
     {
         var requestedLessonIds = GetDistinctPositiveLessonIds(draft.Lines.Select(line => line.LessonId));
         await using var context = createContext();
-        var existingReservation = await FindMatchingIssuingInvoiceAsync(context, requestedLessonIds, cancellationToken);
+        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+        var existingReservation = await FindOldestPendingAsync(context, cancellationToken);
         if (existingReservation is not null)
         {
+            if (!GetDistinctPositiveLessonIds(existingReservation.Lines.Select(line => line.LessonId))
+                .SequenceEqual(requestedLessonIds))
+            {
+                return OperationResult<IssuedInvoice>.Failure(new ValidationError(
+                    "Invoice.PendingExists", $"Invoice {new InvoiceNumber(existingReservation.InvoiceNumber)} is pending. Use Resume Invoice to resolve it first."));
+            }
+
             if (draft.Student.StudentId is { } studentId && existingReservation.StudentId != studentId)
             {
                 return StudentIdentityMismatch();
@@ -160,12 +168,18 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
             return OperationResult<IssuedInvoice>.Success(ToDomain(existingReservation));
         }
 
-        var lessonStudents = await context.Lessons
+        var requestedLessons = await context.Lessons
             .Where(lesson => requestedLessonIds.Contains(lesson.Id))
-            .Select(lesson => lesson.StudentId)
+            .Select(lesson => new { lesson.StudentId, lesson.PendingCalendarMutation })
             .ToArrayAsync(cancellationToken);
-        var ownerIds = lessonStudents.Distinct().ToArray();
-        if (lessonStudents.Length != requestedLessonIds.Length || ownerIds.Length != 1 ||
+        if (requestedLessons.Any(lesson => lesson.PendingCalendarMutation is not null))
+        {
+            return OperationResult<IssuedInvoice>.Failure(new ValidationError(
+                "Invoice.CalendarChangePending", "An invoice lesson has a calendar change that needs review."));
+        }
+
+        var ownerIds = requestedLessons.Select(lesson => lesson.StudentId).Distinct().ToArray();
+        if (requestedLessons.Length != requestedLessonIds.Length || ownerIds.Length != 1 ||
             (draft.Student.StudentId is { } requestedOwner && requestedOwner != ownerIds[0]))
         {
             return StudentIdentityMismatch();
@@ -201,6 +215,7 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
         entity.StudentId = ownerIds[0];
         context.IssuedInvoices.Add(entity);
         await context.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
         return OperationResult<IssuedInvoice>.Success(ToDomain(entity));
     }
 
@@ -230,6 +245,15 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
         {
             return OperationResult<IssuedInvoice>.Failure(
                 new ValidationError("Invoice.NotFound", "The reserved invoice could not be found."));
+        }
+
+        var olderPending = await context.IssuedInvoices
+            .Where(earlier => earlier.IssueStatus == InvoiceIssueStatus.Issuing && earlier.InvoiceNumber < invoice.InvoiceNumber)
+            .MinAsync(earlier => (int?)earlier.InvoiceNumber, cancellationToken);
+        if (olderPending is { } number)
+        {
+            return OperationResult<IssuedInvoice>.Failure(new ValidationError(
+                "Invoice.PendingExists", $"Invoice {new InvoiceNumber(number)} is pending. Use Resume Invoice to resolve it first."));
         }
 
         if (invoice.PlannedPdfPath is not null &&
@@ -263,6 +287,12 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
                 new ValidationError(
                     "Invoice.LessonNotFound",
                     "One or more invoice lessons could not be found."));
+        }
+
+        if (lessons.Any(lesson => lesson.PendingCalendarMutation is not null))
+        {
+            return OperationResult<IssuedInvoice>.Failure(new ValidationError(
+                "Invoice.CalendarChangePending", "An invoice lesson has a calendar change that needs review."));
         }
 
         var alreadyLockedLesson = lessons.FirstOrDefault(lesson =>
@@ -381,7 +411,8 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
             invoice.InvoiceNumber == invoiceNumber.Value &&
             invoice.IssueStatus == InvoiceIssueStatus.Issuing &&
             invoice.PdfFilePath == string.Empty &&
-            invoice.PlannedPdfPath == null);
+            invoice.PlannedPdfPath == null &&
+            !context.IssuedInvoices.Any(later => later.InvoiceNumber > invoice.InvoiceNumber));
 
         if (expectedRevision is not null)
         {
@@ -389,6 +420,43 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
         }
 
         await reservation.ExecuteDeleteAsync(cancellationToken);
+    }
+
+    public async Task<IssuedInvoice?> GetOldestPendingAsync(CancellationToken cancellationToken)
+    {
+        await using var context = createContext();
+        var invoice = await FindOldestPendingAsync(context, cancellationToken);
+        return invoice is null ? null : ToDomain(invoice);
+    }
+
+    public async Task<OperationResult<InvoiceNumber>> DiscardPendingAsync(
+        IssuedInvoice savedInvoice, CancellationToken cancellationToken)
+    {
+        await using var context = createContext();
+        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
+        var invoice = await FindOldestPendingAsync(context, cancellationToken);
+        if (invoice is null || invoice.InvoiceNumber != savedInvoice.InvoiceNumber.Value ||
+            invoice.SnapshotRevision != savedInvoice.SnapshotRevision ||
+            !string.IsNullOrWhiteSpace(invoice.PdfFilePath) || invoice.PlannedPdfPath is not null)
+        {
+            return OperationResult<InvoiceNumber>.Failure(new ValidationError(
+                "Invoice.CannotDiscardPending", "The reservation changed or PDF publication has started."));
+        }
+
+        if (await context.IssuedInvoices.AnyAsync(later => later.InvoiceNumber > invoice.InvoiceNumber, cancellationToken))
+        {
+            // A reservation from an older version may precede an issued invoice.
+            invoice.IssueStatus = InvoiceIssueStatus.Voided;
+            context.IssuedInvoiceLines.RemoveRange(invoice.Lines);
+        }
+        else
+        {
+            context.IssuedInvoices.Remove(invoice);
+        }
+
+        await context.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return OperationResult<InvoiceNumber>.Success(savedInvoice.InvoiceNumber);
     }
 
     private static Task<IssuedInvoiceEntity?> FindEditableReservationAsync(
@@ -643,28 +711,11 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
             .Order()
             .ToArray();
 
-    private static async Task<IssuedInvoiceEntity?> FindMatchingIssuingInvoiceAsync(
-        LedgerDbContext context,
-        IReadOnlyList<int> requestedLessonIds,
-        CancellationToken cancellationToken)
-    {
-        if (requestedLessonIds.Count == 0)
-        {
-            return null;
-        }
-
-        var issuingInvoices = await context.IssuedInvoices
+    private static Task<IssuedInvoiceEntity?> FindOldestPendingAsync(
+        LedgerDbContext context, CancellationToken cancellationToken) =>
+        context.IssuedInvoices
             .Include(invoice => invoice.Lines)
             .Where(invoice => invoice.IssueStatus == InvoiceIssueStatus.Issuing)
             .OrderBy(invoice => invoice.InvoiceNumber)
-            .ToArrayAsync(cancellationToken);
-
-        return issuingInvoices.FirstOrDefault(invoice =>
-            invoice.Lines
-                .Select(line => line.LessonId)
-                .Where(lessonId => lessonId > 0)
-                .Distinct()
-                .Order()
-                .SequenceEqual(requestedLessonIds));
-    }
+            .FirstOrDefaultAsync(cancellationToken);
 }

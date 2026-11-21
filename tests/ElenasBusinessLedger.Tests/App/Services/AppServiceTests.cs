@@ -259,6 +259,12 @@ public sealed class AppServiceTests
         public Task<IssuedInvoice?> GetIssuedInvoiceAsync(InvoiceNumber invoiceNumber, CancellationToken cancellationToken) =>
             Task.FromResult<IssuedInvoice?>(null);
 
+        public Task<IssuedInvoice?> GetOldestPendingAsync(CancellationToken cancellationToken) =>
+            Task.FromResult<IssuedInvoice?>(null);
+
+        public Task<OperationResult<InvoiceNumber>> DiscardPendingAsync(
+            IssuedInvoice savedInvoice, CancellationToken cancellationToken) => throw new NotSupportedException();
+
         public Task<IssuedInvoice?> GetIssuingInvoiceAsync(InvoiceNumber invoiceNumber, CancellationToken cancellationToken) =>
             Task.FromResult<IssuedInvoice?>(null);
 
@@ -277,7 +283,8 @@ public sealed class AppServiceTests
         public Task<IReadOnlyList<LessonRecord>> ListForStudentMonthAsync(
             string studentShortName,
             DateOnly month,
-            CancellationToken cancellationToken) =>
+            CancellationToken cancellationToken,
+            int? studentId = null) =>
             Task.FromResult<IReadOnlyList<LessonRecord>>([]);
 
         public Task<IReadOnlyList<LessonRecord>> ListForWindowAsync(
