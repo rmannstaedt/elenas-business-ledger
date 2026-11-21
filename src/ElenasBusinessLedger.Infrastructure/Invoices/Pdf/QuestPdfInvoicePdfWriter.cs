@@ -83,11 +83,7 @@ public sealed class QuestPdfInvoicePdfWriter : IInvoicePdfWriter
             column.Item().Row(row =>
             {
                 row.RelativeItem().Text("FAKTURA").FontSize(27.5f);
-                row.RelativeItem().AlignRight().Column(company =>
-                {
-                    company.Item().Text(model.CompanyName).SemiBold().FontSize(10.5f);
-                    company.Item().Text("studio.example.test").FontColor(Colors.Grey.Darken1);
-                });
+                row.RelativeItem().AlignRight().Text(model.CompanyName).SemiBold().FontSize(10.5f);
             });
 
             column.Item().PaddingTop(12).Row(row =>
@@ -110,7 +106,6 @@ public sealed class QuestPdfInvoicePdfWriter : IInvoicePdfWriter
 
             AddMetadataRow(table, "Fakturanr.", model.InvoiceNumber);
             AddMetadataRow(table, "Fakturadato", FormatDate(model.InvoiceDate));
-            AddMetadataRow(table, "Forfald", "Ved modtagelse");
             AddMetadataRow(table, "Periode", model.Period);
         });
     }
@@ -178,7 +173,7 @@ public sealed class QuestPdfInvoicePdfWriter : IInvoicePdfWriter
         container.Column(column =>
         {
             column.Item().Text("Ydelser").FontSize(13).SemiBold();
-            column.Item().PaddingTop(3).Text("Klaverundervisning leveret i den angivne periode.")
+            column.Item().PaddingTop(3).Text("Undervisning leveret i den angivne periode.")
                 .FontSize(8.5f)
                 .FontColor(Colors.Grey.Darken2);
             column.Item().Height(5);

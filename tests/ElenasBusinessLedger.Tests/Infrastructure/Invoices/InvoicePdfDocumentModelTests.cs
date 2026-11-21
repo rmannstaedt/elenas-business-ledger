@@ -42,9 +42,11 @@ public sealed class InvoicePdfDocumentModelTests
         Assert.Equal("1234", model.BankRegistrationNumber);
         Assert.Equal("5678901234", model.BankAccountNumber);
         Assert.Equal("MobilePay 5678", model.MobilePayAccount);
+        Assert.Equal("Maple Key Studio", model.CompanyName);
         Assert.Equal(["18 Example Lane", "0000 Example City"], model.CompanyAddressLines);
+        Assert.Equal("Mira Vale", model.StudentFullName);
         var service = Assert.Single(model.Services);
-        Assert.Equal("Klaverundervisning - Tilbud 2", service.Description);
+        Assert.Equal("Undervisning - Tilbud 2", service.Description);
         Assert.Equal("Individuel undervisning, 2 lektioner pr. uge", service.Detail);
         Assert.Equal(8, service.Quantity);
         Assert.Equal("lektioner", service.Unit);

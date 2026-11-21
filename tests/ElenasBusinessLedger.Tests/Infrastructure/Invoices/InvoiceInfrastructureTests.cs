@@ -173,14 +173,14 @@ public sealed class InvoiceInfrastructureTests
     {
         var lines = QuestPdfInvoicePdfWriter.CreatePaymentBoxDetailLines(
             "001",
-            "Betales ved modtagelse.",
+            "8 dage fra fakturadato",
             "0000",
             "0000 000 000",
             "0000 0000");
 
         Assert.Equal(
             [
-                "Betales ved modtagelse.",
+                "8 dage fra fakturadato",
                 "Angiv fakturanr. 001 ved betaling.",
                 "Reg. nr.: 0000   Konto nr.: 0000 000 000",
                 "MobilePay: 0000 0000"
@@ -288,9 +288,10 @@ public sealed class InvoiceInfrastructureTests
                 "Maple Key Studio",
                 "18 Example Lane, 0000 Example City",
                 null,
-                string.Empty,
-                "Reg.nr. 1234 Kontonr. 5678901234",
-                "MobilePay 123456"),
+                "8 dage fra fakturadato",
+                BankRegistrationNumber: "0000",
+                BankAccountNumber: "0000 000 000",
+                MobilePayAccount: "0000 0000"),
             new StudentSnapshot("Mira", "Mira Vale", "42 Sample Lane" + Environment.NewLine + "0000 Example City"),
             dates.Select(date => new InvoiceLineDraft(
                 date,
