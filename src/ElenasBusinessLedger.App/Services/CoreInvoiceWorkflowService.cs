@@ -3,7 +3,6 @@ using ElenasBusinessLedger.Core.Invoices;
 using ElenasBusinessLedger.Core.Ports;
 using ElenasBusinessLedger.Core.Time;
 using ElenasBusinessLedger.Core.UseCases.Invoices;
-using ElenasBusinessLedger.Infrastructure.Invoices.Pdf;
 
 namespace ElenasBusinessLedger.App.Services;
 
@@ -14,6 +13,7 @@ public sealed class CoreInvoiceWorkflowService : IInvoiceWorkflowService
     private readonly InvoicePreviewUseCase previewUseCase;
     private readonly ICompanyProfileRepository companyProfileRepository;
     private readonly IInvoiceRepository invoiceRepository;
+    private readonly Func<string, IInvoiceFileStore> createInvoiceFileStore;
     private readonly IInvoicePdfWriter pdfWriter;
     private readonly IInvoicePrinter printer;
     private readonly IClock clock;
@@ -23,6 +23,7 @@ public sealed class CoreInvoiceWorkflowService : IInvoiceWorkflowService
         InvoicePreviewUseCase previewUseCase,
         ICompanyProfileRepository companyProfileRepository,
         IInvoiceRepository invoiceRepository,
+        Func<string, IInvoiceFileStore> createInvoiceFileStore,
         IInvoicePdfWriter pdfWriter,
         IInvoicePrinter printer,
         IClock clock)
@@ -31,6 +32,7 @@ public sealed class CoreInvoiceWorkflowService : IInvoiceWorkflowService
         this.previewUseCase = previewUseCase;
         this.companyProfileRepository = companyProfileRepository;
         this.invoiceRepository = invoiceRepository;
+        this.createInvoiceFileStore = createInvoiceFileStore;
         this.pdfWriter = pdfWriter;
         this.printer = printer;
         this.clock = clock;
@@ -98,16 +100,7 @@ public sealed class CoreInvoiceWorkflowService : IInvoiceWorkflowService
     {
         try
         {
-            var company = await companyProfileRepository.GetAsync(cancellationToken);
-            var fileStore = new LocalInvoiceFileStore(new InvoiceFileStoreOptions(company.InvoiceFolderPath));
-            var issueUseCase = new IssueInvoiceUseCase(
-                companyProfileRepository,
-                invoiceRepository,
-                fileStore,
-                pdfWriter,
-                printer,
-                clock);
-
+            var issueUseCase = await CreateIssueUseCaseAsync(cancellationToken);
             return await issueUseCase.ExecuteAsync(draft, cancellationToken, chooseRecovery);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -129,15 +122,20 @@ public sealed class CoreInvoiceWorkflowService : IInvoiceWorkflowService
     {
         try
         {
-            var company = await companyProfileRepository.GetAsync(cancellationToken);
-            var fileStore = new LocalInvoiceFileStore(new InvoiceFileStoreOptions(company.InvoiceFolderPath));
-            var useCase = new IssueInvoiceUseCase(companyProfileRepository, invoiceRepository, fileStore, pdfWriter, printer, clock);
-            return await useCase.ResumeAsync(invoiceNumber, cancellationToken);
+            var issueUseCase = await CreateIssueUseCaseAsync(cancellationToken);
+            return await issueUseCase.ResumeAsync(invoiceNumber, cancellationToken);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             return OperationResult<IssueInvoiceResult>.Failure(new ValidationError("Invoice.ResumeFailed", ex.Message));
         }
+    }
+
+    private async Task<IssueInvoiceUseCase> CreateIssueUseCaseAsync(CancellationToken cancellationToken)
+    {
+        var company = await companyProfileRepository.GetAsync(cancellationToken);
+        var fileStore = createInvoiceFileStore(company.InvoiceFolderPath);
+        return new IssueInvoiceUseCase(companyProfileRepository, invoiceRepository, fileStore, pdfWriter, printer, clock);
     }
 
     // Sends the existing invoice to the printer and returns any warnings for the invoice viewer.

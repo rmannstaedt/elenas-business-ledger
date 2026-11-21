@@ -2,21 +2,23 @@ using ElenasBusinessLedger.App.Services;
 using ElenasBusinessLedger.Core.Common;
 using ElenasBusinessLedger.Core.Company;
 using ElenasBusinessLedger.Core.Ports;
-using ElenasBusinessLedger.Infrastructure.Persistence;
+using ElenasBusinessLedger.Core.Calendar;
 
 namespace ElenasBusinessLedger.Tests.App.Services;
 
 // Verifies that printing reuses, saves, or cancels printer selection as appropriate.
 public sealed class InvoicePrinterConfigurationServiceTests
 {
-    [Fact]
-    public async Task EnsureConfiguredSavesSelectedPrinterWhenNoneIsRemembered()
+    [Theory]
+    [InlineData(null)]
+    [InlineData("elena@example.test")]
+    public async Task EnsureConfiguredSavesSelectedPrinterWhenNoneIsRemembered(string? calendarAccount)
     {
         var settings = new FakeAppSettingsService
         {
             Snapshot = new AppSettingsSnapshot(
                 CreateCompanyProfile(configuredInvoicePrinterName: ""),
-                new CalendarSettings("primary", "elena@example.test"),
+                calendarAccount is null ? null : new CalendarSettings("primary", calendarAccount),
                 GoogleOAuthClientConfigurationStatus.Ready)
         };
         var selector = new FakeInvoicePrinterSelectionDialog { SelectedPrinterName = "Office Printer" };
@@ -29,7 +31,7 @@ public sealed class InvoicePrinterConfigurationServiceTests
         Assert.True(selector.WasShown);
         Assert.NotNull(settings.SavedProfile);
         Assert.Equal("Office Printer", settings.SavedProfile.ConfiguredInvoicePrinterName);
-        Assert.Equal(new CalendarSettings("primary", "elena@example.test"), settings.SavedCalendarSettings);
+        Assert.Equal(new CalendarSettings("primary", calendarAccount ?? string.Empty), settings.SavedCalendarSettings);
     }
 
     [Fact]
@@ -131,13 +133,5 @@ public sealed class InvoicePrinterConfigurationServiceTests
                     EconomySettings = economySettings
                 }));
         }
-
-        public Task<OperationResult<bool>> ConnectGoogleCalendarAsync(
-            CalendarSettings calendarSettings,
-            CancellationToken cancellationToken) =>
-            Task.FromResult(OperationResult<bool>.Success(true));
-
-        public Task<OperationResult<bool>> ForgetGoogleAuthorizationAsync(CancellationToken cancellationToken) =>
-            Task.FromResult(OperationResult<bool>.Success(true));
     }
 }

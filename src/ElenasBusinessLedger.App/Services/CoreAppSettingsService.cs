@@ -1,59 +1,21 @@
-using System.IO;
+using ElenasBusinessLedger.Core.Calendar;
 using ElenasBusinessLedger.Core.Common;
 using ElenasBusinessLedger.Core.Company;
 using ElenasBusinessLedger.Core.Ports;
 using ElenasBusinessLedger.Infrastructure.Invoices.Printing;
-using ElenasBusinessLedger.Infrastructure.Persistence;
 
 namespace ElenasBusinessLedger.App.Services;
 
-// Coordinates saved Settings and explicit Google authorization for the Settings window.
-public sealed class CoreAppSettingsService : IAppSettingsService
+// Assembles the Settings snapshot and saves preferences through the atomic settings writer.
+public sealed class CoreAppSettingsService(
+    ICompanyProfileRepository companyProfileRepository,
+    Func<CancellationToken, Task<CalendarSettings?>> loadCalendarSettingsAsync,
+    IAppSettingsWriter settingsWriter,
+    AppPaths appPaths,
+    Func<CalendarSettings?, GoogleCalendarAuthorizationStatus> readAuthorizationStatus,
+    IPrinterCatalog printerCatalog,
+    IEconomyRepository? economyRepository = null) : IAppSettingsService
 {
-    private readonly ICompanyProfileRepository companyProfileRepository;
-    private readonly SqliteCalendarSettingsRepository calendarSettingsRepository;
-    private readonly SqliteAppSettingsWriter settingsWriter;
-    private readonly IEconomyRepository? economyRepository;
-    private readonly AppPaths appPaths;
-    private readonly GoogleOAuthClientConfigurationProvider googleOAuthClientConfigurationProvider;
-    private readonly GoogleCalendarClientFactory? googleCalendarClientFactory;
-    private readonly IPrinterCatalog printerCatalog;
-
-    public CoreAppSettingsService(
-        ICompanyProfileRepository companyProfileRepository,
-        SqliteCalendarSettingsRepository calendarSettingsRepository,
-        string appDataPath,
-        IEconomyRepository? economyRepository = null)
-        : this(
-            companyProfileRepository,
-            calendarSettingsRepository,
-            AppPaths.FromAppDataFolder(appDataPath),
-            new GoogleOAuthClientConfigurationProvider(GoogleOAuthClientConfigurationProvider.CreateDefaultConfigurationPath()),
-            googleCalendarClientFactory: null,
-            economyRepository: economyRepository,
-            printerCatalog: new WindowsPrinterCatalog())
-    {
-    }
-
-    public CoreAppSettingsService(
-        ICompanyProfileRepository companyProfileRepository,
-        SqliteCalendarSettingsRepository calendarSettingsRepository,
-        AppPaths appPaths,
-        GoogleOAuthClientConfigurationProvider googleOAuthClientConfigurationProvider,
-        GoogleCalendarClientFactory? googleCalendarClientFactory = null,
-        IEconomyRepository? economyRepository = null,
-        IPrinterCatalog? printerCatalog = null)
-    {
-        this.companyProfileRepository = companyProfileRepository;
-        this.calendarSettingsRepository = calendarSettingsRepository;
-        settingsWriter = calendarSettingsRepository.CreateSettingsWriter();
-        this.economyRepository = economyRepository;
-        this.appPaths = appPaths;
-        this.googleOAuthClientConfigurationProvider = googleOAuthClientConfigurationProvider;
-        this.googleCalendarClientFactory = googleCalendarClientFactory;
-        this.printerCatalog = printerCatalog ?? new WindowsPrinterCatalog();
-    }
-
     // Collects saved settings and local printer and authorization information for the Settings form.
     public async Task<AppSettingsSnapshot> LoadAsync(CancellationToken cancellationToken)
     {
@@ -67,7 +29,7 @@ public sealed class CoreAppSettingsService : IAppSettingsService
             companyProfile = null;
         }
 
-        var calendarSettings = await calendarSettingsRepository.GetAsync(cancellationToken);
+        var calendarSettings = await loadCalendarSettingsAsync(cancellationToken);
         var economySettings = economyRepository is null
             ? null
             : await economyRepository.GetSettingsAsync(cancellationToken);
@@ -101,89 +63,24 @@ public sealed class CoreAppSettingsService : IAppSettingsService
         }
     }
 
-    // Starts explicit authorization and reads the selected calendar to check that the connection works.
-    public async Task<OperationResult<bool>> ConnectGoogleCalendarAsync(
-        CalendarSettings calendarSettings,
-        CancellationToken cancellationToken)
-    {
-        if (googleCalendarClientFactory is null)
-        {
-            return OperationResult<bool>.Failure(
-                new ValidationError("Settings.GoogleCalendarUnavailable", "Google Calendar connection is not available."));
-        }
-
-        var configuration = googleOAuthClientConfigurationProvider.Load();
-        if (configuration.Status == GoogleOAuthClientConfigurationStatus.Missing)
-        {
-            return OperationResult<bool>.Failure(
-                new ValidationError("Settings.GoogleOAuthMissing", "Google sign-in app configuration is missing."));
-        }
-
-        if (configuration.Status == GoogleOAuthClientConfigurationStatus.Invalid)
-        {
-            return OperationResult<bool>.Failure(
-                new ValidationError("Settings.GoogleOAuthInvalid", "Google sign-in app configuration is invalid."));
-        }
-
-        try
-        {
-            var configuredClient = await googleCalendarClientFactory.CreateForConnectionAsync(calendarSettings, cancellationToken);
-            if (configuredClient is null)
-            {
-                return OperationResult<bool>.Failure(
-                    new ValidationError("Settings.GoogleCalendarUnavailable", "Google Calendar connection is not available."));
-            }
-
-            var now = DateTimeOffset.Now;
-            var fromInclusive = new DateTimeOffset(now.Year, now.Month, 1, 0, 0, 0, now.Offset);
-            var toExclusive = fromInclusive.AddMonths(1);
-            await configuredClient.EventClient.ListEventsAsync(
-                configuredClient.CalendarId,
-                fromInclusive,
-                toExclusive,
-                cancellationToken);
-
-            return OperationResult<bool>.Success(true);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            return OperationResult<bool>.Failure(
-                new ValidationError("Settings.GoogleCalendarConnectionFailed", "Google Calendar connection failed."));
-        }
-    }
-
-    // Clears the Ledger's saved Google tokens for this Windows user so Connect can authorize again.
-    public async Task<OperationResult<bool>> ForgetGoogleAuthorizationAsync(CancellationToken cancellationToken)
-    {
-        try
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var tokenStore = new Infrastructure.Calendar.WindowsProtectedFileDataStore(appPaths.GoogleTokenFolderPath);
-            await tokenStore.ClearAsync();
-            return OperationResult<bool>.Success(true);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            return OperationResult<bool>.Failure(
-                new ValidationError("Settings.GoogleAuthorizationClearFailed", "Google authorization could not be cleared."));
-        }
-    }
-
     private AppSettingsSnapshot CreateSnapshot(
         CompanyProfile? companyProfile,
         CalendarSettings? calendarSettings,
         EconomySettings? economySettings,
-        IReadOnlyList<string>? availablePrinterNames = null) =>
-        new(
+        IReadOnlyList<string>? availablePrinterNames = null)
+    {
+        var authorization = readAuthorizationStatus(calendarSettings);
+        return new AppSettingsSnapshot(
             companyProfile,
             calendarSettings,
-            googleOAuthClientConfigurationProvider.Load().Status,
+            authorization.ConfigurationStatus,
             economySettings,
             appPaths.AppDataFolderPath,
             appPaths.DatabasePath,
             appPaths.GoogleTokenFolderPath,
-            HasGoogleAuthorizationTokens(calendarSettings),
+            authorization.HasSavedToken,
             availablePrinterNames ?? []);
+    }
 
     private async Task<IReadOnlyList<string>> LoadPrinterNamesAsync(CancellationToken cancellationToken)
     {
@@ -195,18 +92,5 @@ public sealed class CoreAppSettingsService : IAppSettingsService
         {
             return [];
         }
-    }
-
-    private bool HasGoogleAuthorizationTokens(CalendarSettings? calendarSettings)
-    {
-        if (calendarSettings is null ||
-            string.IsNullOrWhiteSpace(calendarSettings.GoogleAccountEmail) ||
-            !Directory.Exists(appPaths.GoogleTokenFolderPath))
-        {
-            return false;
-        }
-
-        var tokenStore = new Infrastructure.Calendar.WindowsProtectedFileDataStore(appPaths.GoogleTokenFolderPath);
-        return tokenStore.ContainsKey(calendarSettings.GoogleAccountEmail);
     }
 }

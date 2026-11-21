@@ -9,6 +9,7 @@ using ElenasBusinessLedger.Core.Time;
 using ElenasBusinessLedger.Core.UseCases.Lessons;
 using ElenasBusinessLedger.Core.UseCases.Startup;
 using ElenasBusinessLedger.Infrastructure.Calendar;
+using ElenasBusinessLedger.Infrastructure.Invoices.Printing;
 using ElenasBusinessLedger.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
@@ -20,7 +21,7 @@ public sealed class AppServiceTests
     [Fact]
     public async Task StartupDashboardServiceReturnsFailureInsteadOfSampleRowsWhenCalendarIsNotConfigured()
     {
-        var query = new StartupDashboardQuery(
+        var query = new LoadDashboardUseCase(
             new EmptyStudentRepository(),
             new ThrowingCalendarGateway("Google Calendar is not configured."),
             new EmptyInvoiceRepository(),
@@ -63,11 +64,7 @@ public sealed class AppServiceTests
             Path.Combine(appPaths.GoogleTokenFolderPath, "token.bin"),
             [1, 2, 3],
             TestContext.Current.CancellationToken);
-        var service = new CoreAppSettingsService(
-            new SqliteCompanyProfileRepository(database.CreateContext),
-            new SqliteCalendarSettingsRepository(database.CreateContext),
-            appPaths,
-            new GoogleOAuthClientConfigurationProvider(Path.Combine(appData.Path, "missing-google-oauth-client.json")));
+        var service = CreateSettingsService(database, new SqliteCalendarSettingsRepository(database.CreateContext), appPaths);
 
         var snapshot = await service.LoadAsync(CancellationToken.None);
 
@@ -91,11 +88,7 @@ public sealed class AppServiceTests
             CancellationToken.None);
         var tokenStore = new WindowsProtectedFileDataStore(appPaths.GoogleTokenFolderPath);
         await tokenStore.StoreAsync("elena@example.test", new StoredToken("saved-token"));
-        var service = new CoreAppSettingsService(
-            new SqliteCompanyProfileRepository(database.CreateContext),
-            calendarSettingsRepository,
-            appPaths,
-            new GoogleOAuthClientConfigurationProvider(Path.Combine(appData.Path, "missing-google-oauth-client.json")));
+        var service = CreateSettingsService(database, calendarSettingsRepository, appPaths);
 
         var snapshot = await service.LoadAsync(CancellationToken.None);
 
@@ -123,11 +116,7 @@ public sealed class AppServiceTests
         File.Move(
             hashedFile,
             Path.Combine(appPaths.GoogleTokenFolderPath, LegacyEscapedFileName("elena@example.test")));
-        var service = new CoreAppSettingsService(
-            new SqliteCompanyProfileRepository(database.CreateContext),
-            calendarSettingsRepository,
-            appPaths,
-            new GoogleOAuthClientConfigurationProvider(Path.Combine(appData.Path, "missing-google-oauth-client.json")));
+        var service = CreateSettingsService(database, calendarSettingsRepository, appPaths);
 
         var snapshot = await service.LoadAsync(CancellationToken.None);
 
@@ -144,12 +133,8 @@ public sealed class AppServiceTests
         await economyRepository.SaveSettingsAsync(
             new EconomySettings(new DateOnly(2026, 7, 15)),
             CancellationToken.None);
-        var service = new CoreAppSettingsService(
-            new SqliteCompanyProfileRepository(database.CreateContext),
-            new SqliteCalendarSettingsRepository(database.CreateContext),
-            appPaths,
-            new GoogleOAuthClientConfigurationProvider(Path.Combine(appData.Path, "missing-google-oauth-client.json")),
-            economyRepository: economyRepository);
+        var service = CreateSettingsService(database, new SqliteCalendarSettingsRepository(database.CreateContext),
+            appPaths, economyRepository);
 
         var snapshot = await service.LoadAsync(CancellationToken.None);
         var save = await service.SaveAsync(
@@ -171,6 +156,27 @@ public sealed class AppServiceTests
         Assert.True(save.Succeeded);
         Assert.Equal(new DateOnly(2026, 8, 1), save.Value?.EconomySettings?.FirstApplicationInvoiceMonth);
         Assert.Equal(new DateOnly(2026, 8, 1), savedEconomySettings?.FirstApplicationInvoiceMonth);
+    }
+
+    private static CoreAppSettingsService CreateSettingsService(
+        TestDatabase database,
+        SqliteCalendarSettingsRepository calendars,
+        AppPaths paths,
+        IEconomyRepository? economyRepository = null)
+    {
+        var authorization = new GoogleCalendarAuthorizationService(
+            new GoogleOAuthClientConfigurationProvider(Path.Combine(paths.AppDataFolderPath, "missing-google-oauth-client.json")),
+            (_, _) => Task.FromResult<ConfiguredGoogleCalendarClient?>(null),
+            account => WindowsProtectedFileDataStore.ContainsStoredKey(paths.GoogleTokenFolderPath, account),
+            () => new WindowsProtectedFileDataStore(paths.GoogleTokenFolderPath).ClearAsync());
+        return new CoreAppSettingsService(
+            new SqliteCompanyProfileRepository(database.CreateContext),
+            calendars.GetAsync,
+            new SqliteAppSettingsWriter(database.CreateContext),
+            paths,
+            authorization.GetStatus,
+            new WindowsPrinterCatalog(),
+            economyRepository);
     }
 
     // Supplies an empty student catalog so dashboard tests isolate the behavior of calendar failures.
@@ -198,11 +204,6 @@ public sealed class AppServiceTests
 
         public Task<IReadOnlyList<IssuedInvoiceSummary>> ListInvoicesForStudentAsync(int studentId, CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<IssuedInvoiceSummary>>([]);
-
-        public Task<IReadOnlyList<EconomyInvoiceRecord>> ListIssuedInvoiceOverviewRowsAsync(
-            int periodYear,
-            CancellationToken cancellationToken) =>
-            Task.FromResult<IReadOnlyList<EconomyInvoiceRecord>>([]);
 
         public Task<bool> HasInvoiceForStudentInMonthAsync(int studentId, DateOnly month, CancellationToken cancellationToken) =>
             Task.FromResult(false);

@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 namespace ElenasBusinessLedger.Infrastructure.Persistence;
 
 // Persists invoice snapshots, numbering, and lesson locks, and supplies the saved rows used by the dashboard and Economy.
-public sealed class SqliteInvoiceRepository : IInvoiceRepository
+public sealed class SqliteInvoiceRepository : IInvoiceRepository, IEconomyInvoiceReader
 {
     private readonly Func<LedgerDbContext> createContext;
 

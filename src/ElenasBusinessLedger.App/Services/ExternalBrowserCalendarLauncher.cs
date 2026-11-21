@@ -1,5 +1,5 @@
 using System.Diagnostics;
-using ElenasBusinessLedger.Infrastructure.Persistence;
+using ElenasBusinessLedger.Core.Calendar;
 
 namespace ElenasBusinessLedger.App.Services;
 

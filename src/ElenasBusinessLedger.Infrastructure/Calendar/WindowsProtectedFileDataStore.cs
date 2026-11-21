@@ -66,6 +66,10 @@ public sealed class WindowsProtectedFileDataStore : IDataStore
         return Task.FromResult(Read<T>(filePath));
     }
 
+    // Checks whether a token already exists without creating its directory just to report Settings status.
+    public static bool ContainsStoredKey(string directoryPath, string key) =>
+        Directory.Exists(directoryPath) && new WindowsProtectedFileDataStore(directoryPath).ContainsKey(key);
+
     public bool ContainsKey(string key) =>
         File.Exists(GetHashedFilePath(key)) ||
         File.Exists(GetLegacyFilePath(key));

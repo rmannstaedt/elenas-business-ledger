@@ -1,5 +1,4 @@
 using ElenasBusinessLedger.Core.Common;
-using ElenasBusinessLedger.Core.Ports;
 
 namespace ElenasBusinessLedger.Core.Calendar;
 
@@ -10,7 +9,7 @@ public enum CalendarWriteState
     Uncertain
 }
 
-// Separates the outcome of a calendar write from the outcome of the dashboard refresh.
+// Carries a calendar write outcome and any list already supplied by the gateway.
 public sealed record CalendarWriteReceipt(
     CalendarWriteState State,
     IReadOnlyList<ValidationError> Errors,
@@ -29,27 +28,4 @@ public sealed record CalendarWriteReceipt(
         return new(state, result.Errors);
     }
 
-    // Gets the current month for the dashboard while preserving any refresh result already attached to the receipt.
-    public async Task<OperationResult<IReadOnlyList<CalendarLesson>>> RefreshAsync(
-        IGoogleCalendarGateway gateway, DateOnly month, CancellationToken cancellationToken)
-    {
-        if (RefreshedLessons is not null)
-        {
-            return Errors.Count == 0
-                ? OperationResult<IReadOnlyList<CalendarLesson>>.Success(RefreshedLessons)
-                : OperationResult<IReadOnlyList<CalendarLesson>>.Failure(RefreshedLessons, Errors.ToArray());
-        }
-
-        try
-        {
-            var first = new DateOnly(month.Year, month.Month, 1);
-            return OperationResult<IReadOnlyList<CalendarLesson>>.Success(
-                await gateway.ListLessonsAsync(first, first.AddMonths(1).AddDays(-1), cancellationToken));
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            return OperationResult<IReadOnlyList<CalendarLesson>>.Failure([], new ValidationError(
-                "Calendar.RefreshFailed", "The calendar and local ledger were updated. Refresh the dashboard to see the change."));
-        }
-    }
 }

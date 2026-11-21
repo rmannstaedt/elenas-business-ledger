@@ -2,15 +2,14 @@ using ElenasBusinessLedger.Core.Common;
 using ElenasBusinessLedger.Core.Calendar;
 using ElenasBusinessLedger.Core.Invoices;
 using ElenasBusinessLedger.Core.Lessons;
-using ElenasBusinessLedger.Core.Plans;
 using ElenasBusinessLedger.Core.Ports;
 using ElenasBusinessLedger.Core.Time;
 using ElenasBusinessLedger.Core.Students;
 
 namespace ElenasBusinessLedger.Core.UseCases.Startup;
 
-// Reconciles calendar observations with the ledger and prepares the selected student's dashboard data.
-public sealed class StartupDashboardQuery
+// Loads the selected student's dashboard by coordinating calendar reconciliation and a read-only projection.
+public sealed class LoadDashboardUseCase
 {
     private readonly IStudentRepository studentRepository;
     private readonly IGoogleCalendarGateway calendarGateway;
@@ -18,9 +17,10 @@ public sealed class StartupDashboardQuery
     private readonly IClock clock;
     private readonly ILessonRepository lessonRepository;
     private readonly IPlanCatalogRepository? planCatalogRepository;
-    private readonly TimeZoneInfo lessonTimeZone;
+    private readonly DashboardLessonReconciler reconciler;
+    private readonly DashboardProjection projection;
 
-    public StartupDashboardQuery(
+    public LoadDashboardUseCase(
         IStudentRepository studentRepository,
         IGoogleCalendarGateway calendarGateway,
         IInvoiceRepository invoiceRepository,
@@ -35,7 +35,8 @@ public sealed class StartupDashboardQuery
         this.clock = clock;
         this.lessonRepository = lessonRepository;
         this.planCatalogRepository = planCatalogRepository;
-        this.lessonTimeZone = lessonTimeZone ?? TimeZoneInfo.Local;
+        reconciler = new DashboardLessonReconciler(lessonRepository);
+        projection = new DashboardProjection(lessonTimeZone ?? TimeZoneInfo.Local);
     }
 
     // Reconciles calendar appointments with local billing records and builds the dashboard for the selected student.
@@ -91,7 +92,6 @@ public sealed class StartupDashboardQuery
                 : selectedStudentShortName is null ? null
                     : uniqueNames.GetValueOrDefault(StudentShortNameKey.From(selectedStudentShortName)))
             ?? PickCurrentStudent(knownCalendarLessons, students);
-        var currentStudent = selectedStudent?.Student.ShortName;
 
         var lessonStatuses = await invoiceRepository.ListLessonStatusesAsync(
             from, to, cancellationToken, localLinks.Select(lesson => lesson.Id).ToArray());
@@ -100,7 +100,7 @@ public sealed class StartupDashboardQuery
             .GroupBy(status => status.LessonId)
             .ToDictionary(group => group.Key, group => group.First());
         var localLessons = await lessonRepository.ListForWindowAsync(from, to, cancellationToken);
-        var dashboardLessons = new List<DashboardLesson>();
+        var lessonSources = new List<(LessonRecord Record, InvoiceLessonStatus? InvoiceStatus)>();
         var representedLocalLessonIds = new HashSet<int>();
         foreach (var (lesson, localLesson) in known.OrderBy(match => match.Calendar.StartsAt))
         {
@@ -112,8 +112,8 @@ public sealed class StartupDashboardQuery
             var invoiceStatus = localLesson is null
                 ? null
                 : statusByLessonId.GetValueOrDefault(localLesson.Id);
-            var dashboardLesson = await ReconcileCalendarLessonAsync(lesson, localLesson, invoiceStatus, students, cancellationToken);
-            dashboardLessons.Add(dashboardLesson);
+            var reconciled = await reconciler.ReconcileAsync(lesson, localLesson, invoiceStatus is not null, students, cancellationToken);
+            lessonSources.Add((reconciled, invoiceStatus));
 
             if (localLesson is not null)
             {
@@ -130,95 +130,19 @@ public sealed class StartupDashboardQuery
             .Where(lesson => MatchesCurrentStudent(lesson.StudentShortName, lesson.StudentId, selectedStudent)))
         {
             var invoiceStatus = statusByLessonId.GetValueOrDefault(localLesson.Id);
-            dashboardLessons.Add(CreateDashboardLesson(localLesson, invoiceStatus));
+            lessonSources.Add((localLesson, invoiceStatus));
         }
 
-        var lessons = dashboardLessons
-            .Where(lesson => MatchesCurrentStudent(lesson.StudentShortName, lesson.StudentId, selectedStudent))
-            .OrderBy(lesson => lesson.StartsAt)
-            .ToArray();
-
+        var selectedLessons = lessonSources.Where(source =>
+            MatchesCurrentStudent(source.Record.StudentShortName, source.Record.StudentId, selectedStudent));
         var invoices = selectedStudent is null
             ? []
             : await invoiceRepository.ListInvoicesForStudentAsync(selectedStudent.Id, cancellationToken);
-
-        var studentShortNames = students
-            .Select(student => student.Student.ShortName)
-            .Order(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-        var studentNavigationEntries = CreateStudentNavigationEntries(selectedMonth, knownCalendarLessons, students);
+        var studentNavigationEntries = projection.CreateStudentNavigationEntries(selectedMonth, knownCalendarLessons, students);
         var planOptions = await CreatePlanOptionsAsync(students, cancellationToken);
-        var lessonDefaults = selectedStudent is null
-            ? null
-            : new DashboardStudentLessonDefaults(selectedStudent.Student.ShortName, selectedStudent.Schedule, selectedStudent.PlanPeriods);
 
         return OperationResult<StartupDashboardResult>.Success(
-            new StartupDashboardResult(
-                currentStudent,
-                studentShortNames,
-                lessons,
-                invoices,
-                selectedStudent?.Schedule.Count > 0,
-                studentNavigationEntries,
-                planOptions,
-                lessonDefaults,
-                selectedStudent is { Id: > 0 } ? selectedStudent.Id : null,
-                students.Select(student => new StudentChoice(student.Id, student.Student.ShortName)).ToArray()));
-    }
-
-    private async Task<DashboardLesson> ReconcileCalendarLessonAsync(
-        CalendarLesson calendarLesson,
-        LessonRecord? localLesson,
-        InvoiceLessonStatus? invoiceStatus,
-        IReadOnlyList<StudentRecord> students,
-        CancellationToken cancellationToken)
-    {
-        if (localLesson is not null && invoiceStatus is not null)
-        {
-            return CreateDashboardLesson(localLesson, invoiceStatus);
-        }
-
-        var record = localLesson is null
-            ? CreateLocalLesson(calendarLesson, students)
-            : localLesson with
-            {
-                StartsAt = calendarLesson.StartsAt,
-                HasKnownStartTime = calendarLesson.HasKnownStartTime,
-                State = calendarLesson.State,
-                GoogleCalendarEventId = calendarLesson.Id,
-                InvoiceNumber = null
-            };
-
-        if (record.PlanCatalogId > 0 && record != localLesson)
-        {
-            record = await lessonRepository.SaveAsync(record, cancellationToken);
-        }
-
-        return CreateDashboardLesson(record, invoiceStatus);
-    }
-
-    private static DashboardLesson CreateDashboardLesson(
-        LessonRecord record,
-        InvoiceLessonStatus? invoiceStatus)
-    {
-        var invoiceNumber = invoiceStatus?.InvoiceNumber;
-        var isInvoiced = invoiceNumber is not null;
-
-        return new(
-            record.GoogleCalendarEventId ?? record.Id.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            record.StudentShortName,
-            record.StartsAt,
-            isInvoiced ? LessonState.Completed : record.State,
-            isInvoiced,
-            invoiceStatus?.PaymentStatus,
-            invoiceNumber,
-            record.PlanCatalogId,
-            record.PlanName,
-            record.Id,
-            record.HasKnownStartTime,
-            record.StudentId > 0 ? record.StudentId : null,
-            record.PendingCalendarMutation is not null,
-            record.PlanCatalogId <= 0);
+            DashboardProjection.Create(selectedStudent, students, selectedLessons, invoices, studentNavigationEntries, planOptions));
     }
 
     private async Task<IReadOnlyList<DashboardPlanOption>> CreatePlanOptionsAsync(
@@ -243,32 +167,6 @@ public sealed class StartupDashboardQuery
             .ToArray();
     }
 
-    private static LessonRecord CreateLocalLesson(
-        CalendarLesson calendarLesson,
-        IReadOnlyList<StudentRecord> students)
-    {
-        var student = students.FirstOrDefault(student =>
-            calendarLesson.StudentId is { } studentId ? student.Id == studentId :
-                string.Equals(student.Student.ShortName, calendarLesson.StudentShortName, StringComparison.Ordinal));
-        var lessonDate = DateOnly.FromDateTime(calendarLesson.StartsAt.DateTime);
-        var plan = student is null
-            ? null
-            : StudentPlanPeriod.GetActivePlan(student.PlanPeriods, lessonDate);
-
-        return new LessonRecord(
-            Id: 0,
-            StudentId: student?.Id ?? 0,
-            StudentShortName: calendarLesson.StudentShortName,
-            PlanCatalogId: plan?.PlanCatalogId ?? 0,
-            PlanName: plan?.Name ?? string.Empty,
-            StartsAt: calendarLesson.StartsAt,
-            DurationMinutes: plan?.DurationMinutes ?? 60,
-            State: calendarLesson.State,
-            GoogleCalendarEventId: calendarLesson.Id,
-            InvoiceNumber: null,
-            HasKnownStartTime: calendarLesson.HasKnownStartTime);
-    }
-
     private StudentRecord? PickCurrentStudent(IReadOnlyList<CalendarLesson> calendarLessons, IReadOnlyList<StudentRecord> students)
     {
         var now = clock.Now;
@@ -278,79 +176,10 @@ public sealed class StartupDashboardQuery
             students.FirstOrDefault(student => MatchesCurrentStudent(nearest.StudentShortName, nearest.StudentId, student));
     }
 
-    private IReadOnlyList<DashboardStudentNavigationEntry> CreateStudentNavigationEntries(
-        DateOnly selectedMonth,
-        IReadOnlyList<CalendarLesson> calendarLessons,
-        IReadOnlyList<StudentRecord> students)
-    {
-        var fallbackFrom = selectedMonth.WithDay(1);
-        var fallbackTo = fallbackFrom.AddMonths(1).AddDays(-1);
-        var navigationFrom = selectedMonth.AddMonths(-1).WithDay(1);
-        var navigationTo = selectedMonth.AddMonths(2).WithDay(1).AddDays(-1);
-        var activeStudentShortNames = students
-            .Select(student => student.Student.ShortName)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var scheduledEntries = calendarLessons
-            .Where(lesson => activeStudentShortNames.Contains(lesson.StudentShortName))
-            .Where(lesson => IsInDateWindow(lesson.StartsAt, navigationFrom, navigationTo))
-            .Select(lesson => new DashboardStudentNavigationEntry(lesson.StudentShortName, lesson.StartsAt, StudentId: lesson.StudentId))
-            .OrderBy(entry => entry.StartsAt)
-            .ThenBy(entry => entry.StudentShortName, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-        if (scheduledEntries.Length > 0)
-        {
-            return scheduledEntries;
-        }
-
-        var defaultEntries = students
-            .SelectMany(student => CreateScheduledStarts(student.Schedule, fallbackFrom, fallbackTo)
-                .Select(startsAt => new DashboardStudentNavigationEntry(
-                    student.Student.ShortName,
-                    startsAt,
-                    HasCalendarLesson: false,
-                    StudentId: student.Id > 0 ? student.Id : null)))
-            .ToArray();
-
-        return OrderNavigationEntries(defaultEntries);
-    }
-
-    private static IReadOnlyList<DashboardStudentNavigationEntry> OrderNavigationEntries(
-        IEnumerable<DashboardStudentNavigationEntry> entries) =>
-        entries
-            .OrderBy(entry => entry.StartsAt)
-            .ThenBy(entry => entry.StudentShortName, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-
-    private static bool IsInDateWindow(DateTimeOffset startsAt, DateOnly from, DateOnly to)
-    {
-        var date = DateOnly.FromDateTime(startsAt.DateTime);
-        return date >= from && date <= to;
-    }
-
     private static bool MatchesCurrentStudent(string shortName, int? studentId, StudentRecord? selected) =>
         selected is null || (studentId is > 0 && selected.Id > 0
             ? studentId == selected.Id
             : string.Equals(shortName, selected.Student.ShortName, StringComparison.OrdinalIgnoreCase));
-
-    private IEnumerable<DateTimeOffset> CreateScheduledStarts(
-        IReadOnlyList<ElenasBusinessLedger.Core.Students.StudentScheduleEntry> schedule,
-        DateOnly from,
-        DateOnly to)
-    {
-        for (var date = from; date <= to; date = date.AddDays(1))
-        {
-            foreach (var entry in schedule)
-            {
-                if (entry.Weekday != date.DayOfWeek)
-                {
-                    continue;
-                }
-
-                var localDateTime = date.ToDateTime(entry.StartsAt);
-                yield return new DateTimeOffset(localDateTime, lessonTimeZone.GetUtcOffset(localDateTime));
-            }
-        }
-    }
 }
 
 // Supplies the day replacement used to calculate month boundaries for the dashboard's calendar window.

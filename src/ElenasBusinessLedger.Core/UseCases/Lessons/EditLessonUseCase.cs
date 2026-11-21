@@ -58,7 +58,7 @@ public sealed class EditLessonUseCase
             return LocalLedgerFailure(calendarResult.RefreshedLessons ?? []);
         }
 
-        return await calendarResult.RefreshAsync(calendarGateway, refreshMonth, cancellationToken);
+        return await CalendarRefreshAfterWrite.LoadAsync(calendarGateway, calendarResult, refreshMonth, cancellationToken);
     }
 
     private static OperationResult<IReadOnlyList<CalendarLesson>> LocalLedgerFailure(

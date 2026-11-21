@@ -1,7 +1,7 @@
+using ElenasBusinessLedger.Core.Calendar;
 using ElenasBusinessLedger.Core.Common;
 using ElenasBusinessLedger.Core.Company;
 using ElenasBusinessLedger.Core.Ports;
-using ElenasBusinessLedger.Infrastructure.Persistence;
 
 namespace ElenasBusinessLedger.App.Services;
 
@@ -17,7 +17,7 @@ public sealed record AppSettingsSnapshot(
     bool HasGoogleAuthorizationTokens = false,
     IReadOnlyList<string>? AvailablePrinterNames = null);
 
-// Gives Settings a contract for saved preferences and explicit Google authorization actions.
+// Loads and saves the app preferences shared by Settings and printer selection.
 public interface IAppSettingsService
 {
     Task<AppSettingsSnapshot> LoadAsync(CancellationToken cancellationToken);
@@ -27,10 +27,4 @@ public interface IAppSettingsService
         CalendarSettings calendarSettings,
         EconomySettings? economySettings,
         CancellationToken cancellationToken);
-
-    Task<OperationResult<bool>> ConnectGoogleCalendarAsync(
-        CalendarSettings calendarSettings,
-        CancellationToken cancellationToken);
-
-    Task<OperationResult<bool>> ForgetGoogleAuthorizationAsync(CancellationToken cancellationToken);
 }

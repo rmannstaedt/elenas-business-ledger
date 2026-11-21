@@ -201,103 +201,16 @@ public sealed class EconomyOverviewServiceTests
     }
 
     // Fails an Economy read so the reporting service's error handling can be tested.
-    private sealed class ThrowingInvoiceRepository : IInvoiceRepository
+    private sealed class ThrowingInvoiceRepository : IEconomyInvoiceReader
     {
         public Task<IReadOnlyList<EconomyInvoiceRecord>> ListIssuedInvoiceOverviewRowsAsync(
             int periodYear,
             CancellationToken cancellationToken) =>
             throw new InvalidOperationException("database unavailable");
-
-        public Task<IReadOnlyList<InvoiceLessonStatus>> ListLessonStatusesAsync(
-            DateOnly from,
-            DateOnly to,
-            CancellationToken cancellationToken,
-            IReadOnlyList<int>? includeLessonIds = null) =>
-            throw new NotImplementedException();
-
-        public Task<IReadOnlyList<IssuedInvoiceSummary>> ListInvoicesForStudentAsync(
-            int studentId,
-            CancellationToken cancellationToken) =>
-            throw new NotImplementedException();
-
-        public Task<bool> HasInvoiceForStudentInMonthAsync(
-            int studentId,
-            DateOnly month,
-            CancellationToken cancellationToken) =>
-            throw new NotImplementedException();
-
-        public Task<InvoiceNumber> GetNextInvoiceNumberAsync(CancellationToken cancellationToken) =>
-            throw new NotImplementedException();
-
-        public Task<OperationResult<IssuedInvoice>> ReserveInvoiceAsync(
-            InvoiceDraft draft,
-            InvoiceTotals totals,
-            CancellationToken cancellationToken) =>
-            throw new NotImplementedException();
-
-        public Task<OperationResult<IssuedInvoice>> FinalizeIssuedInvoiceWithLessonLocksAsync(
-            InvoiceNumber invoiceNumber,
-            string pdfFilePath,
-            IReadOnlyList<int> lessonIds,
-            CancellationToken cancellationToken) =>
-            throw new NotImplementedException();
-
-        public Task<OperationResult<IssuedInvoice>> MarkInvoicePdfPublishedAsync(
-            InvoiceNumber invoiceNumber,
-            string pdfFilePath,
-            CancellationToken cancellationToken) =>
-            throw new NotImplementedException();
-
-        public Task<OperationResult<IssuedInvoice>> ReviseInvoiceReservationAsync(
-            IssuedInvoice savedInvoice, InvoiceDraft draft, InvoiceTotals totals, CancellationToken cancellationToken) =>
-            throw new NotSupportedException();
-
-        public Task<OperationResult<IssuedInvoice>> PrepareInvoicePublicationAsync(
-            IssuedInvoice savedInvoice, InvoicePdfPublication publication, CancellationToken cancellationToken) =>
-            throw new NotSupportedException();
-
-        public Task ReleaseInvoiceReservationAsync(
-            InvoiceNumber invoiceNumber, CancellationToken cancellationToken, string? expectedRevision = null) =>
-            throw new NotImplementedException();
-
-        public Task<OperationResult<IssuedInvoice>> UpdatePrintStatusAsync(
-            InvoiceNumber invoiceNumber,
-            InvoicePrintStatus printStatus,
-            DateTimeOffset? printedAt,
-            string? lastPrintError,
-            CancellationToken cancellationToken) =>
-            throw new NotImplementedException();
-
-        public Task<IssuedInvoice?> GetIssuedInvoiceAsync(
-            InvoiceNumber invoiceNumber,
-            CancellationToken cancellationToken) =>
-            throw new NotImplementedException();
-
-        public Task<IssuedInvoice?> GetOldestPendingAsync(CancellationToken cancellationToken) =>
-            Task.FromResult<IssuedInvoice?>(null);
-
-        public Task<OperationResult<InvoiceNumber>> DiscardPendingAsync(
-            IssuedInvoice savedInvoice, CancellationToken cancellationToken) => throw new NotSupportedException();
-
-        public Task<IssuedInvoice?> GetIssuingInvoiceAsync(
-            InvoiceNumber invoiceNumber,
-            CancellationToken cancellationToken) =>
-            throw new NotImplementedException();
-
-        public Task<PaymentStatus> GetPaymentStatusAsync(
-            InvoiceNumber invoiceNumber,
-            CancellationToken cancellationToken) =>
-            throw new NotImplementedException();
-
-        public Task SavePaymentStatusAsync(
-            InvoiceNumber invoiceNumber,
-            PaymentStatus paymentStatus,
-            CancellationToken cancellationToken) =>
-            throw new NotImplementedException();
     }
 
     // Supplies issued rows by year so manual override tests can identify invoice-backed months.
-    private sealed class FakeInvoiceRepository : IInvoiceRepository
+    private sealed class FakeInvoiceRepository : IEconomyInvoiceReader
     {
         public Dictionary<int, IReadOnlyList<EconomyInvoiceRecord>> OverviewRowsByYear { get; } = [];
 
@@ -305,93 +218,6 @@ public sealed class EconomyOverviewServiceTests
             int periodYear,
             CancellationToken cancellationToken) =>
             Task.FromResult(OverviewRowsByYear.TryGetValue(periodYear, out var rows) ? rows : []);
-
-        public Task<IReadOnlyList<InvoiceLessonStatus>> ListLessonStatusesAsync(
-            DateOnly from,
-            DateOnly to,
-            CancellationToken cancellationToken,
-            IReadOnlyList<int>? includeLessonIds = null) =>
-            throw new NotImplementedException();
-
-        public Task<IReadOnlyList<IssuedInvoiceSummary>> ListInvoicesForStudentAsync(
-            int studentId,
-            CancellationToken cancellationToken) =>
-            throw new NotImplementedException();
-
-        public Task<bool> HasInvoiceForStudentInMonthAsync(
-            int studentId,
-            DateOnly month,
-            CancellationToken cancellationToken) =>
-            throw new NotImplementedException();
-
-        public Task<InvoiceNumber> GetNextInvoiceNumberAsync(CancellationToken cancellationToken) =>
-            throw new NotImplementedException();
-
-        public Task<OperationResult<IssuedInvoice>> ReserveInvoiceAsync(
-            InvoiceDraft draft,
-            InvoiceTotals totals,
-            CancellationToken cancellationToken) =>
-            throw new NotImplementedException();
-
-        public Task<OperationResult<IssuedInvoice>> FinalizeIssuedInvoiceWithLessonLocksAsync(
-            InvoiceNumber invoiceNumber,
-            string pdfFilePath,
-            IReadOnlyList<int> lessonIds,
-            CancellationToken cancellationToken) =>
-            throw new NotImplementedException();
-
-        public Task<OperationResult<IssuedInvoice>> MarkInvoicePdfPublishedAsync(
-            InvoiceNumber invoiceNumber,
-            string pdfFilePath,
-            CancellationToken cancellationToken) =>
-            throw new NotImplementedException();
-
-        public Task<OperationResult<IssuedInvoice>> ReviseInvoiceReservationAsync(
-            IssuedInvoice savedInvoice, InvoiceDraft draft, InvoiceTotals totals, CancellationToken cancellationToken) =>
-            throw new NotSupportedException();
-
-        public Task<OperationResult<IssuedInvoice>> PrepareInvoicePublicationAsync(
-            IssuedInvoice savedInvoice, InvoicePdfPublication publication, CancellationToken cancellationToken) =>
-            throw new NotSupportedException();
-
-        public Task ReleaseInvoiceReservationAsync(
-            InvoiceNumber invoiceNumber, CancellationToken cancellationToken, string? expectedRevision = null) =>
-            throw new NotImplementedException();
-
-        public Task<OperationResult<IssuedInvoice>> UpdatePrintStatusAsync(
-            InvoiceNumber invoiceNumber,
-            InvoicePrintStatus printStatus,
-            DateTimeOffset? printedAt,
-            string? lastPrintError,
-            CancellationToken cancellationToken) =>
-            throw new NotImplementedException();
-
-        public Task<IssuedInvoice?> GetIssuedInvoiceAsync(
-            InvoiceNumber invoiceNumber,
-            CancellationToken cancellationToken) =>
-            throw new NotImplementedException();
-
-        public Task<IssuedInvoice?> GetOldestPendingAsync(CancellationToken cancellationToken) =>
-            Task.FromResult<IssuedInvoice?>(null);
-
-        public Task<OperationResult<InvoiceNumber>> DiscardPendingAsync(
-            IssuedInvoice savedInvoice, CancellationToken cancellationToken) => throw new NotSupportedException();
-
-        public Task<IssuedInvoice?> GetIssuingInvoiceAsync(
-            InvoiceNumber invoiceNumber,
-            CancellationToken cancellationToken) =>
-            throw new NotImplementedException();
-
-        public Task<PaymentStatus> GetPaymentStatusAsync(
-            InvoiceNumber invoiceNumber,
-            CancellationToken cancellationToken) =>
-            throw new NotImplementedException();
-
-        public Task SavePaymentStatusAsync(
-            InvoiceNumber invoiceNumber,
-            PaymentStatus paymentStatus,
-            CancellationToken cancellationToken) =>
-            throw new NotImplementedException();
     }
 
     // Holds settings and captures override writes so service tests can check what would be persisted.

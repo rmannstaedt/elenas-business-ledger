@@ -4,6 +4,8 @@ Date: 2026-11-21
 
 ## Current State
 
+- The seven SOLID refactors are recorded in `.ai/implementation-plans/completed/2026-11-21-solid-boundaries.md`. Dashboard refresh separates reconciliation from projection. Startup supplies invoice PDF storage and the atomic Settings writer, and the Economy and invoice picker use focused read interfaces.
+
 - The eight code-review fixes are tracked in `.ai/implementation-plans/completed/2026-11-21-code-review-fixes.md`. The plan records automated verification and the remaining final checks with a disposable ledger, dedicated Google calendar, and test printer.
 
 - The architecture review fixes are tracked in `.ai/implementation-plans/completed/2026-11-21-ledger-integrity.md`. The revised source uses stable invoice ownership, scoped calendar links, and non-destructive calendar reconciliation.

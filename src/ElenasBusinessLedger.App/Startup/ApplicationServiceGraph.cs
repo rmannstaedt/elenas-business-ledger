@@ -33,6 +33,7 @@ internal sealed class ApplicationServiceGraph
         IInvoiceWorkflowService invoiceWorkflowService,
         IInvoiceWorkflowLauncher invoiceWorkflowLauncher,
         IAppSettingsService settingsService,
+        IGoogleCalendarAuthorizationService calendarAuthorization,
         IGoogleCalendarGateway calendarGateway,
         SystemUiClock systemClock)
     {
@@ -52,6 +53,7 @@ internal sealed class ApplicationServiceGraph
         InvoiceWorkflowService = invoiceWorkflowService;
         InvoiceWorkflowLauncher = invoiceWorkflowLauncher;
         SettingsService = settingsService;
+        CalendarAuthorization = calendarAuthorization;
         CalendarGateway = calendarGateway;
         SystemClock = systemClock;
     }
@@ -87,6 +89,8 @@ internal sealed class ApplicationServiceGraph
     public IInvoiceWorkflowLauncher InvoiceWorkflowLauncher { get; }
 
     public IAppSettingsService SettingsService { get; }
+
+    public IGoogleCalendarAuthorizationService CalendarAuthorization { get; }
 
     public IGoogleCalendarGateway CalendarGateway { get; }
 
@@ -141,15 +145,22 @@ internal sealed class ApplicationServiceGraph
                 planCatalogRepository),
             companyProfileRepository,
             invoiceRepository,
+            folder => new LocalInvoiceFileStore(new InvoiceFileStoreOptions(folder)),
             new QuestPdfInvoicePdfWriter(),
             new SavedPdfPrinter(new ShellPrintProcessLauncher(), new WindowsPrinterCatalog()),
             systemClock);
+        var calendarAuthorization = new GoogleCalendarAuthorizationService(
+            googleOAuthClientConfigurationProvider,
+            googleCalendarClientFactory.CreateForConnectionAsync,
+            account => WindowsProtectedFileDataStore.ContainsStoredKey(appPaths.GoogleTokenFolderPath, account),
+            () => new WindowsProtectedFileDataStore(appPaths.GoogleTokenFolderPath).ClearAsync());
         var settingsService = new CoreAppSettingsService(
             companyProfileRepository,
-            calendarSettingsRepository,
+            calendarSettingsRepository.GetAsync,
+            new SqliteAppSettingsWriter(createContext),
             appPaths,
-            googleOAuthClientConfigurationProvider,
-            googleCalendarClientFactory,
+            calendarAuthorization.GetStatus,
+            new WindowsPrinterCatalog(),
             economyRepository);
         var printerConfigurationService = new InvoicePrinterConfigurationService(
             settingsService,
@@ -176,6 +187,7 @@ internal sealed class ApplicationServiceGraph
             invoiceWorkflowService,
             invoiceWorkflowLauncher,
             settingsService,
+            calendarAuthorization,
             calendarGateway,
             systemClock);
     }

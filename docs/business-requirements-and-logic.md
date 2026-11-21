@@ -118,6 +118,8 @@ Google Calendar entries that are *NOT* identified as relevant by their first lin
 
 Calendar titles match trimmed Student short names without regard to case. New or renamed Students must have distinct short names under that same rule. The Ledger warns about duplicate labels in older databases and leaves ambiguous appointments unlinked. Each Student remains selectable by ID, and an existing calendar link retains its Student ID when the label changes. Calendar linkage combines the configured calendar identity and the external event ID. Refresh preserves local billing rows when events are outside the current calendar results. Use the Ledger's explicit delete action to remove an uninvoiced lesson. Legacy event IDs are adopted when the observed event, existing student marker and lesson time agree.
 
+Dashboard refresh resolves observed events to local lessons before building the view. The reconciliation step saves eligible lesson updates for the selected student and supplies the saved records to the dashboard projection. The projection uses those records and issued invoice facts to build lesson rows and navigation choices.
+
 The first line remains the ownership/matching marker. A completed uninvoiced lesson may additionally contain this later line in the Google Calendar entry:
   Status: Completed
 
@@ -306,11 +308,11 @@ flowchart LR
     issued --> print["Print the saved PDF"]
 ```
 
-**Resume Invoice** starts at the saved snapshot. The publication checkpoint lets the file store recognize a PDF already moved to its final path. Economy reads the issued totals from SQLite. A failed print request can be retried using the published PDF.
+**Resume Invoice** starts at the saved snapshot. The publication checkpoint lets the file store recognize a PDF already moved to its final path. Recovery follows the saved paths and checksum even if the default invoice folder changes. Economy reads the issued totals from SQLite. A failed print request can be retried using the published PDF.
 
 ## Settings saves
 
-One **Save** commits the company profile, calendar preferences, and Economy settings together in SQLite, including any removal of obsolete Economy overrides. If the transaction fails, the previous values remain in effect. **Connect Google Calendar** handles browser authorization separately.
+One **Save** commits the company profile, calendar preferences, and Economy settings together in SQLite, including any removal of obsolete Economy overrides. If the transaction fails, the previous values remain in effect. Printer selection saves through the same preferences workflow. **Connect Google Calendar** and **Forget Google sign-in** use the separate authorization workflow.
 
 ## Limitations
 

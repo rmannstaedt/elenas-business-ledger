@@ -4,6 +4,7 @@ using ElenasBusinessLedger.Core.Company;
 using ElenasBusinessLedger.Core.Common;
 using ElenasBusinessLedger.Core.Invoices;
 using ElenasBusinessLedger.Core.Money;
+using ElenasBusinessLedger.Core.Students;
 using ElenasBusinessLedger.Core.UseCases.Invoices;
 using ElenasBusinessLedger.App.Views;
 using System.Windows;
@@ -21,7 +22,7 @@ public sealed class InvoiceViewModelTests
     [Fact]
     public async Task CandidateDialogLoadsStudentsAndPreselectsCurrentStudent()
     {
-        var service = new FakeInvoiceWorkflowService
+        var service = new FakeInvoiceCandidateReader
         {
             Candidates = OperationResult<InvoiceCandidateSelectionResult>.Success(
                 new InvoiceCandidateSelectionResult(["Anna"], ["Anna", "Bo"], "Anna"))
@@ -42,7 +43,7 @@ public sealed class InvoiceViewModelTests
     [Fact]
     public async Task CandidateDialogPrefersInitialStudentOverTimeBasedPreselection()
     {
-        var service = new FakeInvoiceWorkflowService
+        var service = new FakeInvoiceCandidateReader
         {
             Candidates = OperationResult<InvoiceCandidateSelectionResult>.Success(
                 new InvoiceCandidateSelectionResult(["Karina"], ["Mira", "Karina"], "Karina"))
@@ -57,6 +58,27 @@ public sealed class InvoiceViewModelTests
 
         Assert.Equal("Mira", viewModel.SelectedStudentShortName);
         Assert.True(viewModel.ConfirmCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task CandidateDialogPrefersSelectedStudentIdWhenShortNamesOverlap()
+    {
+        var other = new StudentChoice(1, "Mira");
+        var selected = new StudentChoice(2, "mira");
+        var service = new FakeInvoiceCandidateReader
+        {
+            Candidates = OperationResult<InvoiceCandidateSelectionResult>.Success(
+                new InvoiceCandidateSelectionResult(["Mira"], ["Mira", "mira"], "Mira",
+                    [other, selected], [other], other.StudentId))
+        };
+        var date = new DateOnly(2026, 6, 23);
+        var viewModel = new InvoiceCandidateDialogViewModel(service, date,
+            new DateTimeOffset(date.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero),
+            initialStudentId: selected.StudentId);
+
+        await viewModel.LoadAsync();
+
+        Assert.Equal(selected, viewModel.SelectedStudent);
     }
 
     [Fact]
@@ -478,12 +500,19 @@ public sealed class InvoiceViewModelTests
         Assert.True(condition());
     }
 
-    // Supplies choices and controlled issue or reprint results so invoice screens can be tested in isolation.
+    // Supplies picker choices so candidate selection tests depend on the same read-only contract as the view model.
+    private sealed class FakeInvoiceCandidateReader : IInvoiceCandidateReader
+    {
+        public required OperationResult<InvoiceCandidateSelectionResult> Candidates { get; init; }
+
+        public Task<OperationResult<InvoiceCandidateSelectionResult>> LoadCandidatesAsync(
+            DateOnly date, DateTimeOffset now, CancellationToken cancellationToken) =>
+            Task.FromResult(Candidates);
+    }
+
+    // Controls issue and reprint results so the preview and viewer tests can exercise recovery and errors.
     private sealed class FakeInvoiceWorkflowService : IInvoiceWorkflowService
     {
-        public OperationResult<InvoiceCandidateSelectionResult> Candidates { get; init; } =
-            OperationResult<InvoiceCandidateSelectionResult>.Success(new InvoiceCandidateSelectionResult([], [], null));
-
         public OperationResult<IssueInvoiceResult> IssueResult { get; init; } =
             OperationResult<IssueInvoiceResult>.Failure(new ValidationError("Test.NotConfigured", "Issue not configured."));
 
@@ -497,7 +526,7 @@ public sealed class InvoiceViewModelTests
         public InvoiceNumber? ReprintInvoiceNumber { get; private set; }
 
         public Task<OperationResult<InvoiceCandidateSelectionResult>> LoadCandidatesAsync(DateOnly date, DateTimeOffset now, CancellationToken cancellationToken) =>
-            Task.FromResult(Candidates);
+            Task.FromResult(OperationResult<InvoiceCandidateSelectionResult>.Success(new InvoiceCandidateSelectionResult([], [], null)));
 
         public Task<OperationResult<InvoicePreviewResult>> CreatePreviewAsync(string studentShortName, DateOnly invoiceDate, DateOnly from, DateOnly to, CancellationToken cancellationToken, int? studentId = null) =>
             Task.FromResult(OperationResult<InvoicePreviewResult>.Success(CreatePreview()));

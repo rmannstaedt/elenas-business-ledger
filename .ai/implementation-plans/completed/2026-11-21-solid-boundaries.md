@@ -1,8 +1,8 @@
 # Implementation plan for the Ledger’s SOLID findings
 
-Status: Active  
-Created: 2026-11-21  
-Last updated: 2026-11-21  
+Status: Completed
+Created: 2026-11-21
+Last updated: 2026-11-21
 Owner/context: Elena's Business Ledger, design findings from the invoice and commenting passes
 
 ## Goal and scope
@@ -45,8 +45,8 @@ Each stage starts from the previous verified state. Revert only the failed stage
 
 ### Stage 1. Record the baseline and close test gaps
 
-Type: verification and characterization  
-Status: Not started
+Type: verification and characterization
+Status: Completed
 
 - Record the working-tree status and build and run the full Windows suite before moving interfaces. Use isolated build output if Visual Studio has the app open.
 - Locate callers and shares of the invoice repository, the workflow service, the Settings snapshot and writer, the two receipt refresh paths, and dashboard construction. Confirm the test seams in `EconomyOverviewQueryTests`, `EconomyOverviewServiceTests`, `InvoiceViewModelTests`, `InvoicePrinterConfigurationServiceTests`, `AppServiceTests`, `GoogleCalendarGatewayTests`, `UseCaseTests`, and `SqlitePersistenceTests`.
@@ -55,8 +55,8 @@ Status: Not started
 
 ### Stage 2. Narrow Economy and invoice-picker reads
 
-Type: implementation and focused verification  
-Status: Not started  
+Type: implementation and focused verification
+Status: Completed
 Findings: F2 and F6
 
 - Extract an issued-invoice reporting reader, such as `IEconomyInvoiceReader`, with `ListIssuedInvoiceOverviewRowsAsync`. Wire `EconomyOverviewQuery` and the issued-month check in `CoreEconomyOverviewService` to that reader. Keep the existing `SqliteInvoiceRepository` implementation, SQL, projection, and context factory. Update callers and remove the reporting member from the broader contract when they have migrated.
@@ -66,8 +66,8 @@ Findings: F2 and F6
 
 ### Stage 3. Inject invoice PDF storage at startup
 
-Type: implementation and invoice recovery verification  
-Status: Not started  
+Type: implementation and invoice recovery verification
+Status: Completed
 Finding: F1
 
 - Supply `CoreInvoiceWorkflowService` with a factory such as `Func<string, IInvoiceFileStore>`. Compose the concrete `LocalInvoiceFileStore` in `ApplicationServiceGraph`. Reuse one construction path for `IssueAsync` and `ResumeAsync` while preserving their current error results and reading the folder at operation time.
@@ -77,8 +77,8 @@ Finding: F1
 
 ### Stage 4. Invert Settings persistence and narrow printer preferences
 
-Type: implementation and transaction verification  
-Status: Not started  
+Type: implementation and transaction verification
+Status: Completed
 Findings: F3 and F7
 
 - Move the value-only `CalendarSettings` record to a Core namespace and update references while preserving its fields and existing storage mapping. Give `CoreAppSettingsService` an atomic writer contract and a calendar preference reader using the existing loader-delegate pattern where it fits. Bind `SqliteAppSettingsWriter` and the SQLite reader in `ApplicationServiceGraph`. Keep company, calendar, and Economy cleanup inside the writer's current transaction.
@@ -89,8 +89,8 @@ Findings: F3 and F7
 
 ### Stage 5. Give post-write calendar refresh an explicit owner
 
-Type: implementation and failure-order verification  
-Status: Not started  
+Type: implementation and failure-order verification
+Status: Completed
 Finding: F5
 
 - Move the asynchronous list refresh out of `CalendarWriteReceipt` to a small shared operation in the Core lesson workflows, called by `EditLessonUseCase` and `DeleteLessonUseCase` after their local write. Keep the receipt's acknowledgement, errors, and any list supplied by a compatibility gateway. Its pure result mapping may remain with the type.
@@ -100,8 +100,8 @@ Finding: F5
 
 ### Stage 6. Separate dashboard reconciliation from projection
 
-Type: implementation and lifecycle verification  
-Status: Not started  
+Type: implementation and lifecycle verification
+Status: Completed
 Finding: F4
 
 - Name the current entry point as a Core refresh use case, such as `LoadDashboardUseCase`. Give it an explicit reconciliation step that owns `ILessonRepository.SaveAsync`. Build the display result through a projection that has no write dependency. Update `CoreStartupDashboardService`, `ApplicationBootstrapper`, and direct test callers together. Keep the existing WPF refresh entry point.
@@ -112,8 +112,8 @@ Finding: F4
 
 ### Stage 7. Integrated verification and documentation
 
-Type: verification, review, and documentation  
-Status: Not started
+Type: verification, review, and documentation
+Status: Completed
 
 - Build and run the full suite. Use `code-review` and `architecture-review` to trace dependencies from the existing WPF entry points through the narrower contracts and compare each write path with its next reader. Use `ui-review` on observable Settings, printer, invoice, and dashboard transitions.
 - Use `documentation-refresh` for affected architecture guidance and invoice/calendar flow descriptions. Keep the concise type and method comments aligned with the new ownership and report concrete SOLID issues found during implementation.
@@ -146,7 +146,7 @@ Use a disposable Windows user profile or an existing test harness configured wit
 1. Open **Application > Settings**, save changes to the test company and calendar, then reopen Settings. Confirm the values persisted. Use **Connect Google Calendar** on the trial account, close Settings, and refresh the dashboard. Verify appointments load and ordinary refresh does not open a browser.
 2. In the trial calendar, move an unbilled lesson and refresh the Ledger twice. Verify that one local row moves and the intended student remains selected. Cancel a different lesson through the Ledger and open invoice preview immediately. Verify the cancelled lesson is absent and existing invoice-linked lessons keep their status.
 3. Open **Write Invoice** with the fictional student selected. Confirm the picker keeps the selected student and the preview shows the expected lesson lines and totals. If no printer is remembered, first cancel the printer picker and verify issuance has not occurred. Then choose the trial printer and issue. Verify a single invoice number, the saved PDF, and the corresponding Economy row.
-4. Exercise the automated interrupted-publication scenario to create a checkpoint predictably, then confirm **Invoice > Resume Invoice** can recover the same number and verified PDF independently of the current student selection. Reprint an issued trial invoice and verify the saved invoice number and Economy totals agree with the original issuance.
+4. Run `dotnet test ElenasBusinessLedger.sln --filter "FullyQualifiedName~InvoiceRetryCompletesAfterPdfWasMovedBeforeSqliteWasUpdated|FullyQualifiedName~InvoiceRecoveryDialogTests"`. The automated recovery scenario creates its own disposable checkpoint and confirms Resume uses the original number and PDF after the default folder changes. In the trial app, reprint the invoice from step 3 and verify its number and Economy totals still agree with the original issuance.
 
 Inspect Student Invoices, the dashboard lesson rows, **Economy > Overview**, and files in the trial invoice folder. Close the app before cleaning up. Remove the trial calendar and disposable artifacts when they are no longer needed.
 
@@ -154,3 +154,16 @@ Inspect Student Invoices, the dashboard lesson rows, **Economy > Overview**, and
 
 - 2026-11-21 — Recorded all seven findings and verified their current call sites and existing test coverage by source inspection. The baseline build and tests are scheduled for Stage 1. Planning added this file.
 
+- 2026-11-21 — Stage 1. Baseline at 3d0f38d built with zero warnings and errors and passed 434 tests. Extended the existing SQLite recovery and Core dashboard/deletion tests to cover folder changes, stable lesson ID across a second refresh and invoice preview, and immediate billing after an acknowledged deletion with a failed calendar refresh. All four focused cases passed before production changes. No blocking user action.
+
+- 2026-11-21 — Stage 2. Added IEconomyInvoiceReader and IInvoiceCandidateReader. Economy query and manual-override safeguards now depend on the reporting projection contract, and the picker uses only candidate lookup. The same adapters serve existing workflows. Updated narrow fakes and added a colliding-label test for ID-based picker selection. All 77 focused Economy, invoice-view-model, and SQLite cases passed. No blocking user action.
+
+- 2026-11-21 — Stage 3. Moved the PDF store factory to ApplicationServiceGraph and reused construction in Issue and Resume. Both SQLite integration workflows now call the production App service and assert the configured folder passed to the factory; recovery still uses the checkpointed path and preserves its bytes after a folder change. All 160 focused Core, invoice, PDF, and SQLite cases passed. No blocking user action.
+
+- 2026-11-21 — Stage 4. Moved the CalendarSettings value to Core, injected IAppSettingsWriter plus the calendar preference reader, and kept SqliteAppSettingsWriter’s transaction unchanged. Dedicated GoogleCalendarAuthorizationService owns Connect and Forget; the printer retains Load/Save and its existing defaults. Updated the rollback scenario to reopen Settings, added first-printer coverage with and without saved calendar settings, and exercised explicit authorization against the selected calendar with a test client. All 40 Settings, printer, authorization, and rollback cases passed. No blocking user action.
+
+- 2026-11-21 — Stage 5. Moved follow-up month retrieval to CalendarRefreshAfterWrite, called by Move and Delete only after the acknowledged write is applied to SQLite. Kept the legacy bundled-refresh outcome and error mapping. Added order assertions for both mutations and cases for rejected and uncertain writes; retained the SQLite claim and immediate invoice-preview regressions. All 107 focused Core and calendar cases passed. No blocking user action.
+
+- 2026-11-21 — Stage 6. Renamed the orchestration entry point to LoadDashboardUseCase, moved lesson persistence into DashboardLessonReconciler, and made DashboardProjection build rows and navigation from data alone. Preserved calendar scope, selected-student writes, lookup order, and the retained local rows. The lifecycle regression verifies one calendar read per refresh, the same local lesson ID on the second refresh, and that ID in the next invoice preview. All 230 focused Core, app, WPF, and SQLite cases passed. No blocking user action.
+
+- 2026-11-21 — Stage 7. Reviewed the completed dependency boundaries, calendar and invoice operation ordering, and WPF composition against the plan. Updated the project profile, business logic, workflow comments, and final acceptance checklist. Final Windows build passed with zero warnings and errors. All 443 tests passed with simulated Google and printer services, temporary SQLite databases, and real PDF recovery fixtures. No blocking user action.

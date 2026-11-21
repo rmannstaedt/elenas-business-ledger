@@ -1,7 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using ElenasBusinessLedger.Infrastructure.Calendar;
-using ElenasBusinessLedger.Infrastructure.Persistence;
+using ElenasBusinessLedger.Core.Calendar;
 
 namespace ElenasBusinessLedger.App.Services;
 

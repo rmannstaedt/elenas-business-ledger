@@ -8,7 +8,7 @@ namespace ElenasBusinessLedger.App.ViewModels;
 // Loads and selects student choices before the invoice preview builds a draft.
 public sealed class InvoiceCandidateDialogViewModel : ViewModelBase
 {
-    private readonly IInvoiceWorkflowService invoiceWorkflowService;
+    private readonly IInvoiceCandidateReader candidateReader;
     private readonly DateOnly date;
     private readonly DateTimeOffset now;
     private readonly string? initialStudentShortName;
@@ -18,13 +18,13 @@ public sealed class InvoiceCandidateDialogViewModel : ViewModelBase
     private string? errorMessage;
 
     public InvoiceCandidateDialogViewModel(
-        IInvoiceWorkflowService invoiceWorkflowService,
+        IInvoiceCandidateReader candidateReader,
         DateOnly date,
         DateTimeOffset now,
         string? initialStudentShortName = null,
         int? initialStudentId = null)
     {
-        this.invoiceWorkflowService = invoiceWorkflowService;
+        this.candidateReader = candidateReader;
         this.date = date;
         this.now = now;
         this.initialStudentShortName = initialStudentShortName;
@@ -88,7 +88,7 @@ public sealed class InvoiceCandidateDialogViewModel : ViewModelBase
     // Loads choices for the invoice picker and prefers the student already selected on the dashboard.
     public async Task LoadAsync()
     {
-        var result = await invoiceWorkflowService.LoadCandidatesAsync(date, now, CancellationToken.None);
+        var result = await candidateReader.LoadCandidatesAsync(date, now, CancellationToken.None);
         if (!result.Succeeded)
         {
             ErrorMessage = result.Errors.FirstOrDefault()?.Message ?? "Could not load invoice candidates.";

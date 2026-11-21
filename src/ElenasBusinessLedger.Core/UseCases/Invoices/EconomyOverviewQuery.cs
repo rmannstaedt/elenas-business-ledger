@@ -8,17 +8,17 @@ namespace ElenasBusinessLedger.Core.UseCases.Economy;
 // Builds the Economy report from issued totals and eligible manual overrides so display and export agree.
 public sealed class EconomyOverviewQuery
 {
-    private readonly IInvoiceRepository invoiceRepository;
+    private readonly IEconomyInvoiceReader invoiceReader;
     private readonly IEconomyRepository? economyRepository;
 
-    public EconomyOverviewQuery(IInvoiceRepository invoiceRepository)
-        : this(invoiceRepository, economyRepository: null)
+    public EconomyOverviewQuery(IEconomyInvoiceReader invoiceReader)
+        : this(invoiceReader, economyRepository: null)
     {
     }
 
-    public EconomyOverviewQuery(IInvoiceRepository invoiceRepository, IEconomyRepository? economyRepository)
+    public EconomyOverviewQuery(IEconomyInvoiceReader invoiceReader, IEconomyRepository? economyRepository)
     {
-        this.invoiceRepository = invoiceRepository;
+        this.invoiceReader = invoiceReader;
         this.economyRepository = economyRepository;
     }
 
@@ -46,7 +46,7 @@ public sealed class EconomyOverviewQuery
         for (var offset = 0; offset < 5; offset++)
         {
             var summaryYear = year - offset;
-            var records = await invoiceRepository.ListIssuedInvoiceOverviewRowsAsync(summaryYear, cancellationToken);
+            var records = await invoiceReader.ListIssuedInvoiceOverviewRowsAsync(summaryYear, cancellationToken);
             var orderedYearRecords = records
                 .OrderBy(record => record.InvoiceNumber.Value)
                 .ToArray();

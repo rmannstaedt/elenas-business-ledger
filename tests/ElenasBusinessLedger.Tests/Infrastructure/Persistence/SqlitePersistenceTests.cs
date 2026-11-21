@@ -1,4 +1,5 @@
 using ElenasBusinessLedger.App.Services;
+using ElenasBusinessLedger.Core.Calendar;
 using ElenasBusinessLedger.Core.Common;
 using ElenasBusinessLedger.Core.Company;
 using ElenasBusinessLedger.Core.Invoices;
@@ -9,6 +10,7 @@ using ElenasBusinessLedger.Core.Ports;
 using ElenasBusinessLedger.Core.Students;
 using ElenasBusinessLedger.Core.UseCases.Invoices;
 using ElenasBusinessLedger.Infrastructure.Invoices.Pdf;
+using ElenasBusinessLedger.Infrastructure.Invoices.Printing;
 using ElenasBusinessLedger.Infrastructure.Persistence;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -899,8 +901,11 @@ public sealed class SqlitePersistenceTests
                 """, token);
         }
 
-        var service = new CoreAppSettingsService(company, calendars,
-            Path.GetDirectoryName(database.DatabasePath)!, economy);
+        var service = new CoreAppSettingsService(
+            company, calendars.GetAsync, new SqliteAppSettingsWriter(database.CreateContext),
+            AppPaths.FromAppDataFolder(Path.GetDirectoryName(database.DatabasePath)!),
+            _ => new GoogleCalendarAuthorizationStatus(GoogleOAuthClientConfigurationStatus.Missing, false),
+            new WindowsPrinterCatalog(), economy);
         var updatedCompany = CompanyProfile.Create("Changed Studio", original.Address, original.Phone, original.Email,
             original.Cvr, original.VatRegistrationDate, original.VatStatus, original.InvoiceFolderPath);
         var updatedCalendar = new CalendarSettings("new-trial", "ledger@example.test");
@@ -910,6 +915,10 @@ public sealed class SqlitePersistenceTests
         Assert.Equal(original, await company.GetAsync(token));
         Assert.Equal(oldCalendar, await calendars.GetAsync(token));
         Assert.Equal(oldEconomy, await economy.GetSettingsAsync(token));
+        var reloaded = await service.LoadAsync(token);
+        Assert.Equal(original, reloaded.CompanyProfile);
+        Assert.Equal(oldCalendar, reloaded.CalendarSettings);
+        Assert.Equal(oldEconomy, reloaded.EconomySettings);
 
         await using (var context = database.CreateContext())
         {
@@ -1591,9 +1600,9 @@ public sealed class SqlitePersistenceTests
         var revised = InvoiceDraft.Create(draft.InvoiceDate, draft.Company, draft.Student, draft.Lines,
             new PriceAdjustment(Money.Dkk(-50m), "Revised discount"), draft.Period);
         var writer = new RecordingInvoicePdfWriter();
-        var useCase = new IssueInvoiceUseCase(company, invoices, CreateInvoiceFileStore(database), writer,
-            new RecordingInvoicePrinter(), new SystemUiClock());
-        var issued = await useCase.ExecuteAsync(revised, token, (recovery, _) =>
+        var storageFolders = new List<string>();
+        var workflow = CreateInvoiceWorkflow(database, company, invoices, writer, storageFolders);
+        var issued = await workflow.IssueAsync(revised, token, (recovery, _) =>
         {
             Assert.Equal(original.PriceAdjustment, recovery.SavedInvoice.PriceAdjustment);
             Assert.True(recovery.CanRevise);
@@ -1602,6 +1611,7 @@ public sealed class SqlitePersistenceTests
 
         Assert.True(issued.Succeeded, string.Join(", ", issued.Errors.Select(error => error.Message)));
         Assert.Equal(reserved.Value!.InvoiceNumber, issued.Value!.Invoice.InvoiceNumber);
+        Assert.Equal((await company.GetAsync(token)).InvoiceFolderPath, Assert.Single(storageFolders));
         Assert.Equal(Money.Dkk(expectedTotal), writer.Totals!.Total);
         var stored = await invoices.GetIssuedInvoiceAsync(reserved.Value.InvoiceNumber, token);
         Assert.Equal(writer.Totals, stored!.Totals);
@@ -1610,8 +1620,10 @@ public sealed class SqlitePersistenceTests
         Assert.True(File.Exists(stored.PdfFilePath));
     }
 
-    [Fact]
-    public async Task InvoiceRetryCompletesAfterPdfWasMovedBeforeSqliteWasUpdated()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task InvoiceRetryCompletesAfterPdfWasMovedBeforeSqliteWasUpdated(bool changeInvoiceFolder)
     {
         using var database = await TestDatabase.CreateAsync();
         var token = TestContext.Current.CancellationToken;
@@ -1636,13 +1648,50 @@ public sealed class SqlitePersistenceTests
         Assert.True(published.Succeeded);
         Assert.Null((await invoices.GetIssuingInvoiceAsync(number, token))!.PdfFilePath);
 
+        var originalBytes = await File.ReadAllBytesAsync(published.Value!, token);
+        var profile = await company.GetAsync(token);
+        var retryFolder = changeInvoiceFolder
+            ? Path.Combine(Path.GetDirectoryName(database.DatabasePath)!, "replacement-invoices")
+            : profile.InvoiceFolderPath;
+        await company.SaveAsync(profile with { InvoiceFolderPath = retryFolder }, token);
+        var storageFolders = new List<string>();
         var retryWriter = new RecordingInvoicePdfWriter();
-        var retry = new IssueInvoiceUseCase(company, invoices, store, retryWriter, new RecordingInvoicePrinter(), new SystemUiClock());
-        var issued = await retry.ResumeAsync(number, token);
+        var workflow = CreateInvoiceWorkflow(database, company, invoices, retryWriter, storageFolders);
+        var issued = await workflow.ResumeAsync(number, token);
         Assert.True(issued.Succeeded, string.Join(", ", issued.Errors.Select(error => error.Message)));
+        Assert.Equal(retryFolder, Assert.Single(storageFolders));
         Assert.Null(retryWriter.Draft);
         Assert.Equal(number, issued.Value!.Invoice.InvoiceNumber);
         Assert.Equal(published.Value, issued.Value.Invoice.PdfFilePath);
+        Assert.Equal(originalBytes, await File.ReadAllBytesAsync(issued.Value.Invoice.PdfFilePath!, token));
+        if (changeInvoiceFolder)
+        {
+            Assert.False(Directory.Exists(retryFolder));
+        }
+    }
+
+    private static CoreInvoiceWorkflowService CreateInvoiceWorkflow(
+        TestDatabase database,
+        ICompanyProfileRepository company,
+        IInvoiceRepository invoices,
+        IInvoicePdfWriter writer,
+        List<string> storageFolders)
+    {
+        var students = new SqliteStudentRepository(database.CreateContext);
+        var lessons = new SqliteLessonRepository(database.CreateContext);
+        return new CoreInvoiceWorkflowService(
+            new InvoiceCandidateSelectionUseCase(students, lessons),
+            new InvoicePreviewUseCase(students, company, lessons, new SqlitePlanCatalogRepository(database.CreateContext)),
+            company,
+            invoices,
+            folder =>
+            {
+                storageFolders.Add(folder);
+                return new LocalInvoiceFileStore(new InvoiceFileStoreOptions(folder));
+            },
+            writer,
+            new RecordingInvoicePrinter(),
+            new SystemUiClock());
     }
 
     private static LocalInvoiceFileStore CreateInvoiceFileStore(TestDatabase database) =>

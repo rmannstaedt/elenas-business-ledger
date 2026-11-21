@@ -52,7 +52,7 @@ internal sealed class ApplicationBootstrapper
 
     private static MainWindowViewModel CreateMainWindowViewModel(ApplicationServiceGraph services) =>
         new(
-            new CoreStartupDashboardService(new StartupDashboardQuery(
+            new CoreStartupDashboardService(new LoadDashboardUseCase(
                 services.StudentRepository,
                 services.CalendarGateway,
                 services.InvoiceRepository,
@@ -73,7 +73,7 @@ internal sealed class ApplicationBootstrapper
             new CoreLessonStateService(new ToggleLessonStateUseCase(services.CalendarGateway, services.LessonRepository)),
             services.InvoiceWorkflowLauncher,
             new ShellInvoicePdfLauncher(),
-            new SettingsWindowLauncher(services.SettingsService),
+            new SettingsWindowLauncher(services.SettingsService, services.CalendarAuthorization),
             new PlanCatalogWindowLauncher(services.PlanCatalogService),
             new EconomyOverviewWindowLauncher(
                 services.EconomyOverviewService,

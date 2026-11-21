@@ -3,17 +3,13 @@ using ElenasBusinessLedger.Core.Invoices;
 
 namespace ElenasBusinessLedger.Core.Ports;
 
-// Provides invoice persistence, recovery, payment tracking, and reporting queries to the ledger workflows.
+// Provides invoice persistence, recovery, payment tracking, and lesson status to the ledger workflows.
 public interface IInvoiceRepository
 {
     Task<IReadOnlyList<InvoiceLessonStatus>> ListLessonStatusesAsync(
         DateOnly from, DateOnly to, CancellationToken cancellationToken, IReadOnlyList<int>? includeLessonIds = null);
 
     Task<IReadOnlyList<IssuedInvoiceSummary>> ListInvoicesForStudentAsync(int studentId, CancellationToken cancellationToken);
-
-    Task<IReadOnlyList<EconomyInvoiceRecord>> ListIssuedInvoiceOverviewRowsAsync(
-        int periodYear,
-        CancellationToken cancellationToken);
 
     Task<bool> HasInvoiceForStudentInMonthAsync(int studentId, DateOnly month, CancellationToken cancellationToken);
 
