@@ -71,11 +71,11 @@ The following must remain unchanged unless this plan explicitly says otherwise:
 
 ## Affected Files, Projects, Commands, Docs, Schemas, Or Artifacts
 
-- `src/MySmallBusinessLedger.Infrastructure/Calendar/WindowsProtectedFileDataStore.cs`
-- `src/MySmallBusinessLedger.Infrastructure/Calendar/GoogleCalendarCredentialFactory.cs`
-- `src/MySmallBusinessLedger.App/Services/GoogleCalendarClientFactory.cs`
-- `src/MySmallBusinessLedger.App/Services/CoreAppSettingsService.cs`
-- Relevant tests under `tests/MySmallBusinessLedger.Tests/`
+- `src/ElenasBusinessLedger.Infrastructure/Calendar/WindowsProtectedFileDataStore.cs`
+- `src/ElenasBusinessLedger.Infrastructure/Calendar/GoogleCalendarCredentialFactory.cs`
+- `src/ElenasBusinessLedger.App/Services/GoogleCalendarClientFactory.cs`
+- `src/ElenasBusinessLedger.App/Services/CoreAppSettingsService.cs`
+- Relevant tests under `tests/ElenasBusinessLedger.Tests/`
 - `README.md`, `.ai/project-profile.md`, `.ai/context/HANDOFF.md`
 
 No database schema changes are planned.
@@ -236,9 +236,9 @@ Tests to add/update:
 
 Verification commands/manual checks:
 
-- `dotnet test MySmallBusinessLedger.sln --filter "<focused filter>" -nodeReuse:false`
-- `dotnet build MySmallBusinessLedger.sln -nodeReuse:false`
-- `dotnet test MySmallBusinessLedger.sln -nodeReuse:false`
+- `dotnet test ElenasBusinessLedger.sln --filter "<focused filter>" -nodeReuse:false`
+- `dotnet build ElenasBusinessLedger.sln -nodeReuse:false`
+- `dotnet test ElenasBusinessLedger.sln -nodeReuse:false`
 
 Risks:
 
@@ -327,15 +327,15 @@ Cleanup/reset instructions:
 - 2026-06-27:
   - Stage: Stages 1-2 implementation.
   - Files changed:
-    - `src/MySmallBusinessLedger.Infrastructure/Calendar/WindowsProtectedFileDataStore.cs`
-    - `src/MySmallBusinessLedger.Infrastructure/Calendar/GoogleCalendarCredentialFactory.cs`
-    - `src/MySmallBusinessLedger.App/Services/GoogleCalendarClientFactory.cs`
-    - `src/MySmallBusinessLedger.App/Services/CoreAppSettingsService.cs`
-    - `src/MySmallBusinessLedger.App/Services/ConfiguredGoogleCalendarGateway.cs`
-    - `src/MySmallBusinessLedger.App/AssemblyInfo.cs`
+    - `src/ElenasBusinessLedger.Infrastructure/Calendar/WindowsProtectedFileDataStore.cs`
+    - `src/ElenasBusinessLedger.Infrastructure/Calendar/GoogleCalendarCredentialFactory.cs`
+    - `src/ElenasBusinessLedger.App/Services/GoogleCalendarClientFactory.cs`
+    - `src/ElenasBusinessLedger.App/Services/CoreAppSettingsService.cs`
+    - `src/ElenasBusinessLedger.App/Services/ConfiguredGoogleCalendarGateway.cs`
+    - `src/ElenasBusinessLedger.App/AssemblyInfo.cs`
     - focused OAuth/app-service tests
   - Summary: Added legacy escaped token-file fallback/migration, saved-token Calendar service creation, non-interactive startup client creation, and explicit interactive Settings Connect behavior.
-  - Tests/verification run: `dotnet test MySmallBusinessLedger.sln --filter "FullyQualifiedName~GoogleCalendarGatewayTests|FullyQualifiedName~GoogleCalendarClientFactoryTests|FullyQualifiedName~AppServiceTests" -nodeReuse:false`
+  - Tests/verification run: `dotnet test ElenasBusinessLedger.sln --filter "FullyQualifiedName~GoogleCalendarGatewayTests|FullyQualifiedName~GoogleCalendarClientFactoryTests|FullyQualifiedName~AppServiceTests" -nodeReuse:false`
   - Results: Passed, 30/30.
   - Deviations: None.
   - Risks/open questions: Full solution verification still pending.
@@ -358,8 +358,8 @@ Cleanup/reset instructions:
     - `.ai/implementation-plans/active/2026-06-27-google-oauth-startup-token-reuse.md`
   - Summary: Recorded full build/test verification after OAuth startup/token reuse implementation.
   - Tests/verification run:
-    - `dotnet build MySmallBusinessLedger.sln -nodeReuse:false`
-    - `dotnet test MySmallBusinessLedger.sln -nodeReuse:false`
+    - `dotnet build ElenasBusinessLedger.sln -nodeReuse:false`
+    - `dotnet test ElenasBusinessLedger.sln -nodeReuse:false`
   - Results:
     - Build passed with 0 warnings and 0 errors.
     - Tests passed, 341/341.

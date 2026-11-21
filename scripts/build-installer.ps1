@@ -7,11 +7,11 @@ param(
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$projectPath = Join-Path $repoRoot "src\MySmallBusinessLedger.App\MySmallBusinessLedger.App.csproj"
-$innoScriptPath = Join-Path $repoRoot "installer\MySmallBusinessLedger.iss"
-$publishDir = Join-Path $repoRoot "artifacts\publish\MySmallBusinessLedger\$Runtime"
+$projectPath = Join-Path $repoRoot "src\ElenasBusinessLedger.App\ElenasBusinessLedger.App.csproj"
+$innoScriptPath = Join-Path $repoRoot "installer\ElenasBusinessLedger.iss"
+$publishDir = Join-Path $repoRoot "artifacts\publish\ElenasBusinessLedger\$Runtime"
 $installerDir = Join-Path $repoRoot "artifacts\installer"
-$installerFileName = "MySmallBusinessLedger-1.31.0-Setup.exe"
+$installerFileName = "ElenasBusinessLedger-1.31.0-Setup.exe"
 $installerPath = Join-Path $installerDir $installerFileName
 
 if (-not (Test-Path -LiteralPath $InnoSetupCompiler)) {

@@ -11,7 +11,7 @@
 *.sln.docstates
 
 # Local Google OAuth Desktop client configuration. Commit the template only.
-src/MySmallBusinessLedger.App/Configuration/google-oauth-client.json
+src/ElenasBusinessLedger.App/Configuration/google-oauth-client.json
 
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs

@@ -3,7 +3,7 @@
 Status: Implemented; awaiting manual WPF smoke test
 Created: 2026-06-27
 Last updated: 2026-06-27
-Owner/context: Ruben / My Small Business Ledger WPF UI review follow-up
+Owner/context: Ruben / Elena's Business Ledger WPF UI review follow-up
 
 ## Related Docs And Standards
 
@@ -77,19 +77,19 @@ Fix the UI review findings around invoice preview async truthfulness, stale less
 
 ## Affected Files, Projects, Commands, Docs, Schemas, Or Artifacts
 
-- `src/MySmallBusinessLedger.App/ViewModels/InvoicePreviewViewModel.cs`
-- `src/MySmallBusinessLedger.App/Views/InvoicePreviewView.xaml`
-- `src/MySmallBusinessLedger.App/Views/InvoicePreviewView.xaml.cs`
-- `src/MySmallBusinessLedger.App/Services/InvoiceWorkflowWindowLauncher.cs`
-- `src/MySmallBusinessLedger.App/ViewModels/MainWindowViewModel.cs`
-- `src/MySmallBusinessLedger.App/ViewModels/PlanCatalogViewModel.cs`
-- `src/MySmallBusinessLedger.App/Views/PlanCatalogView.xaml.cs`
-- `src/MySmallBusinessLedger.App/Services/IPlanCatalogInteractionService.cs`
-- `src/MySmallBusinessLedger.App/Services/MessageBoxPlanCatalogInteractionService.cs`
-- `src/MySmallBusinessLedger.App/Services/DiscardPlanCatalogInteractionService.cs`
+- `src/ElenasBusinessLedger.App/ViewModels/InvoicePreviewViewModel.cs`
+- `src/ElenasBusinessLedger.App/Views/InvoicePreviewView.xaml`
+- `src/ElenasBusinessLedger.App/Views/InvoicePreviewView.xaml.cs`
+- `src/ElenasBusinessLedger.App/Services/InvoiceWorkflowWindowLauncher.cs`
+- `src/ElenasBusinessLedger.App/ViewModels/MainWindowViewModel.cs`
+- `src/ElenasBusinessLedger.App/ViewModels/PlanCatalogViewModel.cs`
+- `src/ElenasBusinessLedger.App/Views/PlanCatalogView.xaml.cs`
+- `src/ElenasBusinessLedger.App/Services/IPlanCatalogInteractionService.cs`
+- `src/ElenasBusinessLedger.App/Services/MessageBoxPlanCatalogInteractionService.cs`
+- `src/ElenasBusinessLedger.App/Services/DiscardPlanCatalogInteractionService.cs`
 - Relevant App ViewModel/WPF tests
 - `.ai/context/HANDOFF.md`
-- `.ai/implementation-plans/active/2026-06-23-populate-calendar-from-student-schedule.md`
+- `.ai/implementation-plans/completed/2026-06-23-populate-calendar-from-student-schedule.md`
 
 ## Risks And Mitigations
 
@@ -122,7 +122,7 @@ Tests to add/update:
 Verification commands:
 
 ```powershell
-dotnet test MySmallBusinessLedger.sln --filter "InvoiceViewModelTests|MainWindowViewModelTests|PlanCatalogViewModelTests" -nodeReuse:false
+dotnet test ElenasBusinessLedger.sln --filter "InvoiceViewModelTests|MainWindowViewModelTests|PlanCatalogViewModelTests" -nodeReuse:false
 ```
 
 Runner may continue automatically after this stage: yes.
@@ -164,8 +164,8 @@ Goal: Run focused and full verification and inspect the final diff for scope/sta
 Verification commands:
 
 ```powershell
-dotnet build MySmallBusinessLedger.sln -nodeReuse:false
-dotnet test MySmallBusinessLedger.sln -nodeReuse:false
+dotnet build ElenasBusinessLedger.sln -nodeReuse:false
+dotnet test ElenasBusinessLedger.sln -nodeReuse:false
 ```
 
 Runner may continue automatically after this stage: no. Blocking action required: user review/manual WPF smoke.
@@ -230,9 +230,9 @@ Cleanup/reset instructions:
   - Risks/open questions: Real printer hang behavior still needs manual smoke testing.
 - 2026-06-27:
   - Stage: Stages 1-3 - Regression tests, UI behavior fixes, and documentation refresh
-  - Files changed: `README.md`, `docs/business-requirements-and-logic.md`, `.ai/project-profile.md`, `.ai/context/HANDOFF.md`, `.ai/implementation-plans/active/2026-06-23-populate-calendar-from-student-schedule.md`, `src/MySmallBusinessLedger.App/Services/IPlanCatalogInteractionService.cs`, `src/MySmallBusinessLedger.App/Services/DiscardPlanCatalogInteractionService.cs`, `src/MySmallBusinessLedger.App/Services/MessageBoxPlanCatalogInteractionService.cs`, `src/MySmallBusinessLedger.App/Services/InvoiceWorkflowWindowLauncher.cs`, `src/MySmallBusinessLedger.App/ViewModels/InvoiceLineDisplayModel.cs`, `src/MySmallBusinessLedger.App/ViewModels/InvoicePreviewViewModel.cs`, `src/MySmallBusinessLedger.App/ViewModels/MainWindowViewModel.cs`, `src/MySmallBusinessLedger.App/ViewModels/PlanCatalogViewModel.cs`, `src/MySmallBusinessLedger.App/Views/InvoicePreviewView.xaml`, `src/MySmallBusinessLedger.App/Views/InvoicePreviewView.xaml.cs`, `src/MySmallBusinessLedger.App/Views/PlanCatalogView.xaml.cs`, `tests/MySmallBusinessLedger.Tests/App/ViewModels/InvoiceViewModelTests.cs`, `tests/MySmallBusinessLedger.Tests/App/ViewModels/MainWindowViewModelTests.cs`, and `tests/MySmallBusinessLedger.Tests/App/ViewModels/PlanCatalogViewModelTests.cs`
+  - Files changed: `README.md`, `docs/business-requirements-and-logic.md`, `.ai/project-profile.md`, `.ai/context/HANDOFF.md`, `.ai/implementation-plans/active/2026-06-23-populate-calendar-from-student-schedule.md`, `src/ElenasBusinessLedger.App/Services/IPlanCatalogInteractionService.cs`, `src/ElenasBusinessLedger.App/Services/DiscardPlanCatalogInteractionService.cs`, `src/ElenasBusinessLedger.App/Services/MessageBoxPlanCatalogInteractionService.cs`, `src/ElenasBusinessLedger.App/Services/InvoiceWorkflowWindowLauncher.cs`, `src/ElenasBusinessLedger.App/ViewModels/InvoiceLineDisplayModel.cs`, `src/ElenasBusinessLedger.App/ViewModels/InvoicePreviewViewModel.cs`, `src/ElenasBusinessLedger.App/ViewModels/MainWindowViewModel.cs`, `src/ElenasBusinessLedger.App/ViewModels/PlanCatalogViewModel.cs`, `src/ElenasBusinessLedger.App/Views/InvoicePreviewView.xaml`, `src/ElenasBusinessLedger.App/Views/InvoicePreviewView.xaml.cs`, `src/ElenasBusinessLedger.App/Views/PlanCatalogView.xaml.cs`, `tests/ElenasBusinessLedger.Tests/App/ViewModels/InvoiceViewModelTests.cs`, `tests/ElenasBusinessLedger.Tests/App/ViewModels/MainWindowViewModelTests.cs`, and `tests/ElenasBusinessLedger.Tests/App/ViewModels/PlanCatalogViewModelTests.cs`
   - Summary: Added invoice-preview busy close protection and extended-wait prompt, latest-wins lesson plan save handling, Manage Plans close save/discard/cancel prompting, row-specific invoice include checkbox automation names, Add Lesson active-plan prerequisite messaging, and Populate Calendar documentation correction for past-month backfill.
-  - Tests/verification run: `dotnet test MySmallBusinessLedger.sln --filter "InvoiceViewModelTests|MainWindowViewModelTests|PlanCatalogViewModelTests" -nodeReuse:false`
+  - Tests/verification run: `dotnet test ElenasBusinessLedger.sln --filter "InvoiceViewModelTests|MainWindowViewModelTests|PlanCatalogViewModelTests" -nodeReuse:false`
   - Results: Focused slice passed 114/114.
   - Deviations: Removed one WPF close automation test because it hit the shared window-placement file lock; the close-preparation behavior is covered by ViewModel tests and the view wiring mirrors the existing Student Overview closing pattern.
   - Risks/open questions: Real printer hang/wait-prompt feel still needs manual WPF smoke testing with a safe printer/test invoice.
@@ -240,7 +240,7 @@ Cleanup/reset instructions:
   - Stage: Stage 4 - Verification and review
   - Files changed: `.ai/implementation-plans/active/2026-06-27-ui-review-fixes.md`
   - Summary: Ran fresh focused/full verification after implementing the UI review fixes and documentation refresh.
-  - Tests/verification run: `dotnet build MySmallBusinessLedger.sln -nodeReuse:false`; `dotnet test MySmallBusinessLedger.sln -nodeReuse:false`
+  - Tests/verification run: `dotnet build ElenasBusinessLedger.sln -nodeReuse:false`; `dotnet test ElenasBusinessLedger.sln -nodeReuse:false`
   - Results: Build passed with 0 warnings and 0 errors; full test suite passed 333/333.
   - Deviations: Manual WPF smoke testing is still needed for the real printer wait prompt and close/cancel feel.
   - Risks/open questions: The invoice issue/print operation is intentionally not cancellable from the preview; the prompt keeps the UI responsive and truthful while waiting.

@@ -2,12 +2,14 @@
 
 ## Project identity
 
-Working name: My Small Business Ledger
+Working name: Elena's Business Ledger
+
+A Windows app for managing student lessons, invoices, and payments.
 
 Current app version: 1.31
 
 Internal namespace/project prefix:
-MySmallBusinessLedger
+ElenasBusinessLedger
 
 ## Target framework and platform
 
@@ -15,17 +17,17 @@ Target framework: .NET 11. IDE builds require Visual Studio 18.12 or later.
 Platform: Windows desktop
 UI: WPF
 Architecture: local-first desktop app
-Installer/distribution: single-file Inno Setup installer with a self-contained .NET 11 build for Windows x64. The `scripts\build-installer.ps1` script creates `artifacts\installer\MySmallBusinessLedger-1.31.0-Setup.exe`. The per-user installer installs to `%LOCALAPPDATA%\Programs\MySmallBusinessLedger`, creates a Start menu shortcut, offers an optional desktop shortcut, has no auto-update behavior, and must preserve `%APPDATA%\visualtech.dk\MySmallBusinessLedger` during install, replacement, and uninstall.
+Installer/distribution: single-file Inno Setup installer with a self-contained .NET 11 build for Windows x64. The `scripts\build-installer.ps1` script creates `artifacts\installer\ElenasBusinessLedger-1.31.0-Setup.exe`. The per-user installer installs to `%LOCALAPPDATA%\Programs\MySmallBusinessLedger`, creates a Start menu shortcut, offers an optional desktop shortcut, has no auto-update behavior, and must preserve `%APPDATA%\visualtech.dk\MySmallBusinessLedger` during install, replacement, and uninstall.
 
 ## Solution shape
 
 src/
-  MySmallBusinessLedger.App
-  MySmallBusinessLedger.Core
-  MySmallBusinessLedger.Infrastructure
+  ElenasBusinessLedger.App
+  ElenasBusinessLedger.Core
+  ElenasBusinessLedger.Infrastructure
 
 tests/
-  MySmallBusinessLedger.Tests
+  ElenasBusinessLedger.Tests
 
 ## Persistence and storage
 
@@ -47,7 +49,7 @@ Google Calendar selected calendar/account label: stored in SQLite app settings; 
 Runtime app data folder: `%APPDATA%\visualtech.dk\MySmallBusinessLedger`
 Runtime SQLite database path: `%APPDATA%\visualtech.dk\MySmallBusinessLedger\ledger.db`
 Runtime startup/composition: `App.xaml.cs` delegates database migration, service graph creation, startup jobs, and main-window construction to App-layer startup/bootstrapper classes
-Publisher Google OAuth Desktop client configuration: local/release file `src\MySmallBusinessLedger.App\Configuration\google-oauth-client.json`, copied to app output under `Configuration\google-oauth-client.json` when present; the real file is ignored by Git and the committed template is `src\MySmallBusinessLedger.App\Configuration\google-oauth-client.template.json`
+Publisher Google OAuth Desktop client configuration: local/release file `src\ElenasBusinessLedger.App\Configuration\google-oauth-client.json`, copied to app output under `Configuration\google-oauth-client.json` when present; the real file is ignored by Git and the committed template is `src\ElenasBusinessLedger.App\Configuration\google-oauth-client.template.json`
 Google OAuth protected token folder: `%APPDATA%\visualtech.dk\MySmallBusinessLedger\GoogleTokens`
 Window placement file path: `%APPDATA%\visualtech.dk\MySmallBusinessLedger\window-placement.json`
 Grid column width file path: `%APPDATA%\visualtech.dk\MySmallBusinessLedger\grid-column-widths.json`
@@ -73,7 +75,7 @@ WPF + MVVM
 No business logic in code-behind
 Danish user-facing invoice text
 My-facing UI must stay simple
-Company profile, two-line company address entry, bank/MobilePay accounts, invoice folder with typed or folder-picker selection, invoice printer with remembered selector/typed value/clear action, invoice payment instructions selected from `Betales ved modtagelse`, `8 dage fra fakturadato`, `30 dage fra fakturadato`, or custom text, Google calendar/account label, Google sign-in app status, local Google authorization status, connect/reconnect controls, read-only app data/database paths, the durable first application-backed invoice month, and session-only Admin Mode for Economy Overview manual editing are configured or shown from `Application > Settings`; Admin Mode starts unchecked on each application startup and must be explicitly saved for the current session before Economy Overview allows manual month edits; first application-backed invoice month input is normalized to the first day of the selected month; the Google calendar defaults to `primary`; `Application > About My Small Business Ledger` shows the app name and current version from assembly metadata
+Company profile, two-line company address entry, bank/MobilePay accounts, invoice folder with typed or folder-picker selection, invoice printer with remembered selector/typed value/clear action, invoice payment instructions selected from `Betales ved modtagelse`, `8 dage fra fakturadato`, `30 dage fra fakturadato`, or custom text, Google calendar/account label, Google sign-in app status, local Google authorization status, connect/reconnect controls, read-only app data/database paths, the durable first application-backed invoice month, and session-only Admin Mode for Economy Overview manual editing are configured or shown from `Application > Settings`; Admin Mode starts unchecked on each application startup and must be explicitly saved for the current session before Economy Overview allows manual month edits; first application-backed invoice month input is normalized to the first day of the selected month; the Google calendar defaults to `primary`; `Application > About Elena's Business Ledger` shows the app name and current version from assembly metadata
 Student editor uses two stacked address fields and stores them as one multiline student address value.
 Student management is available from `Student > Manage Students`; it opens a Students list window plus a separate Student Details window that share the same selected-student state. The main window `Student Details` button opens the same details window for the currently displayed student. The list window shows active and inactive students and `Add student`; the fixed-size details window shows selected-student fields, current assigned plan, plan assignment, schedule, and invoices. Selecting a student in the list updates the details window immediately, Save remains in the details window, Close prompts to save/discard/cancel when unsaved edits exist, invoice double-click opens the existing viewer, selection mirrors into the main window immediately and on close, and `Student.IsActive` changes persist only when the details editor is saved.
 Main-window `Add Lesson` defaults to today in the current month or the first day of another displayed month. It uses the student's first saved slot for the weekday or the first saved slot overall, and the assigned plan in effect on the draft date when it is selectable. A draft with a valid date and plan saves on that click, with selection restored by the created calendar event id. If a plan is unavailable for the date, selecting an Active plan saves the draft. If no Active plan exists, the window shows `Create or publish an active plan first.` Rows without a known time are written as all-day Google Calendar events. Incomplete draft rows must survive automatic refreshes. Main lesson row time selectors offer a no-time option plus 08:00 through 20:00 in 15-minute increments while still allowing typed time input. Reconciled uninvoiced lesson rows show an editable Plan dropdown. Rapid plan changes preserve the final selected plan, and invoiced lesson plans are locked.
@@ -85,8 +87,8 @@ Resizable desktop windows must remember size and position, including subwindows,
 ## Build and test commands
 
 ```powershell
-dotnet build MySmallBusinessLedger.sln -nodeReuse:false
-dotnet test MySmallBusinessLedger.sln -nodeReuse:false
+dotnet build ElenasBusinessLedger.sln -nodeReuse:false
+dotnet test ElenasBusinessLedger.sln -nodeReuse:false
 powershell -ExecutionPolicy Bypass -File scripts\build-installer.ps1
 ```
 

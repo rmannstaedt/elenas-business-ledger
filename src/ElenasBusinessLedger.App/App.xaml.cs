@@ -1,0 +1,40 @@
+using System.Windows;
+using ElenasBusinessLedger.App.Startup;
+
+namespace ElenasBusinessLedger.App;
+
+public partial class App : Application
+{
+    protected override async void OnStartup(StartupEventArgs e)
+    {
+        base.OnStartup(e);
+
+        ApplicationStartupResult startupResult;
+        try
+        {
+            startupResult = await new ApplicationBootstrapper().StartAsync(CancellationToken.None);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(
+                ex.Message,
+                "Application startup failed",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+            Shutdown(1);
+            return;
+        }
+
+        foreach (var warning in startupResult.Warnings)
+        {
+            MessageBox.Show(
+                warning.Message,
+                warning.Title,
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+        }
+
+        MainWindow = startupResult.MainWindow;
+        startupResult.MainWindow.Show();
+    }
+}
