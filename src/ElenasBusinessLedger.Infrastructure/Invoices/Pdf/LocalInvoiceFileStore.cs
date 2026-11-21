@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Security.Cryptography;
 using System.Text;
 using ElenasBusinessLedger.Core.Common;
 using ElenasBusinessLedger.Core.Invoices;
@@ -71,34 +72,76 @@ public sealed class LocalInvoiceFileStore : IInvoiceFileStore
         return OperationResult<string>.Success(stagingPath);
     }
 
-    public Task<OperationResult<string>> PublishAsync(
-        string stagingPath,
-        InvoiceDraft draft,
-        InvoiceNumber invoiceNumber,
-        CancellationToken cancellationToken)
+    public async Task<OperationResult<InvoicePdfPublication>> PreparePublicationAsync(
+        string stagingPath, InvoiceDraft draft, InvoiceNumber invoiceNumber, CancellationToken cancellationToken)
     {
-        if (!File.Exists(stagingPath))
-        {
-            return Task.FromResult(Failure("InvoicePdf.StagedFileMissing", "The staged invoice PDF was not found."));
-        }
-
         try
         {
-            Directory.CreateDirectory(invoiceFolderPath);
             var finalPath = Path.Combine(invoiceFolderPath, CreateFinalFileName(draft, invoiceNumber));
+            var checksum = await ReadChecksumAsync(stagingPath, cancellationToken);
+            return OperationResult<InvoicePdfPublication>.Success(new InvoicePdfPublication(stagingPath, finalPath, checksum));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return OperationResult<InvoicePdfPublication>.Failure(
+                new ValidationError("InvoicePdf.PrepareFailed", "Could not read the staged invoice PDF for publication."));
+        }
+    }
 
-            if (File.Exists(finalPath))
+    public async Task<OperationResult<string>> CompletePublicationAsync(
+        InvoicePdfPublication publication, CancellationToken cancellationToken)
+    {
+        var (stagedPath, finalPath, checksum) = publication;
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var finalDirectory = Path.GetDirectoryName(finalPath);
+            if (!Path.IsPathFullyQualified(stagedPath) || !Path.IsPathFullyQualified(finalPath) ||
+                finalDirectory is null ||
+                !string.Equals(Path.GetDirectoryName(stagedPath), Path.Combine(finalDirectory, ".staging"),
+                    StringComparison.OrdinalIgnoreCase))
             {
-                return Task.FromResult(Failure("InvoicePdf.FinalFileAlreadyExists", "An invoice PDF with the same final file name already exists."));
+                return Failure("InvoicePdf.InvalidPublicationPaths", "The saved invoice PDF paths are invalid.");
             }
 
-            File.Move(stagingPath, finalPath, overwrite: false);
-            return Task.FromResult(OperationResult<string>.Success(finalPath));
+            if (!File.Exists(finalPath))
+            {
+                if (!File.Exists(stagedPath))
+                {
+                    return Failure("InvoicePdf.StagedFileMissing", "The saved invoice PDF is missing from both invoice folders.");
+                }
+
+                if (!string.Equals(await ReadChecksumAsync(stagedPath, cancellationToken), checksum, StringComparison.Ordinal))
+                {
+                    return Failure("InvoicePdf.StagedFileChanged", "The staged invoice PDF differs from the saved checkpoint.");
+                }
+
+                try
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    File.Move(stagedPath, finalPath, overwrite: false);
+                }
+                catch (IOException) when (File.Exists(finalPath))
+                {
+                    // Another retry may have promoted this same staged file.
+                }
+            }
+
+            return string.Equals(await ReadChecksumAsync(finalPath, cancellationToken), checksum, StringComparison.Ordinal)
+                ? OperationResult<string>.Success(finalPath)
+                : Failure("InvoicePdf.FinalFileAlreadyExists",
+                    "A different invoice PDF already occupies the saved destination. Review the existing file before retrying.");
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            return Task.FromResult(Failure("InvoicePdf.PublishFailed", "Could not publish the invoice PDF to the invoice folder."));
+            return Failure("InvoicePdf.PublishFailed", "Could not publish or verify the saved invoice PDF.");
         }
+    }
+
+    private static async Task<string> ReadChecksumAsync(string path, CancellationToken cancellationToken)
+    {
+        await using var stream = File.OpenRead(path);
+        return Convert.ToHexString(await SHA256.HashDataAsync(stream, cancellationToken));
     }
 
     public Task<OperationResult<string>> DiscardStagingPathAsync(string stagingPath, CancellationToken cancellationToken)

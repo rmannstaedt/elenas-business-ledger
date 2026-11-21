@@ -32,7 +32,8 @@ public sealed class IssueInvoiceUseCase
 
     public async Task<OperationResult<IssueInvoiceResult>> ExecuteAsync(
         InvoiceDraft draft,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Func<PendingInvoiceRecovery, CancellationToken, Task<InvoiceRecoveryChoice>>? chooseRecovery = null)
     {
         var lessonIds = draft.Lines
             .Select(line => line.LessonId)
@@ -55,53 +56,40 @@ public sealed class IssueInvoiceUseCase
             return OperationResult<IssueInvoiceResult>.Failure(reserve.Errors.ToArray());
         }
 
-        var invoiceNumber = reserve.Value!.InvoiceNumber;
-        var publishedPath = reserve.Value.PdfFilePath;
-
-        if (string.IsNullOrWhiteSpace(publishedPath))
+        var savedInvoice = reserve.Value!;
+        if (savedInvoice.SnapshotRevision is null || !MatchesSnapshot(savedInvoice, draft, totals))
         {
-            var stagingPath = await fileStore.CreateStagingPathAsync(draft, invoiceNumber, cancellationToken);
-            if (!stagingPath.Succeeded)
+            var recovery = await ResolvePendingInvoiceAsync(savedInvoice, draft, totals, chooseRecovery, cancellationToken);
+            if (!recovery.Succeeded)
             {
-                return await ReleaseReservationAndFailAsync(invoiceNumber, stagingPath.Errors.ToArray(), cancellationToken);
+                return OperationResult<IssueInvoiceResult>.Failure(recovery.Errors.ToArray());
             }
 
-            var write = await pdfWriter.WriteAsync(draft, totals, invoiceNumber, stagingPath.Value!, cancellationToken);
-            if (!write.Succeeded)
+            savedInvoice = recovery.Value!;
+        }
+
+        if (savedInvoice.Publication is null)
+        {
+            var prepare = await PreparePublicationAsync(savedInvoice, cancellationToken);
+            if (!prepare.Succeeded)
             {
-                return await DiscardStagingReleaseReservationAndFailAsync(
-                    invoiceNumber,
-                    stagingPath.Value!,
-                    write.Errors.ToArray(),
-                    cancellationToken);
+                return OperationResult<IssueInvoiceResult>.Failure(prepare.Errors.ToArray());
             }
 
-            var verify = await fileStore.VerifyStagedPdfAsync(stagingPath.Value!, cancellationToken);
-            if (!verify.Succeeded)
-            {
-                return await DiscardStagingReleaseReservationAndFailAsync(
-                    invoiceNumber,
-                    stagingPath.Value!,
-                    verify.Errors.ToArray(),
-                    cancellationToken);
-            }
+            savedInvoice = prepare.Value!;
+        }
 
-            var publish = await fileStore.PublishAsync(stagingPath.Value!, draft, invoiceNumber, cancellationToken);
-            if (!publish.Succeeded)
-            {
-                return await DiscardStagingMaybeReleaseReservationAndFailAsync(
-                    invoiceNumber,
-                    stagingPath.Value!,
-                    publish.Errors.ToArray(),
-                    releaseReservation: ShouldReleaseReservationAfterPublishFailure(publish.Errors),
-                    cancellationToken);
-            }
+        var publication = await fileStore.CompletePublicationAsync(savedInvoice.Publication!, cancellationToken);
+        if (!publication.Succeeded)
+        {
+            return OperationResult<IssueInvoiceResult>.Failure(publication.Errors.ToArray());
+        }
 
-            publishedPath = publish.Value!;
-            var markPublished = await invoiceRepository.MarkInvoicePdfPublishedAsync(
-                invoiceNumber,
-                publishedPath,
-                cancellationToken);
+        var invoiceNumber = savedInvoice.InvoiceNumber;
+        var publishedPath = publication.Value!;
+        if (savedInvoice.PdfFilePath is null)
+        {
+            var markPublished = await invoiceRepository.MarkInvoicePdfPublishedAsync(invoiceNumber, publishedPath, cancellationToken);
             if (!markPublished.Succeeded)
             {
                 return OperationResult<IssueInvoiceResult>.Failure(markPublished.Errors.ToArray());
@@ -141,50 +129,109 @@ public sealed class IssueInvoiceUseCase
             print.Errors));
     }
 
-    private async Task<OperationResult<IssueInvoiceResult>> ReleaseReservationAndFailAsync(
-        InvoiceNumber invoiceNumber,
-        IReadOnlyList<ValidationError> errors,
+    private async Task<OperationResult<IssuedInvoice>> ResolvePendingInvoiceAsync(
+        IssuedInvoice savedInvoice,
+        InvoiceDraft requestedDraft,
+        InvoiceTotals requestedTotals,
+        Func<PendingInvoiceRecovery, CancellationToken, Task<InvoiceRecoveryChoice>>? chooseRecovery,
         CancellationToken cancellationToken)
     {
-        await invoiceRepository.ReleaseInvoiceReservationAsync(invoiceNumber, cancellationToken);
-        return OperationResult<IssueInvoiceResult>.Failure(errors.ToArray());
-    }
-
-    private async Task<OperationResult<IssueInvoiceResult>> DiscardStagingReleaseReservationAndFailAsync(
-        InvoiceNumber invoiceNumber,
-        string stagingPath,
-        IReadOnlyList<ValidationError> errors,
-        CancellationToken cancellationToken)
-    {
-        return await DiscardStagingMaybeReleaseReservationAndFailAsync(
-            invoiceNumber,
-            stagingPath,
-            errors,
-            releaseReservation: true,
-            cancellationToken);
-    }
-
-    private async Task<OperationResult<IssueInvoiceResult>> DiscardStagingMaybeReleaseReservationAndFailAsync(
-        InvoiceNumber invoiceNumber,
-        string stagingPath,
-        IReadOnlyList<ValidationError> errors,
-        bool releaseReservation,
-        CancellationToken cancellationToken)
-    {
-        var discard = await fileStore.DiscardStagingPathAsync(stagingPath, cancellationToken);
-        if (releaseReservation)
+        var legacy = savedInvoice.SnapshotRevision is null;
+        if (legacy && savedInvoice.PdfFilePath is not null)
         {
-            await invoiceRepository.ReleaseInvoiceReservationAsync(invoiceNumber, cancellationToken);
+            return OperationResult<IssuedInvoice>.Failure(new ValidationError(
+                "Invoice.LegacyPdfNeedsReview",
+                $"Pending invoice {savedInvoice.InvoiceNumber} has an older PDF at '{savedInvoice.PdfFilePath}'. Review that PDF and its saved totals before issuing a replacement."));
         }
 
-        if (discard.Succeeded)
+        var canRevise = savedInvoice.Publication is null && savedInvoice.PdfFilePath is null;
+        var choice = chooseRecovery is null
+            ? InvoiceRecoveryChoice.Cancel
+            : await chooseRecovery(new PendingInvoiceRecovery(savedInvoice, requestedDraft, requestedTotals, canRevise), cancellationToken);
+
+        if (choice == InvoiceRecoveryChoice.Resume && !legacy)
         {
-            return OperationResult<IssueInvoiceResult>.Failure(errors.ToArray());
+            return OperationResult<IssuedInvoice>.Success(savedInvoice);
         }
 
-        return OperationResult<IssueInvoiceResult>.Failure(errors.Concat(discard.Errors).ToArray());
+        if (choice == InvoiceRecoveryChoice.Revise && canRevise)
+        {
+            return await invoiceRepository.ReviseInvoiceReservationAsync(
+                savedInvoice, requestedDraft, requestedTotals, cancellationToken);
+        }
+
+        return OperationResult<IssuedInvoice>.Failure(new ValidationError(
+            "Invoice.PendingRecoveryCancelled", $"Pending invoice {savedInvoice.InvoiceNumber} was left as saved."));
     }
 
-    private static bool ShouldReleaseReservationAfterPublishFailure(IEnumerable<ValidationError> errors) =>
-        !errors.Any(error => string.Equals(error.Code, "InvoicePdf.FinalFileAlreadyExists", StringComparison.Ordinal));
+    private async Task<OperationResult<IssuedInvoice>> PreparePublicationAsync(
+        IssuedInvoice savedInvoice, CancellationToken cancellationToken)
+    {
+        var draft = savedInvoice.CreateSavedDraft();
+        var number = savedInvoice.InvoiceNumber;
+        var staging = await fileStore.CreateStagingPathAsync(draft, number, cancellationToken);
+        if (!staging.Succeeded)
+        {
+            await invoiceRepository.ReleaseInvoiceReservationAsync(number, cancellationToken, savedInvoice.SnapshotRevision);
+            return OperationResult<IssuedInvoice>.Failure(staging.Errors.ToArray());
+        }
+
+        var path = staging.Value!;
+        var write = await pdfWriter.WriteAsync(draft, savedInvoice.Totals, number, path, cancellationToken);
+        if (!write.Succeeded)
+        {
+            return await DiscardFailedStagingAsync(savedInvoice, path, write.Errors, cancellationToken);
+        }
+
+        var verify = await fileStore.VerifyStagedPdfAsync(path, cancellationToken);
+        if (!verify.Succeeded)
+        {
+            return await DiscardFailedStagingAsync(savedInvoice, path, verify.Errors, cancellationToken);
+        }
+
+        var prepare = await fileStore.PreparePublicationAsync(path, draft, number, cancellationToken);
+        if (!prepare.Succeeded)
+        {
+            return await DiscardFailedStagingAsync(savedInvoice, path, prepare.Errors, cancellationToken);
+        }
+
+        var checkpoint = await invoiceRepository.PrepareInvoicePublicationAsync(
+            savedInvoice, prepare.Value!, cancellationToken);
+        if (!checkpoint.Succeeded)
+        {
+            var discard = await fileStore.DiscardStagingPathAsync(path, cancellationToken);
+            return OperationResult<IssuedInvoice>.Failure(checkpoint.Errors.Concat(discard.Errors).ToArray());
+        }
+
+        return checkpoint;
+    }
+
+    private async Task<OperationResult<IssuedInvoice>> DiscardFailedStagingAsync(
+        IssuedInvoice savedInvoice, string path, IReadOnlyList<ValidationError> errors, CancellationToken cancellationToken)
+    {
+        var discard = await fileStore.DiscardStagingPathAsync(path, cancellationToken);
+        await invoiceRepository.ReleaseInvoiceReservationAsync(
+            savedInvoice.InvoiceNumber, cancellationToken, savedInvoice.SnapshotRevision);
+        return OperationResult<IssuedInvoice>.Failure(errors.Concat(discard.Errors).ToArray());
+    }
+
+    private static bool MatchesSnapshot(IssuedInvoice saved, InvoiceDraft draft, InvoiceTotals totals)
+    {
+        if (saved.InvoiceDate != draft.InvoiceDate || saved.Period != draft.Period ||
+            saved.Company != draft.Company ||
+            saved.Student != (draft.Student with { StudentId = draft.Student.StudentId ?? saved.Student.StudentId }) ||
+            saved.PriceAdjustment != draft.PriceAdjustment || saved.Totals != totals ||
+            saved.Lines.Count != draft.Lines.Count)
+        {
+            return false;
+        }
+
+        return saved.Lines.OrderBy(line => line.LessonId).Zip(draft.Lines.OrderBy(line => line.LessonId))
+            .All(pair => pair.First.LessonId == pair.Second.LessonId &&
+                pair.First.LessonDateTime.EqualsExact(pair.Second.LessonDateTime) &&
+                pair.First.HasKnownLessonTime == pair.Second.HasKnownLessonTime &&
+                pair.First.PlanCatalogId == pair.Second.PlanCatalogId &&
+                pair.First.PlanName == pair.Second.PlanName &&
+                pair.First.PriceWithoutVat == pair.Second.PriceWithoutVat);
+    }
 }

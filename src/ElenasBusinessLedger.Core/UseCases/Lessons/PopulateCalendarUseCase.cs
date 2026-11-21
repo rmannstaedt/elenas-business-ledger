@@ -50,9 +50,15 @@ public sealed class PopulateCalendarUseCase
         var lastOfDisplayMonth = firstOfDisplayMonth.AddMonths(1).AddDays(-1);
         var existingLessons = await calendarGateway.ListLessonsAsync(firstOfDisplayMonth, lastOfDisplayMonth, cancellationToken);
         var localLessons = await lessonRepository.ListForStudentMonthAsync(studentShortName, firstOfDisplayMonth, cancellationToken);
+        var linkedLessons = await lessonRepository.ListByGoogleCalendarEventIdsAsync(
+            existingLessons.Select(lesson => lesson.Id).Distinct(StringComparer.Ordinal).ToArray(),
+            cancellationToken);
+        var ownersByEventId = linkedLessons.ToDictionary(lesson => lesson.GoogleCalendarEventId!, lesson => lesson.StudentId);
         var existingStarts = existingLessons
             .Where(lesson => lesson.HasKnownStartTime &&
-                string.Equals(lesson.StudentShortName, studentShortName, StringComparison.OrdinalIgnoreCase))
+                (ownersByEventId.TryGetValue(lesson.Id, out var ownerId)
+                    ? ownerId == student.Id
+                    : string.Equals(lesson.StudentShortName, studentShortName, StringComparison.OrdinalIgnoreCase)))
             .Select(lesson => lesson.StartsAt)
             .Concat(localLessons
                 .Where(lesson => lesson.StudentId == student.Id && lesson.InvoiceNumber is not null && lesson.HasKnownStartTime)

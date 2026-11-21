@@ -2,6 +2,7 @@ using System.Windows;
 using ElenasBusinessLedger.App.ViewModels;
 using ElenasBusinessLedger.App.Views;
 using ElenasBusinessLedger.Core.Invoices;
+using ElenasBusinessLedger.Core.UseCases.Invoices;
 
 namespace ElenasBusinessLedger.App.Services;
 
@@ -64,7 +65,8 @@ public sealed class InvoiceWorkflowWindowLauncher : IInvoiceWorkflowLauncher
             invoiceWorkflowService,
             preview.Value!,
             EnsureInvoicePrinterConfiguredAsync,
-            ConfirmContinueWaitingForInvoiceIssueAsync);
+            ConfirmContinueWaitingForInvoiceIssueAsync,
+            chooseRecovery: ChooseInvoiceRecoveryAsync);
         var previewWindow = new InvoicePreviewView(previewViewModel)
         {
             Owner = Application.Current?.MainWindow
@@ -117,6 +119,22 @@ public sealed class InvoiceWorkflowWindowLauncher : IInvoiceWorkflowLauncher
             MessageBoxResult.Yes);
 
         return Task.FromResult(result == MessageBoxResult.Yes);
+    }
+
+    private static Task<InvoiceRecoveryChoice> ChooseInvoiceRecoveryAsync(
+        PendingInvoiceRecovery recovery, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var dialog = new InvoiceRecoveryDialog(recovery);
+        var owner = Application.Current?.Windows.OfType<Window>().FirstOrDefault(window => window.IsActive);
+        if (owner is not null)
+        {
+            dialog.Owner = owner;
+            dialog.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        }
+
+        dialog.ShowDialog();
+        return Task.FromResult(dialog.Choice);
     }
 
     private static void ShowWarning(string message) =>

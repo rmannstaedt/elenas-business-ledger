@@ -1,3 +1,4 @@
+using ElenasBusinessLedger.App.Services;
 using ElenasBusinessLedger.Core.Common;
 using ElenasBusinessLedger.Core.Company;
 using ElenasBusinessLedger.Core.Invoices;
@@ -6,6 +7,8 @@ using ElenasBusinessLedger.Core.Money;
 using ElenasBusinessLedger.Core.Plans;
 using ElenasBusinessLedger.Core.Ports;
 using ElenasBusinessLedger.Core.Students;
+using ElenasBusinessLedger.Core.UseCases.Invoices;
+using ElenasBusinessLedger.Infrastructure.Invoices.Pdf;
 using ElenasBusinessLedger.Infrastructure.Persistence;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -418,7 +421,48 @@ public sealed class SqlitePersistenceTests
     }
 
     [Fact]
-    public async Task ExistingInvoiceRowsMigrateWithWarningAndRemainReadable()
+    public async Task PreviousVersionUpgradeKeepsInvoiceLinesAndBackfillsStudentFromLesson()
+    {
+        using var database = await TestDatabase.CreateAsync();
+        var token = TestContext.Current.CancellationToken;
+        var invoices = new SqliteInvoiceRepository(database.CreateContext);
+        var plan = await SaveCatalogPlanAsync(new SqlitePlanCatalogRepository(database.CreateContext), "Standard");
+        var date = new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.Zero);
+        var lesson = await SaveLessonAsync(database, "Mira", plan, date);
+        var invoice = CreateIssuedInvoice("Mira", "Mira Example", "Standard", date, plan.Id, lessonId: lesson.Id);
+        Assert.True((await SaveIssuedInvoiceViaBusinessFlowAsync(invoices, invoice, token)).Succeeded);
+        await using (var previous = database.CreateContext())
+        {
+            await previous.Database.MigrateAsync("20260627232113_AddEconomyManualMonthOverrides", token);
+            await previous.Database.ExecuteSqlRawAsync(
+                """
+                DROP TABLE ArchivedInvoiceLines;
+                DELETE FROM __EFMigrationsHistory WHERE MigrationId = '20260627165900_ArchiveUnlinkedInvoiceLines';
+                """, token);
+        }
+
+        await database.MigrateAsync();
+
+        var stored = Assert.Single(await invoices.ListInvoicesForStudentAsync(lesson.StudentId, token));
+        Assert.Equal(invoice.InvoiceNumber, stored.InvoiceNumber);
+        var loaded = await invoices.GetIssuedInvoiceAsync(invoice.InvoiceNumber, token);
+        Assert.Equal(lesson.Id, Assert.Single(loaded!.Lines).LessonId);
+        var laterMonth = new DateOnly(2026, 10, 1);
+        Assert.Empty(await invoices.ListLessonStatusesAsync(laterMonth, laterMonth, token));
+        var movedStatus = Assert.Single(await invoices.ListLessonStatusesAsync(laterMonth, laterMonth, token, [lesson.Id]));
+        Assert.Equal(invoice.InvoiceNumber, movedStatus.InvoiceNumber);
+        Assert.Equal(invoice.Totals, loaded.Totals);
+
+        var backup = Assert.Single(Directory.GetFiles(Path.Combine(Path.GetDirectoryName(database.DatabasePath)!, "Backups"), "*.db"));
+        await using var backupContext = SqliteLedgerDbContextFactory.Create(backup, pooling: false)();
+        var priorMigrations = await backupContext.Database.GetAppliedMigrationsAsync(token);
+        Assert.DoesNotContain(priorMigrations, migration => migration.EndsWith("_ArchiveUnlinkedInvoiceLines", StringComparison.Ordinal));
+        Assert.DoesNotContain(priorMigrations, migration => migration.EndsWith("_LinkInvoiceStudent", StringComparison.Ordinal));
+        Assert.Equal(1, await backupContext.IssuedInvoiceLines.CountAsync(token));
+    }
+
+    [Fact]
+    public async Task ExistingInvoiceRowsMigrateWithWarningAndPreserveArchivedDetails()
     {
         using var database = await TestDatabase.CreateBaselineMigratedAsync();
         await using (var context = database.CreateContext())
@@ -491,6 +535,13 @@ public sealed class SqlitePersistenceTests
         Assert.Null(loaded.PrintedAt);
         Assert.Null(loaded.LastPrintError);
         Assert.Empty(loaded.Lines);
+        await using var archived = database.CreateContext();
+        Assert.Equal("Standard", await archived.Database
+            .SqlQueryRaw<string>("SELECT PlanName AS Value FROM ArchivedInvoiceLines WHERE InvoiceNumber = 1")
+            .SingleAsync(TestContext.Current.CancellationToken));
+        Assert.Equal("400.0", await archived.Database
+            .SqlQueryRaw<string>("SELECT PriceWithoutVatAmount AS Value FROM ArchivedInvoiceLines WHERE InvoiceNumber = 1")
+            .SingleAsync(TestContext.Current.CancellationToken));
         Assert.Empty(await database.MigrateAsync());
     }
 
@@ -537,23 +588,34 @@ public sealed class SqlitePersistenceTests
 
         await SaveIssuedInvoiceViaBusinessFlowAsync(repository, invoice, CancellationToken.None);
 
-        var summary = Assert.Single(await repository.ListInvoicesForStudentAsync("Anna", CancellationToken.None));
+        var summary = Assert.Single(await repository.ListInvoicesForStudentAsync(lesson.StudentId, CancellationToken.None));
         Assert.Equal(new InvoicePeriod(new DateOnly(2026, 8, 1), new DateOnly(2026, 8, 31)), summary.Period);
     }
 
     [Fact]
-    public async Task InvoiceSummaryMatchesStudentShortNameCaseInsensitively()
+    public async Task InvoiceHistoryRetainsItsOwnerWhenShortNameIsRenamedAndReused()
     {
         using var database = await TestDatabase.CreateAsync();
         var repository = new SqliteInvoiceRepository(database.CreateContext);
         var plan = await SaveCatalogPlanAsync(new SqlitePlanCatalogRepository(database.CreateContext), "Standard");
         var lesson = await SaveLessonAsync(database, "Anna", plan, new DateTimeOffset(2026, 7, 30, 15, 0, 0, TimeSpan.FromHours(2)));
         var invoice = CreateIssuedInvoice("Anna", "Anna Andersen", "Standard", lessonId: lesson.Id);
+        var token = TestContext.Current.CancellationToken;
+        Assert.True((await SaveIssuedInvoiceViaBusinessFlowAsync(repository, invoice, token)).Succeeded);
 
-        await SaveIssuedInvoiceViaBusinessFlowAsync(repository, invoice, CancellationToken.None);
+        var students = new SqliteStudentRepository(database.CreateContext);
+        var oldStudent = (await students.GetByShortNameAsync("Anna", token))!;
+        var renamed = Student.Create("Anja", oldStudent.Student.FullName, oldStudent.Student.Address,
+            oldStudent.Student.Phone, oldStudent.Student.Email, oldStudent.Student.AgeBracket,
+            oldStudent.Student.Birthdate, oldStudent.Student.IsActive).Value!;
+        Assert.True((await students.SaveAsync(oldStudent with { Student = renamed }, token)).Succeeded);
+        var replacement = await students.SaveAsync(CreateStudentRecord("Anna", currentPlanId: plan.Id, currentPlanName: plan.Name), token);
+        Assert.True(replacement.Succeeded);
+        Assert.NotEqual(lesson.StudentId, replacement.Value!.Id);
 
-        var summary = Assert.Single(await repository.ListInvoicesForStudentAsync("anna", CancellationToken.None));
+        var summary = Assert.Single(await repository.ListInvoicesForStudentAsync(lesson.StudentId, token));
         Assert.Equal("Anna", summary.StudentShortName);
+        Assert.Empty(await repository.ListInvoicesForStudentAsync(replacement.Value.Id, token));
     }
 
     [Fact]
@@ -641,12 +703,12 @@ public sealed class SqlitePersistenceTests
 
         await SaveIssuedInvoiceViaBusinessFlowAsync(repository, invoice, CancellationToken.None);
 
-        Assert.False(await repository.HasInvoiceForStudentInMonthAsync("Anna", new DateOnly(2026, 7, 1), CancellationToken.None));
-        Assert.True(await repository.HasInvoiceForStudentInMonthAsync("Anna", new DateOnly(2026, 8, 1), CancellationToken.None));
+        Assert.False(await repository.HasInvoiceForStudentInMonthAsync(lesson.StudentId, new DateOnly(2026, 7, 1), CancellationToken.None));
+        Assert.True(await repository.HasInvoiceForStudentInMonthAsync(lesson.StudentId, new DateOnly(2026, 8, 1), CancellationToken.None));
     }
 
     [Fact]
-    public async Task HasInvoiceForStudentInMonthMatchesStudentShortNameCaseInsensitively()
+    public async Task HasInvoiceForStudentInMonthUsesExactStudentId()
     {
         using var database = await TestDatabase.CreateAsync();
         var repository = new SqliteInvoiceRepository(database.CreateContext);
@@ -662,7 +724,8 @@ public sealed class SqlitePersistenceTests
 
         await SaveIssuedInvoiceViaBusinessFlowAsync(repository, invoice, CancellationToken.None);
 
-        Assert.True(await repository.HasInvoiceForStudentInMonthAsync("anna", new DateOnly(2026, 8, 1), CancellationToken.None));
+        Assert.True(await repository.HasInvoiceForStudentInMonthAsync(lesson.StudentId, new DateOnly(2026, 8, 1), CancellationToken.None));
+        Assert.False(await repository.HasInvoiceForStudentInMonthAsync(lesson.StudentId + 1, new DateOnly(2026, 8, 1), CancellationToken.None));
     }
 
     [Fact]
@@ -684,7 +747,7 @@ public sealed class SqlitePersistenceTests
         Assert.Equal(InvoicePrintStatus.NotPrinted, reserved.Value.PrintStatus);
         Assert.Null(reserved.Value.PdfFilePath);
         Assert.Null(await repository.GetIssuedInvoiceAsync(new InvoiceNumber(1), CancellationToken.None));
-        Assert.Empty(await repository.ListInvoicesForStudentAsync("Anna", CancellationToken.None));
+        Assert.Empty(await repository.ListInvoicesForStudentAsync(lesson.StudentId, CancellationToken.None));
 
         var issuing = await repository.GetIssuingInvoiceAsync(new InvoiceNumber(1), CancellationToken.None);
         Assert.NotNull(issuing);
@@ -713,7 +776,7 @@ public sealed class SqlitePersistenceTests
         Assert.Equal("Printer unavailable.", printUpdated.Value.LastPrintError);
 
         var loaded = await repository.GetIssuedInvoiceAsync(new InvoiceNumber(1), CancellationToken.None);
-        var summary = Assert.Single(await repository.ListInvoicesForStudentAsync("Anna", CancellationToken.None));
+        var summary = Assert.Single(await repository.ListInvoicesForStudentAsync(lesson.StudentId, CancellationToken.None));
         Assert.NotNull(loaded);
         Assert.Equal(InvoiceIssueStatus.Issued, loaded.IssueStatus);
         Assert.Equal(InvoicePrintStatus.PrintFailed, loaded.PrintStatus);
@@ -946,14 +1009,15 @@ public sealed class SqlitePersistenceTests
     {
         using var database = await TestDatabase.CreateAsync();
         var repository = new SqliteInvoiceRepository(database.CreateContext);
-        var invoice = CreateIssuedInvoice(
-            "Anna",
-            "Anna Andersen",
-            "Standard",
-            lessonId: 999);
+        var plan = await SaveCatalogPlanAsync(new SqlitePlanCatalogRepository(database.CreateContext), "Standard");
+        var lesson = await SaveLessonAsync(database, "Anna", plan, DateTimeOffset.UtcNow);
+        var invoice = CreateIssuedInvoice("Anna", "Anna Andersen", "Standard", lessonId: lesson.Id);
+        Assert.True((await SaveIssuedInvoiceViaBusinessFlowAsync(repository, invoice, CancellationToken.None)).Succeeded);
 
-        await Assert.ThrowsAsync<DbUpdateException>(() =>
-            SaveIssuedInvoiceViaBusinessFlowAsync(repository, invoice, CancellationToken.None));
+        await using var context = database.CreateContext();
+        var line = await context.IssuedInvoiceLines.SingleAsync(TestContext.Current.CancellationToken);
+        line.LessonId = 999;
+        await Assert.ThrowsAsync<DbUpdateException>(() => context.SaveChangesAsync(TestContext.Current.CancellationToken));
     }
 
     [Fact]
@@ -1095,7 +1159,7 @@ public sealed class SqlitePersistenceTests
         var initial = await repository.GetPaymentStatusAsync(new InvoiceNumber(1), CancellationToken.None);
         await repository.SavePaymentStatusAsync(new InvoiceNumber(1), PaymentStatus.Paid, CancellationToken.None);
         var updated = await repository.GetPaymentStatusAsync(new InvoiceNumber(1), CancellationToken.None);
-        var summaries = await repository.ListInvoicesForStudentAsync("Anna", CancellationToken.None);
+        var summaries = await repository.ListInvoicesForStudentAsync(lesson.StudentId, CancellationToken.None);
         var lessonStatuses = await repository.ListLessonStatusesAsync(new DateOnly(2026, 6, 1), new DateOnly(2026, 6, 30), CancellationToken.None);
 
         Assert.Equal(PaymentStatus.Outstanding, initial);
@@ -1329,6 +1393,114 @@ public sealed class SqlitePersistenceTests
             [
                 new StudentScheduleEntry(DayOfWeek.Tuesday, new TimeOnly(15, 0))
             ]);
+    }
+
+    [Theory]
+    [InlineData(InvoiceRecoveryChoice.Resume, 380)]
+    [InlineData(InvoiceRecoveryChoice.Revise, 350)]
+    public async Task PendingInvoiceUsesOneSnapshotAfterChangedPreview(InvoiceRecoveryChoice choice, int expectedTotal)
+    {
+        using var database = await TestDatabase.CreateAsync();
+        var token = TestContext.Current.CancellationToken;
+        var invoices = new SqliteInvoiceRepository(database.CreateContext);
+        var company = await ConfigureInvoiceCompanyAsync(database, token);
+        var plan = await SaveCatalogPlanAsync(new SqlitePlanCatalogRepository(database.CreateContext), "Standard");
+        var date = new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.Zero);
+        var lesson = await SaveLessonAsync(database, "Mira", plan, date);
+        var draft = CreateInvoiceDraft("Mira", "Mira Example", "Standard", date, plan.Id, lessonId: lesson.Id);
+        var original = InvoiceDraft.Create(draft.InvoiceDate, draft.Company, draft.Student, draft.Lines,
+            new PriceAdjustment(Money.Dkk(-20m), "Original discount"), draft.Period);
+        var reserved = await invoices.ReserveInvoiceAsync(original, original.CalculateTotals(await company.GetAsync(token)), token);
+        Assert.True(reserved.Succeeded);
+
+        var revised = InvoiceDraft.Create(draft.InvoiceDate, draft.Company, draft.Student, draft.Lines,
+            new PriceAdjustment(Money.Dkk(-50m), "Revised discount"), draft.Period);
+        var writer = new RecordingInvoicePdfWriter();
+        var useCase = new IssueInvoiceUseCase(company, invoices, CreateInvoiceFileStore(database), writer,
+            new RecordingInvoicePrinter(), new SystemUiClock());
+        var issued = await useCase.ExecuteAsync(revised, token, (recovery, _) =>
+        {
+            Assert.Equal(original.PriceAdjustment, recovery.SavedInvoice.PriceAdjustment);
+            Assert.True(recovery.CanRevise);
+            return Task.FromResult(choice);
+        });
+
+        Assert.True(issued.Succeeded, string.Join(", ", issued.Errors.Select(error => error.Message)));
+        Assert.Equal(reserved.Value!.InvoiceNumber, issued.Value!.Invoice.InvoiceNumber);
+        Assert.Equal(Money.Dkk(expectedTotal), writer.Totals!.Total);
+        var stored = await invoices.GetIssuedInvoiceAsync(reserved.Value.InvoiceNumber, token);
+        Assert.Equal(writer.Totals, stored!.Totals);
+        Assert.Equal(writer.Draft!.PriceAdjustment, stored.PriceAdjustment);
+        Assert.Equal(choice == InvoiceRecoveryChoice.Resume ? original.PriceAdjustment : revised.PriceAdjustment, stored.PriceAdjustment);
+        Assert.True(File.Exists(stored.PdfFilePath));
+    }
+
+    [Fact]
+    public async Task InvoiceRetryCompletesAfterPdfWasMovedBeforeSqliteWasUpdated()
+    {
+        using var database = await TestDatabase.CreateAsync();
+        var token = TestContext.Current.CancellationToken;
+        var invoices = new SqliteInvoiceRepository(database.CreateContext);
+        var company = await ConfigureInvoiceCompanyAsync(database, token);
+        var plan = await SaveCatalogPlanAsync(new SqlitePlanCatalogRepository(database.CreateContext), "Standard");
+        var date = new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.Zero);
+        var lesson = await SaveLessonAsync(database, "Mira", plan, date);
+        var draft = CreateInvoiceDraft("Mira", "Mira Example", "Standard", date, plan.Id, lessonId: lesson.Id);
+        var totals = draft.CalculateTotals(await company.GetAsync(token));
+        var reserved = await invoices.ReserveInvoiceAsync(draft, totals, token);
+        Assert.True(reserved.Succeeded);
+        var number = reserved.Value!.InvoiceNumber;
+        var store = CreateInvoiceFileStore(database);
+        var stage = await store.CreateStagingPathAsync(draft, number, token);
+        var writer = new QuestPdfInvoicePdfWriter();
+        Assert.True((await writer.WriteAsync(draft, totals, number, stage.Value!, token)).Succeeded);
+        var planned = await store.PreparePublicationAsync(stage.Value!, draft, number, token);
+        Assert.True(planned.Succeeded);
+        Assert.True((await invoices.PrepareInvoicePublicationAsync(reserved.Value, planned.Value!, token)).Succeeded);
+        var published = await store.CompletePublicationAsync(planned.Value!, token);
+        Assert.True(published.Succeeded);
+        Assert.Null((await invoices.GetIssuingInvoiceAsync(number, token))!.PdfFilePath);
+
+        var retryWriter = new RecordingInvoicePdfWriter();
+        var retry = new IssueInvoiceUseCase(company, invoices, store, retryWriter, new RecordingInvoicePrinter(), new SystemUiClock());
+        var issued = await retry.ExecuteAsync(draft, token);
+        Assert.True(issued.Succeeded, string.Join(", ", issued.Errors.Select(error => error.Message)));
+        Assert.Null(retryWriter.Draft);
+        Assert.Equal(number, issued.Value!.Invoice.InvoiceNumber);
+        Assert.Equal(published.Value, issued.Value.Invoice.PdfFilePath);
+    }
+
+    private static LocalInvoiceFileStore CreateInvoiceFileStore(TestDatabase database) =>
+        new(new InvoiceFileStoreOptions(Path.Combine(Path.GetDirectoryName(database.DatabasePath)!, "invoices")));
+
+    private static async Task<SqliteCompanyProfileRepository> ConfigureInvoiceCompanyAsync(TestDatabase database, CancellationToken token)
+    {
+        var company = new SqliteCompanyProfileRepository(database.CreateContext);
+        var folder = Path.Combine(Path.GetDirectoryName(database.DatabasePath)!, "invoices");
+        await company.SaveAsync(CompanyProfile.Create("Maple Key Studio", "Example Road 1", "", "", "", null,
+            VatStatus.NotRegistered, folder), token);
+        return company;
+    }
+
+    private sealed class RecordingInvoicePdfWriter : IInvoicePdfWriter
+    {
+        public InvoiceDraft? Draft { get; private set; }
+
+        public InvoiceTotals? Totals { get; private set; }
+
+        public Task<OperationResult<string>> WriteAsync(InvoiceDraft draft, InvoiceTotals totals, InvoiceNumber invoiceNumber,
+            string stagingPath, CancellationToken cancellationToken)
+        {
+            Draft = draft;
+            Totals = totals;
+            return new QuestPdfInvoicePdfWriter().WriteAsync(draft, totals, invoiceNumber, stagingPath, cancellationToken);
+        }
+    }
+
+    private sealed class RecordingInvoicePrinter : IInvoicePrinter
+    {
+        public Task<OperationResult<string>> PrintAsync(string pdfFilePath, string configuredPrinterName, CancellationToken cancellationToken) =>
+            Task.FromResult(OperationResult<string>.Success(pdfFilePath));
     }
 
     private static IssuedInvoice CreateIssuedInvoice(

@@ -116,7 +116,7 @@ Relevant Google Calendar entries are identified by their first line, which may b
 
 Google Calendar entries that are *NOT* identified as relevant by their first line are *ALWAYS* ignored.
 
-Student short-name matching against saved active Students is case-insensitive. After a marker is matched, the application uses the stored Student short-name casing for dashboard filtering, local lesson reconciliation, and invoice-list lookups.
+Student short-name matching against saved active Students is case-insensitive when importing a new calendar entry. Once linked, a lesson keeps its Student ID if the event title or student's short name changes. Calendar linkage combines the configured calendar identity and the external event ID. Refresh preserves local billing rows when events are outside the current calendar results. Use the Ledger's explicit delete action to remove an uninvoiced lesson. Legacy event IDs are adopted when the observed event, existing student marker and lesson time agree.
 
 The first line remains the ownership/matching marker. A completed uninvoiced lesson may additionally contain this later line in the Google Calendar entry:
   Status: Completed
@@ -127,7 +127,9 @@ When an Invoice is issued, it is added to the Invoice table with its issued invo
 
 Issued invoice lines are authoritative for invoice-to-lesson lineage. The lesson row may keep an invoice-number cache for locking and display, but that cache must be maintained by the invoice finalization transaction and must never replace the issued invoice line's exact local Lesson ID as the durable reference.
 
-During schema upgrades from older data, the application must not invent Lesson IDs for issued invoice lines. If an old invoice line cannot be safely linked to a saved local lesson, the migration skips that line, records a startup warning, and keeps the invoice header plus any safely linkable lines so the application can continue starting.
+Invoice history uses the invoice's Student ID. Names and addresses on an invoice are snapshots of the original recipient. The upgrade links an existing invoice to a student when its saved lesson links all identify one student. Invoices with unknown ownership remain available through the Economy overview.
+
+An upgrade archives older invoice lines that lack a valid unique lesson link in `ArchivedInvoiceLines` before rebuilding the active line table. The invoice header, its totals, the original PDF, and any valid lesson links are retained. The one-time startup warning reports the number of lines excluded from active lesson links. Upgrades that ran under earlier versions require an older backup to recover any lines already removed.
 
 Invoice, completion, and payment state must only be applied to a lesson through that lesson's durable local identity and invoice link. The application must never infer that a lesson is invoiced, completed, or paid merely because it has the same student, date, time, or plan as an issued invoice line; a separate lesson on the same date remains separate and uninvoiced until it is explicitly included in an invoice.
 
@@ -137,7 +139,7 @@ Issued Invoice lines store the catalog Plan identity for lineage/reporting and a
 
 ### Application Startup
 
-Before the main window is shown, the application creates the app-data folder if needed and applies pending EF Core migrations to the local SQLite database. Startup then composes the local repositories, Google Calendar gateway, invoice PDF/printing services, and WPF view models through the App-layer bootstrapper. Schema changes must be represented as EF migrations, not ad hoc startup table/column mutation.
+Before the main window is shown, the application creates the app-data folder if needed. When an existing SQLite database has pending migrations, startup first creates and verifies a database backup under `Backups` in the app data folder. A failed backup stops the upgrade. Startup then applies pending EF Core migrations. Startup then composes the local repositories, Google Calendar gateway, invoice PDF/printing services, and WPF view models through the App-layer bootstrapper. Schema changes must be represented as EF migrations, not ad hoc startup table/column mutation.
 
 Upon startup the application displays a window containing the current student short name and a list of lessons for:
   * previous month
@@ -268,11 +270,10 @@ If the user Cancels before printing starts, the invoice is not saved and no data
 
 Once the invoice has been edited, the user may press the "Save & Print Invoice" button on the Invoice form.
 The "Save & Print Invoice" button does the following:
-  - Reserves the Invoice in the local database as an in-progress issue operation.
-  - Saves a PDF copy of the invoice in the company invoice folder path through a staging, verification, and publish flow.
-    -- note: the final PDF file name uses the invoice number, invoice period, and Student full name, e.g. `Invoice 001 Juni 2026 - Mira Vale.pdf`.
-    -- note: if PDF staging, writing, verification, or publish fails before the final PDF is published, any staged PDF is discarded and the reserved Invoice number is released; the Invoice is not shown as issued, later actions are *not* performed, and the user is notified of the failure. Retrying must reuse that Invoice number rather than skipping to the next one.
-    -- note: if the final PDF has been published but finalizing the Invoice data fails, the application keeps the in-progress `Issuing` reservation and published PDF path for retry/support recovery; the Invoice is not shown as issued, later actions are *not* performed, and the user is notified of the failure.
+  - Reserves the invoice number and saves the invoice snapshot, including the adjustment and reason, in SQLite. PDF generation uses the saved amounts, lesson lines, and billing details.
+  - When a retry with the same lesson selection differs from the pending invoice, shows the saved invoice and the current preview total. **Resume saved invoice** uses the saved details. **Use current preview** updates the pending snapshot under the same number while PDF publication is still pending.
+  - Stages and verifies the PDF. Before moving it, saves the staged path, final path, and checksum in SQLite. The final file name includes the number, invoice period, and student's invoice-time name, for example `Invoice 001 Juni 2026 - Mira Vale.pdf`.
+  - If a staging, writing, or verification error happens before the publication checkpoint is saved, discards the staging file and releases the reservation. After saving the checkpoint, retains the reservation and verifies the staged or final PDF on retry. A different file at the final path is preserved and reported.
   - Finalizes the Invoice data in the Invoice table as issued.
   - Sends a print request to the configured invoice printer, if one is configured and available.
     -- note: a print failure does not undo the issued Invoice or delete the PDF; the Invoice remains issued and can be reprinted from the Invoice Viewer.

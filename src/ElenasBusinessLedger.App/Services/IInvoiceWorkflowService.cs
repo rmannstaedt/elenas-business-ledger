@@ -24,7 +24,8 @@ public interface IInvoiceWorkflowService
 
     Task<OperationResult<IssueInvoiceResult>> IssueAsync(
         InvoiceDraft draft,
-        CancellationToken cancellationToken);
+        CancellationToken cancellationToken,
+        Func<PendingInvoiceRecovery, CancellationToken, Task<InvoiceRecoveryChoice>>? chooseRecovery = null);
 
     Task<OperationResult<ReprintInvoiceResult>> ReprintAsync(
         InvoiceNumber invoiceNumber,

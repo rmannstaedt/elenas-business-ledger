@@ -59,8 +59,13 @@ Use this section for an unconfigured build or to authorize through a Google Clou
 | Google refuses sign-in or says access is blocked | Check the active Cloud project and its audience. For an external app in Testing, add the signing-in account to **Test users**. If a bundled client is restricted to other accounts, configure a client in your own project. |
 | The calendar worked earlier and now asks to reconnect | In Settings, use **Connect Google Calendar**. If the app keeps picking up an old authorization, choose **Forget Google sign-in** first. Authorization for an external app in Testing expires after seven days. [Google OAuth audience and testing](https://support.google.com/cloud/answer/15549945?hl=en) |
 | The connection fails or the calendar is empty | Verify the owning account, selected calendar ID, enabled Calendar API, and displayed month. For a manually added lesson, use a title such as `$ Mira` and confirm that `Mira` matches an active student's short name. |
+| A source build opens **Resume invoice** | Review the saved invoice and current total. Choose **Resume saved invoice** to keep the original details, or **Use current preview** if that option is available and you want to apply your edits. |
 | The PDF exists and the print request failed | The invoice is already issued. Check the configured printer and Windows PDF association, then open the issued invoice and use **Reprint**. |
+
+In current source builds, deleting an appointment outside the Ledger leaves its local billing row in place. Review the selected lessons in the invoice preview before issuing.
 
 ## Where the Ledger stores data
 
 **Application > Settings** shows the database location and app data folder. By default, `%APPDATA%\visualtech.dk\MySmallBusinessLedger` contains the SQLite database `ledger.db`, Windows user-protected Google authorization files under `GoogleTokens`, and saved window and grid layouts. Invoice PDFs are stored separately in the **Invoice folder** you selected. Installer upgrades and uninstall leave those data locations in place. To back up the ledger, close the application and copy the app data folder and the invoice folder.
+
+Source builds after v1.3.2 also create a verified SQLite backup in the app data folder under `Backups` before applying a schema upgrade. This backup covers the database. Continue to keep a copy of the separate invoice folder.

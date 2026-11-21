@@ -16,6 +16,27 @@ namespace ElenasBusinessLedger.Tests.Infrastructure.Calendar;
 public sealed class GoogleCalendarGatewayTests
 {
     [Fact]
+    public async Task CalendarOperationsUseOnlyIdsFromTheConfiguredSource()
+    {
+        var start = new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.Zero);
+        var token = TestContext.Current.CancellationToken;
+        var client = new FakeGoogleCalendarEventClient { Events = [new GoogleCalendarEvent("same-id", "$ Mira", start)] };
+        var gateway = new GoogleCalendarGateway(client, new GoogleCalendarGatewayOptions(
+            "test-calendar", TimeZoneInfo.Utc, TimeSpan.FromHours(1), "original"));
+        var date = new DateOnly(2026, 6, 16);
+        var lesson = Assert.Single(await gateway.ListLessonsAsync(date, date, token));
+        Assert.Equal("original:same-id", lesson.Id);
+        Assert.Equal("same-id", lesson.LegacyEventId);
+
+        var wrong = await gateway.DeleteLessonAsync("other:same-id", date, token);
+        Assert.False(wrong.Succeeded);
+        Assert.Null(client.DeletedEventId);
+        var right = await gateway.DeleteLessonAsync(lesson.Id, date, token);
+        Assert.True(right.Succeeded);
+        Assert.Equal("same-id", client.DeletedEventId);
+    }
+
+    [Fact]
     public void CredentialFactoryRequestsOwnedCalendarEventScopeOnly()
     {
         Assert.Equal(

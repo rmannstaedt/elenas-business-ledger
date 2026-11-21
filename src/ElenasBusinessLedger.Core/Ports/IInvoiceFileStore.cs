@@ -12,11 +12,11 @@ public interface IInvoiceFileStore
 
     Task<OperationResult<string>> VerifyStagedPdfAsync(string stagingPath, CancellationToken cancellationToken);
 
-    Task<OperationResult<string>> PublishAsync(
-        string stagingPath,
-        InvoiceDraft draft,
-        InvoiceNumber invoiceNumber,
-        CancellationToken cancellationToken);
+    Task<OperationResult<InvoicePdfPublication>> PreparePublicationAsync(
+        string stagingPath, InvoiceDraft draft, InvoiceNumber invoiceNumber, CancellationToken cancellationToken);
+
+    Task<OperationResult<string>> CompletePublicationAsync(
+        InvoicePdfPublication publication, CancellationToken cancellationToken);
 
     Task<OperationResult<string>> DiscardStagingPathAsync(string stagingPath, CancellationToken cancellationToken);
 

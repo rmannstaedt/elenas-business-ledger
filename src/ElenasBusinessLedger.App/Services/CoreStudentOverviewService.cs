@@ -25,7 +25,7 @@ public sealed class CoreStudentOverviewService : IStudentOverviewService
         {
             snapshots.Add(new StudentOverviewSnapshot(
                 student,
-                await LoadInvoicesAsync(student.Student.ShortName, cancellationToken)));
+                await invoiceRepository.ListInvoicesForStudentAsync(student.Id, cancellationToken)));
         }
 
         return snapshots;
@@ -56,11 +56,7 @@ public sealed class CoreStudentOverviewService : IStudentOverviewService
         return OperationResult<StudentOverviewSnapshot>.Success(
             new StudentOverviewSnapshot(
                 saveResult.Value!,
-                await LoadInvoicesAsync(saveResult.Value!.Student.ShortName, cancellationToken)));
+                await invoiceRepository.ListInvoicesForStudentAsync(saveResult.Value!.Id, cancellationToken)));
     }
 
-    private async Task<IReadOnlyList<IssuedInvoiceSummary>> LoadInvoicesAsync(
-        string studentShortName,
-        CancellationToken cancellationToken) =>
-        await invoiceRepository.ListInvoicesForStudentAsync(studentShortName, cancellationToken);
 }

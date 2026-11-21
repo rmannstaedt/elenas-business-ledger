@@ -20,7 +20,8 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
     public async Task<IReadOnlyList<InvoiceLessonStatus>> ListLessonStatusesAsync(
         DateOnly from,
         DateOnly to,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        IReadOnlyList<int>? includeLessonIds = null)
     {
         await using var context = createContext();
         var issuedInvoiceLines = await context.IssuedInvoiceLines
@@ -46,8 +47,9 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
             .Where(lesson => invoicedLessonIds.Contains(lesson.Id))
             .ToArrayAsync(cancellationToken);
 
+        var includedIds = includeLessonIds?.ToHashSet();
         return invoicedLessons
-            .Where(lesson => IsInDateRange(lesson.StartsAt, from, to))
+            .Where(lesson => IsInDateRange(lesson.StartsAt, from, to) || includedIds?.Contains(lesson.Id) == true)
             .OrderBy(lesson => lesson.StartsAt)
             .Select(lesson =>
             {
@@ -63,13 +65,13 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
     }
 
     public async Task<IReadOnlyList<IssuedInvoiceSummary>> ListInvoicesForStudentAsync(
-        string studentShortName,
+        int studentId,
         CancellationToken cancellationToken)
     {
         await using var context = createContext();
         return await context.IssuedInvoices
             .AsNoTracking()
-            .Where(invoice => EF.Functions.Collate(invoice.StudentShortName, "NOCASE") == studentShortName)
+            .Where(invoice => invoice.StudentId == studentId)
             .Where(invoice => invoice.IssueStatus == InvoiceIssueStatus.Issued)
             .OrderBy(invoice => invoice.InvoiceNumber)
             .Select(invoice => new IssuedInvoiceSummary(
@@ -111,7 +113,7 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
     }
 
     public async Task<bool> HasInvoiceForStudentInMonthAsync(
-        string studentShortName,
+        int studentId,
         DateOnly month,
         CancellationToken cancellationToken)
     {
@@ -123,7 +125,7 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
             .AnyAsync(
                 invoice =>
                     invoice.IssueStatus == InvoiceIssueStatus.Issued &&
-                    EF.Functions.Collate(invoice.StudentShortName, "NOCASE") == studentShortName &&
+                    invoice.StudentId == studentId &&
                     invoice.PeriodFrom < nextMonth &&
                     invoice.PeriodTo >= firstDay,
                 cancellationToken);
@@ -150,7 +152,23 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
         var existingReservation = await FindMatchingIssuingInvoiceAsync(context, requestedLessonIds, cancellationToken);
         if (existingReservation is not null)
         {
+            if (draft.Student.StudentId is { } studentId && existingReservation.StudentId != studentId)
+            {
+                return StudentIdentityMismatch();
+            }
+
             return OperationResult<IssuedInvoice>.Success(ToDomain(existingReservation));
+        }
+
+        var lessonStudents = await context.Lessons
+            .Where(lesson => requestedLessonIds.Contains(lesson.Id))
+            .Select(lesson => lesson.StudentId)
+            .ToArrayAsync(cancellationToken);
+        var ownerIds = lessonStudents.Distinct().ToArray();
+        if (lessonStudents.Length != requestedLessonIds.Length || ownerIds.Length != 1 ||
+            (draft.Student.StudentId is { } requestedOwner && requestedOwner != ownerIds[0]))
+        {
+            return StudentIdentityMismatch();
         }
 
         var highest = await context.IssuedInvoices
@@ -165,7 +183,8 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
             InvoiceIssueStatus.Issuing,
             InvoicePrintStatus.NotPrinted,
             printedAt: null,
-            lastPrintError: null);
+            lastPrintError: null,
+            snapshotRevision: CreateSnapshotRevision());
 
         var exists = await context.IssuedInvoices.AnyAsync(
             storedInvoice => storedInvoice.InvoiceNumber == invoiceNumber.Value,
@@ -178,9 +197,11 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
                 new ValidationError("Invoice.NumberAlreadyExists", "An issued invoice with this number already exists."));
         }
 
-        context.IssuedInvoices.Add(ToEntity(reservedInvoice));
+        var entity = ToEntity(reservedInvoice);
+        entity.StudentId = ownerIds[0];
+        context.IssuedInvoices.Add(entity);
         await context.SaveChangesAsync(cancellationToken);
-        return OperationResult<IssuedInvoice>.Success(reservedInvoice);
+        return OperationResult<IssuedInvoice>.Success(ToDomain(entity));
     }
 
     public async Task<OperationResult<IssuedInvoice>> FinalizeIssuedInvoiceWithLessonLocksAsync(
@@ -209,6 +230,13 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
         {
             return OperationResult<IssuedInvoice>.Failure(
                 new ValidationError("Invoice.NotFound", "The reserved invoice could not be found."));
+        }
+
+        if (invoice.PlannedPdfPath is not null &&
+            !string.Equals(invoice.PlannedPdfPath, pdfFilePath, StringComparison.OrdinalIgnoreCase))
+        {
+            return OperationResult<IssuedInvoice>.Failure(new ValidationError(
+                "Invoice.PublishedPathConflict", "The final PDF path differs from the saved publication checkpoint."));
         }
 
         var invoiceLineLessonIds = invoice.Lines
@@ -282,8 +310,10 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
                 new ValidationError("Invoice.NotFound", "The reserved invoice could not be found."));
         }
 
-        if (!string.IsNullOrWhiteSpace(invoice.PdfFilePath) &&
-            !string.Equals(invoice.PdfFilePath, pdfFilePath, StringComparison.OrdinalIgnoreCase))
+        if ((invoice.PlannedPdfPath is not null &&
+                !string.Equals(invoice.PlannedPdfPath, pdfFilePath, StringComparison.OrdinalIgnoreCase)) ||
+            (!string.IsNullOrWhiteSpace(invoice.PdfFilePath) &&
+                !string.Equals(invoice.PdfFilePath, pdfFilePath, StringComparison.OrdinalIgnoreCase)))
         {
             return OperationResult<IssuedInvoice>.Failure(
                 new ValidationError(
@@ -297,30 +327,105 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
         return OperationResult<IssuedInvoice>.Success(ToDomain(invoice));
     }
 
-    public async Task ReleaseInvoiceReservationAsync(InvoiceNumber invoiceNumber, CancellationToken cancellationToken)
+    public async Task<OperationResult<IssuedInvoice>> ReviseInvoiceReservationAsync(
+        IssuedInvoice savedInvoice, InvoiceDraft draft, InvoiceTotals totals, CancellationToken cancellationToken)
     {
         await using var context = createContext();
-        var invoice = await context.IssuedInvoices
-            .Include(storedInvoice => storedInvoice.Lines)
-            .SingleOrDefaultAsync(
-                storedInvoice =>
-                    storedInvoice.InvoiceNumber == invoiceNumber.Value &&
-                    storedInvoice.IssueStatus == InvoiceIssueStatus.Issuing,
-                cancellationToken);
+        var invoice = await FindEditableReservationAsync(context, savedInvoice, cancellationToken);
+        if (invoice is null || (draft.Student.StudentId is { } owner && owner != invoice.StudentId) ||
+            !GetDistinctPositiveLessonIds(invoice.Lines.Select(line => line.LessonId))
+                .SequenceEqual(GetDistinctPositiveLessonIds(draft.Lines.Select(line => line.LessonId))))
+        {
+            return ReservationChanged();
+        }
 
+        var replacement = ToEntity(draft.Issue(savedInvoice.InvoiceNumber, totals, pdfFilePath: null,
+            InvoiceIssueStatus.Issuing, snapshotRevision: CreateSnapshotRevision()));
+        replacement.Id = invoice.Id;
+        replacement.StudentId = invoice.StudentId;
+        context.Entry(invoice).CurrentValues.SetValues(replacement);
+        var linesByLessonId = replacement.Lines.ToDictionary(line => line.LessonId);
+        foreach (var line in invoice.Lines)
+        {
+            var replacementLine = linesByLessonId[line.LessonId];
+            replacementLine.Id = line.Id;
+            replacementLine.IssuedInvoiceEntityId = invoice.Id;
+            context.Entry(line).CurrentValues.SetValues(replacementLine);
+        }
+
+        return await SaveReservationUpdateAsync(context, invoice, cancellationToken);
+    }
+
+    public async Task<OperationResult<IssuedInvoice>> PrepareInvoicePublicationAsync(
+        IssuedInvoice savedInvoice, InvoicePdfPublication publication, CancellationToken cancellationToken)
+    {
+        await using var context = createContext();
+        var invoice = await FindEditableReservationAsync(context, savedInvoice, cancellationToken);
         if (invoice is null)
         {
-            return;
+            return ReservationChanged();
         }
 
-        if (!string.IsNullOrWhiteSpace(invoice.PdfFilePath))
-        {
-            return;
-        }
-
-        context.IssuedInvoices.Remove(invoice);
-        await context.SaveChangesAsync(cancellationToken);
+        invoice.StagedPdfPath = publication.StagingPath;
+        invoice.PlannedPdfPath = publication.FinalPath;
+        invoice.PdfSha256 = publication.Sha256;
+        invoice.SnapshotRevision = CreateSnapshotRevision();
+        return await SaveReservationUpdateAsync(context, invoice, cancellationToken);
     }
+
+    public async Task ReleaseInvoiceReservationAsync(
+        InvoiceNumber invoiceNumber, CancellationToken cancellationToken, string? expectedRevision = null)
+    {
+        await using var context = createContext();
+        var reservation = context.IssuedInvoices.Where(invoice =>
+            invoice.InvoiceNumber == invoiceNumber.Value &&
+            invoice.IssueStatus == InvoiceIssueStatus.Issuing &&
+            invoice.PdfFilePath == string.Empty &&
+            invoice.PlannedPdfPath == null);
+
+        if (expectedRevision is not null)
+        {
+            reservation = reservation.Where(invoice => invoice.SnapshotRevision == expectedRevision);
+        }
+
+        await reservation.ExecuteDeleteAsync(cancellationToken);
+    }
+
+    private static Task<IssuedInvoiceEntity?> FindEditableReservationAsync(
+        LedgerDbContext context, IssuedInvoice savedInvoice, CancellationToken cancellationToken) =>
+        context.IssuedInvoices
+            .Include(invoice => invoice.Lines)
+            .SingleOrDefaultAsync(invoice =>
+                invoice.InvoiceNumber == savedInvoice.InvoiceNumber.Value &&
+                invoice.SnapshotRevision == savedInvoice.SnapshotRevision &&
+                invoice.IssueStatus == InvoiceIssueStatus.Issuing &&
+                invoice.PdfFilePath == string.Empty &&
+                invoice.PlannedPdfPath == null,
+                cancellationToken);
+
+    private static async Task<OperationResult<IssuedInvoice>> SaveReservationUpdateAsync(
+        LedgerDbContext context, IssuedInvoiceEntity invoice, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await context.SaveChangesAsync(cancellationToken);
+            return OperationResult<IssuedInvoice>.Success(ToDomain(invoice));
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return ReservationChanged();
+        }
+    }
+
+    private static OperationResult<IssuedInvoice> StudentIdentityMismatch() =>
+        OperationResult<IssuedInvoice>.Failure(new ValidationError(
+            "Invoice.StudentIdentityMismatch", "All invoice lessons must belong to the selected student."));
+
+    private static OperationResult<IssuedInvoice> ReservationChanged() =>
+        OperationResult<IssuedInvoice>.Failure(new ValidationError(
+            "Invoice.ReservationChanged", "The pending invoice changed. Reopen the invoice preview and try again."));
+
+    private static string CreateSnapshotRevision() => Guid.NewGuid().ToString("N");
 
     public async Task<OperationResult<IssuedInvoice>> UpdatePrintStatusAsync(
         InvoiceNumber invoiceNumber,
@@ -429,9 +534,16 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
             CompanyBankRegistrationNumber = invoice.Company.BankRegistrationNumber,
             CompanyBankAccountNumber = invoice.Company.BankAccountNumber,
             CompanyMobilePayAccount = invoice.Company.MobilePayAccount,
+            StudentId = invoice.Student.StudentId,
             StudentShortName = invoice.Student.ShortName,
             StudentFullName = invoice.Student.FullName,
             StudentAddress = invoice.Student.Address,
+            PriceAdjustmentAmount = invoice.PriceAdjustment?.Amount.Amount,
+            PriceAdjustmentReason = invoice.PriceAdjustment?.Reason,
+            SnapshotRevision = invoice.SnapshotRevision,
+            StagedPdfPath = invoice.Publication?.StagingPath,
+            PlannedPdfPath = invoice.Publication?.FinalPath,
+            PdfSha256 = invoice.Publication?.Sha256,
             TotalWithoutVatAmount = invoice.Totals.TotalWithoutVat.Amount,
             VatAmount = invoice.Totals.VatAmount.Amount,
             TotalAmount = invoice.Totals.Total.Amount,
@@ -492,7 +604,7 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
                 entity.CompanyBankRegistrationNumber,
                 entity.CompanyBankAccountNumber,
                 entity.CompanyMobilePayAccount),
-            new StudentSnapshot(entity.StudentShortName, entity.StudentFullName, entity.StudentAddress),
+            new StudentSnapshot(entity.StudentShortName, entity.StudentFullName, entity.StudentAddress, entity.StudentId),
             new ReadOnlyCollection<IssuedInvoiceLine>(lines),
             new InvoiceTotals(
                 new MoneyAmount(entity.TotalWithoutVatAmount, currency),
@@ -502,7 +614,14 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
             entity.IssueStatus,
             entity.PrintStatus,
             entity.PrintedAt,
-            entity.LastPrintError);
+            entity.LastPrintError,
+            entity.PriceAdjustmentAmount is { } amount && entity.PriceAdjustmentReason is { } reason
+                ? new PriceAdjustment(new MoneyAmount(amount, currency), reason)
+                : null,
+            entity.SnapshotRevision,
+            entity.StagedPdfPath is { } staged && entity.PlannedPdfPath is { } planned && entity.PdfSha256 is { } checksum
+                ? new InvoicePdfPublication(staged, planned, checksum)
+                : null);
     }
 
     private static string FormatLessonDateTime(DateTimeOffset lessonDateTime) =>

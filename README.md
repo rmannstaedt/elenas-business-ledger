@@ -21,6 +21,8 @@ The current release is **v1.3.2**.
 | `ElenasBusinessLedger.Infrastructure` | EF Core SQLite, Google Calendar, QuestPDF, and Windows printing |
 | `ElenasBusinessLedger.Tests` | xUnit tests for business rules, app behavior, persistence, and packaging |
 
+The WPF app wires the services at startup. Google Calendar provides appointment timing and attendance state. SQLite holds the durable student, lesson, and financial records. The saved invoice snapshot supplies both the PDF and the amounts used by Economy. The business requirements describe how the current source handles retries and upgrades.
+
 ## Build and test
 
 On Windows, install the .NET 11 SDK. For IDE builds, use Visual Studio 18.12 or later with the .NET desktop development workload. Open `ElenasBusinessLedger.sln`, or run the following from the repository root in PowerShell.

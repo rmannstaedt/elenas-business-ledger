@@ -7,7 +7,7 @@ using ElenasBusinessLedger.Infrastructure.Calendar;
 
 namespace ElenasBusinessLedger.App.Services;
 
-public sealed record ConfiguredGoogleCalendarClient(string CalendarId, IGoogleCalendarEventClient EventClient);
+public sealed record ConfiguredGoogleCalendarClient(string CalendarId, IGoogleCalendarEventClient EventClient, string? CalendarScope = null);
 
 public sealed class ConfiguredGoogleCalendarGateway : IGoogleCalendarGateway
 {
@@ -114,7 +114,7 @@ public sealed class ConfiguredGoogleCalendarGateway : IGoogleCalendarGateway
             ? null
             : new GoogleCalendarGateway(
                 configured.EventClient,
-                new GoogleCalendarGatewayOptions(configured.CalendarId, timeZone, defaultLessonDuration));
+                new GoogleCalendarGatewayOptions(configured.CalendarId, timeZone, defaultLessonDuration, configured.CalendarScope));
     }
 
     private static OperationResult<T> CalendarNotConfigured<T>(T currentValue) =>

@@ -20,7 +20,9 @@ public sealed class InvoiceInfrastructureTests
         await File.WriteAllBytesAsync(stagingPath.Value!, "%PDF-1.7\ncontent"u8.ToArray(), TestContext.Current.CancellationToken);
 
         var verify = await fileStore.VerifyStagedPdfAsync(stagingPath.Value!, CancellationToken.None);
-        var publish = await fileStore.PublishAsync(stagingPath.Value!, draft, invoiceNumber, CancellationToken.None);
+        var prepared = await fileStore.PreparePublicationAsync(stagingPath.Value!, draft, invoiceNumber, CancellationToken.None);
+        Assert.True(prepared.Succeeded);
+        var publish = await fileStore.CompletePublicationAsync(prepared.Value!, CancellationToken.None);
 
         Assert.True(verify.Succeeded);
         Assert.True(publish.Succeeded);
@@ -43,7 +45,9 @@ public sealed class InvoiceInfrastructureTests
         Assert.True(stagingPath.Succeeded);
         await File.WriteAllBytesAsync(stagingPath.Value!, "%PDF-1.7\nnew"u8.ToArray(), TestContext.Current.CancellationToken);
 
-        var publish = await fileStore.PublishAsync(stagingPath.Value!, draft, invoiceNumber, CancellationToken.None);
+        var prepared = await fileStore.PreparePublicationAsync(stagingPath.Value!, draft, invoiceNumber, CancellationToken.None);
+        Assert.True(prepared.Succeeded);
+        var publish = await fileStore.CompletePublicationAsync(prepared.Value!, CancellationToken.None);
 
         Assert.False(publish.Succeeded);
         Assert.Contains(publish.Errors, error => error.Code == "InvoicePdf.FinalFileAlreadyExists");

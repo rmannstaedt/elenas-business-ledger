@@ -14,7 +14,10 @@ public sealed class IssuedInvoice
         InvoiceIssueStatus issueStatus = InvoiceIssueStatus.Issued,
         InvoicePrintStatus printStatus = InvoicePrintStatus.NotPrinted,
         DateTimeOffset? printedAt = null,
-        string? lastPrintError = null)
+        string? lastPrintError = null,
+        PriceAdjustment? priceAdjustment = null,
+        string? snapshotRevision = null,
+        InvoicePdfPublication? publication = null)
     {
         InvoiceNumber = invoiceNumber;
         InvoiceDate = invoiceDate;
@@ -28,6 +31,9 @@ public sealed class IssuedInvoice
         PrintStatus = printStatus;
         PrintedAt = printedAt;
         LastPrintError = lastPrintError;
+        PriceAdjustment = priceAdjustment;
+        SnapshotRevision = snapshotRevision;
+        Publication = publication;
     }
 
     public InvoiceNumber InvoiceNumber { get; }
@@ -53,4 +59,24 @@ public sealed class IssuedInvoice
     public DateTimeOffset? PrintedAt { get; }
 
     public string? LastPrintError { get; }
+
+    public PriceAdjustment? PriceAdjustment { get; }
+
+    public string? SnapshotRevision { get; }
+
+    public InvoicePdfPublication? Publication { get; }
+
+    public InvoiceDraft CreateSavedDraft() => InvoiceDraft.Create(
+        InvoiceDate,
+        Company,
+        Student,
+        Lines.Select(line => new InvoiceLineDraft(
+            line.LessonDateTime,
+            line.PlanName,
+            line.PriceWithoutVat,
+            line.PlanCatalogId,
+            line.LessonId,
+            line.HasKnownLessonTime)).ToArray(),
+        PriceAdjustment,
+        Period);
 }

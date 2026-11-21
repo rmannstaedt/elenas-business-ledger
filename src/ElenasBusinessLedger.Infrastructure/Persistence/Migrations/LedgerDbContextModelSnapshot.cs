@@ -12,10 +12,15 @@ namespace ElenasBusinessLedger.Infrastructure.Persistence.Migrations
     [DbContext(typeof(LedgerDbContext))]
     partial class LedgerDbContextModelSnapshot : ModelSnapshot
     {
+        // If you encounter a merge conflict in the line below, it means you need to
+        // discard one of the migration branches and recreate its migrations on top of
+        // the other branch. See https://aka.ms/efcore-docs-migrations-conflicts for more info.
+        public override string LastMigrationId => "20261121165836_LinkInvoiceStudent";
+
         protected override void BuildModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder.HasAnnotation("ProductVersion", "10.0.9");
+            modelBuilder.HasAnnotation("ProductVersion", "11.0.0");
 
             modelBuilder.Entity("ElenasBusinessLedger.Infrastructure.Persistence.CalendarSettingsEntity", b =>
                 {
@@ -227,10 +232,22 @@ namespace ElenasBusinessLedger.Infrastructure.Persistence.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("PdfSha256")
+                        .HasColumnType("TEXT");
+
                     b.Property<DateOnly>("PeriodFrom")
                         .HasColumnType("TEXT");
 
                     b.Property<DateOnly>("PeriodTo")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PlannedPdfPath")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal?>("PriceAdjustmentAmount")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PriceAdjustmentReason")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("PrintStatus")
@@ -239,6 +256,13 @@ namespace ElenasBusinessLedger.Infrastructure.Persistence.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<DateTimeOffset?>("PrintedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SnapshotRevision")
+                        .IsConcurrencyToken()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("StagedPdfPath")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("StudentAddress")
@@ -250,6 +274,9 @@ namespace ElenasBusinessLedger.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(200)
                         .HasColumnType("TEXT");
+
+                    b.Property<int?>("StudentId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("StudentShortName")
                         .IsRequired()
@@ -269,6 +296,8 @@ namespace ElenasBusinessLedger.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("InvoiceNumber")
                         .IsUnique();
+
+                    b.HasIndex("StudentId");
 
                     b.ToTable("IssuedInvoices");
                 });
@@ -344,6 +373,7 @@ namespace ElenasBusinessLedger.Infrastructure.Persistence.Migrations
                         .HasDefaultValue(true);
 
                     b.Property<int?>("InvoiceNumber")
+                        .IsConcurrencyToken()
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("PlanCatalogId")
@@ -595,6 +625,14 @@ namespace ElenasBusinessLedger.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("StudentScheduleEntries");
+                });
+
+            modelBuilder.Entity("ElenasBusinessLedger.Infrastructure.Persistence.IssuedInvoiceEntity", b =>
+                {
+                    b.HasOne("ElenasBusinessLedger.Infrastructure.Persistence.StudentEntity", null)
+                        .WithMany()
+                        .HasForeignKey("StudentId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("ElenasBusinessLedger.Infrastructure.Persistence.IssuedInvoiceLineEntity", b =>

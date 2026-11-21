@@ -41,7 +41,7 @@ public sealed class GoogleCalendarGateway : IGoogleCalendarGateway
                     calendarEvent.StartsAt,
                     out var entry,
                     calendarEvent.HasKnownStartTime);
-                return new CalendarLesson(
+                return CreateCalendarLesson(
                     calendarEvent.Id,
                     entry!.StudentShortName,
                     entry.StartsAt,
@@ -80,8 +80,8 @@ public sealed class GoogleCalendarGateway : IGoogleCalendarGateway
         {
             var lessons = await ListRefreshMonthAsync(refreshMonth, cancellationToken);
             var createdLesson = lessons.FirstOrDefault(lesson =>
-                StringComparer.OrdinalIgnoreCase.Equals(lesson.Id, createdLessonId)) ??
-                new CalendarLesson(
+                StringComparer.Ordinal.Equals(lesson.Id, CreateScopedId(createdLessonId))) ??
+                CreateCalendarLesson(
                     createdLessonId,
                     request.StudentShortName,
                     request.StartsAt,
@@ -94,7 +94,7 @@ public sealed class GoogleCalendarGateway : IGoogleCalendarGateway
         {
             return OperationResult<LessonAddResult>.Failure(
                 new LessonAddResult(
-                    new CalendarLesson(
+                    CreateCalendarLesson(
                         createdLessonId,
                         request.StudentShortName,
                         request.StartsAt,
@@ -124,7 +124,7 @@ public sealed class GoogleCalendarGateway : IGoogleCalendarGateway
                     request.HasKnownStartTime,
                     options.DefaultLessonDuration,
                     cancellationToken);
-                createdLessons.Add(new CalendarLesson(
+                createdLessons.Add(CreateCalendarLesson(
                     createdLessonId,
                     request.StudentShortName,
                     request.StartsAt,
@@ -145,11 +145,16 @@ public sealed class GoogleCalendarGateway : IGoogleCalendarGateway
         DateOnly refreshMonth,
         CancellationToken cancellationToken)
     {
+        if (GetExternalId(request.LessonId) is not { } eventId)
+        {
+            return WrongCalendar<IReadOnlyList<CalendarLesson>>();
+        }
+
         try
         {
             await eventClient.MoveEventAsync(
                 options.CalendarId,
-                request.LessonId,
+                eventId,
                 request.StartsAt,
                 request.HasKnownStartTime,
                 cancellationToken);
@@ -167,9 +172,14 @@ public sealed class GoogleCalendarGateway : IGoogleCalendarGateway
         DateOnly refreshMonth,
         CancellationToken cancellationToken)
     {
+        if (GetExternalId(lessonId) is not { } eventId)
+        {
+            return WrongCalendar<IReadOnlyList<CalendarLesson>>();
+        }
+
         try
         {
-            await eventClient.DeleteEventAsync(options.CalendarId, lessonId, cancellationToken);
+            await eventClient.DeleteEventAsync(options.CalendarId, eventId, cancellationToken);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -184,9 +194,14 @@ public sealed class GoogleCalendarGateway : IGoogleCalendarGateway
         LessonState state,
         CancellationToken cancellationToken)
     {
+        if (GetExternalId(lessonId) is not { } eventId)
+        {
+            return WrongCalendar<LessonState>();
+        }
+
         try
         {
-            await eventClient.UpdateLessonStateAsync(options.CalendarId, lessonId, state, cancellationToken);
+            await eventClient.UpdateLessonStateAsync(options.CalendarId, eventId, state, cancellationToken);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -199,6 +214,31 @@ public sealed class GoogleCalendarGateway : IGoogleCalendarGateway
 
         return OperationResult<LessonState>.Success(state);
     }
+
+    private CalendarLesson CreateCalendarLesson(
+        string eventId, string studentShortName, DateTimeOffset startsAt, LessonState state, bool hasKnownStartTime) =>
+        new(CreateScopedId(eventId), studentShortName, startsAt, state, hasKnownStartTime,
+            options.CalendarScope is null ? null : eventId);
+
+    private string CreateScopedId(string eventId) =>
+        options.CalendarScope is { } scope ? $"{scope}:{eventId}" : eventId;
+
+    private string? GetExternalId(string lessonId)
+    {
+        if (options.CalendarScope is not { } scope)
+        {
+            return lessonId;
+        }
+
+        var prefix = $"{scope}:";
+        return lessonId.StartsWith(prefix, StringComparison.Ordinal) && lessonId.Length > prefix.Length
+            ? lessonId[prefix.Length..]
+            : null;
+    }
+
+    private static OperationResult<T> WrongCalendar<T>() =>
+        OperationResult<T>.Failure(new ValidationError(
+            "Calendar.ScopeMismatch", "This lesson belongs to a different calendar. Refresh the dashboard or switch to the original calendar."));
 
     private static OperationResult<IReadOnlyList<CalendarLesson>> CalendarUpdateFailure() =>
         OperationResult<IReadOnlyList<CalendarLesson>>.Failure(

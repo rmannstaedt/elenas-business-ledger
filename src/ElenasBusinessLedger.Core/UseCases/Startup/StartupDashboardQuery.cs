@@ -51,37 +51,57 @@ public sealed class StartupDashboardQuery
                 group => group.Key,
                 group => group.First().Student.ShortName,
                 StringComparer.OrdinalIgnoreCase);
-        var knownCalendarLessons = calendarLessons
-            .Select(lesson => activeStudentShortNames.TryGetValue(lesson.StudentShortName, out var canonicalShortName)
-                ? lesson with { StudentShortName = canonicalShortName }
-                : null)
-            .OfType<CalendarLesson>()
+        var eventIds = calendarLessons
+            .SelectMany(lesson => lesson.LegacyEventId is { } rawId ? [lesson.Id, rawId] : new[] { lesson.Id })
+            .Distinct(StringComparer.Ordinal)
             .ToArray();
+        var localLinks = await lessonRepository.ListByGoogleCalendarEventIdsAsync(eventIds, cancellationToken);
+        var byEventId = localLinks.ToDictionary(lesson => lesson.GoogleCalendarEventId!, StringComparer.Ordinal);
+        var known = new List<(CalendarLesson Calendar, LessonRecord? Local)>();
+        foreach (var calendar in calendarLessons)
+        {
+            var local = byEventId.GetValueOrDefault(calendar.Id);
+            if (local is null && calendar.LegacyEventId is { } legacyId &&
+                byEventId.TryGetValue(legacyId, out var legacy))
+            {
+                // Earlier releases stored only the external ID. Require the observed owner and time before adopting it.
+                if (!string.Equals(legacy.StudentShortName, calendar.StudentShortName, StringComparison.OrdinalIgnoreCase) ||
+                    legacy.StartsAt != calendar.StartsAt || legacy.HasKnownStartTime != calendar.HasKnownStartTime)
+                {
+                    continue;
+                }
+
+                local = legacy;
+            }
+
+            if (activeStudentShortNames.TryGetValue(local?.StudentShortName ?? calendar.StudentShortName, out var shortName))
+            {
+                known.Add((calendar with { StudentShortName = shortName }, local));
+            }
+        }
+
+        var knownCalendarLessons = known.Select(match => match.Calendar).ToArray();
         var currentStudent = selectedStudentShortName is not null &&
                              activeStudentShortNames.TryGetValue(selectedStudentShortName, out var canonicalSelectedStudent)
             ? canonicalSelectedStudent
             : PickCurrentStudent(knownCalendarLessons, students);
 
-        var lessonStatuses = await invoiceRepository.ListLessonStatusesAsync(from, to, cancellationToken);
+        var lessonStatuses = await invoiceRepository.ListLessonStatusesAsync(
+            from, to, cancellationToken, localLinks.Select(lesson => lesson.Id).ToArray());
         var statusByLessonId = lessonStatuses
             .Where(status => status.LessonId > 0)
             .GroupBy(status => status.LessonId)
             .ToDictionary(group => group.Key, group => group.First());
         var localLessons = await lessonRepository.ListForWindowAsync(from, to, cancellationToken);
-        var localByCalendarId = localLessons
-            .Where(lesson => !string.IsNullOrWhiteSpace(lesson.GoogleCalendarEventId))
-            .ToDictionary(lesson => lesson.GoogleCalendarEventId!, StringComparer.OrdinalIgnoreCase);
-
         var dashboardLessons = new List<DashboardLesson>();
         var representedLocalLessonIds = new HashSet<int>();
-        foreach (var lesson in knownCalendarLessons.OrderBy(lesson => lesson.StartsAt))
+        foreach (var (lesson, localLesson) in known.OrderBy(match => match.Calendar.StartsAt))
         {
             if (!MatchesCurrentStudent(lesson.StudentShortName, currentStudent))
             {
                 continue;
             }
 
-            var localLesson = localByCalendarId.GetValueOrDefault(lesson.Id);
             var invoiceStatus = localLesson is null
                 ? null
                 : statusByLessonId.GetValueOrDefault(localLesson.Id);
@@ -94,16 +114,8 @@ public sealed class StartupDashboardQuery
             }
         }
 
-        var currentCalendarLessonIds = knownCalendarLessons
-            .Select(lesson => lesson.Id)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var missingUninvoicedLocalLessonIds = localLessons
-            .Where(lesson => !statusByLessonId.ContainsKey(lesson.Id))
-            .Where(lesson => !string.IsNullOrWhiteSpace(lesson.GoogleCalendarEventId))
-            .Where(lesson => !currentCalendarLessonIds.Contains(lesson.GoogleCalendarEventId!))
-            .Select(lesson => lesson.Id)
-            .ToArray();
-        await lessonRepository.DeleteUninvoicedAsync(missingUninvoicedLocalLessonIds, cancellationToken);
+        // An omitted event can belong to another calendar, be outside the date range, or have a changed title.
+        // Only an explicit lesson deletion removes a billing record.
 
         foreach (var localLesson in localLessons
             .Where(lesson => statusByLessonId.ContainsKey(lesson.Id))
@@ -119,9 +131,11 @@ public sealed class StartupDashboardQuery
             .OrderBy(lesson => lesson.StartsAt)
             .ToArray();
 
-        var invoices = currentStudent is null
+        var selectedStudent = students.FirstOrDefault(student =>
+            string.Equals(student.Student.ShortName, currentStudent, StringComparison.OrdinalIgnoreCase));
+        var invoices = selectedStudent is null
             ? []
-            : await invoiceRepository.ListInvoicesForStudentAsync(currentStudent, cancellationToken);
+            : await invoiceRepository.ListInvoicesForStudentAsync(selectedStudent.Id, cancellationToken);
 
         var studentShortNames = students
             .Select(student => student.Student.ShortName)
@@ -129,8 +143,6 @@ public sealed class StartupDashboardQuery
             .ToArray();
         var studentNavigationEntries = CreateStudentNavigationEntries(selectedMonth, knownCalendarLessons, students);
         var planOptions = await CreatePlanOptionsAsync(students, cancellationToken);
-        var selectedStudent = students.FirstOrDefault(student =>
-            string.Equals(student.Student.ShortName, currentStudent, StringComparison.OrdinalIgnoreCase));
         var lessonDefaults = selectedStudent is null
             ? null
             : new DashboardStudentLessonDefaults(selectedStudent.Student.ShortName, selectedStudent.Schedule, selectedStudent.PlanPeriods);
@@ -154,19 +166,26 @@ public sealed class StartupDashboardQuery
         IReadOnlyList<StudentRecord> students,
         CancellationToken cancellationToken)
     {
+        if (localLesson is not null && invoiceStatus is not null)
+        {
+            return CreateDashboardLesson(localLesson, invoiceStatus);
+        }
+
         var record = localLesson is null
             ? CreateLocalLesson(calendarLesson, students)
-            : invoiceStatus is null
-                ? localLesson with
-                {
-                    StartsAt = calendarLesson.StartsAt,
-                    HasKnownStartTime = calendarLesson.HasKnownStartTime,
-                    State = calendarLesson.State,
-                    InvoiceNumber = null
-                }
-                : localLesson;
+            : localLesson with
+            {
+                StartsAt = calendarLesson.StartsAt,
+                HasKnownStartTime = calendarLesson.HasKnownStartTime,
+                State = calendarLesson.State,
+                GoogleCalendarEventId = calendarLesson.Id,
+                InvoiceNumber = null
+            };
 
-        record = await lessonRepository.SaveAsync(record, cancellationToken);
+        if (record != localLesson)
+        {
+            record = await lessonRepository.SaveAsync(record, cancellationToken);
+        }
 
         return CreateDashboardLesson(record, invoiceStatus);
     }
@@ -175,7 +194,8 @@ public sealed class StartupDashboardQuery
         LessonRecord record,
         InvoiceLessonStatus? invoiceStatus)
     {
-        var isInvoiced = invoiceStatus?.InvoiceNumber is not null;
+        var invoiceNumber = invoiceStatus?.InvoiceNumber;
+        var isInvoiced = invoiceNumber is not null;
 
         return new(
             record.GoogleCalendarEventId ?? record.Id.ToString(System.Globalization.CultureInfo.InvariantCulture),
@@ -184,7 +204,7 @@ public sealed class StartupDashboardQuery
             isInvoiced ? LessonState.Completed : record.State,
             isInvoiced,
             invoiceStatus?.PaymentStatus,
-            invoiceStatus?.InvoiceNumber,
+            invoiceNumber,
             record.PlanCatalogId,
             record.PlanName,
             record.Id,

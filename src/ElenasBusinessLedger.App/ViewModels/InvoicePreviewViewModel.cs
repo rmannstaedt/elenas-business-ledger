@@ -17,25 +17,29 @@ public sealed class InvoicePreviewViewModel : ViewModelBase
     private readonly Func<CancellationToken, Task<bool>>? ensureInvoicePrinterConfiguredAsync;
     private readonly Func<CancellationToken, Task<bool>> confirmContinueWaitingAsync;
     private readonly TimeSpan extendedIssueWaitPromptDelay;
+    private readonly Func<PendingInvoiceRecovery, CancellationToken, Task<InvoiceRecoveryChoice>>? chooseRecovery;
     private readonly InvoicePreviewResult preview;
     private string priceAdjustmentAmountText = string.Empty;
     private string priceAdjustmentReason = string.Empty;
     private InvoiceTotals totals;
     private string? errorMessage;
     private bool isBusy;
+    private bool isChoosingRecovery;
 
     public InvoicePreviewViewModel(
         IInvoiceWorkflowService invoiceWorkflowService,
         InvoicePreviewResult preview,
         Func<CancellationToken, Task<bool>>? ensureInvoicePrinterConfiguredAsync = null,
         Func<CancellationToken, Task<bool>>? confirmContinueWaitingAsync = null,
-        TimeSpan? extendedIssueWaitPromptDelay = null)
+        TimeSpan? extendedIssueWaitPromptDelay = null,
+        Func<PendingInvoiceRecovery, CancellationToken, Task<InvoiceRecoveryChoice>>? chooseRecovery = null)
     {
         this.invoiceWorkflowService = invoiceWorkflowService;
         this.ensureInvoicePrinterConfiguredAsync = ensureInvoicePrinterConfiguredAsync;
         this.confirmContinueWaitingAsync = confirmContinueWaitingAsync ?? (_ => Task.FromResult(true));
         this.extendedIssueWaitPromptDelay = extendedIssueWaitPromptDelay ?? DefaultExtendedIssueWaitPromptDelay;
         this.preview = preview;
+        this.chooseRecovery = chooseRecovery;
         totals = preview.Totals;
 
         foreach (var line in preview.Draft.Lines)
@@ -208,7 +212,7 @@ public sealed class InvoicePreviewViewModel : ViewModelBase
 
     private async Task<OperationResult<IssueInvoiceResult>> IssueWithExtendedWaitPromptAsync(InvoiceDraft draft)
     {
-        var issueTask = invoiceWorkflowService.IssueAsync(draft, CancellationToken.None);
+        var issueTask = invoiceWorkflowService.IssueAsync(draft, CancellationToken.None, ChooseRecoveryAsync);
         while (true)
         {
             var completedTask = await Task.WhenAny(
@@ -219,12 +223,36 @@ public sealed class InvoicePreviewViewModel : ViewModelBase
                 return await issueTask;
             }
 
+            if (isChoosingRecovery)
+            {
+                continue;
+            }
+
             var keepWaiting = await confirmContinueWaitingAsync(CancellationToken.None);
             if (!keepWaiting)
             {
                 ErrorMessage =
                     "The invoice is still being written and printed. It cannot be safely cancelled from this window.";
             }
+        }
+    }
+
+    private async Task<InvoiceRecoveryChoice> ChooseRecoveryAsync(
+        PendingInvoiceRecovery recovery, CancellationToken cancellationToken)
+    {
+        if (chooseRecovery is null)
+        {
+            return InvoiceRecoveryChoice.Cancel;
+        }
+
+        isChoosingRecovery = true;
+        try
+        {
+            return await chooseRecovery(recovery, cancellationToken);
+        }
+        finally
+        {
+            isChoosingRecovery = false;
         }
     }
 

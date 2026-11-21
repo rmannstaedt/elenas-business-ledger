@@ -87,7 +87,8 @@ public sealed class CoreInvoiceWorkflowService : IInvoiceWorkflowService
 
     public async Task<OperationResult<IssueInvoiceResult>> IssueAsync(
         InvoiceDraft draft,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Func<PendingInvoiceRecovery, CancellationToken, Task<InvoiceRecoveryChoice>>? chooseRecovery = null)
     {
         try
         {
@@ -101,7 +102,7 @@ public sealed class CoreInvoiceWorkflowService : IInvoiceWorkflowService
                 printer,
                 clock);
 
-            return await issueUseCase.ExecuteAsync(draft, cancellationToken);
+            return await issueUseCase.ExecuteAsync(draft, cancellationToken, chooseRecovery);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {

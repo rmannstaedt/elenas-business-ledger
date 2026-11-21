@@ -136,7 +136,7 @@ public sealed class UseCaseTests
         var dashboardLesson = Assert.Single(result.Value.Lessons);
         Assert.Equal("Anna", dashboardLesson.StudentShortName);
         Assert.Equal("Anna", Assert.Single(lessons.SavedLessons).StudentShortName);
-        Assert.Equal("Anna", invoices.LastStudentInvoiceLookup);
+        Assert.Equal(CreateStudentRecord("Anna").Id, invoices.LastStudentInvoiceLookup);
         Assert.Single(result.Value.Invoices);
     }
 
@@ -342,7 +342,7 @@ public sealed class UseCaseTests
     }
 
     [Fact]
-    public async Task StartupDashboardRemovesUninvoicedLocalLessonWhenCalendarEventWasDeleted()
+    public async Task StartupDashboardKeepsUninvoicedLocalLessonWhenEventIsOutsideCalendarResults()
     {
         var startsAt = new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.Zero);
         var clock = new FakeClock(startsAt);
@@ -360,8 +360,39 @@ public sealed class UseCaseTests
 
         Assert.True(result.Succeeded);
         Assert.Empty(result.Value!.Lessons);
-        Assert.Equal([saved.Id], lessons.DeletedLessonIds);
-        Assert.Empty(lessons.SavedLessons);
+        Assert.Equal(saved, Assert.Single(lessons.SavedLessons));
+    }
+
+    [Fact]
+    public async Task CalendarSwitchAndRenameRetainExactOriginalLessonAndPlan()
+    {
+        var start = new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.Zero);
+        var moved = start.AddMonths(4);
+        var original = CreateStudentRecord("Miri") with { Id = 31 };
+        var replacement = CreateStudentRecord("Mira") with { Id = 32 };
+        var students = new FakeStudentRepository([original, replacement]);
+        var lessons = new FakeLessonRepository();
+        var saved = await lessons.SaveAsync(CreateLessonRecord("Miri", start, planCatalogId: 17,
+            planName: "Original plan", googleCalendarEventId: "first:lesson-1") with { StudentId = original.Id },
+            CancellationToken.None);
+        var invoices = new FakeInvoiceRepository();
+        var clock = new FakeClock(start);
+
+        var otherCalendar = new StartupDashboardQuery(students, new FakeCalendarGateway([]), invoices, clock, lessons);
+        Assert.True((await otherCalendar.ExecuteAsync(new DateOnly(2026, 6, 1), "Miri", CancellationToken.None)).Succeeded);
+        Assert.Equal(saved, Assert.Single(lessons.SavedLessons));
+
+        var originalCalendar = new StartupDashboardQuery(students,
+            new FakeCalendarGateway([new CalendarLesson("first:lesson-1", "Mira", moved)]),
+            invoices, clock, lessons);
+        var onOriginal = await originalCalendar.ExecuteAsync(new DateOnly(2026, 10, 1), "Miri", CancellationToken.None);
+        Assert.True(onOriginal.Succeeded);
+        var row = Assert.Single(onOriginal.Value!.Lessons);
+        Assert.Equal(saved.Id, row.LocalLessonId);
+        Assert.Equal("Miri", row.StudentShortName);
+        Assert.Equal("Original plan", row.PlanName);
+        Assert.Equal(moved, row.StartsAt);
+        Assert.Equal(original.Id, Assert.Single(lessons.SavedLessons).StudentId);
     }
 
     [Fact]
@@ -1333,7 +1364,7 @@ public sealed class UseCaseTests
     }
 
     [Fact]
-    public async Task IssueInvoiceReleasesReservedInvoiceNumberWhenPdfPublishFailsBeforeFinalPathExists()
+    public async Task IssueInvoiceKeepsCheckpointWhenPdfPublishFails()
     {
         var calls = new List<string>();
         var company = new FakeCompanyProfileRepository();
@@ -1364,12 +1395,10 @@ public sealed class UseCaseTests
                 "stage:001",
                 "write:C:\\Invoices\\.staging\\001.pdf",
                 "verify:C:\\Invoices\\.staging\\001.pdf",
-                "publish:C:\\Invoices\\.staging\\001.pdf",
-                "discard:C:\\Invoices\\.staging\\001.pdf",
-                "release:001"
+                "publish:C:\\Invoices\\.staging\\001.pdf"
             ],
             calls);
-        Assert.True(invoices.ReleaseReservationCalled);
+        Assert.False(invoices.ReleaseReservationCalled);
         Assert.False(invoices.FinalizeCalled);
         Assert.False(printer.PrintCalled);
     }
@@ -1406,8 +1435,7 @@ public sealed class UseCaseTests
                 "stage:001",
                 "write:C:\\Invoices\\.staging\\001.pdf",
                 "verify:C:\\Invoices\\.staging\\001.pdf",
-                "publish:C:\\Invoices\\.staging\\001.pdf",
-                "discard:C:\\Invoices\\.staging\\001.pdf"
+                "publish:C:\\Invoices\\.staging\\001.pdf"
             ],
             calls);
         Assert.False(invoices.ReleaseReservationCalled);
@@ -1472,7 +1500,9 @@ public sealed class UseCaseTests
                 InvoiceIssueStatus.Issuing,
                 InvoicePrintStatus.NotPrinted,
                 printedAt: null,
-                lastPrintError: null)
+                lastPrintError: null,
+                snapshotRevision: "prepared",
+                publication: new InvoicePdfPublication(@"C:\Invoices\.staging\001.pdf", @"C:\Invoices\001.pdf", "checksum"))
         };
         var fileStore = new FakeInvoiceFileStore(calls);
         var pdfWriter = new FakeInvoicePdfWriter { Calls = calls };
@@ -1491,6 +1521,7 @@ public sealed class UseCaseTests
         Assert.Equal(
             [
                 "reserve",
+                "publish:C:\\Invoices\\.staging\\001.pdf",
                 "finalize:C:\\Invoices\\001.pdf",
                 "print:C:\\Invoices\\001.pdf:Office Printer",
                 "print-status:Printed:2026-06-16T17:30:00.0000000+00:00:"
@@ -1734,8 +1765,6 @@ public sealed class UseCaseTests
 
         public bool ThrowOnSave { get; set; }
 
-        public IReadOnlyList<int> DeletedLessonIds { get; private set; } = [];
-
         public Task<LessonRecord> SaveAsync(LessonRecord lesson, CancellationToken cancellationToken)
         {
             if (ThrowOnSave)
@@ -1866,12 +1895,10 @@ public sealed class UseCaseTests
             return Task.FromResult(removed > 0);
         }
 
-        public Task DeleteUninvoicedAsync(IReadOnlyList<int> lessonIds, CancellationToken cancellationToken)
-        {
-            DeletedLessonIds = lessonIds.ToArray();
-            lessons.RemoveAll(lesson => lessonIds.Contains(lesson.Id) && lesson.InvoiceNumber is null);
-            return Task.CompletedTask;
-        }
+        public Task<IReadOnlyList<LessonRecord>> ListByGoogleCalendarEventIdsAsync(
+            IReadOnlyList<string> eventIds, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<LessonRecord>>(lessons
+                .Where(lesson => lesson.GoogleCalendarEventId is { } id && eventIds.Contains(id)).ToArray());
     }
 
     private sealed class FakePlanCatalogRepository(IReadOnlyList<PlanCatalogItem> plans) : IPlanCatalogRepository
@@ -2022,15 +2049,13 @@ public sealed class UseCaseTests
 
         public IReadOnlyList<IssuedInvoiceSummary> StudentInvoices { get; init; } = [];
 
-        public HashSet<string> StudentsWithInvoiceThisMonth { get; init; } = [];
-
         public PaymentStatus CurrentPaymentStatus { get; init; } = PaymentStatus.Outstanding;
 
         public IssuedInvoice? IssuedInvoiceToReturn { get; init; }
 
         public IssuedInvoice? ReservedInvoiceToReturn { get; init; }
 
-        public string? LastStudentInvoiceLookup { get; private set; }
+        public int? LastStudentInvoiceLookup { get; private set; }
 
         public bool ReserveCalled { get; private set; }
 
@@ -2050,12 +2075,13 @@ public sealed class UseCaseTests
 
         public OperationResult<IssuedInvoice>? FinalizeResult { get; init; }
 
-        public Task<IReadOnlyList<InvoiceLessonStatus>> ListLessonStatusesAsync(DateOnly from, DateOnly to, CancellationToken cancellationToken) =>
+        public Task<IReadOnlyList<InvoiceLessonStatus>> ListLessonStatusesAsync(DateOnly from, DateOnly to, CancellationToken cancellationToken,
+            IReadOnlyList<int>? includeLessonIds = null) =>
             Task.FromResult(LessonStatuses);
 
-        public Task<IReadOnlyList<IssuedInvoiceSummary>> ListInvoicesForStudentAsync(string studentShortName, CancellationToken cancellationToken)
+        public Task<IReadOnlyList<IssuedInvoiceSummary>> ListInvoicesForStudentAsync(int studentId, CancellationToken cancellationToken)
         {
-            LastStudentInvoiceLookup = studentShortName;
+            LastStudentInvoiceLookup = studentId;
             return Task.FromResult(StudentInvoices);
         }
 
@@ -2064,8 +2090,8 @@ public sealed class UseCaseTests
             CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<EconomyInvoiceRecord>>([]);
 
-        public Task<bool> HasInvoiceForStudentInMonthAsync(string studentShortName, DateOnly month, CancellationToken cancellationToken) =>
-            Task.FromResult(StudentsWithInvoiceThisMonth.Contains(studentShortName));
+        public Task<bool> HasInvoiceForStudentInMonthAsync(int studentId, DateOnly month, CancellationToken cancellationToken) =>
+            Task.FromResult(false);
 
         public Task<InvoiceNumber> GetNextInvoiceNumberAsync(CancellationToken cancellationToken) =>
             Task.FromResult(new InvoiceNumber(1));
@@ -2089,7 +2115,8 @@ public sealed class UseCaseTests
                 InvoiceIssueStatus.Issuing,
                 InvoicePrintStatus.NotPrinted,
                 printedAt: null,
-                lastPrintError: null)));
+                lastPrintError: null,
+                snapshotRevision: "reserved")));
         }
 
         private Task<OperationResult<IssuedInvoice>> FinalizeIssuedInvoice(
@@ -2171,7 +2198,18 @@ public sealed class UseCaseTests
                 source.LastPrintError)));
         }
 
-        public Task ReleaseInvoiceReservationAsync(InvoiceNumber invoiceNumber, CancellationToken cancellationToken)
+        public Task<OperationResult<IssuedInvoice>> ReviseInvoiceReservationAsync(
+            IssuedInvoice savedInvoice, InvoiceDraft draft, InvoiceTotals totals, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
+        public Task<OperationResult<IssuedInvoice>> PrepareInvoicePublicationAsync(
+            IssuedInvoice savedInvoice, InvoicePdfPublication publication, CancellationToken cancellationToken) =>
+            Task.FromResult(OperationResult<IssuedInvoice>.Success(savedInvoice.CreateSavedDraft().Issue(
+                savedInvoice.InvoiceNumber, savedInvoice.Totals, null, InvoiceIssueStatus.Issuing,
+                snapshotRevision: "prepared", publication: publication)));
+
+        public Task ReleaseInvoiceReservationAsync(
+            InvoiceNumber invoiceNumber, CancellationToken cancellationToken, string? expectedRevision = null)
         {
             ReleaseReservationCalled = true;
             calls?.Add($"release:{invoiceNumber}");
@@ -2260,9 +2298,15 @@ public sealed class UseCaseTests
             return Task.FromResult(OperationResult<string>.Success(stagingPath));
         }
 
-        public Task<OperationResult<string>> PublishAsync(string stagingPath, InvoiceDraft draft, InvoiceNumber invoiceNumber, CancellationToken cancellationToken)
+        public Task<OperationResult<InvoicePdfPublication>> PreparePublicationAsync(
+            string stagingPath, InvoiceDraft draft, InvoiceNumber invoiceNumber, CancellationToken cancellationToken) =>
+            Task.FromResult(OperationResult<InvoicePdfPublication>.Success(new InvoicePdfPublication(
+                stagingPath, @"C:\Invoices\001.pdf", "checksum")));
+
+        public Task<OperationResult<string>> CompletePublicationAsync(
+            InvoicePdfPublication publication, CancellationToken cancellationToken)
         {
-            calls?.Add($"publish:{stagingPath}");
+            calls?.Add($"publish:{publication.StagingPath}");
             return Task.FromResult(PublishResult);
         }
 

@@ -101,7 +101,7 @@ public sealed class InvoicePreviewUseCase
                 company.BankRegistrationNumber,
                 company.BankAccountNumber,
                 company.MobilePayAccount),
-            new StudentSnapshot(student.Student.ShortName, student.Student.FullName, student.Student.Address),
+            new StudentSnapshot(student.Student.ShortName, student.Student.FullName, student.Student.Address, student.Id),
             lines.ToArray(),
             priceAdjustment: null,
             period: new InvoicePeriod(from, to));

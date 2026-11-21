@@ -317,16 +317,17 @@ public sealed class EconomyOverviewQueryTests
         public Task<IReadOnlyList<InvoiceLessonStatus>> ListLessonStatusesAsync(
             DateOnly from,
             DateOnly to,
-            CancellationToken cancellationToken) =>
+            CancellationToken cancellationToken,
+            IReadOnlyList<int>? includeLessonIds = null) =>
             throw new NotImplementedException();
 
         public Task<IReadOnlyList<IssuedInvoiceSummary>> ListInvoicesForStudentAsync(
-            string studentShortName,
+            int studentId,
             CancellationToken cancellationToken) =>
             throw new NotImplementedException();
 
         public Task<bool> HasInvoiceForStudentInMonthAsync(
-            string studentShortName,
+            int studentId,
             DateOnly month,
             CancellationToken cancellationToken) =>
             throw new NotImplementedException();
@@ -353,9 +354,16 @@ public sealed class EconomyOverviewQueryTests
             CancellationToken cancellationToken) =>
             throw new NotImplementedException();
 
+        public Task<OperationResult<IssuedInvoice>> ReviseInvoiceReservationAsync(
+            IssuedInvoice savedInvoice, InvoiceDraft draft, InvoiceTotals totals, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
+        public Task<OperationResult<IssuedInvoice>> PrepareInvoicePublicationAsync(
+            IssuedInvoice savedInvoice, InvoicePdfPublication publication, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
         public Task ReleaseInvoiceReservationAsync(
-            InvoiceNumber invoiceNumber,
-            CancellationToken cancellationToken) =>
+            InvoiceNumber invoiceNumber, CancellationToken cancellationToken, string? expectedRevision = null) =>
             throw new NotImplementedException();
 
         public Task<OperationResult<IssuedInvoice>> UpdatePrintStatusAsync(

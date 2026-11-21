@@ -19,13 +19,25 @@ public sealed class SqliteLessonRepository : ILessonRepository
     {
         await using var context = createContext();
         var entity = lesson.Id > 0
-            ? await context.Lessons.SingleOrDefaultAsync(storedLesson => storedLesson.Id == lesson.Id, cancellationToken)
+            ? await context.Lessons.Include(storedLesson => storedLesson.Student)
+                .SingleOrDefaultAsync(storedLesson => storedLesson.Id == lesson.Id, cancellationToken)
             : null;
 
         if (entity is null)
         {
+            if (lesson.Id > 0)
+            {
+                throw new InvalidOperationException("The lesson was removed before it could be updated. Refresh the dashboard.");
+            }
+
             entity = new LessonEntity();
             context.Lessons.Add(entity);
+        }
+
+        if (entity.Id > 0 && await context.IssuedInvoiceLines.AnyAsync(
+            line => line.LessonId == entity.Id && line.Invoice.IssueStatus == InvoiceIssueStatus.Issued, cancellationToken))
+        {
+            return ToDomain(entity);
         }
 
         entity.StudentId = lesson.StudentId;
@@ -193,21 +205,20 @@ public sealed class SqliteLessonRepository : ILessonRepository
         return true;
     }
 
-    public async Task DeleteUninvoicedAsync(IReadOnlyList<int> lessonIds, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<LessonRecord>> ListByGoogleCalendarEventIdsAsync(
+        IReadOnlyList<string> eventIds, CancellationToken cancellationToken)
     {
-        if (lessonIds.Count == 0)
+        if (eventIds.Count == 0)
         {
-            return;
+            return [];
         }
 
         await using var context = createContext();
-        var lessons = await context.Lessons
-            .Where(lesson => lessonIds.Contains(lesson.Id))
-            .Where(lesson => lesson.InvoiceNumber == null)
+        var lessons = await context.Lessons.AsNoTracking()
+            .Include(lesson => lesson.Student)
+            .Where(lesson => lesson.GoogleCalendarEventId != null && eventIds.Contains(lesson.GoogleCalendarEventId))
             .ToArrayAsync(cancellationToken);
-
-        context.Lessons.RemoveRange(lessons);
-        await context.SaveChangesAsync(cancellationToken);
+        return lessons.Select(ToDomain).ToArray();
     }
 
     private static LessonRecord ToDomain(LessonEntity entity) =>

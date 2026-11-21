@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using ElenasBusinessLedger.Infrastructure.Calendar;
 using ElenasBusinessLedger.Infrastructure.Persistence;
 
@@ -107,6 +109,15 @@ public sealed class GoogleCalendarClientFactory
             cancellationToken);
     }
 
+    internal static string CreateCalendarScope(CalendarSettings settings)
+    {
+        var calendarId = settings.SelectedCalendarId.Trim();
+        var identity = string.Equals(calendarId, "primary", StringComparison.Ordinal)
+            ? settings.GoogleAccountEmail.Trim().ToLowerInvariant()
+            : calendarId;
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(identity)));
+    }
+
     private async Task<ConfiguredGoogleCalendarClient?> BuildClientAsync(
         CalendarSettings settings,
         GoogleOAuthClientConfigurationResult configuration,
@@ -130,6 +141,7 @@ public sealed class GoogleCalendarClientFactory
             ? null
             : new ConfiguredGoogleCalendarClient(
                 settings.SelectedCalendarId,
-                new GoogleCalendarServiceEventClient(calendarService, timeZoneId));
+                new GoogleCalendarServiceEventClient(calendarService, timeZoneId),
+                CreateCalendarScope(settings));
     }
 }

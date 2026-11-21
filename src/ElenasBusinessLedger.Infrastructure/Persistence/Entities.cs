@@ -209,11 +209,25 @@ public sealed class IssuedInvoiceEntity
 
     public string CompanyMobilePayAccount { get; set; } = string.Empty;
 
+    public int? StudentId { get; set; }
+
     public string StudentShortName { get; set; } = string.Empty;
 
     public string StudentFullName { get; set; } = string.Empty;
 
     public string StudentAddress { get; set; } = string.Empty;
+
+    public decimal? PriceAdjustmentAmount { get; set; }
+
+    public string? PriceAdjustmentReason { get; set; }
+
+    public string? SnapshotRevision { get; set; }
+
+    public string? StagedPdfPath { get; set; }
+
+    public string? PlannedPdfPath { get; set; }
+
+    public string? PdfSha256 { get; set; }
 
     public decimal TotalWithoutVatAmount { get; set; }
 

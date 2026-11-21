@@ -141,8 +141,13 @@ public sealed class LedgerDbContext : DbContext
 
         modelBuilder.Entity<IssuedInvoiceEntity>(entity =>
         {
+            entity.Property(invoice => invoice.SnapshotRevision).IsConcurrencyToken();
             entity.HasKey(invoice => invoice.Id);
             entity.HasIndex(invoice => invoice.InvoiceNumber).IsUnique();
+            entity.HasOne<StudentEntity>()
+                .WithMany()
+                .HasForeignKey(invoice => invoice.StudentId)
+                .OnDelete(DeleteBehavior.Restrict);
             entity.Property(invoice => invoice.CompanyName).HasMaxLength(200).IsRequired();
             entity.Property(invoice => invoice.CompanyAddress).HasMaxLength(500).IsRequired();
             entity.Property(invoice => invoice.CompanyCvr).HasMaxLength(50);
@@ -189,6 +194,7 @@ public sealed class LedgerDbContext : DbContext
             entity.Property(lesson => lesson.State).HasConversion<string>().HasMaxLength(50).IsRequired();
             entity.Property(lesson => lesson.GoogleCalendarEventId).HasMaxLength(500);
             entity.HasIndex(lesson => lesson.GoogleCalendarEventId).IsUnique();
+            entity.Property(lesson => lesson.InvoiceNumber).IsConcurrencyToken();
             entity.HasIndex(lesson => lesson.StartsAt);
             entity.HasIndex(lesson => new { lesson.StudentId, lesson.StartsAt });
             entity.HasOne(lesson => lesson.PlanCatalog)

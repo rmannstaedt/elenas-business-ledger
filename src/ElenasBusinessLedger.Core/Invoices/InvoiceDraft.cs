@@ -102,7 +102,9 @@ public sealed class InvoiceDraft
         InvoiceIssueStatus issueStatus = InvoiceIssueStatus.Issued,
         InvoicePrintStatus printStatus = InvoicePrintStatus.NotPrinted,
         DateTimeOffset? printedAt = null,
-        string? lastPrintError = null)
+        string? lastPrintError = null,
+        string? snapshotRevision = null,
+        InvoicePdfPublication? publication = null)
     {
         var issuedLines = Lines
             .Select(line => new IssuedInvoiceLine(
@@ -126,6 +128,9 @@ public sealed class InvoiceDraft
             issueStatus,
             printStatus,
             printedAt,
-            lastPrintError);
+            lastPrintError,
+            PriceAdjustment,
+            snapshotRevision,
+            publication);
     }
 }

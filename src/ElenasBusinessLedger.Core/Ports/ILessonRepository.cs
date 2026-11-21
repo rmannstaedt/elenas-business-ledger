@@ -38,5 +38,6 @@ public interface ILessonRepository
         string googleCalendarEventId,
         CancellationToken cancellationToken);
 
-    Task DeleteUninvoicedAsync(IReadOnlyList<int> lessonIds, CancellationToken cancellationToken);
+    Task<IReadOnlyList<LessonRecord>> ListByGoogleCalendarEventIdsAsync(
+        IReadOnlyList<string> eventIds, CancellationToken cancellationToken);
 }

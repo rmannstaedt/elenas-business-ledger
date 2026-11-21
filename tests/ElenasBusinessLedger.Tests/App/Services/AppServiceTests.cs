@@ -189,10 +189,11 @@ public sealed class AppServiceTests
 
     private sealed class EmptyInvoiceRepository : IInvoiceRepository
     {
-        public Task<IReadOnlyList<InvoiceLessonStatus>> ListLessonStatusesAsync(DateOnly from, DateOnly to, CancellationToken cancellationToken) =>
+        public Task<IReadOnlyList<InvoiceLessonStatus>> ListLessonStatusesAsync(DateOnly from, DateOnly to, CancellationToken cancellationToken,
+            IReadOnlyList<int>? includeLessonIds = null) =>
             Task.FromResult<IReadOnlyList<InvoiceLessonStatus>>([]);
 
-        public Task<IReadOnlyList<IssuedInvoiceSummary>> ListInvoicesForStudentAsync(string studentShortName, CancellationToken cancellationToken) =>
+        public Task<IReadOnlyList<IssuedInvoiceSummary>> ListInvoicesForStudentAsync(int studentId, CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<IssuedInvoiceSummary>>([]);
 
         public Task<IReadOnlyList<EconomyInvoiceRecord>> ListIssuedInvoiceOverviewRowsAsync(
@@ -200,7 +201,7 @@ public sealed class AppServiceTests
             CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<EconomyInvoiceRecord>>([]);
 
-        public Task<bool> HasInvoiceForStudentInMonthAsync(string studentShortName, DateOnly month, CancellationToken cancellationToken) =>
+        public Task<bool> HasInvoiceForStudentInMonthAsync(int studentId, DateOnly month, CancellationToken cancellationToken) =>
             Task.FromResult(false);
 
         public Task<InvoiceNumber> GetNextInvoiceNumberAsync(CancellationToken cancellationToken) =>
@@ -234,7 +235,16 @@ public sealed class AppServiceTests
             Task.FromResult(OperationResult<IssuedInvoice>.Failure(
                 new ValidationError("Invoice.NotConfigured", "Invoice PDF publication is not configured.")));
 
-        public Task ReleaseInvoiceReservationAsync(InvoiceNumber invoiceNumber, CancellationToken cancellationToken) =>
+        public Task<OperationResult<IssuedInvoice>> ReviseInvoiceReservationAsync(
+            IssuedInvoice savedInvoice, InvoiceDraft draft, InvoiceTotals totals, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
+        public Task<OperationResult<IssuedInvoice>> PrepareInvoicePublicationAsync(
+            IssuedInvoice savedInvoice, InvoicePdfPublication publication, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
+        public Task ReleaseInvoiceReservationAsync(
+            InvoiceNumber invoiceNumber, CancellationToken cancellationToken, string? expectedRevision = null) =>
             Task.CompletedTask;
 
         public Task<OperationResult<IssuedInvoice>> UpdatePrintStatusAsync(
@@ -302,8 +312,8 @@ public sealed class AppServiceTests
             CancellationToken cancellationToken) =>
             Task.FromResult(false);
 
-        public Task DeleteUninvoicedAsync(IReadOnlyList<int> lessonIds, CancellationToken cancellationToken) =>
-            Task.CompletedTask;
+        public Task<IReadOnlyList<LessonRecord>> ListByGoogleCalendarEventIdsAsync(
+            IReadOnlyList<string> eventIds, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<LessonRecord>>([]);
     }
 
     private sealed class ThrowingCalendarGateway(string message) : IGoogleCalendarGateway
