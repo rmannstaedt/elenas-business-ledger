@@ -5,6 +5,7 @@ using ElenasBusinessLedger.Core.Time;
 
 namespace ElenasBusinessLedger.Core.UseCases.Invoices;
 
+// Sends an issued invoice's existing PDF to the current printer so a failed print can be retried under the same invoice number.
 public sealed class ReprintIssuedInvoiceUseCase
 {
     private readonly ICompanyProfileRepository companyProfileRepository;

@@ -1,5 +1,6 @@
 namespace ElenasBusinessLedger.Core.Invoices;
 
+// Carries the stored billing snapshot in both pending and issued states. Recovery, printing, and reporting use these saved values.
 public sealed class IssuedInvoice
 {
     public IssuedInvoice(
@@ -66,6 +67,7 @@ public sealed class IssuedInvoice
 
     public InvoicePdfPublication? Publication { get; }
 
+    /// <summary>Recreates the PDF input from the stored details without reloading student or plan data.</summary>
     public InvoiceDraft CreateSavedDraft() => InvoiceDraft.Create(
         InvoiceDate,
         Company,

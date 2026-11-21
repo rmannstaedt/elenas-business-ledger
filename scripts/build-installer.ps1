@@ -32,7 +32,7 @@ $projectPath = Join-Path $repoRoot "src\ElenasBusinessLedger.App\ElenasBusinessL
 $innoScriptPath = Join-Path $repoRoot "installer\ElenasBusinessLedger.iss"
 $buildRoot = Join-Path $repoRoot "artifacts\installer-builds"
 $installerDir = Join-Path $repoRoot "artifacts\installer"
-$installerFileName = "ElenasBusinessLedger-1.3.2-Setup.exe"
+$installerFileName = "ElenasBusinessLedger-1.4.0-Setup.exe"
 $installerPath = Join-Path $installerDir $installerFileName
 
 Assert-OwnedPath $repoRoot $buildRoot
@@ -60,7 +60,9 @@ if (Test-Path -LiteralPath $stage) {
 try {
     New-Item -ItemType Directory -Force -Path $publishDir, $candidateDir | Out-Null
     Write-Host "Publishing $projectPath"
-    & dotnet publish $projectPath --configuration $Configuration --framework net11.0-windows --runtime $Runtime --self-contained true --output $publishDir -p:PublishSingleFile=false
+    # MSBuild inserts PublishDir into a quoted file transform, so pass a project-relative directory.
+    $projectRelativePublishDir = Join-Path '..\..' $publishDir.Substring($repoRoot.Length + 1)
+    & dotnet publish $projectPath --configuration $Configuration --framework net11.0-windows --runtime $Runtime --self-contained true "-p:PublishDir=$projectRelativePublishDir" -p:PublishSingleFile=false
     if ($LASTEXITCODE -ne 0) {
         throw "dotnet publish failed with exit code $LASTEXITCODE."
     }

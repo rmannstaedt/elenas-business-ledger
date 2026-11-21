@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ElenasBusinessLedger.Infrastructure.Persistence;
 
+// Persists invoice snapshots, numbering, and lesson locks, and supplies the saved rows used by the dashboard and Economy.
 public sealed class SqliteInvoiceRepository : IInvoiceRepository
 {
     private readonly Func<LedgerDbContext> createContext;
@@ -142,12 +143,14 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
         return new InvoiceNumber((highest ?? 0) + 1);
     }
 
+    /// <summary>Reuses a matching pending snapshot or reserves the next number when the sequence is clear.</summary>
     public async Task<OperationResult<IssuedInvoice>> ReserveInvoiceAsync(
         InvoiceDraft draft,
         InvoiceTotals totals,
         CancellationToken cancellationToken)
     {
         var requestedLessonIds = GetDistinctPositiveLessonIds(draft.Lines.Select(line => line.LessonId));
+        // Check the pending reservation and allocate the number in the same transaction so concurrent issuers cannot both proceed.
         await using var context = createContext();
         await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
         var existingReservation = await FindOldestPendingAsync(context, cancellationToken);
@@ -219,6 +222,7 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
         return OperationResult<IssuedInvoice>.Success(ToDomain(entity));
     }
 
+    /// <summary>Commits issuance and locks its lessons together so the next preview sees a consistent ledger.</summary>
     public async Task<OperationResult<IssuedInvoice>> FinalizeIssuedInvoiceWithLessonLocksAsync(
         InvoiceNumber invoiceNumber,
         string pdfFilePath,
@@ -374,6 +378,7 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
         replacement.Id = invoice.Id;
         replacement.StudentId = invoice.StudentId;
         context.Entry(invoice).CurrentValues.SetValues(replacement);
+        // Update the existing line rows by lesson ID, preserving their identity even if the preview order changed.
         var linesByLessonId = replacement.Lines.ToDictionary(line => line.LessonId);
         foreach (var line in invoice.Lines)
         {
@@ -429,6 +434,7 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
         return invoice is null ? null : ToDomain(invoice);
     }
 
+    /// <summary>Discards an unpublished reservation and preserves its number as void if later numbers already exist.</summary>
     public async Task<OperationResult<InvoiceNumber>> DiscardPendingAsync(
         IssuedInvoice savedInvoice, CancellationToken cancellationToken)
     {

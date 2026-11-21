@@ -7,6 +7,7 @@ using ElenasBusinessLedger.Infrastructure.Invoices.Pdf;
 
 namespace ElenasBusinessLedger.App.Services;
 
+// Adapts WPF requests to the invoice use cases and resolves the configured invoice folder for each issue or resume attempt.
 public sealed class CoreInvoiceWorkflowService : IInvoiceWorkflowService
 {
     private readonly InvoiceCandidateSelectionUseCase candidateSelectionUseCase;

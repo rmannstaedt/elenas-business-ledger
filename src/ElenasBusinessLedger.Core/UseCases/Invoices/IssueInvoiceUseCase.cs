@@ -5,6 +5,7 @@ using ElenasBusinessLedger.Core.Time;
 
 namespace ElenasBusinessLedger.Core.UseCases.Invoices;
 
+// Coordinates the ledger and PDF store so interrupted issuance can recover the saved invoice number and billing details.
 public sealed class IssueInvoiceUseCase
 {
     private readonly ICompanyProfileRepository companyProfileRepository;
@@ -30,6 +31,7 @@ public sealed class IssueInvoiceUseCase
         this.clock = clock;
     }
 
+    /// <summary>Reserves or recovers a draft and reports issuance separately from the print result.</summary>
     public async Task<OperationResult<IssueInvoiceResult>> ExecuteAsync(
         InvoiceDraft draft,
         CancellationToken cancellationToken,
@@ -71,6 +73,7 @@ public sealed class IssueInvoiceUseCase
         return await PublishAndPrintAsync(savedInvoice, company.ConfiguredInvoicePrinterName, cancellationToken);
     }
 
+    /// <summary>Finishes the oldest recoverable reservation using its saved snapshot.</summary>
     public async Task<OperationResult<IssueInvoiceResult>> ResumeAsync(
         InvoiceNumber invoiceNumber, CancellationToken cancellationToken)
     {
@@ -127,6 +130,7 @@ public sealed class IssueInvoiceUseCase
             return OperationResult<IssueInvoiceResult>.Failure(finalize.Errors.ToArray());
         }
 
+        // Issuance is committed here. Print failures must leave the saved invoice available for reprint.
         var issued = finalize.Value!;
         OperationResult<string> print;
         try
@@ -168,6 +172,7 @@ public sealed class IssueInvoiceUseCase
         return OperationResult<IssueInvoiceResult>.Success(new IssueInvoiceResult(issued, print.Succeeded, warnings));
     }
 
+    // Ask before choosing between the saved snapshot and a changed draft. Publication freezes the saved details.
     private async Task<OperationResult<IssuedInvoice>> ResolvePendingInvoiceAsync(
         IssuedInvoice savedInvoice,
         InvoiceDraft requestedDraft,
@@ -234,6 +239,7 @@ public sealed class IssueInvoiceUseCase
             return await DiscardFailedStagingAsync(savedInvoice, path, prepare.Errors, cancellationToken);
         }
 
+        // Persist the paths and checksum before moving the file so a retry can recognize the same PDF.
         var checkpoint = await invoiceRepository.PrepareInvoicePublicationAsync(
             savedInvoice, prepare.Value!, cancellationToken);
         if (!checkpoint.Succeeded)
@@ -265,6 +271,7 @@ public sealed class IssueInvoiceUseCase
             return false;
         }
 
+        // Compare by lesson ID so a change in display order does not trigger recovery.
         return saved.Lines.OrderBy(line => line.LessonId).Zip(draft.Lines.OrderBy(line => line.LessonId))
             .All(pair => pair.First.LessonId == pair.Second.LessonId &&
                 pair.First.LessonDateTime.EqualsExact(pair.Second.LessonDateTime) &&

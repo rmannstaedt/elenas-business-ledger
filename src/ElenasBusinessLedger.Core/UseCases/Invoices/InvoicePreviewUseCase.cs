@@ -6,6 +6,7 @@ using MoneyAmount = ElenasBusinessLedger.Core.Money.Money;
 
 namespace ElenasBusinessLedger.Core.UseCases.Invoices;
 
+// Builds an editable draft from the local lesson ledger so the WPF preview can show prices before reserving a number.
 public sealed class InvoicePreviewUseCase
 {
     private readonly IStudentRepository studentRepository;
@@ -33,6 +34,7 @@ public sealed class InvoicePreviewUseCase
         CancellationToken cancellationToken,
         int? studentId = null)
     {
+        // Use the selected student's ID when available so a reused short name cannot redirect the preview.
         var student = studentId is { } id
             ? await studentRepository.GetByIdAsync(id, cancellationToken)
             : await studentRepository.GetByShortNameAsync(studentShortName, cancellationToken);
@@ -69,6 +71,7 @@ public sealed class InvoicePreviewUseCase
         var errors = new List<ValidationError>();
         var lines = new List<InvoiceLineDraft>();
 
+        // Copy the plan price into the draft and carry the lesson ID forward for the lock at issuance.
         foreach (var lesson in matchingLessons)
         {
             var plan = await planCatalogRepository.GetAsync(lesson.PlanCatalogId, cancellationToken);

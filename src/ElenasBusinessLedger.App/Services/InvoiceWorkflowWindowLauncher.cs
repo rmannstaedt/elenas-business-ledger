@@ -6,6 +6,7 @@ using ElenasBusinessLedger.Core.UseCases.Invoices;
 
 namespace ElenasBusinessLedger.App.Services;
 
+// Runs the WPF invoice dialogs and reports issuance to the dashboard so it can refresh its lesson and invoice rows.
 public sealed class InvoiceWorkflowWindowLauncher : IInvoiceWorkflowLauncher
 {
     private readonly IInvoiceWorkflowService invoiceWorkflowService;
@@ -75,10 +76,12 @@ public sealed class InvoiceWorkflowWindowLauncher : IInvoiceWorkflowLauncher
             Owner = Application.Current?.MainWindow
         };
 
+        // A print warning can keep the dialog open even though the invoice has already been issued.
         previewWindow.ShowDialog();
         return previewViewModel.WasIssued;
     }
 
+    /// <summary>Opens the oldest pending reservation independently of the current dashboard selection.</summary>
     public async Task<bool> ShowResumeInvoiceAsync(CancellationToken cancellationToken)
     {
         try

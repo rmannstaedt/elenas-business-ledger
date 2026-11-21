@@ -290,13 +290,31 @@ Issued Invoices show payment and print status in the main/student invoice lists.
 
 The invoice printer is selected from Application Settings during setup. If no invoice printer has been selected when printing or reprinting is first attempted, the app opens the printer selection dialog directly, lets the user choose a printer, and remembers that printer before continuing. The selected printer is remembered for subsequent invoice printing and can later be changed or cleared from Application Settings. When the app records an Invoice as Printed, that means the configured printer existed and Windows accepted the print request launch; the app does not verify physical paper output or Windows spooler completion.
 
+### Invoice data flow
+
+The preview copies billing details and prices into an `InvoiceDraft`. Each line keeps its local lesson ID so the ledger can lock the exact lesson when issuing the invoice. Confirming the preview saves those values and the invoice number as an `Issuing` snapshot.
+
+```mermaid
+flowchart LR
+    lessons["Local lessons and plan prices"] --> draft["InvoiceDraft in the WPF preview"]
+    draft --> reservation["Issuing snapshot in SQLite"]
+    reservation --> staged["Staged PDF"]
+    staged --> checkpoint["Saved PDF paths and checksum"]
+    checkpoint --> pdf["Published PDF"]
+    pdf --> issued["Issued snapshot and lesson locks"]
+    issued --> economy["Economy totals"]
+    issued --> print["Print the saved PDF"]
+```
+
+**Resume Invoice** starts at the saved snapshot. The publication checkpoint lets the file store recognize a PDF already moved to its final path. Economy reads the issued totals from SQLite. A failed print request can be retried using the published PDF.
+
 ## Settings saves
 
 One **Save** commits the company profile, calendar preferences, and Economy settings together in SQLite, including any removal of obsolete Economy overrides. If the transaction fails, the previous values remain in effect. **Connect Google Calendar** handles browser authorization separately.
 
 ## Limitations
 
-### Version 1.3.2
+### Version 1.4.0
 
   * VAT exemptions for individual students are outside the current scope.
   * No formal VAT return or bookkeeping-system VAT report; Economy Overview summarizes issued invoice net/VAT totals plus explicit manual legacy month overrides only.
@@ -304,5 +322,5 @@ One **Save** commits the company profile, calendar preferences, and Economy sett
   * No support for credit notes/correction invoices.
   * No integration with MobilePay/Bank for payment registration.
   * No tax reserve estimate.
-  * No automated backup.
+  * No scheduled backups of the database or invoice folder. The Ledger backs up the database before upgrading its schema.
   * No calendar conflict detection for `Populate Calendar` beyond exact duplicate same-student same-date/time skipping.

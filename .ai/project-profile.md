@@ -6,7 +6,7 @@ Working name: Elena's Business Ledger
 
 A Windows app for managing student lessons, invoices, and payments.
 
-Current app version: 1.3.2
+Current app version: 1.4.0
 
 Internal namespace/project prefix:
 ElenasBusinessLedger
@@ -17,7 +17,7 @@ Target framework: .NET 11. IDE builds require Visual Studio 18.12 or later.
 Platform: Windows desktop
 UI: WPF
 Architecture: local-first desktop app
-Installer/distribution: single-file Inno Setup installer with a self-contained .NET 11 build for Windows x64. The `scripts\build-installer.ps1` script creates `artifacts\installer\ElenasBusinessLedger-1.3.2-Setup.exe`. The installer build stages each attempt separately and replaces the same-named output only after a successful Inno compilation and candidate check. The per-user installer installs to `%LOCALAPPDATA%\Programs\MySmallBusinessLedger`, creates a Start menu shortcut, offers an optional desktop shortcut, has no auto-update behavior, and must preserve `%APPDATA%\visualtech.dk\MySmallBusinessLedger` during install, replacement, and uninstall.
+Installer/distribution: single-file Inno Setup installer with a self-contained .NET 11 build for Windows x64. The `scripts\build-installer.ps1` script creates `artifacts\installer\ElenasBusinessLedger-1.4.0-Setup.exe`. The installer build stages each attempt separately and replaces the same-named output only after a successful Inno compilation and candidate check. The per-user installer installs to `%LOCALAPPDATA%\Programs\MySmallBusinessLedger`, creates a Start menu shortcut, offers an optional desktop shortcut, has no auto-update behavior, and must preserve `%APPDATA%\visualtech.dk\MySmallBusinessLedger` during install, replacement, and uninstall.
 
 ## Solution shape
 
@@ -53,7 +53,7 @@ Publisher Google OAuth Desktop client configuration: local/release file `src\Ele
 Google OAuth protected token folder: `%APPDATA%\visualtech.dk\MySmallBusinessLedger\GoogleTokens`
 Window placement file path: `%APPDATA%\visualtech.dk\MySmallBusinessLedger\window-placement.json`
 Grid column width file path: `%APPDATA%\visualtech.dk\MySmallBusinessLedger\grid-column-widths.json`
-Backup: source builds after v1.3.2 verify a SQLite backup in the app data folder's `Backups` directory before migrating an existing database. Copy the invoice folder separately for a full backup.
+Backup: version 1.4.0 verifies a SQLite backup in the app data folder's `Backups` directory before migrating an existing database. Copy the invoice folder separately for a full backup.
 
 ## External integrations
 

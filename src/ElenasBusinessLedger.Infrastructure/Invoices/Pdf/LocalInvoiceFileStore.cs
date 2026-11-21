@@ -7,6 +7,7 @@ using ElenasBusinessLedger.Core.Ports;
 
 namespace ElenasBusinessLedger.Infrastructure.Invoices.Pdf;
 
+// Stages invoice PDFs beside their destination so the saved checkpoint can drive a safe move or retry.
 public sealed class LocalInvoiceFileStore : IInvoiceFileStore
 {
     private static readonly byte[] PdfHeader = "%PDF"u8.ToArray();
@@ -88,6 +89,7 @@ public sealed class LocalInvoiceFileStore : IInvoiceFileStore
         }
     }
 
+    /// <summary>Publishes the saved PDF or verifies that the same file already occupies its destination.</summary>
     public async Task<OperationResult<string>> CompletePublicationAsync(
         InvoicePdfPublication publication, CancellationToken cancellationToken)
     {
@@ -95,6 +97,7 @@ public sealed class LocalInvoiceFileStore : IInvoiceFileStore
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
+            // Follow the folder saved in the checkpoint, even if the configured invoice folder has changed.
             var finalDirectory = Path.GetDirectoryName(finalPath);
             if (!Path.IsPathFullyQualified(stagedPath) || !Path.IsPathFullyQualified(finalPath) ||
                 finalDirectory is null ||
