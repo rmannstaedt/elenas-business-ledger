@@ -5,6 +5,7 @@ using ElenasBusinessLedger.Core.UseCases.Economy;
 
 namespace ElenasBusinessLedger.App.Services;
 
+// Writes the formatted Economy report to the user's selected export path.
 public sealed class EconomyOverviewCsvFileService : IEconomyOverviewCsvFileService
 {
     private static readonly UTF8Encoding Utf8WithoutBom = new(encoderShouldEmitUTF8Identifier: false);
@@ -15,6 +16,7 @@ public sealed class EconomyOverviewCsvFileService : IEconomyOverviewCsvFileServi
         this.formatter = formatter;
     }
 
+    // Writes the displayed Economy report to the chosen UTF-8 CSV file and returns the saved path.
     public async Task<OperationResult<string>> SaveAsync(
         EconomyOverview overview,
         string filePath,

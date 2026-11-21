@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ElenasBusinessLedger.Infrastructure.Persistence;
 
+// Persists student details, plan periods, and schedules while protecting stable identity and short-name uniqueness.
 public sealed class SqliteStudentRepository : IStudentRepository
 {
     private readonly Func<LedgerDbContext> createContext;
@@ -15,6 +16,7 @@ public sealed class SqliteStudentRepository : IStudentRepository
         this.createContext = createContext;
     }
 
+    // Loads active and inactive students with their plans and schedules for Manage Students.
     public async Task<IReadOnlyList<StudentRecord>> ListStudentsAsync(CancellationToken cancellationToken)
     {
         await using var context = createContext();
@@ -29,6 +31,7 @@ public sealed class SqliteStudentRepository : IStudentRepository
         return students.Select(ToDomain).ToArray();
     }
 
+    // Loads the active students that the dashboard can match to calendar appointments.
     public async Task<IReadOnlyList<StudentRecord>> ListActiveStudentsAsync(CancellationToken cancellationToken)
     {
         await using var context = createContext();
@@ -44,6 +47,7 @@ public sealed class SqliteStudentRepository : IStudentRepository
         return students.Select(ToDomain).ToArray();
     }
 
+    // Loads the student record by stable identity so a rename does not affect the lookup.
     public async Task<StudentRecord?> GetByIdAsync(int studentId, CancellationToken cancellationToken)
     {
         await using var context = createContext();
@@ -55,6 +59,7 @@ public sealed class SqliteStudentRepository : IStudentRepository
         return student is null ? null : ToDomain(student);
     }
 
+    // Loads the exact stored short name for callers that do not have the student's ID.
     public async Task<StudentRecord?> GetByShortNameAsync(string shortName, CancellationToken cancellationToken)
     {
         await using var context = createContext();
@@ -68,6 +73,7 @@ public sealed class SqliteStudentRepository : IStudentRepository
         return student is null ? null : ToDomain(student);
     }
 
+    // Saves the student, schedule, and plan periods together and checks whether a new short name conflicts.
     public async Task<OperationResult<StudentRecord>> SaveAsync(StudentRecord student, CancellationToken cancellationToken)
     {
         await using var context = createContext();

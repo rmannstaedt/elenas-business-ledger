@@ -8,8 +8,10 @@ using ElenasBusinessLedger.Infrastructure.Persistence;
 
 namespace ElenasBusinessLedger.App.Startup;
 
+// Upgrades the ledger and runs startup jobs before handing a ready main window and its warnings to WPF.
 internal sealed class ApplicationBootstrapper
 {
+    // Upgrades the local database and runs startup jobs before returning the main window and any warnings.
     public async Task<ApplicationStartupResult> StartAsync(CancellationToken cancellationToken)
     {
         var appPaths = AppPaths.CreateDefault();

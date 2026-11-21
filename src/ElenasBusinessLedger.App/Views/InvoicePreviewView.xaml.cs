@@ -7,6 +7,7 @@ using ElenasBusinessLedger.App.ViewModels;
 
 namespace ElenasBusinessLedger.App.Views;
 
+// Presents the draft and handles window closing while the view model issues or reprints the invoice.
 public partial class InvoicePreviewView : Window
 {
     private bool closeWasConfirmed;

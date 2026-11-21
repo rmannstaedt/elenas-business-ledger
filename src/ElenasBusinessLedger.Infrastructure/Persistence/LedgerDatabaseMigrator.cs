@@ -7,6 +7,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ElenasBusinessLedger.Infrastructure.Persistence;
 
+// Backs up existing data before applying EF migrations and reports historical issues that need attention.
 public sealed class LedgerDatabaseMigrator
 {
     private const string MigrationWarningsTableName = "__LedgerMigrationWarnings";
@@ -18,6 +19,7 @@ public sealed class LedgerDatabaseMigrator
         this.createContext = createContext;
     }
 
+    // Backs up an existing ledger before a schema upgrade and returns integrity warnings for startup to display.
     public async Task<IReadOnlyList<LedgerMigrationWarning>> MigrateAsync(CancellationToken cancellationToken)
     {
         await using var context = createContext();

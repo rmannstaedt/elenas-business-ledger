@@ -3,6 +3,7 @@ using System.Runtime.InteropServices;
 
 namespace ElenasBusinessLedger.Infrastructure.Invoices.Printing;
 
+// Enumerates Windows printers for the printer picker and for validating print requests.
 public sealed class WindowsPrinterCatalog : IPrinterCatalog
 {
     private const int PrinterEnumLocal = 0x00000002;

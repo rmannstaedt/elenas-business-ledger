@@ -4,6 +4,7 @@ using ElenasBusinessLedger.Core.Ports;
 
 namespace ElenasBusinessLedger.Core.UseCases.Plans;
 
+// Validates and saves new plan terms as a draft so they can be prepared before assignment.
 public sealed class CreateDraftPlanUseCase
 {
     private readonly IPlanCatalogRepository planCatalogRepository;
@@ -13,6 +14,7 @@ public sealed class CreateDraftPlanUseCase
         this.planCatalogRepository = planCatalogRepository;
     }
 
+    // Saves a validated draft that can be edited before it becomes assignable.
     public Task<OperationResult<PlanCatalogItem>> ExecuteAsync(
         PlanDraftInput input,
         CancellationToken cancellationToken)

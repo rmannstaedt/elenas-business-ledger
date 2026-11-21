@@ -25,6 +25,7 @@ public sealed class ReprintIssuedInvoiceUseCase
         this.clock = clock;
     }
 
+    // Sends the saved PDF to the configured printer and records the outcome on the existing invoice.
     public async Task<OperationResult<ReprintInvoiceResult>> ExecuteAsync(
         InvoiceNumber invoiceNumber,
         CancellationToken cancellationToken)

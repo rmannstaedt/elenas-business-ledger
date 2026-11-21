@@ -4,6 +4,7 @@ using ElenasBusinessLedger.Infrastructure.Persistence;
 
 namespace ElenasBusinessLedger.Tests.App.Services;
 
+// Checks when the factory can reuse authorization, request sign-in, or return no calendar client.
 public sealed class GoogleCalendarClientFactoryTests
 {
     [Fact]
@@ -112,6 +113,7 @@ public sealed class GoogleCalendarClientFactoryTests
         return configurationPath;
     }
 
+    // Isolates the OAuth configuration and token files used to test calendar client creation.
     private sealed class TemporaryDirectory : IDisposable
     {
         public TemporaryDirectory()
@@ -131,6 +133,7 @@ public sealed class GoogleCalendarClientFactoryTests
         }
     }
 
+    // Stands in for an authorized event client so factory tests can inspect setup without Google requests.
     private sealed class FakeGoogleCalendarEventClient : IGoogleCalendarEventClient
     {
         public Task<IReadOnlyList<GoogleCalendarEvent>> ListEventsAsync(

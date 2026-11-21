@@ -5,6 +5,7 @@ using ElenasBusinessLedger.Infrastructure.Invoices.Printing;
 
 namespace ElenasBusinessLedger.Tests.Infrastructure.Invoices;
 
+// Verifies PDF staging, rendering, layout, and printer request behavior with isolated artifacts.
 public sealed class InvoiceInfrastructureTests
 {
     [Fact]
@@ -352,6 +353,7 @@ public sealed class InvoiceInfrastructureTests
             System.Text.RegularExpressions.RegexOptions.CultureInvariant).Count;
     }
 
+    // Records the PDF path and printer sent to Windows without launching a real print request.
     private sealed class FakePrintProcessLauncher : IPrintProcessLauncher
     {
         public bool WasCalled { get; private set; }
@@ -369,12 +371,14 @@ public sealed class InvoiceInfrastructureTests
         }
     }
 
+    // Supplies available printer names for tests of invoice print validation.
     private sealed class FakePrinterCatalog(IReadOnlyList<string> printerNames) : IPrinterCatalog
     {
         public Task<IReadOnlyList<string>> ListPrinterNamesAsync(CancellationToken cancellationToken) =>
             Task.FromResult(printerNames);
     }
 
+    // Creates an isolated invoice directory for PDF tests and removes it after use.
     private sealed class TestInvoiceFolder : IDisposable
     {
         private TestInvoiceFolder(string path)

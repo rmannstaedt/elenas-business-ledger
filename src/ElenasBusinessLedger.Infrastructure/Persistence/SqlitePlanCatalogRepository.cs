@@ -6,6 +6,7 @@ using ElenasBusinessLedger.Core.Ports;
 
 namespace ElenasBusinessLedger.Infrastructure.Persistence;
 
+// Stores plan terms, lifecycle state, and rename history under stable catalog IDs.
 public sealed class SqlitePlanCatalogRepository : IPlanCatalogRepository
 {
     private readonly Func<LedgerDbContext> createContext;
@@ -15,6 +16,7 @@ public sealed class SqlitePlanCatalogRepository : IPlanCatalogRepository
         this.createContext = createContext;
     }
 
+    // Returns draft, active, and retired items for the full plan management list.
     public async Task<IReadOnlyList<PlanCatalogItem>> ListAllAsync(CancellationToken cancellationToken)
     {
         await using var context = createContext();
@@ -27,6 +29,7 @@ public sealed class SqlitePlanCatalogRepository : IPlanCatalogRepository
         return entities.Select(ToModel).ToArray();
     }
 
+    // Returns active plans for the editors that assign plans to students or lessons.
     public async Task<IReadOnlyList<PlanCatalogItem>> ListAssignableAsync(CancellationToken cancellationToken)
     {
         await using var context = createContext();
@@ -49,6 +52,7 @@ public sealed class SqlitePlanCatalogRepository : IPlanCatalogRepository
         return entity is null ? null : ToModel(entity);
     }
 
+    // Stores catalog terms and lifecycle state so editors and scheduled retirement share one plan record.
     public async Task<OperationResult<PlanCatalogItem>> SaveAsync(
         PlanCatalogItem plan,
         CancellationToken cancellationToken)
@@ -95,6 +99,7 @@ public sealed class SqlitePlanCatalogRepository : IPlanCatalogRepository
         return OperationResult<PlanCatalogItem>.Success(ToModel(entity));
     }
 
+    // Renames the plan and records its previous name in the same transaction, keeping the catalog ID stable.
     public async Task<OperationResult<PlanCatalogItem>> RenameAsync(
         int id,
         string newName,

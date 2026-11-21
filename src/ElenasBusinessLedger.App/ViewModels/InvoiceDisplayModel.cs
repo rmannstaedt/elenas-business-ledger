@@ -3,6 +3,7 @@ using ElenasBusinessLedger.Core.Invoices;
 
 namespace ElenasBusinessLedger.App.ViewModels;
 
+// Formats invoice dates, payment, and print state for the dashboard and student history.
 public sealed class InvoiceDisplayModel : ViewModelBase
 {
     private PaymentStatus paymentStatus;

@@ -1,5 +1,6 @@
 namespace ElenasBusinessLedger.Core.Common;
 
+// Returns a validated value or errors so editors can correct input before data is saved.
 public sealed class ValidationResult<T>
 {
     private ValidationResult(T? value, IReadOnlyList<ValidationError> errors)

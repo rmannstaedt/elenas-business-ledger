@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ElenasBusinessLedger.Infrastructure.Persistence;
 
+// Stores the selected calendar and Google account and creates the writer used for atomic Settings saves.
 public sealed class SqliteCalendarSettingsRepository
 {
     private const int SingletonId = 1;
@@ -24,6 +25,7 @@ public sealed class SqliteCalendarSettingsRepository
             : new CalendarSettings(entity.SelectedCalendarId, entity.GoogleAccountEmail);
     }
 
+    // Shares this repository's database factory with the writer that saves all settings in one transaction.
     public SqliteAppSettingsWriter CreateSettingsWriter() => new(createContext);
 
     public async Task SaveAsync(CalendarSettings settings, CancellationToken cancellationToken)

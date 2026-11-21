@@ -3,6 +3,7 @@ using InfrastructureAssemblyMarker = ElenasBusinessLedger.Infrastructure.Assembl
 
 namespace ElenasBusinessLedger.Tests.Core;
 
+// Checks that the test project can reference both the Core and Infrastructure assemblies.
 public sealed class SolutionSmokeTests
 {
     [Fact]

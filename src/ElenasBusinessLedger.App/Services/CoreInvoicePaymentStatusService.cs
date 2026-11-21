@@ -4,6 +4,7 @@ using ElenasBusinessLedger.Core.UseCases.Invoices;
 
 namespace ElenasBusinessLedger.App.Services;
 
+// Adapts the payment status use case to the result shown by the dashboard.
 public sealed class CoreInvoicePaymentStatusService : IInvoicePaymentStatusService
 {
     private readonly ToggleInvoicePaymentStatusUseCase useCase;

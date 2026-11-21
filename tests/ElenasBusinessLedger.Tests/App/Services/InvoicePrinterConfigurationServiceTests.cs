@@ -6,6 +6,7 @@ using ElenasBusinessLedger.Infrastructure.Persistence;
 
 namespace ElenasBusinessLedger.Tests.App.Services;
 
+// Verifies that printing reuses, saves, or cancels printer selection as appropriate.
 public sealed class InvoicePrinterConfigurationServiceTests
 {
     [Fact]
@@ -85,6 +86,7 @@ public sealed class InvoicePrinterConfigurationServiceTests
             invoiceFolderPath: @"C:\Invoices",
             configuredInvoicePrinterName);
 
+    // Returns a scripted selection and records whether the printer picker was shown.
     private sealed class FakeInvoicePrinterSelectionDialog : IInvoicePrinterSelectionDialog
     {
         public string? SelectedPrinterName { get; init; }
@@ -98,6 +100,7 @@ public sealed class InvoicePrinterConfigurationServiceTests
         }
     }
 
+    // Supplies Settings and captures the write so tests can verify a selected printer is saved.
     private sealed class FakeAppSettingsService : IAppSettingsService
     {
         public AppSettingsSnapshot Snapshot { get; init; } = new(null, null, GoogleOAuthClientConfigurationStatus.Missing);

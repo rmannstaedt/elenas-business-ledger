@@ -3,6 +3,7 @@ using ElenasBusinessLedger.Core.UseCases.Invoices;
 
 namespace ElenasBusinessLedger.App.Views;
 
+// Presents the saved and proposed invoice details so the user can choose how to resolve a pending reservation.
 public partial class InvoiceRecoveryDialog : Window
 {
     public InvoiceRecoveryDialog(PendingInvoiceRecovery recovery, bool directRecovery = false, bool canDiscard = false)

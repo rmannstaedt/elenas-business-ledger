@@ -12,6 +12,7 @@ using ElenasBusinessLedger.Core.UseCases.Startup;
 
 namespace ElenasBusinessLedger.App.ViewModels;
 
+// Owns dashboard selection and coordinates refresh, scheduling, and invoice commands for the main window.
 public sealed class MainWindowViewModel : ViewModelBase
 {
     private static readonly TimeSpan ActivationRefreshMinimumInterval = TimeSpan.FromSeconds(10);
@@ -268,8 +269,10 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     public AsyncRelayCommand DismissErrorCommand { get; }
 
+    // Loads the initial dashboard using the current display month and student selection.
     public Task LoadAsync() => RefreshAsync();
 
+    // Refreshes when focus returns, while avoiding duplicate requests and refreshes during suspended editing.
     public async Task RefreshAfterActivationAsync()
     {
         if (activationRefreshSuspendCount > 0)

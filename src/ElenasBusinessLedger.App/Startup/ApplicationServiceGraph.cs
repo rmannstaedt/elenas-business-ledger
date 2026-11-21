@@ -11,6 +11,7 @@ using ElenasBusinessLedger.Infrastructure.Persistence;
 
 namespace ElenasBusinessLedger.App.Startup;
 
+// Assembles production repositories, adapters, and use cases in one place for the WPF host.
 internal sealed class ApplicationServiceGraph
 {
     private static readonly TimeSpan DefaultLessonDuration = TimeSpan.FromMinutes(60);
@@ -91,6 +92,7 @@ internal sealed class ApplicationServiceGraph
 
     public SystemUiClock SystemClock { get; }
 
+    // Wires the production repositories and adapters that the WPF startup code uses to build the main window.
     public static ApplicationServiceGraph Create(AppPaths appPaths, Func<LedgerDbContext> createContext)
     {
         var studentRepository = new SqliteStudentRepository(createContext);

@@ -31,7 +31,7 @@ public sealed class IssueInvoiceUseCase
         this.clock = clock;
     }
 
-    /// <summary>Reserves or recovers a draft and reports issuance separately from the print result.</summary>
+    // Reserves or recovers a draft and reports issuance separately from the print result.
     public async Task<OperationResult<IssueInvoiceResult>> ExecuteAsync(
         InvoiceDraft draft,
         CancellationToken cancellationToken,
@@ -73,7 +73,7 @@ public sealed class IssueInvoiceUseCase
         return await PublishAndPrintAsync(savedInvoice, company.ConfiguredInvoicePrinterName, cancellationToken);
     }
 
-    /// <summary>Finishes the oldest recoverable reservation using its saved snapshot.</summary>
+    // Finishes the oldest recoverable reservation using its saved snapshot.
     public async Task<OperationResult<IssueInvoiceResult>> ResumeAsync(
         InvoiceNumber invoiceNumber, CancellationToken cancellationToken)
     {

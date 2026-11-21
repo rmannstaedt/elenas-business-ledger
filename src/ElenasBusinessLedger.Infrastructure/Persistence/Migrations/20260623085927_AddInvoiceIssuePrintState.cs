@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace ElenasBusinessLedger.Infrastructure.Persistence.Migrations
 {
+    // Adds issue and print tracking so a saved invoice can retain its state across print failures.
     /// <inheritdoc />
     public partial class AddInvoiceIssuePrintState : Migration
     {

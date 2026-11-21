@@ -2,6 +2,7 @@ using ElenasBusinessLedger.Core.Common;
 
 namespace ElenasBusinessLedger.Core.Students;
 
+// Represents validated information about a learner for editing, lesson matching, and billing.
 public sealed record Student(
     string ShortName,
     string FullName,
@@ -12,6 +13,7 @@ public sealed record Student(
     DateOnly? Birthdate,
     bool IsActive)
 {
+    // Validates student details before an editor can turn them into a saved student.
     public static ValidationResult<Student> Create(
         string shortName,
         string fullName,

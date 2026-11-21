@@ -17,6 +17,7 @@ using System.Data.Common;
 
 namespace ElenasBusinessLedger.Tests.Infrastructure.Persistence;
 
+// Checks schema upgrades, stored settings, and durable student, lesson, and invoice behavior in SQLite.
 public sealed class SqlitePersistenceTests
 {
     [Fact]
@@ -1656,6 +1657,7 @@ public sealed class SqlitePersistenceTests
         return company;
     }
 
+    // Captures the draft and totals used to render a PDF in SQLite recovery tests.
     private sealed class RecordingInvoicePdfWriter : IInvoicePdfWriter
     {
         public InvoiceDraft? Draft { get; private set; }
@@ -1671,6 +1673,7 @@ public sealed class SqlitePersistenceTests
         }
     }
 
+    // Provides a print adapter for persistence tests so issued invoice scenarios need no Windows printer.
     private sealed class RecordingInvoicePrinter : IInvoicePrinter
     {
         public Task<OperationResult<string>> PrintAsync(string pdfFilePath, string configuredPrinterName, CancellationToken cancellationToken) =>
@@ -1810,6 +1813,7 @@ public sealed class SqlitePersistenceTests
             CancellationToken.None);
     }
 
+    // Creates disposable SQLite ledgers at selected migration versions so fresh and upgrade paths can be checked.
     private sealed class TestDatabase : IDisposable
     {
         private readonly string directory;
@@ -1877,6 +1881,7 @@ public sealed class SqlitePersistenceTests
         return new SqliteLessonRepository(() => new LedgerDbContext(options));
     }
 
+    // Records SQL commands so persistence tests can check query behavior as well as returned data.
     private sealed class CapturingCommandInterceptor : DbCommandInterceptor
     {
         public List<string> Commands { get; } = [];

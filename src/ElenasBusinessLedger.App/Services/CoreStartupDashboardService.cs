@@ -3,6 +3,7 @@ using ElenasBusinessLedger.Core.UseCases.Startup;
 
 namespace ElenasBusinessLedger.App.Services;
 
+// Wraps dashboard reconciliation so WPF receives results it can display when a refresh fails.
 public sealed class CoreStartupDashboardService : IStartupDashboardService
 {
     private readonly StartupDashboardQuery query;
@@ -12,6 +13,7 @@ public sealed class CoreStartupDashboardService : IStartupDashboardService
         this.query = query;
     }
 
+    // Runs dashboard reconciliation and translates refresh failures into a result the UI can display.
     public async Task<OperationResult<StartupDashboardResult>> LoadAsync(
         DateOnly month,
         string? selectedStudentShortName,

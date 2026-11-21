@@ -67,7 +67,7 @@ public sealed class IssuedInvoice
 
     public InvoicePdfPublication? Publication { get; }
 
-    /// <summary>Recreates the PDF input from the stored details without reloading student or plan data.</summary>
+    // Recreates the PDF input from the stored details without reloading student or plan data.
     public InvoiceDraft CreateSavedDraft() => InvoiceDraft.Create(
         InvoiceDate,
         Company,

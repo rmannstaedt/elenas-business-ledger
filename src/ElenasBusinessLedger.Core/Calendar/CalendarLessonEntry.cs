@@ -2,6 +2,7 @@ using ElenasBusinessLedger.Core.Lessons;
 
 namespace ElenasBusinessLedger.Core.Calendar;
 
+// Interprets the lesson marker and completion status in calendar text so ordinary appointments stay out of the ledger.
 public sealed record CalendarLessonEntry(
     string StudentShortName,
     DateTimeOffset StartsAt,
@@ -10,6 +11,7 @@ public sealed record CalendarLessonEntry(
 {
     private const string CompletedStatusLine = "Status: Completed";
 
+    // Recognizes lesson entries by their dollar-sign prefix and reads the student label and completion marker.
     public static bool TryParse(
         string text,
         DateTimeOffset startsAt,
@@ -37,6 +39,7 @@ public sealed record CalendarLessonEntry(
         return true;
     }
 
+    // Updates the completion marker while preserving the other lines of the calendar entry.
     public static string WithState(string text, LessonState state)
     {
         var lines = SplitLines(text)

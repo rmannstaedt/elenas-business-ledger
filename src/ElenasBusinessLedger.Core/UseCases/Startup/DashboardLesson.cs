@@ -3,6 +3,7 @@ using ElenasBusinessLedger.Core.Lessons;
 
 namespace ElenasBusinessLedger.Core.UseCases.Startup;
 
+// Combines appointment details with local plan, invoice, or review state for a lesson row on the dashboard.
 public sealed record DashboardLesson(
     string Id,
     string StudentShortName,

@@ -26,6 +26,7 @@ using WpfTextBlock = System.Windows.Controls.TextBlock;
 
 namespace ElenasBusinessLedger.Tests.App.ViewModels;
 
+// Checks shared student selection, editor saves, cancelled edits, and the WPF Details layout.
 public sealed class StudentOverviewViewModelTests
 {
     [Fact]
@@ -858,6 +859,7 @@ public sealed class StudentOverviewViewModelTests
         return matches;
     }
 
+    // Supplies student snapshots and records reload and availability requests for the shared editor.
     private sealed class FakeStudentOverviewService : IStudentOverviewService
     {
         private readonly List<StudentOverviewSnapshot> snapshots;
@@ -901,6 +903,7 @@ public sealed class StudentOverviewViewModelTests
         }
     }
 
+    // Captures student save requests and can return a failure to exercise the Details dialog.
     private sealed class FakeStudentEditorService : IStudentEditorService
     {
         public string SavedShortName { get; init; } = "Anna";
@@ -921,6 +924,7 @@ public sealed class StudentOverviewViewModelTests
         }
     }
 
+    // Provides assignable catalog plans for student editor tests without a database.
     private sealed class FakePlanCatalogService : IPlanCatalogService
     {
         private readonly IReadOnlyList<PlanCatalogItem> assignablePlans;
@@ -964,6 +968,7 @@ public sealed class StudentOverviewViewModelTests
             throw new NotSupportedException();
     }
 
+    // Scripts how unsaved student changes are resolved and counts the prompts.
     private sealed class FakeStudentOverviewInteractionService : IStudentOverviewInteractionService
     {
         public StudentEditSaveChangesChoice NextSaveChangesChoice { get; init; } = StudentEditSaveChangesChoice.Discard;
@@ -977,6 +982,7 @@ public sealed class StudentOverviewViewModelTests
         }
     }
 
+    // Captures the invoice number sent to the viewer from Student Details.
     private sealed class FakeInvoiceWorkflowLauncher : IInvoiceWorkflowLauncher
     {
         public InvoiceNumber? LastViewedInvoiceNumber { get; private set; }
@@ -997,6 +1003,7 @@ public sealed class StudentOverviewViewModelTests
         }
     }
 
+    // Fixes the time used by student editor tests so date defaults are reproducible.
     private sealed class FakeUiClock : IUiClock
     {
         public FakeUiClock(DateTimeOffset now)

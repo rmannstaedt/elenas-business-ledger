@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace ElenasBusinessLedger.Infrastructure.Persistence.Migrations;
 
+// Stores pending calendar changes so billing can hold affected lessons until the outcome is settled.
 [DbContext(typeof(LedgerDbContext))]
 [Migration("20261121190100_HoldUnconfirmedCalendarMutations")]
 public sealed class HoldUnconfirmedCalendarMutations : Migration

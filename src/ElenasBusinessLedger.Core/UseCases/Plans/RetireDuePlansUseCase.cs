@@ -4,6 +4,7 @@ using ElenasBusinessLedger.Core.Ports;
 
 namespace ElenasBusinessLedger.Core.UseCases.Plans;
 
+// Processes scheduled retirements so due plans leave the assignment lists.
 public sealed class RetireDuePlansUseCase
 {
     private readonly IPlanCatalogRepository planCatalogRepository;
@@ -13,6 +14,7 @@ public sealed class RetireDuePlansUseCase
         this.planCatalogRepository = planCatalogRepository;
     }
 
+    // Retires active plans whose retirement date has arrived so they leave the assignment list.
     public async Task<OperationResult<int>> ExecuteAsync(DateTimeOffset now, CancellationToken cancellationToken)
     {
         var plans = await planCatalogRepository.ListAllAsync(cancellationToken);

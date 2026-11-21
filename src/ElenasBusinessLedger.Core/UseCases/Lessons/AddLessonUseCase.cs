@@ -6,6 +6,7 @@ using ElenasBusinessLedger.Core.Ports;
 
 namespace ElenasBusinessLedger.Core.UseCases.Lessons;
 
+// Creates a calendar appointment and records its selected plan in the local ledger for billing.
 public sealed class AddLessonUseCase
 {
     private readonly IGoogleCalendarGateway calendarGateway;
@@ -25,6 +26,7 @@ public sealed class AddLessonUseCase
         this.lessonRepository = lessonRepository;
     }
 
+    // Creates a Google Calendar appointment and records the chosen plan and event ID in the local billing ledger.
     public async Task<OperationResult<LessonAddResult>> ExecuteAsync(
         LessonAddRequest request,
         DateOnly refreshMonth,

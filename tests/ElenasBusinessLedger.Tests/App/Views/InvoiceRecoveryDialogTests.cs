@@ -7,6 +7,7 @@ using ElenasBusinessLedger.Core.UseCases.Invoices;
 
 namespace ElenasBusinessLedger.Tests.App.Views;
 
+// Checks which recovery actions the dialog presents for unpublished, checkpointed, and legacy reservations.
 public sealed class InvoiceRecoveryDialogTests
 {
     [Theory]

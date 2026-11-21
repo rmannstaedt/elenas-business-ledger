@@ -7,6 +7,7 @@ using Google.Apis.Util.Store;
 
 namespace ElenasBusinessLedger.Infrastructure.Calendar;
 
+// Builds a Calendar API service from saved credentials or explicit sign-in so refresh can run without a prompt.
 public sealed class GoogleCalendarCredentialFactory
 {
     internal static readonly string[] RequestedScopes = [CalendarService.Scope.CalendarEventsOwned];
@@ -24,6 +25,7 @@ public sealed class GoogleCalendarCredentialFactory
         this.applicationName = applicationName;
     }
 
+    // Authorizes the selected Google user and opens a calendar client for the explicit connection workflow.
     public async Task<CalendarService> CreateCalendarServiceAsync(string userId, CancellationToken cancellationToken)
     {
         var credential = await GoogleWebAuthorizationBroker.AuthorizeAsync(
@@ -36,6 +38,7 @@ public sealed class GoogleCalendarCredentialFactory
         return CreateCalendarService(credential);
     }
 
+    // Creates a client from a saved token so dashboard refresh can proceed without starting interactive sign-in.
     public async Task<CalendarService?> TryCreateCalendarServiceFromSavedCredentialAsync(
         string userId,
         CancellationToken cancellationToken)

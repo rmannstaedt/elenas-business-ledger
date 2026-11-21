@@ -2,6 +2,7 @@ using ElenasBusinessLedger.Core.Students;
 
 namespace ElenasBusinessLedger.Tests.Core.Students;
 
+// Verifies student validation rules that depend on age and birthdate.
 public sealed class StudentTests
 {
     [Fact]

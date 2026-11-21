@@ -4,6 +4,7 @@ using ElenasBusinessLedger.App.Views;
 
 namespace ElenasBusinessLedger.App.Services;
 
+// Creates the standalone add and edit lesson windows and reports whether the lesson changed.
 public sealed class LessonEditorWindowLauncher : ILessonEditorLauncher
 {
     private readonly ILessonEditorService lessonEditorService;

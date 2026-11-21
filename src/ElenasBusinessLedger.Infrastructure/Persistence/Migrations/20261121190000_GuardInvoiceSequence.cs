@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace ElenasBusinessLedger.Infrastructure.Persistence.Migrations;
 
+// Prevents a second pending reservation in SQLite so concurrent issuers cannot advance the number sequence.
 [DbContext(typeof(LedgerDbContext))]
 [Migration("20261121190000_GuardInvoiceSequence")]
 public sealed class GuardInvoiceSequence : Migration

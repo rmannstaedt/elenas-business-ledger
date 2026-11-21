@@ -5,6 +5,7 @@ using ElenasBusinessLedger.Core.Students;
 
 namespace ElenasBusinessLedger.App.ViewModels;
 
+// Loads and selects student choices before the invoice preview builds a draft.
 public sealed class InvoiceCandidateDialogViewModel : ViewModelBase
 {
     private readonly IInvoiceWorkflowService invoiceWorkflowService;
@@ -84,6 +85,7 @@ public sealed class InvoiceCandidateDialogViewModel : ViewModelBase
 
     public event EventHandler<bool?>? CloseRequested;
 
+    // Loads choices for the invoice picker and prefers the student already selected on the dashboard.
     public async Task LoadAsync()
     {
         var result = await invoiceWorkflowService.LoadCandidatesAsync(date, now, CancellationToken.None);

@@ -6,6 +6,7 @@ using ElenasBusinessLedger.App.ViewModels;
 
 namespace ElenasBusinessLedger.App.Views;
 
+// Presents the selected student editor and its invoices, and closes on Save or Cancel through the shared view model.
 public partial class StudentDetailsView : Window
 {
     private bool closeWasConfirmed;
@@ -20,6 +21,7 @@ public partial class StudentDetailsView : Window
         Closed += (_, _) => viewModel.DetailsCloseRequested -= OnDetailsCloseRequested;
     }
 
+    // Closes Student Details after its shared view model has already resolved any unsaved edits.
     public void CloseWithoutPrompt()
     {
         closeWasConfirmed = true;

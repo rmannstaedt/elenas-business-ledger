@@ -3,6 +3,7 @@ using ElenasBusinessLedger.Infrastructure.Persistence;
 
 namespace ElenasBusinessLedger.App.Services;
 
+// Prompts for and saves a printer when issuing or reprinting requires one and none is configured.
 public sealed class InvoicePrinterConfigurationService : IInvoicePrinterConfigurationService
 {
     private const string DefaultCalendarId = "primary";
@@ -17,6 +18,7 @@ public sealed class InvoicePrinterConfigurationService : IInvoicePrinterConfigur
         this.printerSelectionDialog = printerSelectionDialog;
     }
 
+    // Prompts for and saves a printer when none is configured, so later print requests can reuse that choice.
     public async Task<OperationResult<bool>> EnsureConfiguredAsync(CancellationToken cancellationToken)
     {
         var snapshot = await settingsService.LoadAsync(cancellationToken);

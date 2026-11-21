@@ -6,6 +6,7 @@ using Microsoft.Win32;
 
 namespace ElenasBusinessLedger.App.Views;
 
+// Presents preferences and routes folder browsing and window actions to the Settings view model.
 public partial class SettingsView : Window
 {
     public SettingsView(SettingsViewModel viewModel)

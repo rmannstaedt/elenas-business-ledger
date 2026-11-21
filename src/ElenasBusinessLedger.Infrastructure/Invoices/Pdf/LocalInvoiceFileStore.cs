@@ -26,6 +26,7 @@ public sealed class LocalInvoiceFileStore : IInvoiceFileStore
         stagingFolderPath = Path.GetFullPath(Path.Combine(invoiceFolderPath, ".staging"));
     }
 
+    // Allocates a unique path under the invoice folder's staging directory for each PDF attempt.
     public Task<OperationResult<string>> CreateStagingPathAsync(
         InvoiceDraft draft,
         InvoiceNumber invoiceNumber,
@@ -48,6 +49,7 @@ public sealed class LocalInvoiceFileStore : IInvoiceFileStore
         }
     }
 
+    // Checks the PDF signature and minimum size before recording a publication checkpoint.
     public async Task<OperationResult<string>> VerifyStagedPdfAsync(string stagingPath, CancellationToken cancellationToken)
     {
         if (!File.Exists(stagingPath))
@@ -73,6 +75,7 @@ public sealed class LocalInvoiceFileStore : IInvoiceFileStore
         return OperationResult<string>.Success(stagingPath);
     }
 
+    // Computes the final filename and a checksum so recovery can identify the staged PDF after a move.
     public async Task<OperationResult<InvoicePdfPublication>> PreparePublicationAsync(
         string stagingPath, InvoiceDraft draft, InvoiceNumber invoiceNumber, CancellationToken cancellationToken)
     {
@@ -89,7 +92,7 @@ public sealed class LocalInvoiceFileStore : IInvoiceFileStore
         }
     }
 
-    /// <summary>Publishes the saved PDF or verifies that the same file already occupies its destination.</summary>
+    // Publishes the saved PDF or verifies that the same file already occupies its destination.
     public async Task<OperationResult<string>> CompletePublicationAsync(
         InvoicePdfPublication publication, CancellationToken cancellationToken)
     {
@@ -147,6 +150,7 @@ public sealed class LocalInvoiceFileStore : IInvoiceFileStore
         return Convert.ToHexString(await SHA256.HashDataAsync(stream, cancellationToken));
     }
 
+    // Removes a staged file only within the configured staging folder after an abandoned attempt.
     public Task<OperationResult<string>> DiscardStagingPathAsync(string stagingPath, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -174,6 +178,7 @@ public sealed class LocalInvoiceFileStore : IInvoiceFileStore
         }
     }
 
+    // Removes a published file in the invoice folder when the caller explicitly requests cleanup.
     public Task<OperationResult<string>> DiscardPublishedPathAsync(string publishedPath, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();

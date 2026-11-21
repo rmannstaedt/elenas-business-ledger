@@ -12,6 +12,7 @@ internal delegate Task<ConfiguredGoogleCalendarClient?> GoogleCalendarClientBuil
     bool allowInteractiveAuthorization,
     CancellationToken cancellationToken);
 
+// Builds a scoped calendar client from Settings and allows interactive authorization only for Connect.
 public sealed class GoogleCalendarClientFactory
 {
     private readonly Func<CancellationToken, Task<CalendarSettings?>> loadSettingsAsync;
@@ -53,6 +54,7 @@ public sealed class GoogleCalendarClientFactory
         this.buildClientAsync = buildClientAsync ?? BuildClientAsync;
     }
 
+    // Opens the saved calendar with existing credentials so background refresh does not start an authorization prompt.
     public async Task<ConfiguredGoogleCalendarClient?> CreateAsync(CancellationToken cancellationToken)
     {
         var settings = await loadSettingsAsync(cancellationToken);
@@ -66,11 +68,13 @@ public sealed class GoogleCalendarClientFactory
         return await CreateAsync(settings, allowInteractiveAuthorization: false, cancellationToken);
     }
 
+    // Uses the supplied calendar settings with saved credentials and leaves interactive authorization to Connect.
     public async Task<ConfiguredGoogleCalendarClient?> CreateAsync(
         CalendarSettings settings,
         CancellationToken cancellationToken) =>
         await CreateAsync(settings, allowInteractiveAuthorization: false, cancellationToken);
 
+    // Allows interactive Google sign-in during the explicit Connect action in Settings.
     public async Task<ConfiguredGoogleCalendarClient?> CreateForConnectionAsync(
         CalendarSettings settings,
         CancellationToken cancellationToken) =>

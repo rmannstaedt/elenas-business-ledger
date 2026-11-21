@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace ElenasBusinessLedger.Infrastructure.Persistence.Migrations
 {
+    // Adds storage for manual legacy amounts and the first app-backed month used by Economy.
     /// <inheritdoc />
     public partial class AddEconomyManualMonthOverrides : Migration
     {

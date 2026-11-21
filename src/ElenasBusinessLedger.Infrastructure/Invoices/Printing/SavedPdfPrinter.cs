@@ -3,6 +3,7 @@ using ElenasBusinessLedger.Core.Ports;
 
 namespace ElenasBusinessLedger.Infrastructure.Invoices.Printing;
 
+// Checks that the saved file and printer exist before submitting a Windows print request.
 public sealed class SavedPdfPrinter : IInvoicePrinter
 {
     private readonly IPrintProcessLauncher processLauncher;
@@ -14,6 +15,7 @@ public sealed class SavedPdfPrinter : IInvoicePrinter
         this.printerCatalog = printerCatalog;
     }
 
+    // Checks that the PDF and configured printer exist before asking Windows to launch a print request.
     public async Task<OperationResult<string>> PrintAsync(
         string pdfFilePath,
         string configuredPrinterName,

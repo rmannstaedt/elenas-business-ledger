@@ -4,6 +4,7 @@ using ElenasBusinessLedger.Core.Ports;
 
 namespace ElenasBusinessLedger.Core.UseCases.Plans;
 
+// Supplies the full plan catalog for management, including drafts and retired entries.
 public sealed class ListPlansUseCase
 {
     private readonly IPlanCatalogRepository planCatalogRepository;

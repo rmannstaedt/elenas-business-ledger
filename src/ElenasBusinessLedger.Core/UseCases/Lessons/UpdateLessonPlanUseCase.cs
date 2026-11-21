@@ -4,6 +4,7 @@ using ElenasBusinessLedger.Core.Ports;
 
 namespace ElenasBusinessLedger.Core.UseCases.Lessons;
 
+// Assigns a plan to an appointment or changes an unlocked lesson's plan so it can be billed correctly.
 public sealed class UpdateLessonPlanUseCase
 {
     private readonly ILessonRepository lessonRepository;
@@ -17,6 +18,7 @@ public sealed class UpdateLessonPlanUseCase
         this.planCatalogRepository = planCatalogRepository;
     }
 
+    // Assigns a plan to a recognized calendar appointment so it can become a billable local lesson.
     public async Task<OperationResult<LessonRecord>> LinkAsync(
         LessonRecord observed, int planCatalogId, CancellationToken cancellationToken)
     {
@@ -52,6 +54,7 @@ public sealed class UpdateLessonPlanUseCase
         return OperationResult<LessonRecord>.Success(saved);
     }
 
+    // Changes an existing lesson's plan while leaving the invoicing and calendar locks in force.
     public async Task<OperationResult<LessonRecord>> ExecuteAsync(
         int lessonId,
         int planCatalogId,

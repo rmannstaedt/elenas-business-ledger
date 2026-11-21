@@ -4,6 +4,7 @@ using ElenasBusinessLedger.Core.Students;
 
 namespace ElenasBusinessLedger.Core.UseCases.Invoices;
 
+// Finds students with unbilled lessons and suggests a selection based on nearby lesson times.
 public sealed class InvoiceCandidateSelectionUseCase
 {
     private readonly IStudentRepository studentRepository;
@@ -20,6 +21,7 @@ public sealed class InvoiceCandidateSelectionUseCase
         this.lessonDuration = lessonDuration ?? TimeSpan.FromHours(1);
     }
 
+    // Builds the invoice dialog's student choices and suggests a selection based on nearby uninvoiced lessons.
     public async Task<OperationResult<InvoiceCandidateSelectionResult>> ExecuteAsync(
         DateOnly date,
         DateTimeOffset now,

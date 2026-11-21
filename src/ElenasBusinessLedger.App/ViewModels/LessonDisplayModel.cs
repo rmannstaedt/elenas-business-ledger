@@ -6,6 +6,7 @@ using ElenasBusinessLedger.Core.UseCases.Startup;
 
 namespace ElenasBusinessLedger.App.ViewModels;
 
+// Holds the dashboard row's editable time and plan alongside its saved identity and billing state.
 public sealed class LessonDisplayModel : ViewModelBase
 {
     private const int FirstTimeOptionHour = 8;
@@ -237,12 +238,14 @@ public sealed class LessonDisplayModel : ViewModelBase
         _ => string.Empty
     };
 
+    // Makes the saved date and time the new baseline for detecting further edits.
     public void AcceptDateTimeChange()
     {
         savedStartsAt = StartsAt;
         savedHasKnownStartTime = HasKnownStartTime;
     }
 
+    // Replaces the draft identity with the created calendar event so future edits target the saved appointment.
     public void AcceptCreatedLesson(CalendarLesson lesson)
     {
         id = lesson.Id;
@@ -262,6 +265,7 @@ public sealed class LessonDisplayModel : ViewModelBase
         OnPropertyChanged(nameof(StartsAtTimeText));
     }
 
+    // Updates the row from the saved plan and attaches its local lesson ID when the appointment was just linked.
     public void AcceptPlanChange(LessonRecord lesson)
     {
         if (NeedsPlan)
@@ -284,6 +288,7 @@ public sealed class LessonDisplayModel : ViewModelBase
         return TryGetStartsAt(out startsAt, out _);
     }
 
+    // Builds the appointment time in the lesson's time zone and distinguishes a blank time from an entered midnight.
     public bool TryGetStartsAt(out DateTimeOffset startsAt, out bool hasKnownStartTime)
     {
         startsAt = default;
@@ -313,6 +318,7 @@ public sealed class LessonDisplayModel : ViewModelBase
         return true;
     }
 
+    // Compares the editor values with the saved time, including changes between timed and all-day lessons.
     public bool HasDateOrTimeChange() =>
         TryGetStartsAt(out var startsAt, out var hasKnownStartTime) &&
         (startsAt != savedStartsAt || hasKnownStartTime != savedHasKnownStartTime);

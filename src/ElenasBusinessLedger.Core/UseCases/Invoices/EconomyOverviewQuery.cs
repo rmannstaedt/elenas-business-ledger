@@ -5,6 +5,7 @@ using MoneyAmount = ElenasBusinessLedger.Core.Money.Money;
 
 namespace ElenasBusinessLedger.Core.UseCases.Economy;
 
+// Builds the Economy report from issued totals and eligible manual overrides so display and export agree.
 public sealed class EconomyOverviewQuery
 {
     private readonly IInvoiceRepository invoiceRepository;
@@ -21,6 +22,7 @@ public sealed class EconomyOverviewQuery
         this.economyRepository = economyRepository;
     }
 
+    // Builds the selected year's invoice view and five-year totals from issued records and eligible manual overrides.
     public async Task<OperationResult<EconomyOverview>> LoadAsync(int year, CancellationToken cancellationToken)
     {
         var years = new List<EconomyOverviewYearTotal>();

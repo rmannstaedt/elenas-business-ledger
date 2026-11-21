@@ -5,6 +5,7 @@ using ElenasBusinessLedger.Core.UseCases.Lessons;
 
 namespace ElenasBusinessLedger.App.Services;
 
+// Supplies the local and calendar lesson workflows behind dashboard and editor actions.
 public interface ILessonEditorService
 {
     Task<OperationResult<LessonAddResult>> AddAsync(

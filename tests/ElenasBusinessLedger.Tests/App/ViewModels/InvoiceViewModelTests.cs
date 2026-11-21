@@ -15,6 +15,7 @@ using WpfCheckBox = System.Windows.Controls.CheckBox;
 
 namespace ElenasBusinessLedger.Tests.App.ViewModels;
 
+// Tests student selection, draft adjustments, issuance, reprint behavior, and dismissing the preview.
 public sealed class InvoiceViewModelTests
 {
     [Fact]
@@ -477,6 +478,7 @@ public sealed class InvoiceViewModelTests
         Assert.True(condition());
     }
 
+    // Supplies choices and controlled issue or reprint results so invoice screens can be tested in isolation.
     private sealed class FakeInvoiceWorkflowService : IInvoiceWorkflowService
     {
         public OperationResult<InvoiceCandidateSelectionResult> Candidates { get; init; } =

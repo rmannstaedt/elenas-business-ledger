@@ -3,6 +3,7 @@ using ElenasBusinessLedger.App.ViewModels;
 
 namespace ElenasBusinessLedger.App.Services;
 
+// Abstracts the WPF message box so confirmation behavior can be checked without showing a real dialog.
 public interface IMessageBoxPresenter
 {
     MessageBoxResult Show(
@@ -14,6 +15,7 @@ public interface IMessageBoxPresenter
         MessageBoxResult defaultResult);
 }
 
+// Implements confirmation prompts with the native WPF message box.
 public sealed class WpfMessageBoxPresenter : IMessageBoxPresenter
 {
     public MessageBoxResult Show(
@@ -28,6 +30,7 @@ public sealed class WpfMessageBoxPresenter : IMessageBoxPresenter
             : MessageBox.Show(owner, messageBoxText, caption, button, icon, defaultResult);
 }
 
+// Presents dashboard confirmations with the relevant lesson or invoice details.
 public sealed class MessageBoxConfirmationService : IConfirmationService
 {
     private readonly Func<Window?> ownerProvider;

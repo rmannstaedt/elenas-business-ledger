@@ -3,6 +3,7 @@ using ElenasBusinessLedger.Core.Invoices;
 
 namespace ElenasBusinessLedger.Core.Ports;
 
+// Provides invoice persistence, recovery, payment tracking, and reporting queries to the ledger workflows.
 public interface IInvoiceRepository
 {
     Task<IReadOnlyList<InvoiceLessonStatus>> ListLessonStatusesAsync(

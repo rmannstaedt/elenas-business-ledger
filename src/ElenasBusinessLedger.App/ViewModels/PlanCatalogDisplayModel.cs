@@ -2,6 +2,7 @@ using ElenasBusinessLedger.Core.Plans;
 
 namespace ElenasBusinessLedger.App.ViewModels;
 
+// Formats a catalog plan's terms and lifecycle state for selection and display in the plan list.
 public sealed class PlanCatalogDisplayModel
 {
     public PlanCatalogDisplayModel(PlanCatalogItem plan)

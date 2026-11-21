@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace ElenasBusinessLedger.Infrastructure.Persistence.Migrations;
 
+// Adds stable student ownership to invoices and backfills it when the saved lesson links agree.
 /// <inheritdoc />
 public partial class _20261121165836_LinkInvoiceStudent : Migration
 {

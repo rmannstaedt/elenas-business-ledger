@@ -14,6 +14,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ElenasBusinessLedger.Tests.App.Services;
 
+// Checks dashboard failures, Google authorization status, and Settings behavior at the app service boundary.
 public sealed class AppServiceTests
 {
     [Fact]
@@ -172,6 +173,7 @@ public sealed class AppServiceTests
         Assert.Equal(new DateOnly(2026, 8, 1), savedEconomySettings?.FirstApplicationInvoiceMonth);
     }
 
+    // Supplies an empty student catalog so dashboard tests isolate the behavior of calendar failures.
     private sealed class EmptyStudentRepository : IStudentRepository
     {
         public Task<IReadOnlyList<StudentRecord>> ListStudentsAsync(CancellationToken cancellationToken) =>
@@ -187,6 +189,7 @@ public sealed class AppServiceTests
             Task.FromResult(OperationResult<StudentRecord>.Success(student));
     }
 
+    // Supplies empty invoice reads so dashboard service tests run without billing records.
     private sealed class EmptyInvoiceRepository : IInvoiceRepository
     {
         public Task<IReadOnlyList<InvoiceLessonStatus>> ListLessonStatusesAsync(DateOnly from, DateOnly to, CancellationToken cancellationToken,
@@ -275,6 +278,7 @@ public sealed class AppServiceTests
             Task.CompletedTask;
     }
 
+    // Supplies empty lesson reads so service tests do not need a populated billing ledger.
     private sealed class EmptyLessonRepository : ILessonRepository
     {
         public Task<LessonRecord> SaveAsync(LessonRecord lesson, CancellationToken cancellationToken) =>
@@ -323,6 +327,7 @@ public sealed class AppServiceTests
             IReadOnlyList<string> eventIds, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<LessonRecord>>([]);
     }
 
+    // Simulates a calendar exception so the dashboard's failure result can be asserted.
     private sealed class ThrowingCalendarGateway(string message) : IGoogleCalendarGateway
     {
         public Task<IReadOnlyList<CalendarLesson>> ListLessonsAsync(DateOnly from, DateOnly to, CancellationToken cancellationToken) =>
@@ -356,11 +361,13 @@ public sealed class AppServiceTests
             Task.FromResult(OperationResult<LessonState>.Failure(state, new ValidationError("Calendar.NotConfigured", message)));
     }
 
+    // Gives dashboard tests a stable date without depending on the system clock.
     private sealed class FixedClock : IClock
     {
         public DateTimeOffset Now => new(2026, 6, 16, 15, 0, 0, TimeSpan.Zero);
     }
 
+    // Creates a disposable SQLite ledger so Settings tests exercise the real repositories.
     private sealed class TestDatabase : IDisposable
     {
         private readonly string directory;
@@ -392,6 +399,7 @@ public sealed class AppServiceTests
         }
     }
 
+    // Provides an isolated location for token and configuration fixtures and removes it after the test.
     private sealed class TemporaryDirectory : IDisposable
     {
         public TemporaryDirectory()
@@ -408,6 +416,7 @@ public sealed class AppServiceTests
         }
     }
 
+    // Supplies minimal credential data for tests of saved authorization detection.
     private sealed record StoredToken(string AccessToken);
 
     private static string LegacyEscapedFileName(string key) =>

@@ -5,6 +5,7 @@ using ElenasBusinessLedger.Core.UseCases.Plans;
 
 namespace ElenasBusinessLedger.Tests.Core.UseCases;
 
+// Checks draft validation and catalog transitions, including scheduled retirement and reactivation.
 public sealed class PlanCatalogUseCaseTests
 {
     [Fact]
@@ -290,6 +291,7 @@ public sealed class PlanCatalogUseCaseTests
             RetireOn: null,
             state);
 
+    // Stores seeded plans in memory so the tests can verify lifecycle transitions without SQLite.
     private sealed class FakePlanCatalogRepository : IPlanCatalogRepository
     {
         private readonly List<PlanCatalogItem> plans = [];

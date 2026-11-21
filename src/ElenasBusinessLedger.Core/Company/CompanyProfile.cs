@@ -1,5 +1,6 @@
 namespace ElenasBusinessLedger.Core.Company;
 
+// Holds the business, VAT, invoice, and printer settings used to prepare and issue invoices.
 public sealed record CompanyProfile(
     string Name,
     string Address,
@@ -44,6 +45,7 @@ public sealed record CompanyProfile(
             bankAccountNumber,
             mobilePayAccount);
 
+    // Checks the VAT registration date used by billing to decide whether a period is taxable.
     public bool ChargesVatOn(DateOnly invoiceDate) =>
         VatStatus == VatStatus.Registered &&
         VatRegistrationDate is not null &&

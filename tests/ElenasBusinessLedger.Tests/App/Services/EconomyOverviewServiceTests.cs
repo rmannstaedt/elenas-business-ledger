@@ -7,6 +7,7 @@ using MoneyAmount = ElenasBusinessLedger.Core.Money.Money;
 
 namespace ElenasBusinessLedger.Tests.App.Services;
 
+// Checks reporting errors, protection of issued months, and the shape of Economy CSV exports.
 public sealed class EconomyOverviewServiceTests
 {
     [Fact]
@@ -199,6 +200,7 @@ public sealed class EconomyOverviewServiceTests
         Assert.Contains("Year,2026,2026,,,100.00,25.00,125.00,DisplayedTotals", csv);
     }
 
+    // Fails an Economy read so the reporting service's error handling can be tested.
     private sealed class ThrowingInvoiceRepository : IInvoiceRepository
     {
         public Task<IReadOnlyList<EconomyInvoiceRecord>> ListIssuedInvoiceOverviewRowsAsync(
@@ -294,6 +296,7 @@ public sealed class EconomyOverviewServiceTests
             throw new NotImplementedException();
     }
 
+    // Supplies issued rows by year so manual override tests can identify invoice-backed months.
     private sealed class FakeInvoiceRepository : IInvoiceRepository
     {
         public Dictionary<int, IReadOnlyList<EconomyInvoiceRecord>> OverviewRowsByYear { get; } = [];
@@ -391,6 +394,7 @@ public sealed class EconomyOverviewServiceTests
             throw new NotImplementedException();
     }
 
+    // Holds settings and captures override writes so service tests can check what would be persisted.
     private sealed class FakeEconomyRepository : IEconomyRepository
     {
         public EconomySettings? Settings { get; set; }

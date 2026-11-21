@@ -21,6 +21,7 @@ using MoneyAmount = ElenasBusinessLedger.Core.Money.Money;
 
 namespace ElenasBusinessLedger.Tests.App.Views;
 
+// Checks the report window's layout, keyboard navigation, error display, and manual editing controls.
 public sealed class EconomyOverviewViewTests
 {
     [Fact]
@@ -393,6 +394,7 @@ public sealed class EconomyOverviewViewTests
         capturedException?.Throw();
     }
 
+    // Supplies a known report or error so the real WPF view can be exercised without loading SQLite.
     private sealed class FakeEconomyOverviewService(OperationResult<EconomyOverview>? loadResult) : IEconomyOverviewService
     {
         public Task<OperationResult<EconomyOverview>> LoadAsync(int year, CancellationToken cancellationToken) =>
@@ -406,11 +408,13 @@ public sealed class EconomyOverviewViewTests
             Task.FromResult(OperationResult<EconomyOverview>.Success(CreateOverview(overviewYear)));
     }
 
+    // Satisfies the export picker dependency without displaying a native dialog.
     private sealed class FakeEconomyOverviewExportDialog : IEconomyOverviewExportDialog
     {
         public string? ShowSaveCsvDialog(int year) => null;
     }
 
+    // Stands in for file export so layout and keyboard tests do not write reports.
     private sealed class FakeEconomyOverviewCsvFileService : IEconomyOverviewCsvFileService
     {
         public Task<OperationResult<string>> SaveAsync(
@@ -420,12 +424,14 @@ public sealed class EconomyOverviewViewTests
             Task.FromResult(OperationResult<string>.Success(filePath));
     }
 
+    // Supplies the viewer dependency without opening PDF files during view tests.
     private sealed class FakeInvoicePdfLauncher : IInvoicePdfLauncher
     {
         public Task OpenAsync(string pdfFilePath, CancellationToken cancellationToken) =>
             Task.CompletedTask;
     }
 
+    // Supplies a fixed reporting date for tests of the Economy view.
     private sealed class FakeUiClock : IUiClock
     {
         public FakeUiClock(DateTimeOffset now)

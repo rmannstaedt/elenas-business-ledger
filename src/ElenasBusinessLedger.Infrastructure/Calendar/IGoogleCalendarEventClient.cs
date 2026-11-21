@@ -2,6 +2,7 @@ using ElenasBusinessLedger.Core.Lessons;
 
 namespace ElenasBusinessLedger.Infrastructure.Calendar;
 
+// Defines the event operations the gateway needs so calendar workflows can be tested without making Google calls.
 public interface IGoogleCalendarEventClient
 {
     Task<IReadOnlyList<GoogleCalendarEvent>> ListEventsAsync(

@@ -7,6 +7,7 @@ using ElenasBusinessLedger.Infrastructure.Persistence;
 
 namespace ElenasBusinessLedger.App.Services;
 
+// Coordinates saved Settings and explicit Google authorization for the Settings window.
 public sealed class CoreAppSettingsService : IAppSettingsService
 {
     private readonly ICompanyProfileRepository companyProfileRepository;
@@ -53,6 +54,7 @@ public sealed class CoreAppSettingsService : IAppSettingsService
         this.printerCatalog = printerCatalog ?? new WindowsPrinterCatalog();
     }
 
+    // Collects saved settings and local printer and authorization information for the Settings form.
     public async Task<AppSettingsSnapshot> LoadAsync(CancellationToken cancellationToken)
     {
         CompanyProfile? companyProfile = null;
@@ -73,6 +75,7 @@ public sealed class CoreAppSettingsService : IAppSettingsService
         return CreateSnapshot(companyProfile, calendarSettings, economySettings, printerNames);
     }
 
+    // Saves company, calendar, and Economy settings together and returns the snapshot shown in Settings.
     public async Task<OperationResult<AppSettingsSnapshot>> SaveAsync(
         CompanyProfile companyProfile,
         CalendarSettings calendarSettings,
@@ -98,6 +101,7 @@ public sealed class CoreAppSettingsService : IAppSettingsService
         }
     }
 
+    // Starts explicit authorization and reads the selected calendar to check that the connection works.
     public async Task<OperationResult<bool>> ConnectGoogleCalendarAsync(
         CalendarSettings calendarSettings,
         CancellationToken cancellationToken)
@@ -148,6 +152,7 @@ public sealed class CoreAppSettingsService : IAppSettingsService
         }
     }
 
+    // Clears the Ledger's saved Google tokens for this Windows user so Connect can authorize again.
     public async Task<OperationResult<bool>> ForgetGoogleAuthorizationAsync(CancellationToken cancellationToken)
     {
         try

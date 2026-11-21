@@ -9,6 +9,7 @@ using ElenasBusinessLedger.Core.Students;
 
 namespace ElenasBusinessLedger.Core.UseCases.Startup;
 
+// Reconciles calendar observations with the ledger and prepares the selected student's dashboard data.
 public sealed class StartupDashboardQuery
 {
     private readonly IStudentRepository studentRepository;
@@ -37,6 +38,7 @@ public sealed class StartupDashboardQuery
         this.lessonTimeZone = lessonTimeZone ?? TimeZoneInfo.Local;
     }
 
+    // Reconciles calendar appointments with local billing records and builds the dashboard for the selected student.
     public async Task<OperationResult<StartupDashboardResult>> ExecuteAsync(
         DateOnly selectedMonth,
         string? selectedStudentShortName,
@@ -351,6 +353,7 @@ public sealed class StartupDashboardQuery
     }
 }
 
+// Supplies the day replacement used to calculate month boundaries for the dashboard's calendar window.
 internal static class DateOnlyExtensions
 {
     public static DateOnly WithDay(this DateOnly date, int day) => new(date.Year, date.Month, day);

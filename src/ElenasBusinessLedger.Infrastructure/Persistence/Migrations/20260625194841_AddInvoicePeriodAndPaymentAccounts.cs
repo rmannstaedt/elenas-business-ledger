@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace ElenasBusinessLedger.Infrastructure.Persistence.Migrations
 {
+    // Records invoice periods and payment accounts so saved documents retain those billing details.
     /// <inheritdoc />
     public partial class AddInvoicePeriodAndPaymentAccounts : Migration
     {

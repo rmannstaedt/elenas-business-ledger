@@ -5,6 +5,7 @@ using MoneyAmount = ElenasBusinessLedger.Core.Money.Money;
 
 namespace ElenasBusinessLedger.App.Services;
 
+// Provides Economy reports and screens manual overrides against issued months before committing them.
 public sealed class CoreEconomyOverviewService : IEconomyOverviewService
 {
     private readonly EconomyOverviewQuery query;
@@ -21,6 +22,7 @@ public sealed class CoreEconomyOverviewService : IEconomyOverviewService
         this.invoiceRepository = invoiceRepository;
     }
 
+    // Loads the report for the selected year and returns any errors the Economy window needs to display.
     public async Task<OperationResult<EconomyOverview>> LoadAsync(int year, CancellationToken cancellationToken)
     {
         try
@@ -34,6 +36,7 @@ public sealed class CoreEconomyOverviewService : IEconomyOverviewService
         }
     }
 
+    // Saves eligible legacy amounts and reloads the report so it reflects the committed overrides.
     public async Task<OperationResult<EconomyOverview>> SaveManualMonthOverridesAsync(
         int overviewYear,
         EconomySettings settings,

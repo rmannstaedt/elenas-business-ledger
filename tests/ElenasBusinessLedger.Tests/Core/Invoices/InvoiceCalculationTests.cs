@@ -4,6 +4,7 @@ using ElenasBusinessLedger.Core.Money;
 
 namespace ElenasBusinessLedger.Tests.Core.Invoices;
 
+// Checks when VAT is charged and which billing date controls the calculation.
 public sealed class InvoiceCalculationTests
 {
     [Fact]

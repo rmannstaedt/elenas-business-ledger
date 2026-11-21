@@ -7,6 +7,7 @@ using ElenasBusinessLedger.Core.Students;
 
 namespace ElenasBusinessLedger.Core.UseCases.Lessons;
 
+// Creates missing monthly schedule entries and saves acknowledged writes as local billing lessons.
 public sealed class PopulateCalendarUseCase
 {
     private readonly IStudentRepository studentRepository;
@@ -26,6 +27,7 @@ public sealed class PopulateCalendarUseCase
         this.lessonRepository = lessonRepository;
     }
 
+    // Creates missing scheduled lessons for the month and stores each successful calendar write in the billing ledger.
     public async Task<OperationResult<PopulateCalendarResult>> ExecuteAsync(
         PopulateCalendarRequest request,
         CancellationToken cancellationToken)
@@ -167,6 +169,7 @@ public sealed class PopulateCalendarUseCase
         }
     }
 
+    // Keeps the proposed appointment and its resolved plan together until the calendar write is saved locally.
     private sealed record ScheduledLessonCandidate(
         LessonAddRequest Request,
         Plan Plan);

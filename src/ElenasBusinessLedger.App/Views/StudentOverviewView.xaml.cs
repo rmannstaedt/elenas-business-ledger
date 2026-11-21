@@ -4,6 +4,7 @@ using ElenasBusinessLedger.App.ViewModels;
 
 namespace ElenasBusinessLedger.App.Views;
 
+// Presents the student list and coordinates closing with the shared editor's unsaved changes.
 public partial class StudentOverviewView : Window
 {
     private bool closeWasConfirmed;

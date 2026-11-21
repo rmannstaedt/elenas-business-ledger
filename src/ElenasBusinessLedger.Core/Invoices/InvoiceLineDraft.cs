@@ -2,6 +2,7 @@ using MoneyAmount = ElenasBusinessLedger.Core.Money.Money;
 
 namespace ElenasBusinessLedger.Core.Invoices;
 
+// Holds the price and plan at preview time while retaining the lesson ID needed for the eventual billing lock.
 public sealed class InvoiceLineDraft
 {
     public InvoiceLineDraft(

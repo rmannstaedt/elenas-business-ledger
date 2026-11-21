@@ -5,6 +5,7 @@ using ElenasBusinessLedger.Core.Ports;
 
 namespace ElenasBusinessLedger.Core.UseCases.Lessons;
 
+// Coordinates calendar removal with local billing removal so a cancelled lesson stays out of later previews.
 public sealed class DeleteLessonUseCase
 {
     private readonly IGoogleCalendarGateway calendarGateway;
@@ -18,6 +19,7 @@ public sealed class DeleteLessonUseCase
         this.lessonRepository = lessonRepository;
     }
 
+    // Removes the appointment and its local billing row so the cancelled lesson cannot be invoiced.
     public async Task<OperationResult<IReadOnlyList<CalendarLesson>>> ExecuteAsync(
         string lessonId,
         DateOnly refreshMonth,

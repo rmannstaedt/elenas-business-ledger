@@ -5,6 +5,7 @@ using System.Windows;
 
 namespace ElenasBusinessLedger.App.Services;
 
+// Persists window position and optional size so reopening a window restores its layout.
 public static class WindowPlacementStore
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
@@ -19,6 +20,7 @@ public static class WindowPlacementStore
 
     private static string StorePath => StorePathOverride ?? DefaultStorePath;
 
+    // Restores and saves window placement and optionally size, allowing fixed-size dialogs to retain position only.
     public static void Attach(Window window, string key, bool rememberSize = true)
     {
         window.SourceInitialized += (_, _) => Restore(window, key, rememberSize);
@@ -100,5 +102,6 @@ public static class WindowPlacementStore
         }
     }
 
+    // Holds the saved coordinates and size needed to restore one window.
     private sealed record WindowPlacement(double Left, double Top, double Width, double Height);
 }

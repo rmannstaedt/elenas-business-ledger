@@ -26,6 +26,7 @@ public sealed class InvoicePreviewUseCase
         this.planCatalogRepository = planCatalogRepository;
     }
 
+    // Loads the selected student's local lessons to build an editable preview without assigning an invoice number.
     public async Task<OperationResult<InvoicePreviewResult>> CreateAsync(
         string studentShortName,
         DateOnly invoiceDate,

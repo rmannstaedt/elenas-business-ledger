@@ -3,6 +3,7 @@ using ElenasBusinessLedger.Core.Invoices;
 
 namespace ElenasBusinessLedger.Core.Ports;
 
+// Defines staging, recovery, and publication operations for PDFs so issuance can verify the artifact across retries.
 public interface IInvoiceFileStore
 {
     Task<OperationResult<string>> CreateStagingPathAsync(

@@ -10,11 +10,13 @@ public enum CalendarWriteState
     Uncertain
 }
 
+// Separates the outcome of a calendar write from the outcome of the dashboard refresh.
 public sealed record CalendarWriteReceipt(
     CalendarWriteState State,
     IReadOnlyList<ValidationError> Errors,
     IReadOnlyList<CalendarLesson>? RefreshedLessons = null)
 {
+    // Adapts write-and-refresh results so a failed refresh does not turn an acknowledged write into an uncertain one.
     public static CalendarWriteReceipt FromPreviousResult(OperationResult<IReadOnlyList<CalendarLesson>> result)
     {
         if (result.Succeeded || result.Errors.Any(error => error.Code == "Calendar.RefreshFailed"))
@@ -27,6 +29,7 @@ public sealed record CalendarWriteReceipt(
         return new(state, result.Errors);
     }
 
+    // Gets the current month for the dashboard while preserving any refresh result already attached to the receipt.
     public async Task<OperationResult<IReadOnlyList<CalendarLesson>>> RefreshAsync(
         IGoogleCalendarGateway gateway, DateOnly month, CancellationToken cancellationToken)
     {

@@ -2,6 +2,7 @@ using ElenasBusinessLedger.App.Services;
 
 namespace ElenasBusinessLedger.Tests.App.Services;
 
+// Guards the default roaming data path so releases keep finding the same ledger and preferences.
 public sealed class AppPathsTests
 {
     [Fact]

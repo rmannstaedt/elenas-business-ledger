@@ -3,6 +3,7 @@ using System.Runtime.CompilerServices;
 
 namespace ElenasBusinessLedger.Tests.Packaging;
 
+// Checks installer identity and failure containment so builds can replace their output without harming prior installers.
 public sealed class InstallerPackagingTests
 {
     private const string InstallerFileName = "ElenasBusinessLedger-1.4.0-Setup.exe";

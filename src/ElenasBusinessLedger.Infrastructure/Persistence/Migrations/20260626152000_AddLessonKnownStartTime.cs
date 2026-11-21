@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace ElenasBusinessLedger.Infrastructure.Persistence.Migrations;
 
+// Preserves whether a lesson has an explicit start time so calendar and invoice rows can show all-day lessons.
 [DbContext(typeof(LedgerDbContext))]
 [Migration("20260626152000_AddLessonKnownStartTime")]
 public partial class AddLessonKnownStartTime : Migration

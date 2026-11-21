@@ -5,6 +5,7 @@ using ElenasBusinessLedger.Infrastructure.Persistence;
 
 namespace ElenasBusinessLedger.App.Services;
 
+// Packages saved preferences and local connection status so Settings can populate the whole form.
 public sealed record AppSettingsSnapshot(
     CompanyProfile? CompanyProfile,
     CalendarSettings? CalendarSettings,
@@ -16,6 +17,7 @@ public sealed record AppSettingsSnapshot(
     bool HasGoogleAuthorizationTokens = false,
     IReadOnlyList<string>? AvailablePrinterNames = null);
 
+// Gives Settings a contract for saved preferences and explicit Google authorization actions.
 public interface IAppSettingsService
 {
     Task<AppSettingsSnapshot> LoadAsync(CancellationToken cancellationToken);

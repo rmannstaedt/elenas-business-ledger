@@ -5,6 +5,7 @@ using ElenasBusinessLedger.Core.UseCases.Lessons;
 
 namespace ElenasBusinessLedger.App.Services;
 
+// Exposes lesson editing, batch population, and calendar review workflows to the WPF lesson controls.
 public sealed class CoreLessonEditorService : ILessonEditorService
 {
     private readonly AddLessonUseCase addLessonUseCase;
@@ -36,6 +37,7 @@ public sealed class CoreLessonEditorService : ILessonEditorService
         CancellationToken cancellationToken) =>
         addLessonUseCase.ExecuteAsync(request, refreshMonth, cancellationToken);
 
+    // Creates missing lessons from the selected student's schedule and reports how much of the batch succeeded.
     public async Task<OperationResult<PopulateCalendarResult>> PopulateCalendarAsync(
         string studentShortName,
         DateOnly displayMonth,
@@ -56,6 +58,7 @@ public sealed class CoreLessonEditorService : ILessonEditorService
         }
     }
 
+    // Resolves a lesson held for calendar review or returns the confirmation the dashboard needs.
     public async Task<OperationResult<bool>> ReviewCalendarMutationAsync(
         string eventId, DateOnly month, bool confirmRemoved, CancellationToken cancellationToken)
     {
@@ -83,6 +86,7 @@ public sealed class CoreLessonEditorService : ILessonEditorService
         CancellationToken cancellationToken) =>
         deleteLessonUseCase.ExecuteAsync(lessonId, refreshMonth, cancellationToken);
 
+    // Assigns a plan to an unlinked calendar row so it can enter the local billing ledger.
     public async Task<OperationResult<LessonRecord>> LinkToPlanAsync(
         LessonRecord observed, int planCatalogId, CancellationToken cancellationToken)
     {

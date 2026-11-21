@@ -9,6 +9,7 @@ using QuestPDF.Infrastructure;
 
 namespace ElenasBusinessLedger.Infrastructure.Invoices.Pdf;
 
+// Lays out a numbered invoice in QuestPDF using the supplied snapshot and totals.
 public sealed class QuestPdfInvoicePdfWriter : IInvoicePdfWriter
 {
     private const string InvoiceFontFamily = "Segoe UI";
@@ -25,6 +26,7 @@ public sealed class QuestPdfInvoicePdfWriter : IInvoicePdfWriter
         QuestPDF.Settings.ThrowOnMissingFontFamilies = false;
     }
 
+    // Renders the supplied invoice snapshot and totals to a PDF file for the publication workflow.
     public Task<OperationResult<string>> WriteAsync(
         InvoiceDraft draft,
         InvoiceTotals totals,

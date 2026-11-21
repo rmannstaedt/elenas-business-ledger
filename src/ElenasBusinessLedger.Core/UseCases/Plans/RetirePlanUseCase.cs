@@ -4,6 +4,7 @@ using ElenasBusinessLedger.Core.Ports;
 
 namespace ElenasBusinessLedger.Core.UseCases.Plans;
 
+// Marks a plan retired so it can remain in history while leaving the active choices.
 public sealed class RetirePlanUseCase
 {
     private readonly IPlanCatalogRepository planCatalogRepository;
@@ -13,6 +14,7 @@ public sealed class RetirePlanUseCase
         this.planCatalogRepository = planCatalogRepository;
     }
 
+    // Removes an active plan from future choices by marking it retired.
     public async Task<OperationResult<PlanCatalogItem>> ExecuteAsync(int planId, CancellationToken cancellationToken)
     {
         var plan = await planCatalogRepository.GetAsync(planId, cancellationToken);

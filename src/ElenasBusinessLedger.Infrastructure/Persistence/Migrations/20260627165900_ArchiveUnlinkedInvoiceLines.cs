@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace ElenasBusinessLedger.Infrastructure.Persistence.Migrations;
 
+// Preserves older invoice lines without a reliable lesson ID before tighter link rules are applied.
 [DbContext(typeof(LedgerDbContext))]
 [Migration("20260627165900_ArchiveUnlinkedInvoiceLines")]
 public sealed class ArchiveUnlinkedInvoiceLines : Migration

@@ -1,5 +1,6 @@
 namespace ElenasBusinessLedger.Core.Plans;
 
+// Represents the reusable plan terms and lifecycle state that determine whether an editor can assign the plan.
 public sealed record PlanCatalogItem(
     int Id,
     string Name,

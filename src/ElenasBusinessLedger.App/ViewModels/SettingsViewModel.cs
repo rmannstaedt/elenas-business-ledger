@@ -7,6 +7,7 @@ using ElenasBusinessLedger.Infrastructure.Persistence;
 
 namespace ElenasBusinessLedger.App.ViewModels;
 
+// Holds editable preferences and connection status so the user can save Settings explicitly.
 public sealed class SettingsViewModel : ViewModelBase
 {
     private const string DefaultCalendarId = "primary";
@@ -213,6 +214,7 @@ public sealed class SettingsViewModel : ViewModelBase
 
     public event EventHandler<bool?>? CloseRequested;
 
+    // Fills the settings form from saved values and shows the current printer and Google authorization state.
     public async Task LoadAsync()
     {
         var snapshot = await settingsService.LoadAsync(CancellationToken.None);

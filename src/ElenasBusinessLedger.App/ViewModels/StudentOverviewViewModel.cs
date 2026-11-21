@@ -7,6 +7,7 @@ using ElenasBusinessLedger.Core.UseCases.Students;
 
 namespace ElenasBusinessLedger.App.ViewModels;
 
+// Keeps the student list and details editor on one selection and resolves pending edits before switching or closing.
 public sealed class StudentOverviewViewModel : ViewModelBase
 {
     private readonly IStudentOverviewService studentOverviewService;
@@ -93,6 +94,7 @@ public sealed class StudentOverviewViewModel : ViewModelBase
         }
     }
 
+    // Checks for unsaved edits before switching the student shown in the shared details editor.
     public async Task SelectStudentAsync(StudentOverviewStudentDisplayModel? student)
     {
         if (ReferenceEquals(selectedStudent, student))
@@ -122,6 +124,7 @@ public sealed class StudentOverviewViewModel : ViewModelBase
         SetSelectedStudentCore(target is null ? null : SelectStudent(target) ?? student);
     }
 
+    // Resolves unsaved student edits before Manage Students closes and takes its details window with it.
     public async Task<bool> PrepareForCloseAsync()
     {
         var preparation = await PrepareCurrentEditorForNavigationAsync(SelectedStudent?.Choice);
@@ -133,6 +136,7 @@ public sealed class StudentOverviewViewModel : ViewModelBase
         return true;
     }
 
+    // Resolves unsaved edits and restores the saved selection so Manage Students can stay open.
     public async Task<bool> PrepareForDetailsWindowCloseAsync()
     {
         if (!await PrepareCurrentEditorForDetailsCloseAsync())
@@ -214,6 +218,7 @@ public sealed class StudentOverviewViewModel : ViewModelBase
 
     public AsyncRelayCommand DismissErrorCommand { get; }
 
+    // Refreshes students, invoice history, and assignable plans, then selects the requested student by ID when available.
     public async Task LoadAsync(string? selectedStudentShortName = null, int? studentId = null)
     {
         IsBusy = true;

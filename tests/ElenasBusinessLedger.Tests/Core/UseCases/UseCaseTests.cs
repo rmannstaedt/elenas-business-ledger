@@ -14,6 +14,7 @@ using ElenasBusinessLedger.Core.UseCases.Startup;
 
 namespace ElenasBusinessLedger.Tests.Core.UseCases;
 
+// Exercises how dashboard, calendar, and invoice use cases coordinate their records and recovery paths.
 public sealed class UseCaseTests
 {
     [Fact]
@@ -1796,11 +1797,13 @@ public sealed class UseCaseTests
             schedule ?? [new StudentScheduleEntry(DayOfWeek.Tuesday, new TimeOnly(15, 0))]);
     }
 
+    // Pins domain time so dashboard and billing scenarios remain deterministic.
     private sealed class FakeClock(DateTimeOffset now) : IClock
     {
         public DateTimeOffset Now => now;
     }
 
+    // Supplies selected student records and schedules to Core use cases.
     private sealed class FakeStudentRepository(IReadOnlyList<StudentRecord> students) : IStudentRepository
     {
         public Task<IReadOnlyList<StudentRecord>> ListStudentsAsync(CancellationToken cancellationToken) =>
@@ -1816,6 +1819,7 @@ public sealed class UseCaseTests
             Task.FromResult(OperationResult<StudentRecord>.Success(student));
     }
 
+    // Provides billing, VAT, and printer settings for tests of Core invoice operations.
     private sealed class FakeCompanyProfileRepository : ICompanyProfileRepository
     {
         public Task<CompanyProfile> GetAsync(CancellationToken cancellationToken) =>
@@ -1834,6 +1838,7 @@ public sealed class UseCaseTests
             Task.CompletedTask;
     }
 
+    // Tracks local lesson changes and simulates save errors so calendar and billing coordination can be tested.
     private sealed class FakeLessonRepository : ILessonRepository
     {
         private readonly List<LessonRecord> lessons = [];
@@ -1979,6 +1984,7 @@ public sealed class UseCaseTests
                 .Where(lesson => lesson.GoogleCalendarEventId is { } id && eventIds.Contains(id)).ToArray());
     }
 
+    // Provides plan terms for use cases that assign a plan to a lesson or prepare an invoice.
     private sealed class FakePlanCatalogRepository(IReadOnlyList<PlanCatalogItem> plans) : IPlanCatalogRepository
     {
         public Task<IReadOnlyList<PlanCatalogItem>> ListAllAsync(CancellationToken cancellationToken) =>
@@ -2005,6 +2011,7 @@ public sealed class UseCaseTests
             Task.FromResult(OperationResult<bool>.Success(true));
     }
 
+    // Scripts appointment reads and writes, including failures after Google has acknowledged a change.
     private sealed class FakeCalendarGateway(IReadOnlyList<CalendarLesson> lessons) : IGoogleCalendarGateway
     {
         private readonly List<CalendarLesson> populatedLessons = [];
@@ -2125,6 +2132,7 @@ public sealed class UseCaseTests
         }
     }
 
+    // Supplies invoice state and captures reservations, locks, print updates, or payment writes during Core tests.
     private sealed class FakeInvoiceRepository(List<string>? calls = null) : IInvoiceRepository
     {
         public IReadOnlyList<InvoiceLessonStatus> LessonStatuses { get; init; } = [];
@@ -2372,6 +2380,7 @@ public sealed class UseCaseTests
         }
     }
 
+    // Simulates PDF staging and publication and records their order relative to the invoice writes.
     private sealed class FakeInvoiceFileStore(List<string>? calls = null) : IInvoiceFileStore
     {
         public OperationResult<string> PublishResult { get; init; } =
@@ -2417,6 +2426,7 @@ public sealed class UseCaseTests
         }
     }
 
+    // Captures whether a staged PDF was requested and supplies a controlled render outcome.
     private sealed class FakeInvoicePdfWriter : IInvoicePdfWriter
     {
         public OperationResult<string> WriteResult { get; init; } =
@@ -2439,6 +2449,7 @@ public sealed class UseCaseTests
         }
     }
 
+    // Controls the print outcome and records when printing happens relative to issuance.
     private sealed class FakeInvoicePrinter(List<string>? calls = null) : IInvoicePrinter
     {
         public OperationResult<string> PrintResult { get; init; } =

@@ -13,6 +13,7 @@ using System.Text.Json;
 
 namespace ElenasBusinessLedger.Tests.Infrastructure.Calendar;
 
+// Covers calendar scoping, event formatting, refresh outcomes, and reuse of saved Google authorization.
 public sealed class GoogleCalendarGatewayTests
 {
     [Fact]
@@ -625,11 +626,13 @@ public sealed class GoogleCalendarGatewayTests
             TimeZone: TimeZoneInfo.FindSystemTimeZoneById("Romance Standard Time"),
             DefaultLessonDuration: defaultLessonDuration ?? TimeSpan.FromHours(1));
 
+    // Provides a minimal token fixture so credential tests do not need a real Google account.
     private sealed record StoredToken(string AccessToken);
 
     private static string LegacyEscapedFileName(string key) =>
         $"{Uri.EscapeDataString(key).Replace("%", "_")}.bin";
 
+    // Stores OAuth fixtures in memory so credential reuse can be tested without protected files.
     private sealed class InMemoryDataStore : IDataStore
     {
         private readonly Dictionary<string, object?> values = [];
@@ -660,6 +663,7 @@ public sealed class GoogleCalendarGatewayTests
         }
     }
 
+    // Records Google event requests and simulates API failures without a network call.
     private sealed class FakeGoogleCalendarEventClient : IGoogleCalendarEventClient
     {
         public IReadOnlyList<GoogleCalendarEvent> Events { get; init; } = [];
@@ -790,6 +794,7 @@ public sealed class GoogleCalendarGatewayTests
         }
     }
 
+    // Captures created event values so tests can verify calendar titles, timing, and duration.
     private sealed record CreatedCalendarEvent(
         string Summary,
         DateTimeOffset StartsAt,

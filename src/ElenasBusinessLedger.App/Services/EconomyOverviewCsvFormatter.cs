@@ -5,8 +5,10 @@ using ElenasBusinessLedger.Core.UseCases.Economy;
 
 namespace ElenasBusinessLedger.App.Services;
 
+// Produces sectioned CSV with invariant numbers so Economy exports can be read across locales.
 public sealed class EconomyOverviewCsvFormatter
 {
+    // Produces invoice, month, quarter, and year rows with invariant amounts so exports can be consumed across locales.
     public string Format(EconomyOverview overview)
     {
         var rows = new List<string[]>

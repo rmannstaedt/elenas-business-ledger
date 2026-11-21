@@ -6,6 +6,7 @@ using ElenasBusinessLedger.Core.UseCases.Startup;
 
 namespace ElenasBusinessLedger.Tests.App.Services;
 
+// Checks that the lesson confirmation is owned by the dashboard window.
 public sealed class MessageBoxConfirmationServiceTests
 {
     [Fact]
@@ -61,6 +62,7 @@ public sealed class MessageBoxConfirmationServiceTests
         }
     }
 
+    // Records confirmation arguments so tests can inspect ownership and button defaults without showing a message box.
     private sealed class CapturingMessageBoxPresenter : IMessageBoxPresenter
     {
         private readonly MessageBoxResult result;

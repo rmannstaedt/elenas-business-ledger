@@ -5,6 +5,7 @@ using ElenasBusinessLedger.Core.UseCases.Plans;
 
 namespace ElenasBusinessLedger.App.Services;
 
+// Connects plan management commands and scheduled retirement to the Core catalog use cases.
 public sealed class CorePlanCatalogService : IPlanCatalogService
 {
     private readonly ListPlansUseCase listPlansUseCase;

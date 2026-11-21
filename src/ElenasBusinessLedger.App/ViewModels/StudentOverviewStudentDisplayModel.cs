@@ -3,6 +3,7 @@ using ElenasBusinessLedger.Core.Students;
 
 namespace ElenasBusinessLedger.App.ViewModels;
 
+// Wraps a student's snapshot with display fields and the stable ID used when switching selection.
 public sealed class StudentOverviewStudentDisplayModel : ViewModelBase
 {
     public StudentOverviewStudentDisplayModel(StudentOverviewSnapshot snapshot)

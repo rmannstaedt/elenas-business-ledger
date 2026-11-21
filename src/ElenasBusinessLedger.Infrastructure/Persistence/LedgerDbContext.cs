@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ElenasBusinessLedger.Infrastructure.Persistence;
 
+// Defines the EF Core tables and relationships that repositories use to persist the SQLite ledger.
 public sealed class LedgerDbContext : DbContext
 {
     public LedgerDbContext(DbContextOptions<LedgerDbContext> options)

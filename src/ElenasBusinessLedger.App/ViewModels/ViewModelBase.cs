@@ -3,6 +3,7 @@ using System.Runtime.CompilerServices;
 
 namespace ElenasBusinessLedger.App.ViewModels;
 
+// Centralizes WPF property-change notifications so bindings reflect changes in view-model state.
 public abstract class ViewModelBase : INotifyPropertyChanged
 {
     public event PropertyChangedEventHandler? PropertyChanged;

@@ -5,6 +5,7 @@ using ElenasBusinessLedger.Core.UseCases.Lessons;
 
 namespace ElenasBusinessLedger.Core.Ports;
 
+// Exposes calendar lesson reads and writes so Core can coordinate Google updates with the local ledger.
 public interface IGoogleCalendarGateway
 {
     Task<IReadOnlyList<CalendarLesson>> ListLessonsAsync(DateOnly from, DateOnly to, CancellationToken cancellationToken);

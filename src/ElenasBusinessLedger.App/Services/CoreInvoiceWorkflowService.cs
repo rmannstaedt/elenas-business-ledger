@@ -36,6 +36,7 @@ public sealed class CoreInvoiceWorkflowService : IInvoiceWorkflowService
         this.clock = clock;
     }
 
+    // Loads the student choices shown before invoice preview and surfaces lookup failures to the dialog.
     public async Task<OperationResult<InvoiceCandidateSelectionResult>> LoadCandidatesAsync(
         DateOnly date,
         DateTimeOffset now,
@@ -52,6 +53,7 @@ public sealed class CoreInvoiceWorkflowService : IInvoiceWorkflowService
         }
     }
 
+    // Builds an invoice draft for the requested period so the editor can display amounts before issuance.
     public async Task<OperationResult<InvoicePreviewResult>> CreatePreviewAsync(
         string studentShortName,
         DateOnly invoiceDate,
@@ -71,6 +73,7 @@ public sealed class CoreInvoiceWorkflowService : IInvoiceWorkflowService
         }
     }
 
+    // Uses current company VAT settings to calculate the on-screen totals for an edited draft.
     public async Task<OperationResult<InvoiceTotals>> CalculateTotalsAsync(
         InvoiceDraft draft,
         CancellationToken cancellationToken)
@@ -87,6 +90,7 @@ public sealed class CoreInvoiceWorkflowService : IInvoiceWorkflowService
         }
     }
 
+    // Uses the configured invoice folder to issue the draft or recover a matching pending reservation.
     public async Task<OperationResult<IssueInvoiceResult>> IssueAsync(
         InvoiceDraft draft,
         CancellationToken cancellationToken,
@@ -119,6 +123,7 @@ public sealed class CoreInvoiceWorkflowService : IInvoiceWorkflowService
     public Task<OperationResult<InvoiceNumber>> DiscardPendingAsync(IssuedInvoice invoice, CancellationToken cancellationToken) =>
         invoiceRepository.DiscardPendingAsync(invoice, cancellationToken);
 
+    // Reopens the saved reservation using the configured file store and returns the issuance and print outcomes.
     public async Task<OperationResult<IssueInvoiceResult>> ResumeAsync(
         InvoiceNumber invoiceNumber, CancellationToken cancellationToken)
     {
@@ -135,6 +140,7 @@ public sealed class CoreInvoiceWorkflowService : IInvoiceWorkflowService
         }
     }
 
+    // Sends the existing invoice to the printer and returns any warnings for the invoice viewer.
     public async Task<OperationResult<ReprintInvoiceResult>> ReprintAsync(
         InvoiceNumber invoiceNumber,
         CancellationToken cancellationToken)

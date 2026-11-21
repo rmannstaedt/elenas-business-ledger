@@ -18,6 +18,7 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
         this.createContext = createContext;
     }
 
+    // Projects issued invoice lines and payment status by lesson ID for the dashboard's lock and payment indicators.
     public async Task<IReadOnlyList<InvoiceLessonStatus>> ListLessonStatusesAsync(
         DateOnly from,
         DateOnly to,
@@ -65,6 +66,7 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
             .ToArray();
     }
 
+    // Loads issued history by student ID so a rename does not separate the student from past invoices.
     public async Task<IReadOnlyList<IssuedInvoiceSummary>> ListInvoicesForStudentAsync(
         int studentId,
         CancellationToken cancellationToken)
@@ -89,6 +91,7 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
             .ToArrayAsync(cancellationToken);
     }
 
+    // Reads issued totals by invoice period for Economy, which uses SQLite as its reporting source.
     public async Task<IReadOnlyList<EconomyInvoiceRecord>> ListIssuedInvoiceOverviewRowsAsync(
         int periodYear,
         CancellationToken cancellationToken)
@@ -113,6 +116,7 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
             .ToArrayAsync(cancellationToken);
     }
 
+    // Checks whether an issued invoice overlaps the month, including invoices that span a month boundary.
     public async Task<bool> HasInvoiceForStudentInMonthAsync(
         int studentId,
         DateOnly month,
@@ -132,6 +136,7 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
                 cancellationToken);
     }
 
+    // Calculates the next number without reserving it. Reservation must serialize with competing issuers.
     public async Task<InvoiceNumber> GetNextInvoiceNumberAsync(CancellationToken cancellationToken)
     {
         await using var context = createContext();
@@ -143,7 +148,7 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
         return new InvoiceNumber((highest ?? 0) + 1);
     }
 
-    /// <summary>Reuses a matching pending snapshot or reserves the next number when the sequence is clear.</summary>
+    // Reuses a matching pending snapshot or reserves the next number when the sequence is clear.
     public async Task<OperationResult<IssuedInvoice>> ReserveInvoiceAsync(
         InvoiceDraft draft,
         InvoiceTotals totals,
@@ -222,7 +227,7 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
         return OperationResult<IssuedInvoice>.Success(ToDomain(entity));
     }
 
-    /// <summary>Commits issuance and locks its lessons together so the next preview sees a consistent ledger.</summary>
+    // Commits issuance and locks its lessons together so the next preview sees a consistent ledger.
     public async Task<OperationResult<IssuedInvoice>> FinalizeIssuedInvoiceWithLessonLocksAsync(
         InvoiceNumber invoiceNumber,
         string pdfFilePath,
@@ -324,6 +329,7 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
         return OperationResult<IssuedInvoice>.Success(ToDomain(invoice));
     }
 
+    // Records the verified final path so a retry can distinguish a published PDF from a staged one.
     public async Task<OperationResult<IssuedInvoice>> MarkInvoicePdfPublishedAsync(
         InvoiceNumber invoiceNumber,
         string pdfFilePath,
@@ -361,6 +367,7 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
         return OperationResult<IssuedInvoice>.Success(ToDomain(invoice));
     }
 
+    // Replaces billing details before publication while keeping the existing number, student, and lesson IDs.
     public async Task<OperationResult<IssuedInvoice>> ReviseInvoiceReservationAsync(
         IssuedInvoice savedInvoice, InvoiceDraft draft, InvoiceTotals totals, CancellationToken cancellationToken)
     {
@@ -391,6 +398,7 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
         return await SaveReservationUpdateAsync(context, invoice, cancellationToken);
     }
 
+    // Stores the staging path, destination, and checksum needed to recognize the same PDF on recovery.
     public async Task<OperationResult<IssuedInvoice>> PrepareInvoicePublicationAsync(
         IssuedInvoice savedInvoice, InvoicePdfPublication publication, CancellationToken cancellationToken)
     {
@@ -408,6 +416,7 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
         return await SaveReservationUpdateAsync(context, invoice, cancellationToken);
     }
 
+    // Releases an unpublished tail number, with an optional revision check to protect a newer attempt.
     public async Task ReleaseInvoiceReservationAsync(
         InvoiceNumber invoiceNumber, CancellationToken cancellationToken, string? expectedRevision = null)
     {
@@ -427,6 +436,7 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
         await reservation.ExecuteDeleteAsync(cancellationToken);
     }
 
+    // Returns the first unresolved reservation so recovery processes pending invoice numbers in order.
     public async Task<IssuedInvoice?> GetOldestPendingAsync(CancellationToken cancellationToken)
     {
         await using var context = createContext();
@@ -434,7 +444,7 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
         return invoice is null ? null : ToDomain(invoice);
     }
 
-    /// <summary>Discards an unpublished reservation and preserves its number as void if later numbers already exist.</summary>
+    // Discards an unpublished reservation and preserves its number as void if later numbers already exist.
     public async Task<OperationResult<InvoiceNumber>> DiscardPendingAsync(
         IssuedInvoice savedInvoice, CancellationToken cancellationToken)
     {
@@ -501,6 +511,7 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
 
     private static string CreateSnapshotRevision() => Guid.NewGuid().ToString("N");
 
+    // Records the outcome of a print request on the issued invoice without changing its billing details.
     public async Task<OperationResult<IssuedInvoice>> UpdatePrintStatusAsync(
         InvoiceNumber invoiceNumber,
         InvoicePrintStatus printStatus,
@@ -543,6 +554,7 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
             .SingleAsync(cancellationToken);
     }
 
+    // Updates payment tracking for an issued invoice independently of its billing snapshot.
     public async Task SavePaymentStatusAsync(
         InvoiceNumber invoiceNumber,
         PaymentStatus paymentStatus,
@@ -559,6 +571,7 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
         await context.SaveChangesAsync(cancellationToken);
     }
 
+    // Loads the committed snapshot used by viewing and reprint.
     public async Task<IssuedInvoice?> GetIssuedInvoiceAsync(
         InvoiceNumber invoiceNumber,
         CancellationToken cancellationToken)
@@ -576,6 +589,7 @@ public sealed class SqliteInvoiceRepository : IInvoiceRepository
         return invoice is null ? null : ToDomain(invoice);
     }
 
+    // Loads the pending snapshot for a number while keeping issued history separate.
     public async Task<IssuedInvoice?> GetIssuingInvoiceAsync(
         InvoiceNumber invoiceNumber,
         CancellationToken cancellationToken)

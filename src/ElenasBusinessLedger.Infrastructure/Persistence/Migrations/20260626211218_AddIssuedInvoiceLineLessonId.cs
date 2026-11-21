@@ -4,6 +4,7 @@
 
 namespace ElenasBusinessLedger.Infrastructure.Persistence.Migrations
 {
+    // Adds space for the lesson identity that lets an issued line refer back to the local lesson.
     /// <inheritdoc />
     public partial class AddIssuedInvoiceLineLessonId : Migration
     {

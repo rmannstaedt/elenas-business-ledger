@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ElenasBusinessLedger.Infrastructure.Persistence;
 
+// Persists local lessons and calendar holds so appointment changes and invoice reservations coordinate in SQLite.
 public sealed class SqliteLessonRepository : ILessonRepository
 {
     private readonly Func<LedgerDbContext> createContext;
@@ -17,6 +18,7 @@ public sealed class SqliteLessonRepository : ILessonRepository
         this.createContext = createContext;
     }
 
+    // Places a hold before a calendar write so invoice reservation and the calendar change cannot claim the same lesson.
     public async Task<OperationResult<bool>> ClaimCalendarMutationAsync(
         string eventId, CalendarMutationKind kind, CancellationToken cancellationToken)
     {
@@ -46,6 +48,7 @@ public sealed class SqliteLessonRepository : ILessonRepository
         return OperationResult<bool>.Success(true);
     }
 
+    // Removes the matching hold when a calendar change was rejected and billing can use the existing row again.
     public async Task ClearCalendarMutationAsync(string eventId, CalendarMutationKind kind, CancellationToken cancellationToken)
     {
         await using var context = createContext();
@@ -54,6 +57,7 @@ public sealed class SqliteLessonRepository : ILessonRepository
                 cancellationToken);
     }
 
+    // Applies an observed appointment or confirmed removal to release a pending calendar hold.
     public async Task<OperationResult<bool>> ResolveCalendarMutationAsync(
         string eventId, CalendarLesson? observed, CancellationToken cancellationToken)
     {
@@ -84,6 +88,7 @@ public sealed class SqliteLessonRepository : ILessonRepository
         return OperationResult<bool>.Success(true);
     }
 
+    // Writes a local billing row while preserving any existing lesson held by invoicing or calendar review.
     public async Task<LessonRecord> SaveAsync(LessonRecord lesson, CancellationToken cancellationToken)
     {
         await using var context = createContext();
@@ -131,6 +136,7 @@ public sealed class SqliteLessonRepository : ILessonRepository
         return ToDomain(saved);
     }
 
+    // Reads one student's lessons in the local calendar month for previews and schedule checks.
     public async Task<IReadOnlyList<LessonRecord>> ListForStudentMonthAsync(
         string studentShortName,
         DateOnly month,
@@ -158,6 +164,7 @@ public sealed class SqliteLessonRepository : ILessonRepository
             .ToArray();
     }
 
+    // Loads local lesson dates across a window for dashboard reconciliation and billing selection.
     public async Task<IReadOnlyList<LessonRecord>> ListForWindowAsync(
         DateOnly from,
         DateOnly to,
@@ -182,6 +189,7 @@ public sealed class SqliteLessonRepository : ILessonRepository
             .ToArray();
     }
 
+    // Updates a lesson's plan if neither invoicing nor a pending calendar mutation has locked it.
     public async Task<LessonRecord?> UpdatePlanAsync(
         int lessonId,
         int planCatalogId,
@@ -209,6 +217,7 @@ public sealed class SqliteLessonRepository : ILessonRepository
         return ToDomain(lesson);
     }
 
+    // Records an acknowledged move and clears the billing hold on the matched lesson.
     public async Task<LessonRecord?> UpdateUninvoicedTimingByGoogleCalendarEventIdAsync(
         string googleCalendarEventId,
         DateTimeOffset startsAt,
@@ -236,6 +245,7 @@ public sealed class SqliteLessonRepository : ILessonRepository
         return ToDomain(lesson);
     }
 
+    // Records the acknowledged completion or reopening and clears the lesson's billing hold.
     public async Task<LessonRecord?> UpdateUninvoicedStateByGoogleCalendarEventIdAsync(
         string googleCalendarEventId,
         LessonState state,
@@ -261,6 +271,7 @@ public sealed class SqliteLessonRepository : ILessonRepository
         return ToDomain(lesson);
     }
 
+    // Removes the matched local billing row after Google Calendar acknowledges removal.
     public async Task<bool> DeleteUninvoicedByGoogleCalendarEventIdAsync(
         string googleCalendarEventId,
         CancellationToken cancellationToken)
@@ -281,6 +292,7 @@ public sealed class SqliteLessonRepository : ILessonRepository
         return true;
     }
 
+    // Finds saved links by exact event ID so synchronization can reuse the established student ownership.
     public async Task<IReadOnlyList<LessonRecord>> ListByGoogleCalendarEventIdsAsync(
         IReadOnlyList<string> eventIds, CancellationToken cancellationToken)
     {

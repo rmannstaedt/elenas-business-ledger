@@ -4,6 +4,7 @@ using ElenasBusinessLedger.Core.Ports;
 
 namespace ElenasBusinessLedger.App.Services;
 
+// Supplies student records with invoice history for Manage Students and Student Details.
 public sealed class CoreStudentOverviewService : IStudentOverviewService
 {
     private readonly IStudentRepository studentRepository;
@@ -17,6 +18,7 @@ public sealed class CoreStudentOverviewService : IStudentOverviewService
         this.invoiceRepository = invoiceRepository;
     }
 
+    // Pairs each stored student with their issued invoices for the shared Manage Students and Details views.
     public async Task<IReadOnlyList<StudentOverviewSnapshot>> LoadAsync(CancellationToken cancellationToken)
     {
         var students = await studentRepository.ListStudentsAsync(cancellationToken);
@@ -31,6 +33,7 @@ public sealed class CoreStudentOverviewService : IStudentOverviewService
         return snapshots;
     }
 
+    // Changes the student's availability and returns their refreshed details and invoice history.
     public async Task<OperationResult<StudentOverviewSnapshot>> SetStudentActiveAsync(
         string studentShortName,
         bool isActive,

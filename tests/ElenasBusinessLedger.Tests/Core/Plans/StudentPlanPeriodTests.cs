@@ -2,6 +2,7 @@ using ElenasBusinessLedger.Core.Plans;
 
 namespace ElenasBusinessLedger.Tests.Core.Plans;
 
+// Verifies that assignment switches to the new plan on the plan period's first day.
 public sealed class StudentPlanPeriodTests
 {
     [Fact]

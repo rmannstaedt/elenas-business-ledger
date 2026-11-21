@@ -3,8 +3,10 @@ using ElenasBusinessLedger.Core.Ports;
 
 namespace ElenasBusinessLedger.Core.UseCases.Lessons;
 
+// Resolves a held calendar change from an observed appointment or an explicitly confirmed removal.
 public sealed class ReviewCalendarMutationUseCase(IGoogleCalendarGateway calendarGateway, ILessonRepository lessonRepository)
 {
+    // Resolves a pending calendar change from the observed event or an explicitly confirmed removal.
     public async Task<OperationResult<bool>> ExecuteAsync(
         string eventId, DateOnly month, bool confirmRemoved, CancellationToken cancellationToken)
     {

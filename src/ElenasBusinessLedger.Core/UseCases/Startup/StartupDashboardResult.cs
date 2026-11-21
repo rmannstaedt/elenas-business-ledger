@@ -3,6 +3,7 @@ using ElenasBusinessLedger.Core.Students;
 
 namespace ElenasBusinessLedger.Core.UseCases.Startup;
 
+// Returns the dashboard selection, lesson rows, invoice history, and editor defaults from one refresh.
 public sealed record StartupDashboardResult(
     string? CurrentStudentShortName,
     IReadOnlyList<string> StudentShortNames,

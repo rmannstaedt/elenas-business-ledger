@@ -2,6 +2,7 @@ using MoneyAmount = ElenasBusinessLedger.Core.Money.Money;
 
 namespace ElenasBusinessLedger.Core.Invoices;
 
+// Stores a lesson's billed description, time, and price while retaining its original lesson ID.
 public sealed record IssuedInvoiceLine
 {
     public IssuedInvoiceLine(

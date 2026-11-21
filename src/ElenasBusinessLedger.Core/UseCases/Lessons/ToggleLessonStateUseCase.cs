@@ -4,6 +4,7 @@ using ElenasBusinessLedger.Core.Ports;
 
 namespace ElenasBusinessLedger.Core.UseCases.Lessons;
 
+// Changes completion status in the calendar and billing ledger while protecting held or invoiced lessons.
 public sealed class ToggleLessonStateUseCase
 {
     private readonly IGoogleCalendarGateway calendarGateway;
@@ -17,6 +18,7 @@ public sealed class ToggleLessonStateUseCase
         this.lessonRepository = lessonRepository;
     }
 
+    // Changes the lesson state in Google Calendar and SQLite, asking before reopening a completed lesson.
     public async Task<OperationResult<LessonState>> ExecuteAsync(
         string lessonId,
         LessonState currentState,

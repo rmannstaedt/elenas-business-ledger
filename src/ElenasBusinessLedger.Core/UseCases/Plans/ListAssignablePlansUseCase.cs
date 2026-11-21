@@ -4,6 +4,7 @@ using ElenasBusinessLedger.Core.Ports;
 
 namespace ElenasBusinessLedger.Core.UseCases.Plans;
 
+// Supplies active catalog choices to editors that assign plans.
 public sealed class ListAssignablePlansUseCase
 {
     private readonly IPlanCatalogRepository planCatalogRepository;

@@ -10,6 +10,7 @@ using System.Windows.Controls;
 
 namespace ElenasBusinessLedger.Tests.App.ViewModels;
 
+// Checks Settings defaults, field mapping, save behavior, and Google authorization actions.
 public sealed class SettingsViewModelTests
 {
     [Fact]
@@ -514,6 +515,7 @@ public sealed class SettingsViewModelTests
         Assert.Contains("Company name", viewModel.ErrorMessage);
     }
 
+    // Supplies saved preferences and captures the Settings form's save and connection requests.
     private sealed class FakeAppSettingsService : IAppSettingsService
     {
         public AppSettingsSnapshot Snapshot { get; init; } = new(null, null, GoogleOAuthClientConfigurationStatus.Missing);

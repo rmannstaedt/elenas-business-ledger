@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ElenasBusinessLedger.Infrastructure.Persistence;
 
+// Persists the company and invoice defaults used by billing and shown in Settings.
 public sealed class SqliteCompanyProfileRepository : ICompanyProfileRepository
 {
     private const int SingletonId = 1;

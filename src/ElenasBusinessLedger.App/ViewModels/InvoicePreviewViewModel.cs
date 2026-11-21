@@ -9,6 +9,7 @@ using ElenasBusinessLedger.Core.UseCases.Invoices;
 
 namespace ElenasBusinessLedger.App.ViewModels;
 
+// Owns draft line selection and adjustments, then shows the separate outcomes of issuance and printing.
 public sealed class InvoicePreviewViewModel : ViewModelBase
 {
     private static readonly TimeSpan DefaultExtendedIssueWaitPromptDelay = TimeSpan.FromSeconds(7);
@@ -142,6 +143,7 @@ public sealed class InvoicePreviewViewModel : ViewModelBase
 
     public event EventHandler<bool?>? CloseRequested;
 
+    // Keeps the invoice window open during issuance so the user can see the save and print outcomes.
     public Task<bool> RequestDismissAsync()
     {
         if (CanDismiss)
@@ -153,6 +155,7 @@ public sealed class InvoicePreviewViewModel : ViewModelBase
         return Task.FromResult(false);
     }
 
+    // Updates the displayed amounts from the valid draft as the user edits the invoice.
     public async Task RefreshTotalsAsync()
     {
         var draft = BuildDraft(showErrors: false);

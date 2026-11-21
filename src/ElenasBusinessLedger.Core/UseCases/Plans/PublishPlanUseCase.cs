@@ -4,6 +4,7 @@ using ElenasBusinessLedger.Core.Ports;
 
 namespace ElenasBusinessLedger.Core.UseCases.Plans;
 
+// Validates a complete draft and makes the plan available for new assignments.
 public sealed class PublishPlanUseCase
 {
     private readonly IPlanCatalogRepository planCatalogRepository;
@@ -13,6 +14,7 @@ public sealed class PublishPlanUseCase
         this.planCatalogRepository = planCatalogRepository;
     }
 
+    // Activates a complete draft so the student and lesson editors can assign it.
     public async Task<OperationResult<PlanCatalogItem>> ExecuteAsync(int planId, CancellationToken cancellationToken)
     {
         var plan = await planCatalogRepository.GetAsync(planId, cancellationToken);

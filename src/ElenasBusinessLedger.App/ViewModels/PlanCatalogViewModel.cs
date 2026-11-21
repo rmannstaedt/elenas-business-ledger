@@ -8,6 +8,7 @@ using ElenasBusinessLedger.Core.UseCases.Plans;
 
 namespace ElenasBusinessLedger.App.ViewModels;
 
+// Tracks catalog selection and edits while coordinating draft saves, publication, and retirement.
 public sealed class PlanCatalogViewModel : ViewModelBase
 {
     private readonly IPlanCatalogService planCatalogService;
@@ -152,6 +153,7 @@ public sealed class PlanCatalogViewModel : ViewModelBase
 
     public Task LoadAsync() => ReloadAsync();
 
+    // Lets the user save or discard pending plan edits before the catalog window closes.
     public async Task<bool> PrepareForCloseAsync()
     {
         if (SelectedPlan is null)

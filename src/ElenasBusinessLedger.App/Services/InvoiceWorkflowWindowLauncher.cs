@@ -23,6 +23,7 @@ public sealed class InvoiceWorkflowWindowLauncher : IInvoiceWorkflowLauncher
         this.clock = clock;
     }
 
+    // Opens the student picker and preview, then tells the dashboard whether the invoice was issued.
     public async Task<bool> ShowWriteInvoiceAsync(
         DateOnly displayMonth,
         string? initialStudentShortName,
@@ -81,7 +82,7 @@ public sealed class InvoiceWorkflowWindowLauncher : IInvoiceWorkflowLauncher
         return previewViewModel.WasIssued;
     }
 
-    /// <summary>Opens the oldest pending reservation independently of the current dashboard selection.</summary>
+    // Opens the oldest pending reservation independently of the current dashboard selection.
     public async Task<bool> ShowResumeInvoiceAsync(CancellationToken cancellationToken)
     {
         try
@@ -138,6 +139,7 @@ public sealed class InvoiceWorkflowWindowLauncher : IInvoiceWorkflowLauncher
         }
     }
 
+    // Loads the saved invoice for viewing or reprinting under its original number.
     public async Task ShowInvoiceViewerAsync(InvoiceNumber invoiceNumber, CancellationToken cancellationToken)
     {
         var invoice = await invoiceWorkflowService.GetIssuedInvoiceAsync(invoiceNumber, cancellationToken);

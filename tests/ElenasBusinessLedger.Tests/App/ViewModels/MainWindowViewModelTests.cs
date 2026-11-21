@@ -37,6 +37,7 @@ using AppMainWindow = ElenasBusinessLedger.App.MainWindow;
 
 namespace ElenasBusinessLedger.Tests.App.ViewModels;
 
+// Exercises dashboard commands, selection, activation refresh, and key WPF interactions.
 public sealed class MainWindowViewModelTests
 {
     [Fact]
@@ -2916,6 +2917,7 @@ public sealed class MainWindowViewModelTests
         Assert.True(condition());
     }
 
+    // Supplies scripted dashboard rows and tracks loads so tests can inspect refresh and selection behavior.
     private sealed class FakeDashboardService : IStartupDashboardService
     {
         public int LoadCount { get; private set; }
@@ -3032,6 +3034,7 @@ public sealed class MainWindowViewModelTests
         Assert.True(condition());
     }
 
+    // Captures which invoice and confirmation flag the dashboard sends when toggling payment.
     private sealed class FakePaymentService : IInvoicePaymentStatusService
     {
         public InvoiceNumber LastInvoiceNumber { get; private set; }
@@ -3057,6 +3060,7 @@ public sealed class MainWindowViewModelTests
         }
     }
 
+    // Scripts confirmation choices and records prompts so dashboard command branches can be asserted.
     private sealed class FakeConfirmationService : IConfirmationService
     {
         public bool NextAnswer { get; init; } = true;
@@ -3093,6 +3097,7 @@ public sealed class MainWindowViewModelTests
         }
     }
 
+    // Records whether the dashboard opens the external calendar without launching a browser.
     private sealed class FakeCalendarLauncher : ICalendarLauncher
     {
         public bool WasOpened { get; private set; }
@@ -3104,6 +3109,7 @@ public sealed class MainWindowViewModelTests
         }
     }
 
+    // Scripts list and Details selections so the dashboard's selection synchronization can be tested.
     private sealed class FakeStudentOverviewLauncher : IStudentOverviewLauncher
     {
         public bool WasShown { get; private set; }
@@ -3171,6 +3177,7 @@ public sealed class MainWindowViewModelTests
         }
     }
 
+    // Records whether the dashboard opens a standalone add or edit lesson window.
     private sealed class FakeLessonEditorLauncher : ILessonEditorLauncher
     {
         public bool AddWasShown { get; private set; }
@@ -3197,6 +3204,7 @@ public sealed class MainWindowViewModelTests
         }
     }
 
+    // Captures dashboard lesson writes and allows tests to control operation order and outcomes.
     private sealed class FakeLessonEditorService : ILessonEditorService
     {
         public bool AddWasCalled => AddCount > 0;
@@ -3317,6 +3325,7 @@ public sealed class MainWindowViewModelTests
             GoogleCalendarEventId: "lesson-1",
             InvoiceNumber: null);
 
+    // Records lesson state transitions without updating the calendar or the local ledger.
     private sealed class FakeLessonStateService : ILessonStateService
     {
         public string? LastLessonId { get; private set; }
@@ -3343,6 +3352,7 @@ public sealed class MainWindowViewModelTests
         }
     }
 
+    // Captures issue and viewer requests and controls whether the dashboard sees a completed issuance.
     private sealed class FakeInvoiceWorkflowLauncher : IInvoiceWorkflowLauncher
     {
         public bool NextWriteResult { get; init; }
@@ -3373,6 +3383,7 @@ public sealed class MainWindowViewModelTests
         }
     }
 
+    // Records which stored PDF the dashboard asked Windows to open.
     private sealed class FakeInvoicePdfLauncher : IInvoicePdfLauncher
     {
         public string? LastOpenedPdfFilePath { get; private set; }
@@ -3384,6 +3395,7 @@ public sealed class MainWindowViewModelTests
         }
     }
 
+    // Controls the settings dialog result so tests can verify how the dashboard updates Admin Mode.
     private sealed class FakeSettingsLauncher : ISettingsLauncher
     {
         public SettingsDialogResult NextResult { get; init; } = new(false, false);
@@ -3400,6 +3412,7 @@ public sealed class MainWindowViewModelTests
         }
     }
 
+    // Records whether the dashboard dispatched the plan catalog command.
     private sealed class FakePlanCatalogLauncher : IPlanCatalogLauncher
     {
         public bool WasShown { get; private set; }
@@ -3411,6 +3424,7 @@ public sealed class MainWindowViewModelTests
         }
     }
 
+    // Records the dashboard's request to open Economy and the Admin Mode passed to it.
     private sealed class FakeEconomyOverviewLauncher : IEconomyOverviewLauncher
     {
         public bool WasShown { get; private set; }
@@ -3425,6 +3439,7 @@ public sealed class MainWindowViewModelTests
         }
     }
 
+    // Records whether the dashboard requests About without opening a modal dialog.
     private sealed class FakeAboutDialogLauncher : IAboutDialogLauncher
     {
         public bool WasShown { get; private set; }
@@ -3436,6 +3451,7 @@ public sealed class MainWindowViewModelTests
         }
     }
 
+    // Supplies controlled time for the dashboard's month, selection, and activation logic.
     private sealed class FakeUiClock : IUiClock
     {
         public FakeUiClock(DateTimeOffset now)

@@ -7,6 +7,7 @@ using ElenasBusinessLedger.Core.Money;
 
 namespace ElenasBusinessLedger.App.ViewModels;
 
+// Presents the saved invoice and provides reprint using the original number and PDF.
 public sealed class InvoiceViewerViewModel : ViewModelBase
 {
     private readonly IInvoiceWorkflowService? invoiceWorkflowService;
@@ -171,6 +172,7 @@ public sealed class InvoiceViewerViewModel : ViewModelBase
         string.Create(CultureInfo.GetCultureInfo("da-DK"), $"{money.Amount:N2} {money.Currency}");
 }
 
+// Formats a saved lesson line for viewing without exposing an editable preview row.
 public sealed class InvoiceViewerLineDisplayModel
 {
     public InvoiceViewerLineDisplayModel(IssuedInvoiceLine line)

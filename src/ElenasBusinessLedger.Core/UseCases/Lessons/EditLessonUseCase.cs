@@ -5,6 +5,7 @@ using ElenasBusinessLedger.Core.Ports;
 
 namespace ElenasBusinessLedger.Core.UseCases.Lessons;
 
+// Records an acknowledged calendar move in the billing ledger before requesting a refreshed lesson list.
 public sealed class EditLessonUseCase
 {
     private readonly IGoogleCalendarGateway calendarGateway;
@@ -18,6 +19,7 @@ public sealed class EditLessonUseCase
         this.lessonRepository = lessonRepository;
     }
 
+    // Moves the appointment and records its new time before refreshing the dashboard.
     public async Task<OperationResult<IReadOnlyList<CalendarLesson>>> ExecuteAsync(
         LessonEditRequest request,
         DateOnly refreshMonth,

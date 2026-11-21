@@ -4,6 +4,7 @@ using ElenasBusinessLedger.App.ViewModels;
 
 namespace ElenasBusinessLedger.App.Views;
 
+// Presents the student picker and closes when selection is confirmed or cancelled.
 public partial class InvoiceCandidateDialog : Window
 {
     public InvoiceCandidateDialog(InvoiceCandidateDialogViewModel viewModel)

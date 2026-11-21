@@ -4,6 +4,7 @@ using ElenasBusinessLedger.Core.UseCases.Lessons;
 
 namespace ElenasBusinessLedger.App.Services;
 
+// Applies lesson state changes through Core so the dashboard can show the result of marking attendance.
 public sealed class CoreLessonStateService : ILessonStateService
 {
     private readonly ToggleLessonStateUseCase useCase;

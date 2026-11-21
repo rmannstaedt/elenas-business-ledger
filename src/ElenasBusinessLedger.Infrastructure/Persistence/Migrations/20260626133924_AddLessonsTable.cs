@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace ElenasBusinessLedger.Infrastructure.Persistence.Migrations
 {
+    // Introduces the local lesson ledger so appointments can be linked to students, plans, and billing.
     /// <inheritdoc />
     public partial class AddLessonsTable : Migration
     {

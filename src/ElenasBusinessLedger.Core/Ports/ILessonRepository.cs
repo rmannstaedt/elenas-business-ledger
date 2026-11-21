@@ -3,6 +3,7 @@ using ElenasBusinessLedger.Core.Lessons;
 
 namespace ElenasBusinessLedger.Core.Ports;
 
+// Provides local lesson storage and calendar holds so updates and invoice locks protect the same records.
 public interface ILessonRepository
 {
     Task<OperationResult<bool>> ClaimCalendarMutationAsync(

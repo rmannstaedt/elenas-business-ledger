@@ -7,8 +7,10 @@ using ElenasBusinessLedger.Infrastructure.Calendar;
 
 namespace ElenasBusinessLedger.App.Services;
 
+// Bundles an authorized event client with its calendar and scope so future calls target the right account.
 public sealed record ConfiguredGoogleCalendarClient(string CalendarId, IGoogleCalendarEventClient EventClient, string? CalendarScope = null);
 
+// Resolves the saved calendar connection before dispatching lesson reads and writes to Google.
 public sealed class ConfiguredGoogleCalendarGateway : IGoogleCalendarGateway
 {
     private readonly Func<CancellationToken, Task<ConfiguredGoogleCalendarClient?>> loadClientAsync;

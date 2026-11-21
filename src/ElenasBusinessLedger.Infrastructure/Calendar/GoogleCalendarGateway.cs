@@ -6,6 +6,7 @@ using ElenasBusinessLedger.Core.UseCases.Lessons;
 
 namespace ElenasBusinessLedger.Infrastructure.Calendar;
 
+// Translates Calendar API events into lesson records and reports write outcomes for local reconciliation.
 public sealed class GoogleCalendarGateway : IGoogleCalendarGateway
 {
     private readonly IGoogleCalendarEventClient eventClient;
@@ -17,6 +18,7 @@ public sealed class GoogleCalendarGateway : IGoogleCalendarGateway
         this.options = options;
     }
 
+    // Reads recognizable lesson entries for an inclusive date window and scopes their IDs to this calendar.
     public async Task<IReadOnlyList<CalendarLesson>> ListLessonsAsync(
         DateOnly from,
         DateOnly to,
@@ -52,6 +54,7 @@ public sealed class GoogleCalendarGateway : IGoogleCalendarGateway
             .ToArray();
     }
 
+    // Creates an appointment and returns its ID even if the follow-up list cannot be refreshed.
     public async Task<OperationResult<LessonAddResult>> AddLessonAsync(
         LessonAddRequest request,
         DateOnly refreshMonth,
@@ -111,6 +114,7 @@ public sealed class GoogleCalendarGateway : IGoogleCalendarGateway
         IReadOnlyList<LessonAddRequest> requests, DateOnly refreshMonth, CancellationToken cancellationToken) =>
         PopulateWithReceiptsAsync(requests, refreshMonth, (_, _, _) => Task.FromResult<ValidationError?>(null), cancellationToken);
 
+    // Waits for each created event to be saved locally before creating the next one, preserving partial progress.
     public async Task<OperationResult<IReadOnlyList<CalendarLesson>>> PopulateWithReceiptsAsync(
         IReadOnlyList<LessonAddRequest> requests, DateOnly refreshMonth,
         Func<int, CalendarLesson, CancellationToken, Task<ValidationError?>> saveReceipt,
@@ -173,11 +177,13 @@ public sealed class GoogleCalendarGateway : IGoogleCalendarGateway
             : OperationResult<IReadOnlyList<CalendarLesson>>.Failure(receipt.Errors.ToArray());
     }
 
+    // Reports the calendar move so the caller can update the billing ledger before refreshing.
     public Task<CalendarWriteReceipt> UpdateWithoutRefreshAsync(
         LessonEditRequest request, DateOnly refreshMonth, CancellationToken cancellationToken) =>
         WriteEventAsync(request.LessonId, eventId => eventClient.MoveEventAsync(options.CalendarId, eventId,
             request.StartsAt, request.HasKnownStartTime, cancellationToken));
 
+    // Returns the deletion receipt so the billing row can be removed before reading the calendar again.
     public Task<CalendarWriteReceipt> DeleteWithoutRefreshAsync(
         string lessonId, DateOnly refreshMonth, CancellationToken cancellationToken) =>
         WriteEventAsync(lessonId, eventId => eventClient.DeleteEventAsync(options.CalendarId, eventId, cancellationToken));
@@ -201,6 +207,7 @@ public sealed class GoogleCalendarGateway : IGoogleCalendarGateway
         }
     }
 
+    // Changes the completion marker on the event identified within the configured calendar.
     public async Task<OperationResult<LessonState>> UpdateLessonStateAsync(
         string lessonId,
         LessonState state,

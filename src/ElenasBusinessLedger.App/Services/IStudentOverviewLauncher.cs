@@ -2,6 +2,7 @@ using ElenasBusinessLedger.Core.Students;
 
 namespace ElenasBusinessLedger.App.Services;
 
+// Lets the dashboard open the student windows and follow their final or changing selection.
 public interface IStudentOverviewLauncher
 {
     Task<string?> ShowStudentOverviewAsync(

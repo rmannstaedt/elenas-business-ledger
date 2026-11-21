@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace ElenasBusinessLedger.Infrastructure.Persistence.Migrations
 {
+    // Enforces a unique lesson reference for linked invoice lines so a lesson cannot belong to multiple invoices.
     /// <inheritdoc />
     [DbContext(typeof(LedgerDbContext))]
     [Migration("20260627170000_AddIssuedInvoiceLineLessonReference")]

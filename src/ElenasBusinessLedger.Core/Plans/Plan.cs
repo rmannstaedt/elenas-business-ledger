@@ -1,5 +1,6 @@
 namespace ElenasBusinessLedger.Core.Plans;
 
+// Captures the terms assigned for a student period while retaining the originating catalog plan ID.
 public sealed class Plan
 {
     public Plan(

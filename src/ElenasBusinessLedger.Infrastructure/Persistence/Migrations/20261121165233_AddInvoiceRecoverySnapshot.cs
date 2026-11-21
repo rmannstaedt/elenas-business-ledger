@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace ElenasBusinessLedger.Infrastructure.Persistence.Migrations;
 
+// Adds revision, adjustment, and PDF checkpoint fields so interrupted issuance can resume from saved details.
 /// <inheritdoc />
 public partial class _20261121165233_AddInvoiceRecoverySnapshot : Migration
 {

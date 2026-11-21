@@ -4,6 +4,7 @@ using ElenasBusinessLedger.Core.Ports;
 
 namespace ElenasBusinessLedger.Core.UseCases.Plans;
 
+// Changes editable draft terms while protecting plans that have already been published.
 public sealed class UpdateDraftPlanUseCase
 {
     private readonly IPlanCatalogRepository planCatalogRepository;
@@ -13,6 +14,7 @@ public sealed class UpdateDraftPlanUseCase
         this.planCatalogRepository = planCatalogRepository;
     }
 
+    // Updates a draft while protecting terms on plans that have already been published.
     public async Task<OperationResult<PlanCatalogItem>> ExecuteAsync(
         int planId,
         PlanDraftInput input,

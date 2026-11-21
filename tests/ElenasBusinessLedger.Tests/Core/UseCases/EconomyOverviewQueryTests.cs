@@ -6,6 +6,7 @@ using MoneyAmount = ElenasBusinessLedger.Core.Money.Money;
 
 namespace ElenasBusinessLedger.Tests.Core.UseCases;
 
+// Covers report aggregation, legacy cutover rules, and conflicts between issued and manual amounts.
 public sealed class EconomyOverviewQueryTests
 {
     [Fact]
@@ -300,6 +301,7 @@ public sealed class EconomyOverviewQueryTests
         Assert.Contains("2026-05", result.Errors[0].Message);
     }
 
+    // Supplies issued rows for requested years so the report can be checked without a database.
     private sealed class FakeInvoiceRepository : IInvoiceRepository
     {
         public Dictionary<int, IReadOnlyList<EconomyInvoiceRecord>> OverviewRowsByYear { get; } = [];
@@ -402,6 +404,7 @@ public sealed class EconomyOverviewQueryTests
             throw new NotImplementedException();
     }
 
+    // Supplies the reporting cutover and manual amounts and records the range requested by Economy.
     private sealed class FakeEconomyRepository : IEconomyRepository
     {
         public EconomySettings? Settings { get; init; }
