@@ -230,17 +230,9 @@ A calendar appointment linked to an unambiguous Student but lacking an applicabl
 
 ### Write and Print an Invoice
 
-Invoices are written by the press of a button in the main application window: "Write Invoice"
+Choose **Write Invoice** in the main window to open the editable preview for the selected Student and the displayed month. Select another Student in the main window to invoice them. The button is unavailable until a Student is selected.
 
-Before the invoice is written, the system will display a dialogue with student short names.
-The dialogue will list all students with local uninvoiced lessons in the selected period. A student may appear even if another invoice already exists for that same month, provided later lessons remain uninvoiced.
-When opened from the main window, the dialogue will preselect the currently displayed Student if that Student is still in the all-students list.
-If the currently displayed Student is not available, the dialogue will preselect the Student who has a lesson at the current time/date.
-If neither of those choices is available, the dialogue falls back to the first listed candidate/all-student entry so the visible selection remains explicit before Continue.
-The dialogue will also allow the user to choose from all students in the database.
-
-Once a student has been selected, the application will display the invoice on screen as a pre-filled, partially editable form.
-The form will contain the proposed final invoice layout and information.
+The preview includes the selected Student’s local uninvoiced lessons for the displayed month, including when an earlier invoice exists for the same month. If the dashboard resolves an already issued invoice for the current view, the button opens that invoice in the viewer. Issued invoices are also accessible under **Student Invoices**.
 
 The Invoice will contain the Company information.
 The Invoice will contain the Student information.
@@ -316,7 +308,7 @@ One **Save** commits the company profile, calendar preferences, and Economy sett
 
 ## Limitations
 
-### Version 1.4.1
+### Version 1.4.2
 
   * VAT exemptions for individual students are outside the current scope.
   * No formal VAT return or bookkeeping-system VAT report; Economy Overview summarizes issued invoice net/VAT totals plus explicit manual legacy month overrides only.

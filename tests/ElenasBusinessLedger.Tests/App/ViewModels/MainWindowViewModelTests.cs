@@ -1600,23 +1600,42 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
-    public async Task WriteInvoicePassesCurrentStudentToWorkflow()
+    public async Task WriteInvoiceUsesSelectedStudentIdAndDisplayedMonth()
+    {
+        var mira = new StudentChoice(21, "Mira");
+        var other = new StudentChoice(22, "mira");
+        var dashboard = new FakeDashboardService { LessonIsInvoiced = false, InvoiceSummaries = [] };
+        var invoices = new FakeInvoiceWorkflowLauncher();
+        var viewModel = CreateViewModel(dashboard: dashboard, invoiceWorkflowLauncher: invoices);
+        await viewModel.LoadAsync();
+        var previousMonth = viewModel.DisplayMonth.AddMonths(-1);
+        await viewModel.PreviousMonthCommand.ExecuteAsync();
+        dashboard.NextResult = OperationResult<StartupDashboardResult>.Success(
+            new StartupDashboardResult(other.ShortName, [mira.ShortName, other.ShortName], [], [], false, [],
+                CurrentStudentId: other.StudentId, StudentChoices: [mira, other]));
+
+        await viewModel.SelectStudentCommand.ExecuteAsync(other);
+        await viewModel.WriteInvoiceCommand.ExecuteAsync();
+
+        Assert.Equal(other, invoices.LastWriteStudent);
+        Assert.Equal(previousMonth, invoices.LastWriteMonth);
+    }
+
+    [Fact]
+    public async Task WriteInvoiceIsUnavailableWhenNoStudentIsSelected()
     {
         var dashboard = new FakeDashboardService
         {
-            StudentShortNames = ["Anna", "Mira"],
-            LessonIsInvoiced = false,
-            LessonPaymentStatus = null,
-            InvoiceSummaries = []
+            NextResult = OperationResult<StartupDashboardResult>.Success(
+                new StartupDashboardResult(null, [], [], [], false, []))
         };
         var invoices = new FakeInvoiceWorkflowLauncher();
         var viewModel = CreateViewModel(dashboard: dashboard, invoiceWorkflowLauncher: invoices);
         await viewModel.LoadAsync();
 
-        await viewModel.SelectStudentCommand.ExecuteAsync("Mira");
+        Assert.False(viewModel.WriteInvoiceCommand.CanExecute(null));
         await viewModel.WriteInvoiceCommand.ExecuteAsync();
-
-        Assert.Equal("Mira", invoices.LastWriteInitialStudentShortName);
+        Assert.False(invoices.WriteWasShown);
     }
 
     [Fact]
@@ -1769,9 +1788,9 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public void ApplicationInfoUsesAppAssemblyVersion()
     {
-        Assert.Equal("1.4.1", ApplicationInfo.Version);
+        Assert.Equal("1.4.2", ApplicationInfo.Version);
         Assert.Contains("Elena's Business Ledger", ApplicationInfo.AboutText);
-        Assert.Contains("Version 1.4.1", ApplicationInfo.AboutText);
+        Assert.Contains("Version 1.4.2", ApplicationInfo.AboutText);
     }
 
     [Fact]
@@ -3406,18 +3425,20 @@ public sealed class MainWindowViewModelTests
 
         public bool WriteWasShown { get; private set; }
 
-        public string? LastWriteInitialStudentShortName { get; private set; }
+        public StudentChoice? LastWriteStudent { get; private set; }
+
+        public DateOnly? LastWriteMonth { get; private set; }
 
         public InvoiceNumber? LastViewedInvoiceNumber { get; private set; }
 
         public Task<bool> ShowWriteInvoiceAsync(
             DateOnly displayMonth,
-            string? initialStudentShortName,
-            CancellationToken cancellationToken,
-            int? studentId = null)
+            StudentChoice student,
+            CancellationToken cancellationToken)
         {
             WriteWasShown = true;
-            LastWriteInitialStudentShortName = initialStudentShortName;
+            LastWriteStudent = student;
+            LastWriteMonth = displayMonth;
             return Task.FromResult(NextWriteResult);
         }
 

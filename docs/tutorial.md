@@ -33,7 +33,7 @@ Once you have tried the one-lesson workflow, you can use **Add Lesson** to creat
 
 ## 5. Preview, issue, and record payment
 
-1. With Mira selected and the lesson month displayed, choose **Write Invoice**. Select **Mira** if needed and choose **Continue**.
+1. With Mira selected and the lesson month displayed, choose **Write Invoice** to open her preview. If your version shows the student list, select **Mira** and choose **Continue**.
 2. In the invoice preview, check the student, invoice date, included lesson, and total. With just this lesson, the total is **320 DKK** for the fictional studio. Choose **Cancel** to finish at the preview stage.
 3. To try the rest of the workflow, choose **Save & Print Invoice** from the preview. The Ledger issues an invoice to your trial folder and requests printing. On a fresh Ledger database, an invoice for November 2026 would be named `Invoice 001 November 2026 - Mira Vale.pdf`. The actual number and month follow your database and selected billing period.
 4. Under **Student Invoices**, find the issued invoice. Click **Outstanding** in the **Status** column to mark it **Paid**. The linked lesson also reflects the change.

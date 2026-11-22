@@ -4,8 +4,8 @@ using ElenasBusinessLedger.Core.UseCases.Invoices;
 
 namespace ElenasBusinessLedger.App.Services;
 
-// Supplies invoice choices, preview totals, issuance, recovery, and reprint operations to the WPF views.
-public interface IInvoiceWorkflowService : IInvoiceCandidateReader
+// Supplies invoice previews and totals, issuance, recovery, and reprint operations to the WPF views.
+public interface IInvoiceWorkflowService
 {
     Task<OperationResult<InvoicePreviewResult>> CreatePreviewAsync(
         string studentShortName,

@@ -1,4 +1,5 @@
 using ElenasBusinessLedger.Core.Invoices;
+using ElenasBusinessLedger.Core.Students;
 
 namespace ElenasBusinessLedger.App.Services;
 
@@ -7,9 +8,8 @@ public interface IInvoiceWorkflowLauncher
 {
     Task<bool> ShowWriteInvoiceAsync(
         DateOnly displayMonth,
-        string? initialStudentShortName,
-        CancellationToken cancellationToken,
-        int? studentId = null);
+        StudentChoice student,
+        CancellationToken cancellationToken);
 
     Task<bool> ShowResumeInvoiceAsync(CancellationToken cancellationToken);
 

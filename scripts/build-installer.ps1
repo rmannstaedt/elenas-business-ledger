@@ -32,7 +32,7 @@ $projectPath = Join-Path $repoRoot "src\ElenasBusinessLedger.App\ElenasBusinessL
 $innoScriptPath = Join-Path $repoRoot "installer\ElenasBusinessLedger.iss"
 $buildRoot = Join-Path $repoRoot "artifacts\installer-builds"
 $installerDir = Join-Path $repoRoot "artifacts\installer"
-$installerFileName = "ElenasBusinessLedger-1.4.1-Setup.exe"
+$installerFileName = "ElenasBusinessLedger-1.4.2-Setup.exe"
 $installerPath = Join-Path $installerDir $installerFileName
 
 Assert-OwnedPath $repoRoot $buildRoot

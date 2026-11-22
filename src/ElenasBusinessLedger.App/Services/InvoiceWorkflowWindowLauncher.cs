@@ -2,6 +2,7 @@ using System.Windows;
 using ElenasBusinessLedger.App.ViewModels;
 using ElenasBusinessLedger.App.Views;
 using ElenasBusinessLedger.Core.Invoices;
+using ElenasBusinessLedger.Core.Students;
 using ElenasBusinessLedger.Core.UseCases.Invoices;
 
 namespace ElenasBusinessLedger.App.Services;
@@ -23,42 +24,21 @@ public sealed class InvoiceWorkflowWindowLauncher : IInvoiceWorkflowLauncher
         this.clock = clock;
     }
 
-    // Opens the student picker and preview, then tells the dashboard whether the invoice was issued.
+    // Opens the selected student's preview and tells the dashboard whether the invoice was issued.
     public async Task<bool> ShowWriteInvoiceAsync(
         DateOnly displayMonth,
-        string? initialStudentShortName,
-        CancellationToken cancellationToken,
-        int? studentId = null)
+        StudentChoice student,
+        CancellationToken cancellationToken)
     {
         var today = DateOnly.FromDateTime(clock.Now.DateTime);
-        var candidateViewModel = new InvoiceCandidateDialogViewModel(
-            invoiceWorkflowService,
-            today,
-            clock.Now,
-            initialStudentShortName,
-            studentId);
-        await candidateViewModel.LoadAsync();
-
-        var candidateWindow = new InvoiceCandidateDialog(candidateViewModel)
-        {
-            Owner = Application.Current?.MainWindow
-        };
-
-        if (candidateWindow.ShowDialog() != true ||
-            !candidateViewModel.WasConfirmed ||
-            candidateViewModel.SelectedStudentShortName is null)
-        {
-            return false;
-        }
-
         var month = new DateOnly(displayMonth.Year, displayMonth.Month, 1);
         var preview = await invoiceWorkflowService.CreatePreviewAsync(
-            candidateViewModel.SelectedStudentShortName,
+            student.ShortName,
             today,
             month,
             month.AddMonths(1).AddDays(-1),
             cancellationToken,
-            candidateViewModel.SelectedStudent?.StudentId is > 0 ? candidateViewModel.SelectedStudent.StudentId : null);
+            student.StudentId > 0 ? student.StudentId : null);
 
         if (!preview.Succeeded)
         {

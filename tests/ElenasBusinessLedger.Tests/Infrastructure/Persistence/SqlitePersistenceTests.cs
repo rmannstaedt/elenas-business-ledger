@@ -1680,7 +1680,6 @@ public sealed class SqlitePersistenceTests
         var students = new SqliteStudentRepository(database.CreateContext);
         var lessons = new SqliteLessonRepository(database.CreateContext);
         return new CoreInvoiceWorkflowService(
-            new InvoiceCandidateSelectionUseCase(students, lessons),
             new InvoicePreviewUseCase(students, company, lessons, new SqlitePlanCatalogRepository(database.CreateContext)),
             company,
             invoices,

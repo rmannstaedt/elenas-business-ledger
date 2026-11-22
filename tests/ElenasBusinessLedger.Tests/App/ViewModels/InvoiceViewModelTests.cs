@@ -10,75 +10,49 @@ using ElenasBusinessLedger.App.Views;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Threading;
 using WpfCheckBox = System.Windows.Controls.CheckBox;
 
 namespace ElenasBusinessLedger.Tests.App.ViewModels;
 
-// Tests student selection, draft adjustments, issuance, reprint behavior, and dismissing the preview.
+// Tests draft adjustments, issuance, reprint behavior, and dismissing the preview.
 public sealed class InvoiceViewModelTests
 {
     [Fact]
-    public async Task CandidateDialogLoadsStudentsAndPreselectsCurrentStudent()
+    public void WriteInvoiceOpensPreviewDirectlyAndCancelDoesNotIssue()
     {
-        var service = new FakeInvoiceCandidateReader
+        RunOnStaThread(() =>
         {
-            Candidates = OperationResult<InvoiceCandidateSelectionResult>.Success(
-                new InvoiceCandidateSelectionResult(["Anna"], ["Anna", "Bo"], "Anna"))
-        };
-        var viewModel = new InvoiceCandidateDialogViewModel(
-            service,
-            new DateOnly(2026, 6, 16),
-            new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.Zero));
+            var workflow = new FakeInvoiceWorkflowService();
+            var clock = new FixedInvoiceClock(new DateTimeOffset(2026, 11, 22, 12, 0, 0, TimeSpan.Zero));
+            var launcher = new InvoiceWorkflowWindowLauncher(workflow, new UnusedPrinterConfiguration(), clock);
+            var student = new StudentChoice(42, "Mira");
+            var dispatcher = Dispatcher.CurrentDispatcher;
+            var shownWindows = dispatcher.InvokeAsync(() =>
+            {
+                var windows = PresentationSource.CurrentSources.OfType<HwndSource>()
+                    .Select(source => source.RootVisual).OfType<Window>()
+                    .Where(window => ReferenceEquals(window.Dispatcher, dispatcher) && window.IsVisible)
+                    .ToArray();
+                foreach (var window in windows)
+                {
+                    window.Close();
+                }
 
-        await viewModel.LoadAsync();
+                return windows.Select(window => window.Title).ToArray();
+            }, DispatcherPriority.ApplicationIdle);
 
-        Assert.Equal(["Anna"], viewModel.CandidateStudentShortNames);
-        Assert.Equal(["Anna", "Bo"], viewModel.AllStudentShortNames);
-        Assert.Equal("Anna", viewModel.SelectedStudentShortName);
-        Assert.True(viewModel.ConfirmCommand.CanExecute(null));
-    }
+            var issued = launcher.ShowWriteInvoiceAsync(new DateOnly(2026, 10, 15), student, CancellationToken.None)
+                .GetAwaiter().GetResult();
 
-    [Fact]
-    public async Task CandidateDialogPrefersInitialStudentOverTimeBasedPreselection()
-    {
-        var service = new FakeInvoiceCandidateReader
-        {
-            Candidates = OperationResult<InvoiceCandidateSelectionResult>.Success(
-                new InvoiceCandidateSelectionResult(["Karina"], ["Mira", "Karina"], "Karina"))
-        };
-        var viewModel = new InvoiceCandidateDialogViewModel(
-            service,
-            new DateOnly(2026, 6, 23),
-            new DateTimeOffset(2026, 6, 23, 15, 0, 0, TimeSpan.Zero),
-            initialStudentShortName: "Mira");
-
-        await viewModel.LoadAsync();
-
-        Assert.Equal("Mira", viewModel.SelectedStudentShortName);
-        Assert.True(viewModel.ConfirmCommand.CanExecute(null));
-    }
-
-    [Fact]
-    public async Task CandidateDialogPrefersSelectedStudentIdWhenShortNamesOverlap()
-    {
-        var other = new StudentChoice(1, "Mira");
-        var selected = new StudentChoice(2, "mira");
-        var service = new FakeInvoiceCandidateReader
-        {
-            Candidates = OperationResult<InvoiceCandidateSelectionResult>.Success(
-                new InvoiceCandidateSelectionResult(["Mira"], ["Mira", "mira"], "Mira",
-                    [other, selected], [other], other.StudentId))
-        };
-        var date = new DateOnly(2026, 6, 23);
-        var viewModel = new InvoiceCandidateDialogViewModel(service, date,
-            new DateTimeOffset(date.ToDateTime(TimeOnly.MinValue), TimeSpan.Zero),
-            initialStudentId: selected.StudentId);
-
-        await viewModel.LoadAsync();
-
-        Assert.Equal(selected, viewModel.SelectedStudent);
+            Assert.Equal("Invoice Preview", Assert.Single(shownWindows.Task.GetAwaiter().GetResult()));
+            Assert.Equal((student.ShortName, (int?)student.StudentId, new DateOnly(2026, 11, 22),
+                new DateOnly(2026, 10, 1), new DateOnly(2026, 10, 31)), workflow.PreviewRequest);
+            Assert.False(issued);
+            Assert.False(workflow.IssueCalled);
+        });
     }
 
     [Fact]
@@ -500,17 +474,17 @@ public sealed class InvoiceViewModelTests
         Assert.True(condition());
     }
 
-    // Supplies picker choices so candidate selection tests depend on the same read-only contract as the view model.
-    private sealed class FakeInvoiceCandidateReader : IInvoiceCandidateReader
-    {
-        public required OperationResult<InvoiceCandidateSelectionResult> Candidates { get; init; }
+    // Keeps the issue date stable while the test previews a different billing month.
+    private sealed record FixedInvoiceClock(DateTimeOffset Now) : IUiClock;
 
-        public Task<OperationResult<InvoiceCandidateSelectionResult>> LoadCandidatesAsync(
-            DateOnly date, DateTimeOffset now, CancellationToken cancellationToken) =>
-            Task.FromResult(Candidates);
+    // Fails if a read-only invoice preview tries to configure a printer.
+    private sealed class UnusedPrinterConfiguration : IInvoicePrinterConfigurationService
+    {
+        public Task<OperationResult<bool>> EnsureConfiguredAsync(CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("Preview must not configure the invoice printer.");
     }
 
-    // Controls issue and reprint results so the preview and viewer tests can exercise recovery and errors.
+    // Captures draft, issue, and reprint requests without writing files or changing invoice state.
     private sealed class FakeInvoiceWorkflowService : IInvoiceWorkflowService
     {
         public OperationResult<IssueInvoiceResult> IssueResult { get; init; } =
@@ -525,11 +499,14 @@ public sealed class InvoiceViewModelTests
 
         public InvoiceNumber? ReprintInvoiceNumber { get; private set; }
 
-        public Task<OperationResult<InvoiceCandidateSelectionResult>> LoadCandidatesAsync(DateOnly date, DateTimeOffset now, CancellationToken cancellationToken) =>
-            Task.FromResult(OperationResult<InvoiceCandidateSelectionResult>.Success(new InvoiceCandidateSelectionResult([], [], null)));
+        public (string ShortName, int? StudentId, DateOnly Date, DateOnly From, DateOnly To)? PreviewRequest { get; private set; }
 
-        public Task<OperationResult<InvoicePreviewResult>> CreatePreviewAsync(string studentShortName, DateOnly invoiceDate, DateOnly from, DateOnly to, CancellationToken cancellationToken, int? studentId = null) =>
-            Task.FromResult(OperationResult<InvoicePreviewResult>.Success(CreatePreview()));
+        public Task<OperationResult<InvoicePreviewResult>> CreatePreviewAsync(
+            string studentShortName, DateOnly invoiceDate, DateOnly from, DateOnly to, CancellationToken cancellationToken, int? studentId = null)
+        {
+            PreviewRequest = (studentShortName, studentId, invoiceDate, from, to);
+            return Task.FromResult(OperationResult<InvoicePreviewResult>.Success(CreatePreview()));
+        }
 
         public Task<OperationResult<InvoiceTotals>> CalculateTotalsAsync(InvoiceDraft draft, CancellationToken cancellationToken) =>
             Task.FromResult(OperationResult<InvoiceTotals>.Success(draft.CalculateTotals(CreateCompanyProfile())));

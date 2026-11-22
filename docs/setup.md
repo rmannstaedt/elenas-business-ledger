@@ -4,7 +4,7 @@ You can use the Windows x64 installer or run the application from source. For a 
 
 ## Install or run the application
 
-**Windows installer.** Close any running copy of the Ledger and run `ElenasBusinessLedger-1.4.1-Setup.exe` from your normal Windows account. The installer includes the .NET runtime and installs per user. Open **Elena's Business Ledger** from the Start menu, then check **Application > About Elena's Business Ledger** for version **1.4.1**. The installer is unsigned, so Windows may show a SmartScreen prompt.
+**Windows installer.** Close any running copy of the Ledger and run `ElenasBusinessLedger-1.4.2-Setup.exe` from your normal Windows account. The installer includes the .NET runtime and installs per user. Open **Elena's Business Ledger** from the Start menu, then check **Application > About Elena's Business Ledger** for version **1.4.2**. The installer is unsigned, so Windows may show a SmartScreen prompt.
 
 If you have an earlier version, run this installer over the existing installation. The installer uses the existing installation identity and replaces application files in place. The database, Settings, and Google authorization stay in the existing app data folder. [Inno Setup upgrade behavior](https://jrsoftware.org/inno-setup/faq)
 

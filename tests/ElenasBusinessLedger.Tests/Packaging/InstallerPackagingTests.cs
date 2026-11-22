@@ -6,14 +6,14 @@ namespace ElenasBusinessLedger.Tests.Packaging;
 // Checks installer identity and failure containment so builds can replace their output without harming prior installers.
 public sealed class InstallerPackagingTests
 {
-    private const string InstallerFileName = "ElenasBusinessLedger-1.4.1-Setup.exe";
+    private const string InstallerFileName = "ElenasBusinessLedger-1.4.2-Setup.exe";
 
     [Fact]
     public void InnoSetupScriptInstallsPerUserAndPreservesAppData()
     {
         var script = File.ReadAllText(Path.Combine(FindRepositoryRoot(), "installer", "ElenasBusinessLedger.iss"));
 
-        Assert.Contains("#define MyAppVersion \"1.4.1\"", script, StringComparison.Ordinal);
+        Assert.Contains("#define MyAppVersion \"1.4.2\"", script, StringComparison.Ordinal);
         Assert.Contains("AppId={{8F2B99B4-0C13-4980-8B57-0A58D9CCFC3F}", script, StringComparison.Ordinal);
         Assert.Contains("PrivilegesRequired=lowest", script, StringComparison.Ordinal);
         Assert.Contains(@"DefaultDirName={localappdata}\Programs\MySmallBusinessLedger", script, StringComparison.Ordinal);

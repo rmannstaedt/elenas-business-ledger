@@ -493,7 +493,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     {
         await WaitForActivationRefreshAsync();
 
-        if (IsBusy)
+        if (IsBusy || CurrentStudentChoice() is not { } student)
         {
             return;
         }
@@ -508,9 +508,8 @@ public sealed class MainWindowViewModel : ViewModelBase
 
             var issued = await invoiceWorkflowLauncher.ShowWriteInvoiceAsync(
                 DisplayMonth,
-                CurrentStudentShortName,
-                CancellationToken.None,
-                currentStudentId);
+                student,
+                CancellationToken.None);
             if (issued)
             {
                 await RefreshAsync();
@@ -1333,7 +1332,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private bool CanScheduleLessons() => !IsBusy && isCalendarAvailable && CurrentStudentShortName is not null;
 
     private bool CanStartWriteInvoice() =>
-        !IsBusy || IsActivationRefreshRunning();
+        CurrentStudentShortName is not null && (!IsBusy || IsActivationRefreshRunning());
 
     private bool IsActivationRefreshRunning() =>
         activationRefreshTask is { IsCompleted: false };

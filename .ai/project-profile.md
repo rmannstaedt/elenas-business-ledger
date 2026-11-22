@@ -6,7 +6,7 @@ Working name: Elena's Business Ledger
 
 A Windows app for managing student lessons, invoices, and payments.
 
-Current app version: 1.4.1
+Current app version: 1.4.2
 
 Internal namespace/project prefix:
 ElenasBusinessLedger
@@ -17,7 +17,7 @@ Target framework: .NET 11. IDE builds require Visual Studio 18.12 or later.
 Platform: Windows desktop
 UI: WPF
 Architecture: local-first desktop app
-Installer/distribution: single-file Inno Setup installer with a self-contained .NET 11 build for Windows x64. The `scripts\build-installer.ps1` script creates `artifacts\installer\ElenasBusinessLedger-1.4.1-Setup.exe`. The installer build stages each attempt separately and replaces the same-named output only after a successful Inno compilation and candidate check. The per-user installer installs to `%LOCALAPPDATA%\Programs\MySmallBusinessLedger`, creates a Start menu shortcut, offers an optional desktop shortcut, has no auto-update behavior, and must preserve `%APPDATA%\visualtech.dk\MySmallBusinessLedger` during install, replacement, and uninstall.
+Installer/distribution: single-file Inno Setup installer with a self-contained .NET 11 build for Windows x64. The `scripts\build-installer.ps1` script creates `artifacts\installer\ElenasBusinessLedger-1.4.2-Setup.exe`. The installer build stages each attempt separately and replaces the same-named output only after a successful Inno compilation and candidate check. The per-user installer installs to `%LOCALAPPDATA%\Programs\MySmallBusinessLedger`, creates a Start menu shortcut, offers an optional desktop shortcut, has no auto-update behavior, and must preserve `%APPDATA%\visualtech.dk\MySmallBusinessLedger` during install, replacement, and uninstall.
 
 ## Solution shape
 
@@ -72,7 +72,7 @@ Dashboard refresh: `LoadDashboardUseCase` loads the observed calendar window and
 Lesson source of truth: Google Calendar controls scheduling for uninvoiced lessons. Local SQLite `Lessons` rows hold billing data and are retained when an event is missing from a refresh. A calendar-scoped event key protects existing links when the configured calendar changes. App-initiated lesson population, date/time edits, deletes, and planned/completed state changes must update the exact uninvoiced local row before reporting success; refresh/reconciliation is a recovery path, not the ordinary correctness path. Invoiced lessons are locked locally and later Google Calendar edits/deletions must not alter billed/auditable lesson state. Lesson month/window repository queries must be bounded in SQLite before applying exact local-date filtering in memory.
 Google Calendar population: main-window `Populate Calendar` uses the selected student's saved schedule for the full displayed month and the plan in effect on each occurrence date. It skips exact matching Google Calendar lessons and invoice-locked local slots for the selected student. Created calendar lessons are saved to local SQLite before success is reported. Version 1 does not detect other conflicts.
 Calendar availability: invoice issue must rely on the accepted invoice preview/snapshot rather than requiring a fresh Google Calendar read at the final print/save moment
-Write Invoice selection: when opened from the main window, the candidate dialog must prefer the currently displayed student when available before falling back to today/time-based invoice candidates
+Write Invoice opens the preview for the selected student and displayed month, using the student ID for lookup. The button requires a student selection and opens the existing invoice viewer when the dashboard resolves an issued invoice.
 PDF generation: QuestPDF Community license accepted for v1
 
 ## UI policy
