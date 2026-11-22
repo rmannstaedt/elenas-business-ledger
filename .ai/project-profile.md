@@ -29,6 +29,8 @@ src/
 tests/
   ElenasBusinessLedger.Tests
 
+The App project groups windows, view models, and workflow-specific services under `Features/Invoices`, `Features/Students`, `Features/Plans`, `Features/Economy`, `Features/Settings`, and `Features/Lessons`. The main window, startup composition, shared WPF helpers, and Google Calendar adapters have their own locations in the App project.
+
 ## Persistence and storage
 
 Database: SQLite

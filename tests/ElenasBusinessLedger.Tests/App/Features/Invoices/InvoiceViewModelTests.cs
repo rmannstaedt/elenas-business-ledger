@@ -265,6 +265,29 @@ public sealed class InvoiceViewModelTests
     }
 
     [Fact]
+    public void ViewerOpensTheSavedInvoiceWindow()
+    {
+        WpfTestThread.Run(() =>
+        {
+            var invoice = CreateIssuedInvoice();
+            var viewModel = new InvoiceViewerViewModel(invoice, new FakeInvoiceWorkflowService());
+            var window = new InvoiceViewerView(viewModel) { ShowActivated = false };
+            try
+            {
+                window.Show();
+
+                Assert.True(window.IsVisible);
+                Assert.Equal(invoice.InvoiceNumber.ToString(), viewModel.InvoiceNumberText);
+                Assert.NotNull(window.FindName("InvoiceLinesGrid"));
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
+    [Fact]
     public async Task ViewerReprintUsesExistingInvoiceNumberAndRefreshesPrintStatus()
     {
         var updatedInvoice = CreateIssuedInvoice(
