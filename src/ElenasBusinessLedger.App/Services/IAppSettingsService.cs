@@ -1,10 +1,11 @@
+using ElenasBusinessLedger.Core.Calendar;
 using ElenasBusinessLedger.Core.Common;
 using ElenasBusinessLedger.Core.Company;
 using ElenasBusinessLedger.Core.Ports;
-using ElenasBusinessLedger.Infrastructure.Persistence;
 
 namespace ElenasBusinessLedger.App.Services;
 
+// Packages saved preferences and local connection status so Settings can populate the whole form.
 public sealed record AppSettingsSnapshot(
     CompanyProfile? CompanyProfile,
     CalendarSettings? CalendarSettings,
@@ -16,6 +17,7 @@ public sealed record AppSettingsSnapshot(
     bool HasGoogleAuthorizationTokens = false,
     IReadOnlyList<string>? AvailablePrinterNames = null);
 
+// Loads and saves the app preferences shared by Settings and printer selection.
 public interface IAppSettingsService
 {
     Task<AppSettingsSnapshot> LoadAsync(CancellationToken cancellationToken);
@@ -25,10 +27,4 @@ public interface IAppSettingsService
         CalendarSettings calendarSettings,
         EconomySettings? economySettings,
         CancellationToken cancellationToken);
-
-    Task<OperationResult<bool>> ConnectGoogleCalendarAsync(
-        CalendarSettings calendarSettings,
-        CancellationToken cancellationToken);
-
-    Task<OperationResult<bool>> ForgetGoogleAuthorizationAsync(CancellationToken cancellationToken);
 }

@@ -3,6 +3,7 @@ using ElenasBusinessLedger.Core.Invoices;
 
 namespace ElenasBusinessLedger.App.ViewModels;
 
+// Wraps a draft lesson line with display text and lets the user include or exclude it from the preview.
 public sealed class InvoiceLineDisplayModel : ViewModelBase
 {
     private bool isIncluded = true;

@@ -5,6 +5,7 @@ using MoneyAmount = ElenasBusinessLedger.Core.Money.Money;
 
 namespace ElenasBusinessLedger.Core.Invoices;
 
+// Holds proposed lines and billing details so the preview can calculate amounts before reserving a number.
 public sealed class InvoiceDraft
 {
     private InvoiceDraft(
@@ -35,6 +36,7 @@ public sealed class InvoiceDraft
 
     public PriceAdjustment? PriceAdjustment { get; }
 
+    // Builds a draft for callers that treat invalid or incomplete billing data as an error.
     public static InvoiceDraft Create(
         DateOnly invoiceDate,
         CompanySnapshot companySnapshot,
@@ -47,6 +49,7 @@ public sealed class InvoiceDraft
         return result.Value ?? throw new InvalidOperationException(string.Join("; ", result.Errors.Select(error => error.Message)));
     }
 
+    // Validates draft lines, period, and adjustments so the editor can surface errors before issuance.
     public static ValidationResult<InvoiceDraft> TryCreate(
         DateOnly invoiceDate,
         CompanySnapshot companySnapshot,
@@ -86,6 +89,7 @@ public sealed class InvoiceDraft
             priceAdjustment));
     }
 
+    // Applies the adjustment and determines VAT from the start of the invoice period.
     public InvoiceTotals CalculateTotals(CompanyProfile company)
     {
         var subtotal = Lines.Aggregate(MoneyAmount.Dkk(0m), (total, line) => total + line.PriceWithoutVat);
@@ -95,6 +99,7 @@ public sealed class InvoiceDraft
         return new InvoiceTotals(totalWithoutVat, vat, totalWithoutVat + vat);
     }
 
+    // Copies the billing details and lesson IDs into a snapshot under the supplied invoice number.
     public IssuedInvoice Issue(
         InvoiceNumber invoiceNumber,
         InvoiceTotals totals,
@@ -102,7 +107,9 @@ public sealed class InvoiceDraft
         InvoiceIssueStatus issueStatus = InvoiceIssueStatus.Issued,
         InvoicePrintStatus printStatus = InvoicePrintStatus.NotPrinted,
         DateTimeOffset? printedAt = null,
-        string? lastPrintError = null)
+        string? lastPrintError = null,
+        string? snapshotRevision = null,
+        InvoicePdfPublication? publication = null)
     {
         var issuedLines = Lines
             .Select(line => new IssuedInvoiceLine(
@@ -126,6 +133,9 @@ public sealed class InvoiceDraft
             issueStatus,
             printStatus,
             printedAt,
-            lastPrintError);
+            lastPrintError,
+            PriceAdjustment,
+            snapshotRevision,
+            publication);
     }
 }

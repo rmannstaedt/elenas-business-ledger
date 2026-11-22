@@ -4,6 +4,7 @@ using ElenasBusinessLedger.Core.Ports;
 
 namespace ElenasBusinessLedger.Core.UseCases.Plans;
 
+// Makes a retired plan assignable again while retaining its catalog identity.
 public sealed class ReactivatePlanUseCase
 {
     private readonly IPlanCatalogRepository planCatalogRepository;
@@ -13,6 +14,7 @@ public sealed class ReactivatePlanUseCase
         this.planCatalogRepository = planCatalogRepository;
     }
 
+    // Makes a retired plan assignable again and clears its previous retirement date.
     public async Task<OperationResult<PlanCatalogItem>> ExecuteAsync(int planId, CancellationToken cancellationToken)
     {
         var plan = await planCatalogRepository.GetAsync(planId, cancellationToken);

@@ -66,6 +66,7 @@ Do not turn advisory guidance into noisy review comments. Prefer high-signal fin
 - Preserve existing user-visible behavior unless explicitly asked to change it.
 - Keep changes scoped to the request.
 - Prefer simple, readable, maintainable code over cleverness.
+- Follow the [commenting guidance](.ai/standards/coding-standards.md#comments-and-xml-documentation) whenever adding or changing C# code.
 - Prefer efficient-enough designs for realistic workloads; avoid both premature cleverness and avoidable unbounded memory/I/O/database/UI-thread work.
 - Prefer cohesive design over both god-classes and excessive micro-class fragmentation.
 - Add abstractions only when they clarify ownership, isolate dependencies, protect boundaries, create useful test seams, or remove real duplication.

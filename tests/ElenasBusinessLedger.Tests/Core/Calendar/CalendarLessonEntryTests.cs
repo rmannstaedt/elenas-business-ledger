@@ -3,6 +3,7 @@ using ElenasBusinessLedger.Core.Lessons;
 
 namespace ElenasBusinessLedger.Tests.Core.Calendar;
 
+// Covers the lesson marker and completion rules used to read and update calendar summaries.
 public sealed class CalendarLessonEntryTests
 {
     [Theory]

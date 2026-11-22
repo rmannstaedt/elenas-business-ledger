@@ -1,8 +1,9 @@
 using System.Diagnostics;
-using ElenasBusinessLedger.Infrastructure.Persistence;
+using ElenasBusinessLedger.Core.Calendar;
 
 namespace ElenasBusinessLedger.App.Services;
 
+// Opens Google Calendar in the user's browser with an account hint from the saved settings.
 public sealed class ExternalBrowserCalendarLauncher : ICalendarLauncher
 {
     private readonly Func<CancellationToken, Task<CalendarSettings?>> loadCalendarSettingsAsync;
@@ -21,6 +22,7 @@ public sealed class ExternalBrowserCalendarLauncher : ICalendarLauncher
         this.openUri = openUri ?? OpenWithShell;
     }
 
+    // Opens Google Calendar in the browser, using the configured account as a sign-in hint when available.
     public async Task OpenAsync(CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();

@@ -6,6 +6,7 @@ using ElenasBusinessLedger.Core.Ports;
 
 namespace ElenasBusinessLedger.Core.UseCases.Lessons;
 
+// Creates a calendar appointment and records its selected plan in the local ledger for billing.
 public sealed class AddLessonUseCase
 {
     private readonly IGoogleCalendarGateway calendarGateway;
@@ -25,6 +26,7 @@ public sealed class AddLessonUseCase
         this.lessonRepository = lessonRepository;
     }
 
+    // Creates a Google Calendar appointment and records the chosen plan and event ID in the local billing ledger.
     public async Task<OperationResult<LessonAddResult>> ExecuteAsync(
         LessonAddRequest request,
         DateOnly refreshMonth,
@@ -36,7 +38,9 @@ public sealed class AddLessonUseCase
                 new ValidationError("Lesson.PlanRequired", "A lesson plan is required."));
         }
 
-        var student = await studentRepository.GetByShortNameAsync(request.StudentShortName, cancellationToken);
+        var student = request.StudentId is { } id
+            ? await studentRepository.GetByIdAsync(id, cancellationToken)
+            : await studentRepository.GetByShortNameAsync(request.StudentShortName, cancellationToken);
         if (student is null)
         {
             return OperationResult<LessonAddResult>.Failure(
@@ -56,6 +60,7 @@ public sealed class AddLessonUseCase
                 new ValidationError("Lesson.PlanNotAssignable", "The selected plan cannot be assigned to a lesson."));
         }
 
+        request = request with { StudentShortName = student.Student.ShortName };
         var addResult = await calendarGateway.AddLessonAsync(request, refreshMonth, cancellationToken);
         if (addResult.Value is not { } calendarResult || string.IsNullOrWhiteSpace(calendarResult.CreatedLesson.Id))
         {

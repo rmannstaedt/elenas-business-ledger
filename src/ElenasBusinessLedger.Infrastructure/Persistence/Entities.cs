@@ -6,6 +6,7 @@ using ElenasBusinessLedger.Core.Students;
 
 namespace ElenasBusinessLedger.Infrastructure.Persistence;
 
+// Stores the settings row for company details, invoice options, and payment instructions.
 public sealed class CompanyProfileEntity
 {
     public int Id { get; set; }
@@ -37,6 +38,7 @@ public sealed class CompanyProfileEntity
     public string MobilePayAccount { get; set; } = string.Empty;
 }
 
+// Stores the selected calendar and account so the app can reconnect on a later launch.
 public sealed class CalendarSettingsEntity
 {
     public int Id { get; set; }
@@ -46,6 +48,7 @@ public sealed class CalendarSettingsEntity
     public string GoogleAccountEmail { get; set; } = string.Empty;
 }
 
+// Persists the first app-backed month that separates legacy reporting from ledger-backed reporting.
 public sealed class EconomySettingsEntity
 {
     public int Id { get; set; }
@@ -53,6 +56,7 @@ public sealed class EconomySettingsEntity
     public DateOnly FirstApplicationInvoiceMonth { get; set; }
 }
 
+// Stores a month's manually entered net and VAT amounts for legacy reporting.
 public sealed class EconomyManualMonthOverrideEntity
 {
     public int Id { get; set; }
@@ -70,6 +74,7 @@ public sealed class EconomyManualMonthOverrideEntity
     public DateTimeOffset UpdatedAt { get; set; }
 }
 
+// Persists reusable teaching terms and their lifecycle state for plan assignment.
 public sealed class PlanCatalogEntity
 {
     public int Id { get; set; }
@@ -95,6 +100,7 @@ public sealed class PlanCatalogEntity
     public PlanCatalogState State { get; set; }
 }
 
+// Stores student identity and profile fields with the links to schedules, assigned plans, and lessons.
 public sealed class StudentEntity
 {
     public int Id { get; set; }
@@ -122,6 +128,7 @@ public sealed class StudentEntity
     public List<LessonEntity> Lessons { get; } = [];
 }
 
+// Stores assigned plan terms and dates under the student and source plan IDs.
 public sealed class StudentPlanPeriodEntity
 {
     public int Id { get; set; }
@@ -155,6 +162,7 @@ public sealed class StudentPlanPeriodEntity
     public DateOnly? EndsOn { get; set; }
 }
 
+// Records when a plan's label changed so the catalog can retain its rename history.
 public sealed class PlanNameChangeEntity
 {
     public int Id { get; set; }
@@ -170,6 +178,7 @@ public sealed class PlanNameChangeEntity
     public DateTimeOffset ChangedAt { get; set; }
 }
 
+// Stores one student's recurring weekday and start time for monthly calendar population.
 public sealed class StudentScheduleEntryEntity
 {
     public int Id { get; set; }
@@ -183,6 +192,7 @@ public sealed class StudentScheduleEntryEntity
     public TimeOnly StartsAt { get; set; }
 }
 
+// Persists the numbered billing snapshot, PDF recovery state, and payment and print status.
 public sealed class IssuedInvoiceEntity
 {
     public int Id { get; set; }
@@ -209,11 +219,25 @@ public sealed class IssuedInvoiceEntity
 
     public string CompanyMobilePayAccount { get; set; } = string.Empty;
 
+    public int? StudentId { get; set; }
+
     public string StudentShortName { get; set; } = string.Empty;
 
     public string StudentFullName { get; set; } = string.Empty;
 
     public string StudentAddress { get; set; } = string.Empty;
+
+    public decimal? PriceAdjustmentAmount { get; set; }
+
+    public string? PriceAdjustmentReason { get; set; }
+
+    public string? SnapshotRevision { get; set; }
+
+    public string? StagedPdfPath { get; set; }
+
+    public string? PlannedPdfPath { get; set; }
+
+    public string? PdfSha256 { get; set; }
 
     public decimal TotalWithoutVatAmount { get; set; }
 
@@ -238,6 +262,7 @@ public sealed class IssuedInvoiceEntity
     public List<IssuedInvoiceLineEntity> Lines { get; } = [];
 }
 
+// Stores invoiced lesson details and the local lesson link used to enforce billing ownership.
 public sealed class IssuedInvoiceLineEntity
 {
     public int Id { get; set; }
@@ -263,6 +288,7 @@ public sealed class IssuedInvoiceLineEntity
     public string Currency { get; set; } = "DKK";
 }
 
+// Persists the local lesson and its student, plan, calendar event, and billing state.
 public sealed class LessonEntity
 {
     public int Id { get; set; }
@@ -286,6 +312,8 @@ public sealed class LessonEntity
     public LessonState State { get; set; }
 
     public string? GoogleCalendarEventId { get; set; }
+
+    public CalendarMutationKind? PendingCalendarMutation { get; set; }
 
     public int? InvoiceNumber { get; set; }
 }

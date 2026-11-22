@@ -6,6 +6,7 @@ using MoneyAmount = ElenasBusinessLedger.Core.Money.Money;
 
 namespace ElenasBusinessLedger.Core.UseCases.Invoices;
 
+// Builds an editable draft from the local lesson ledger so the WPF preview can show prices before reserving a number.
 public sealed class InvoicePreviewUseCase
 {
     private readonly IStudentRepository studentRepository;
@@ -25,14 +26,19 @@ public sealed class InvoicePreviewUseCase
         this.planCatalogRepository = planCatalogRepository;
     }
 
+    // Loads the selected student's local lessons to build an editable preview without assigning an invoice number.
     public async Task<OperationResult<InvoicePreviewResult>> CreateAsync(
         string studentShortName,
         DateOnly invoiceDate,
         DateOnly from,
         DateOnly to,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        int? studentId = null)
     {
-        var student = await studentRepository.GetByShortNameAsync(studentShortName, cancellationToken);
+        // Use the selected student's ID when available so a reused short name cannot redirect the preview.
+        var student = studentId is { } id
+            ? await studentRepository.GetByIdAsync(id, cancellationToken)
+            : await studentRepository.GetByShortNameAsync(studentShortName, cancellationToken);
         if (student is null)
         {
             return OperationResult<InvoicePreviewResult>.Failure(new ValidationError(
@@ -53,19 +59,20 @@ public sealed class InvoicePreviewUseCase
         CancellationToken cancellationToken)
     {
         var month = new DateOnly(from.Year, from.Month, 1);
-        var lessons = await lessonRepository.ListForStudentMonthAsync(student.Student.ShortName, month, cancellationToken);
+        var lessons = await lessonRepository.ListForStudentMonthAsync(student.Student.ShortName, month, cancellationToken, student.Id > 0 ? student.Id : null);
         var matchingLessons = lessons
             .Where(lesson =>
             {
                 var date = DateOnly.FromDateTime(lesson.StartsAt.DateTime);
                 return date >= from && date <= to;
             })
-            .Where(lesson => lesson.InvoiceNumber is null)
+            .Where(lesson => lesson.InvoiceNumber is null && lesson.PendingCalendarMutation is null)
             .OrderBy(lesson => lesson.StartsAt)
             .ToArray();
         var errors = new List<ValidationError>();
         var lines = new List<InvoiceLineDraft>();
 
+        // Copy the plan price into the draft and carry the lesson ID forward for the lock at issuance.
         foreach (var lesson in matchingLessons)
         {
             var plan = await planCatalogRepository.GetAsync(lesson.PlanCatalogId, cancellationToken);
@@ -101,7 +108,7 @@ public sealed class InvoicePreviewUseCase
                 company.BankRegistrationNumber,
                 company.BankAccountNumber,
                 company.MobilePayAccount),
-            new StudentSnapshot(student.Student.ShortName, student.Student.FullName, student.Student.Address),
+            new StudentSnapshot(student.Student.ShortName, student.Student.FullName, student.Student.Address, student.Id),
             lines.ToArray(),
             priceAdjustment: null,
             period: new InvoicePeriod(from, to));

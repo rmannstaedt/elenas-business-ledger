@@ -4,6 +4,7 @@ using ElenasBusinessLedger.Core.Ports;
 
 namespace ElenasBusinessLedger.Infrastructure.Persistence;
 
+// Stores the report cutover and manual legacy amounts so Economy can reload them consistently.
 public sealed class SqliteEconomyRepository : IEconomyRepository
 {
     private const int SingletonSettingsId = 1;
@@ -18,6 +19,11 @@ public sealed class SqliteEconomyRepository : IEconomyRepository
     public async Task<EconomySettings?> GetSettingsAsync(CancellationToken cancellationToken)
     {
         await using var context = createContext();
+        return await ReadSettingsAsync(context, cancellationToken);
+    }
+
+    internal static async Task<EconomySettings?> ReadSettingsAsync(LedgerDbContext context, CancellationToken cancellationToken)
+    {
         var settings = await context.EconomySettings
             .AsNoTracking()
             .SingleOrDefaultAsync(entity => entity.Id == SingletonSettingsId, cancellationToken);
@@ -45,14 +51,22 @@ public sealed class SqliteEconomyRepository : IEconomyRepository
             .ToArrayAsync(cancellationToken);
     }
 
+    // Saves the first app-backed invoice month and removes manual overrides that the new cutover makes obsolete.
     public async Task SaveSettingsAsync(EconomySettings settings, CancellationToken cancellationToken)
     {
         await using var context = createContext();
-        await SaveSettingsAsync(context, settings, cancellationToken);
-        await RemoveManualOverridesOnOrAfterCutOverAsync(context, settings.FirstApplicationInvoiceMonth, cancellationToken);
+        await SetSettingsAndRemoveObsoleteOverridesAsync(context, settings, cancellationToken);
         await context.SaveChangesAsync(cancellationToken);
     }
 
+    internal static async Task SetSettingsAndRemoveObsoleteOverridesAsync(
+        LedgerDbContext context, EconomySettings settings, CancellationToken cancellationToken)
+    {
+        await SaveSettingsAsync(context, settings, cancellationToken);
+        await RemoveManualOverridesOnOrAfterCutOverAsync(context, settings.FirstApplicationInvoiceMonth, cancellationToken);
+    }
+
+    // Saves the manual amounts and removes entries on or after the saved cutover.
     public async Task SaveManualMonthOverridesAsync(
         IReadOnlyList<EconomyManualMonthOverride> overrides,
         CancellationToken cancellationToken)
@@ -79,6 +93,7 @@ public sealed class SqliteEconomyRepository : IEconomyRepository
         await transaction.CommitAsync(cancellationToken);
     }
 
+    // Commits a new cutover and manual amounts together so reporting sees a consistent set of settings.
     public async Task SaveSettingsAndManualMonthOverridesAsync(
         EconomySettings settings,
         IReadOnlyList<EconomyManualMonthOverride> overrides,

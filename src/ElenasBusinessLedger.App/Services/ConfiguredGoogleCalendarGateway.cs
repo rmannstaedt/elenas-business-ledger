@@ -7,8 +7,10 @@ using ElenasBusinessLedger.Infrastructure.Calendar;
 
 namespace ElenasBusinessLedger.App.Services;
 
-public sealed record ConfiguredGoogleCalendarClient(string CalendarId, IGoogleCalendarEventClient EventClient);
+// Bundles an authorized event client with its calendar and scope so future calls target the right account.
+public sealed record ConfiguredGoogleCalendarClient(string CalendarId, IGoogleCalendarEventClient EventClient, string? CalendarScope = null);
 
+// Resolves the saved calendar connection before dispatching lesson reads and writes to Google.
 public sealed class ConfiguredGoogleCalendarGateway : IGoogleCalendarGateway
 {
     private readonly Func<CancellationToken, Task<ConfiguredGoogleCalendarClient?>> loadClientAsync;
@@ -63,6 +65,16 @@ public sealed class ConfiguredGoogleCalendarGateway : IGoogleCalendarGateway
             : await gateway.PopulateLessonsAsync(requests, refreshMonth, cancellationToken);
     }
 
+    public async Task<OperationResult<IReadOnlyList<CalendarLesson>>> PopulateWithReceiptsAsync(
+        IReadOnlyList<LessonAddRequest> requests, DateOnly refreshMonth,
+        Func<int, CalendarLesson, CancellationToken, Task<ValidationError?>> saveReceipt,
+        CancellationToken cancellationToken)
+    {
+        var gateway = await TryCreateGatewayAsync(cancellationToken);
+        return gateway is null ? CalendarNotConfigured<IReadOnlyList<CalendarLesson>>([]) :
+            await gateway.PopulateWithReceiptsAsync(requests, refreshMonth, saveReceipt, cancellationToken);
+    }
+
     public async Task<OperationResult<IReadOnlyList<CalendarLesson>>> UpdateLessonAsync(
         LessonEditRequest request,
         DateOnly refreshMonth,
@@ -84,6 +96,25 @@ public sealed class ConfiguredGoogleCalendarGateway : IGoogleCalendarGateway
             ? CalendarNotConfigured<IReadOnlyList<CalendarLesson>>([])
             : await gateway.DeleteLessonAsync(lessonId, refreshMonth, cancellationToken);
     }
+
+    public async Task<CalendarWriteReceipt> UpdateWithoutRefreshAsync(
+        LessonEditRequest request, DateOnly refreshMonth, CancellationToken cancellationToken)
+    {
+        var gateway = await TryCreateGatewayAsync(cancellationToken);
+        return gateway is null ? WriteNotConfigured() :
+            await gateway.UpdateWithoutRefreshAsync(request, refreshMonth, cancellationToken);
+    }
+
+    public async Task<CalendarWriteReceipt> DeleteWithoutRefreshAsync(
+        string lessonId, DateOnly refreshMonth, CancellationToken cancellationToken)
+    {
+        var gateway = await TryCreateGatewayAsync(cancellationToken);
+        return gateway is null ? WriteNotConfigured() :
+            await gateway.DeleteWithoutRefreshAsync(lessonId, refreshMonth, cancellationToken);
+    }
+
+    private static CalendarWriteReceipt WriteNotConfigured() =>
+        new(CalendarWriteState.Rejected, [new ValidationError("Calendar.NotConfigured", NotConfiguredMessage)]);
 
     public async Task<OperationResult<LessonState>> UpdateLessonStateAsync(
         string lessonId,
@@ -114,7 +145,7 @@ public sealed class ConfiguredGoogleCalendarGateway : IGoogleCalendarGateway
             ? null
             : new GoogleCalendarGateway(
                 configured.EventClient,
-                new GoogleCalendarGatewayOptions(configured.CalendarId, timeZone, defaultLessonDuration));
+                new GoogleCalendarGatewayOptions(configured.CalendarId, timeZone, defaultLessonDuration, configured.CalendarScope));
     }
 
     private static OperationResult<T> CalendarNotConfigured<T>(T currentValue) =>

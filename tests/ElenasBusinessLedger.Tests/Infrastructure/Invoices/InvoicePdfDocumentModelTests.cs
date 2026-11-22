@@ -4,6 +4,7 @@ using ElenasBusinessLedger.Infrastructure.Invoices.Pdf;
 
 namespace ElenasBusinessLedger.Tests.Infrastructure.Invoices;
 
+// Checks how saved lesson lines become grouped PDF services and plan-change notes.
 public sealed class InvoicePdfDocumentModelTests
 {
     [Fact]

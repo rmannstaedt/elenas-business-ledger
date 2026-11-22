@@ -6,11 +6,13 @@ using ElenasBusinessLedger.App.Services;
 using ElenasBusinessLedger.Core.Invoices;
 using ElenasBusinessLedger.Core.Lessons;
 using ElenasBusinessLedger.Core.Plans;
+using ElenasBusinessLedger.Core.Students;
 using ElenasBusinessLedger.Core.UseCases.Lessons;
 using ElenasBusinessLedger.Core.UseCases.Startup;
 
 namespace ElenasBusinessLedger.App.ViewModels;
 
+// Owns dashboard selection and coordinates refresh, scheduling, and invoice commands for the main window.
 public sealed class MainWindowViewModel : ViewModelBase
 {
     private static readonly TimeSpan ActivationRefreshMinimumInterval = TimeSpan.FromSeconds(10);
@@ -32,6 +34,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private readonly TimeZoneInfo lessonTimeZone;
     private readonly Dictionary<LessonDisplayModel, int> autoSaveDraftVersions = [];
     private readonly HashSet<LessonDisplayModel> savingDraftLessons = [];
+    private readonly List<LessonDisplayModel> draftLessonRows = [];
     private readonly HashSet<LessonDisplayModel> savingPlanLessons = [];
     private readonly Dictionary<LessonDisplayModel, int> pendingPlanCatalogIds = [];
     private readonly HashSet<LessonDisplayModel> acceptingPlanChangeLessons = [];
@@ -39,6 +42,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private DateTimeOffset? lastRefreshAt;
     private string? currentStudentShortName;
     private string[] studentShortNames = [];
+    private int? currentStudentId;
     private DashboardStudentNavigationEntry[] studentNavigationEntries = [];
     private int? selectedStudentNavigationIndex;
     private bool suppressNavigationSelectionOnce;
@@ -46,6 +50,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private DashboardStudentLessonDefaults? currentStudentLessonDefaults;
     private Task? activationRefreshTask;
     private bool isBusy;
+    private bool isCalendarAvailable = true;
     private int activationRefreshSuspendCount;
     private LessonDisplayModel? selectedLesson;
     private InvoiceDisplayModel? selectedInvoice;
@@ -94,11 +99,15 @@ public sealed class MainWindowViewModel : ViewModelBase
         PreviousStudentCommand = new AsyncRelayCommand(() => SelectAdjacentStudentAsync(-1), CanNavigateStudents);
         NextStudentCommand = new AsyncRelayCommand(() => SelectAdjacentStudentAsync(1), CanNavigateStudents);
         SelectStudentCommand = new AsyncRelayCommand(
-            parameter => SelectStudentFromDropdownAsync((string)parameter!),
-            parameter =>
-                parameter is string shortName &&
-                !IsBusy &&
-                !StringComparer.OrdinalIgnoreCase.Equals(shortName, CurrentStudentShortName));
+            parameter => parameter is StudentChoice student
+                ? SelectStudentFromDropdownAsync(student.ShortName, student.StudentId)
+                : SelectStudentFromDropdownAsync((string)parameter!),
+            parameter => !IsBusy && (parameter switch
+            {
+                StudentChoice student => student.StudentId != currentStudentId,
+                string shortName => !StringComparer.OrdinalIgnoreCase.Equals(shortName, CurrentStudentShortName),
+                _ => false
+            }));
         ToggleInvoicePaymentStatusCommand = new AsyncRelayCommand(
             parameter => ToggleInvoicePaymentStatusAsync((InvoiceDisplayModel)parameter!),
             parameter => parameter is InvoiceDisplayModel && !IsBusy);
@@ -106,6 +115,7 @@ public sealed class MainWindowViewModel : ViewModelBase
             () => calendarLauncher.OpenAsync(CancellationToken.None),
             () => !IsBusy);
         WriteInvoiceCommand = new AsyncRelayCommand(WriteInvoiceAsync, CanStartWriteInvoice);
+        ResumeInvoiceCommand = new AsyncRelayCommand(ResumeInvoiceAsync, () => !IsBusy);
         OpenInvoiceCommand = new AsyncRelayCommand(
             parameter => OpenInvoiceAsync((InvoiceDisplayModel)parameter!),
             parameter => parameter is InvoiceDisplayModel && !IsBusy);
@@ -120,8 +130,8 @@ public sealed class MainWindowViewModel : ViewModelBase
         OpenManagePlansCommand = new AsyncRelayCommand(OpenManagePlansAsync, () => !IsBusy);
         OpenEconomyOverviewCommand = new AsyncRelayCommand(OpenEconomyOverviewAsync, () => !IsBusy);
         OpenAboutCommand = new AsyncRelayCommand(OpenAboutAsync);
-        AddLessonCommand = new AsyncRelayCommand(AddLessonAsync, () => !IsBusy && CurrentStudentShortName is not null);
-        PopulateCalendarCommand = new AsyncRelayCommand(PopulateCalendarAsync, CanPopulateCalendar);
+        AddLessonCommand = new AsyncRelayCommand(AddLessonAsync, CanScheduleLessons);
+        PopulateCalendarCommand = new AsyncRelayCommand(PopulateCalendarAsync, CanScheduleLessons);
         SaveLessonCommand = new AsyncRelayCommand(
             parameter => SaveLessonAsync((LessonDisplayModel)parameter!),
             parameter => parameter is LessonDisplayModel && !IsBusy);
@@ -145,6 +155,8 @@ public sealed class MainWindowViewModel : ViewModelBase
     public ObservableCollection<InvoiceDisplayModel> Invoices { get; } = [];
 
     public ObservableCollection<string> SelectableStudentShortNames { get; } = [];
+
+    public ObservableCollection<StudentChoice> SelectableStudents { get; } = [];
 
     public LessonDisplayModel? SelectedLesson
     {
@@ -228,6 +240,8 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     public AsyncRelayCommand WriteInvoiceCommand { get; }
 
+    public AsyncRelayCommand ResumeInvoiceCommand { get; }
+
     public AsyncRelayCommand OpenInvoiceCommand { get; }
 
     public AsyncRelayCommand OpenInvoicePdfCommand { get; }
@@ -256,8 +270,10 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     public AsyncRelayCommand DismissErrorCommand { get; }
 
+    // Loads the initial dashboard using the current display month and student selection.
     public Task LoadAsync() => RefreshAsync();
 
+    // Refreshes when focus returns, while avoiding duplicate requests and refreshes during suspended editing.
     public async Task RefreshAfterActivationAsync()
     {
         if (activationRefreshSuspendCount > 0)
@@ -293,21 +309,22 @@ public sealed class MainWindowViewModel : ViewModelBase
         IsBusy = true;
         try
         {
-            var result = await dashboardService.LoadAsync(DisplayMonth, CurrentStudentShortName, CancellationToken.None);
-            if (!result.Succeeded)
-            {
-                ErrorMessage = result.Errors.FirstOrDefault()?.Message ?? "Could not refresh dashboard.";
-                return;
-            }
-
+            var result = await dashboardService.LoadAsync(DisplayMonth, CurrentStudentShortName, CancellationToken.None, currentStudentId);
             if (shouldApply is not null && !shouldApply())
             {
                 return;
             }
 
-            ApplyDashboard(result.Value!, lessonIdToSelect);
-            ErrorMessage = null;
-            lastRefreshAt = clock.Now;
+            ErrorMessage = result.Succeeded
+                ? null
+                : result.Errors.FirstOrDefault()?.Message ?? "Could not refresh dashboard.";
+            // A failed calendar read can still return a fresh projection from the local ledger.
+            if (result.Value is { } dashboard)
+            {
+                isCalendarAvailable = result.Succeeded;
+                ApplyDashboard(dashboard, lessonIdToSelect);
+                lastRefreshAt = clock.Now;
+            }
         }
         finally
         {
@@ -326,9 +343,8 @@ public sealed class MainWindowViewModel : ViewModelBase
         if (selectedStudentNavigationIndex is { } index &&
             index >= 0 &&
             index < studentNavigationEntries.Length &&
-            StringComparer.OrdinalIgnoreCase.Equals(
-                studentNavigationEntries[index].StudentShortName,
-                CurrentStudentShortName))
+            MatchesStudent(studentNavigationEntries[index].StudentId, studentNavigationEntries[index].StudentShortName,
+                currentStudentId, CurrentStudentShortName))
         {
             return index;
         }
@@ -339,7 +355,7 @@ public sealed class MainWindowViewModel : ViewModelBase
             var selectedLessonIndex = Array.FindIndex(
                 studentNavigationEntries,
                 entry =>
-                    StringComparer.OrdinalIgnoreCase.Equals(entry.StudentShortName, selectedLesson.StudentShortName) &&
+                    MatchesStudent(entry.StudentId, entry.StudentShortName, selectedLesson.StudentId, selectedLesson.StudentShortName) &&
                     entry.StartsAt == selectedStartsAt);
             if (selectedLessonIndex >= 0)
             {
@@ -364,15 +380,17 @@ public sealed class MainWindowViewModel : ViewModelBase
 
         var nextEntry = studentNavigationEntries[nextIndex];
         selectedStudentNavigationIndex = nextIndex;
+        currentStudentId = nextEntry.StudentId;
         CurrentStudentShortName = nextEntry.StudentShortName;
         DisplayMonth = new DateOnly(nextEntry.StartsAt.Year, nextEntry.StartsAt.Month, 1);
         await RefreshAsync();
     }
 
-    private async Task SelectStudentFromDropdownAsync(string studentShortName)
+    private async Task SelectStudentFromDropdownAsync(string studentShortName, int? studentId = null)
     {
         selectedStudentNavigationIndex = null;
         suppressNavigationSelectionOnce = true;
+        currentStudentId = studentId;
         CurrentStudentShortName = studentShortName;
         SelectedLesson = null;
         await RefreshAsync();
@@ -421,29 +439,33 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     private async Task OpenManageStudentsAsync()
     {
-        var selectedStudentShortName = await studentOverviewLauncher.ShowStudentOverviewAsync(
-            CurrentStudentShortName,
+        var selectedStudent = await studentOverviewLauncher.ShowStudentOverviewForAsync(
+            CurrentStudentChoice(),
             ApplyStudentOverviewSelectionAsync,
             CancellationToken.None);
-        await ApplyStudentOverviewSelectionAsync(selectedStudentShortName, CancellationToken.None);
+        await ApplyStudentOverviewSelectionAsync(selectedStudent, CancellationToken.None);
     }
 
     private async Task OpenStudentDetailsAsync()
     {
-        var selectedStudentShortName = await studentOverviewLauncher.ShowStudentDetailsAsync(
-            CurrentStudentShortName,
+        var selectedStudent = await studentOverviewLauncher.ShowStudentDetailsForAsync(
+            CurrentStudentChoice(),
             CancellationToken.None);
-        await ApplyStudentOverviewSelectionAsync(selectedStudentShortName, CancellationToken.None);
+        await ApplyStudentOverviewSelectionAsync(selectedStudent, CancellationToken.None);
     }
 
-    private async Task ApplyStudentOverviewSelectionAsync(string? selectedStudentShortName, CancellationToken cancellationToken)
+    private StudentChoice? CurrentStudentChoice() =>
+        CurrentStudentShortName is { } name ? new StudentChoice(currentStudentId ?? 0, name) : null;
+
+    private async Task ApplyStudentOverviewSelectionAsync(StudentChoice? selectedStudent, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(selectedStudentShortName))
+        if (selectedStudent is null || string.IsNullOrWhiteSpace(selectedStudent.ShortName))
         {
             return;
         }
 
-        CurrentStudentShortName = selectedStudentShortName;
+        currentStudentId = selectedStudent.StudentId > 0 ? selectedStudent.StudentId : null;
+        CurrentStudentShortName = selectedStudent.ShortName;
         var selectionVersion = Interlocked.Increment(ref studentOverviewSelectionVersion);
         await RefreshAsync(() => selectionVersion == Interlocked.Read(ref studentOverviewSelectionVersion));
     }
@@ -471,7 +493,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     {
         await WaitForActivationRefreshAsync();
 
-        if (IsBusy)
+        if (IsBusy || CurrentStudentChoice() is not { } student)
         {
             return;
         }
@@ -486,9 +508,21 @@ public sealed class MainWindowViewModel : ViewModelBase
 
             var issued = await invoiceWorkflowLauncher.ShowWriteInvoiceAsync(
                 DisplayMonth,
-                CurrentStudentShortName,
+                student,
                 CancellationToken.None);
             if (issued)
+            {
+                await RefreshAsync();
+            }
+        });
+    }
+
+    private async Task ResumeInvoiceAsync()
+    {
+        await WaitForActivationRefreshAsync();
+        await RunWithActivationRefreshSuspendedAsync(async () =>
+        {
+            if (await invoiceWorkflowLauncher.ShowResumeInvoiceAsync(CancellationToken.None))
             {
                 await RefreshAsync();
             }
@@ -536,7 +570,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         TimeOnly? defaultTime = null;
         DashboardPlanOption? defaultPlan = null;
         if (currentStudentLessonDefaults is { } defaults &&
-            StringComparer.OrdinalIgnoreCase.Equals(defaults.StudentShortName, studentShortName))
+            StringComparer.Ordinal.Equals(defaults.StudentShortName, studentShortName))
         {
             var slot = defaults.Schedule.FirstOrDefault(entry => entry.Weekday == defaultDate.DayOfWeek)
                 ?? defaults.Schedule.FirstOrDefault();
@@ -546,7 +580,8 @@ public sealed class MainWindowViewModel : ViewModelBase
         }
 
         var draft = LessonDisplayModel.CreateDraft(
-            studentShortName, lessonTimeZone, defaultDate.ToDateTime(TimeOnly.MinValue), defaultTime, defaultPlan);
+            studentShortName, lessonTimeZone, defaultDate.ToDateTime(TimeOnly.MinValue), defaultTime, defaultPlan, currentStudentId);
+        draftLessonRows.Add(draft);
         AddLessonRow(draft);
         SelectedLesson = draft;
         RaiseCommandAvailabilityChanged();
@@ -579,7 +614,8 @@ public sealed class MainWindowViewModel : ViewModelBase
             var result = await lessonEditorService.PopulateCalendarAsync(
                 CurrentStudentShortName,
                 DisplayMonth,
-                CancellationToken.None);
+                CancellationToken.None,
+                currentStudentId);
             if (!result.Succeeded)
             {
                 ErrorMessage = result.Errors.FirstOrDefault()?.Message ?? "Google Calendar could not be populated.";
@@ -677,12 +713,13 @@ public sealed class MainWindowViewModel : ViewModelBase
     {
         var requestedPlanCatalogId = lesson.PlanCatalogId;
         var result = await lessonEditorService.AddAsync(
-            new LessonAddRequest(lesson.StudentShortName, startsAt, requestedPlanCatalogId, hasKnownStartTime),
+            new LessonAddRequest(lesson.StudentShortName, startsAt, requestedPlanCatalogId, hasKnownStartTime, lesson.StudentId),
             DisplayMonth,
             CancellationToken.None);
         if (result.Value is { CreatedLesson: { } createdLesson })
         {
             lesson.AcceptCreatedLesson(createdLesson);
+            draftLessonRows.Remove(lesson);
             RaiseCommandAvailabilityChanged();
         }
 
@@ -732,13 +769,15 @@ public sealed class MainWindowViewModel : ViewModelBase
     private async Task DeleteConfirmedLessonAsync(LessonDisplayModel lesson)
     {
         var result = await lessonEditorService.DeleteAsync(lesson.Id, DisplayMonth, CancellationToken.None);
-        if (!result.Succeeded)
+        var refreshError = result.Errors.FirstOrDefault(error => error.Code == "Calendar.RefreshFailed");
+        if (!result.Succeeded && refreshError is null)
         {
+            await RefreshAsync();
             ErrorMessage = result.Errors.FirstOrDefault()?.Message ?? "Google Calendar lesson deletion failed.";
             return;
         }
 
-        ErrorMessage = null;
+        ErrorMessage = refreshError?.Message;
         RemoveLessonRow(lesson);
         if (ReferenceEquals(SelectedLesson, lesson))
         {
@@ -750,6 +789,34 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     private async Task ToggleLessonStateAsync(LessonDisplayModel lesson)
     {
+        if (lesson.NeedsCalendarReview)
+        {
+            await RunWithActivationRefreshSuspendedAsync(async () =>
+            {
+                var review = await lessonEditorService.ReviewCalendarMutationAsync(
+                    lesson.Id, DisplayMonth, confirmRemoved: false, CancellationToken.None);
+                if (review.RequiresConfirmation)
+                {
+                    if (!await confirmationService.ConfirmCalendarRemovalAsync(lesson, CancellationToken.None))
+                    {
+                        return;
+                    }
+                    review = await lessonEditorService.ReviewCalendarMutationAsync(
+                        lesson.Id, DisplayMonth, confirmRemoved: true, CancellationToken.None);
+                }
+
+                if (review.Succeeded)
+                {
+                    await RefreshAsync();
+                }
+                else
+                {
+                    ErrorMessage = review.Errors[0].Message;
+                }
+            });
+            return;
+        }
+
         if (lesson.IsInvoiced)
         {
             ErrorMessage = "Invoiced lessons cannot be changed.";
@@ -838,7 +905,16 @@ public sealed class MainWindowViewModel : ViewModelBase
             index >= 0 && index < studentNavigationEntries.Length
             ? studentNavigationEntries[index]
             : null;
+        currentStudentId = dashboard.CurrentStudentId;
         CurrentStudentShortName = dashboard.CurrentStudentShortName;
+        SelectableStudents.Clear();
+        foreach (var student in dashboard.StudentChoices ?? [])
+        {
+            if (student.StudentId > 0 && student.StudentId != currentStudentId)
+            {
+                SelectableStudents.Add(student);
+            }
+        }
         currentStudentLessonDefaults = dashboard.LessonDefaults;
         studentShortNames = dashboard.StudentShortNames
             .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -861,9 +937,6 @@ public sealed class MainWindowViewModel : ViewModelBase
                 dashboard.CurrentStudentShortName,
                 selectedLesson);
 
-        var draftLessons = Lessons
-            .Where(lesson => lesson.IsDraft)
-            .ToArray();
         ClearLessonRows();
         foreach (var lesson in dashboard.Lessons
                      .Where(lesson => IsInDisplayMonth(lesson.StartsAt))
@@ -872,7 +945,7 @@ public sealed class MainWindowViewModel : ViewModelBase
             AddLessonRow(new LessonDisplayModel(lesson, lessonTimeZone));
         }
 
-        foreach (var draft in draftLessons.Where(lesson => lesson.IsDraft && IsVisibleDraftForDisplayMonth(lesson)))
+        foreach (var draft in draftLessonRows.Where(IsVisibleDraftForDisplayMonth))
         {
             AddLessonRow(draft);
         }
@@ -934,7 +1007,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         }
 
         return Lessons.FirstOrDefault(lesson =>
-            StringComparer.OrdinalIgnoreCase.Equals(lesson.StudentShortName, selectedLesson.StudentShortName) &&
+            MatchesStudent(lesson.StudentId, lesson.StudentShortName, selectedLesson.StudentId, selectedLesson.StudentShortName) &&
             lesson.TryGetStartsAt(out var startsAt, out var hasKnownStartTime) &&
             startsAt == selectedStartsAt &&
             hasKnownStartTime == selectedHasKnownStartTime);
@@ -984,7 +1057,7 @@ public sealed class MainWindowViewModel : ViewModelBase
 
         if (preferredEntry is not null &&
             IsInDisplayMonth(preferredEntry.StartsAt) &&
-            StringComparer.OrdinalIgnoreCase.Equals(preferredEntry.StudentShortName, currentStudent))
+            MatchesStudent(preferredEntry.StudentId, preferredEntry.StudentShortName, currentStudentId, currentStudent))
         {
             var preferredIndex = Array.IndexOf(studentNavigationEntries, preferredEntry);
             if (preferredIndex >= 0)
@@ -995,7 +1068,7 @@ public sealed class MainWindowViewModel : ViewModelBase
 
         if (selectedLesson is { IsDraft: false } &&
             IsInDisplayMonth(selectedLesson.StartsAt) &&
-            StringComparer.OrdinalIgnoreCase.Equals(selectedLesson.StudentShortName, currentStudent))
+            MatchesStudent(selectedLesson.StudentId, selectedLesson.StudentShortName, currentStudentId, currentStudent))
         {
             var matchingLessonIndex = Array.FindIndex(
                 studentNavigationEntries,
@@ -1014,7 +1087,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     {
         var now = clock.Now;
         var studentEntries = studentNavigationEntries.Where(entry =>
-            StringComparer.OrdinalIgnoreCase.Equals(entry.StudentShortName, student));
+            MatchesStudent(entry.StudentId, entry.StudentShortName, currentStudentId, student));
         var displayedEntries = studentEntries.Where(entry => IsInDisplayMonth(entry.StartsAt));
         var startingEntry = displayedEntries
             .Where(entry => entry.HasCalendarLesson && entry.StartsAt.Date == now.Date)
@@ -1051,9 +1124,13 @@ public sealed class MainWindowViewModel : ViewModelBase
     private static bool NavigationEntryMatchesLesson(
         DashboardStudentNavigationEntry entry,
         LessonDisplayModel lesson) =>
-        StringComparer.OrdinalIgnoreCase.Equals(entry.StudentShortName, lesson.StudentShortName) &&
+        MatchesStudent(entry.StudentId, entry.StudentShortName, lesson.StudentId, lesson.StudentShortName) &&
         lesson.TryGetStartsAt(out var startsAt) &&
         startsAt == entry.StartsAt;
+
+    private static bool MatchesStudent(int? firstId, string? firstName, int? secondId, string? secondName) =>
+        firstId is > 0 && secondId is > 0 ? firstId == secondId :
+            StringComparer.OrdinalIgnoreCase.Equals(firstName, secondName);
 
     private void AddLessonRow(LessonDisplayModel lesson)
     {
@@ -1066,13 +1143,14 @@ public sealed class MainWindowViewModel : ViewModelBase
         startsAt.Month == DisplayMonth.Month;
 
     private bool IsVisibleDraftForDisplayMonth(LessonDisplayModel lesson) =>
-        lesson.StartsOnDate is null ||
-        (lesson.StartsOnDate.Value.Year == DisplayMonth.Year &&
-         lesson.StartsOnDate.Value.Month == DisplayMonth.Month);
+        (lesson.StudentId is null || lesson.StudentId == currentStudentId) &&
+        (lesson.StartsOnDate is null ||
+         (lesson.StartsOnDate.Value.Year == DisplayMonth.Year && lesson.StartsOnDate.Value.Month == DisplayMonth.Month));
 
     private void RemoveLessonRow(LessonDisplayModel lesson)
     {
         lesson.PropertyChanged -= OnLessonPropertyChanged;
+        draftLessonRows.Remove(lesson);
         Lessons.Remove(lesson);
     }
 
@@ -1121,7 +1199,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     {
         if (lesson.IsDraft ||
             !lesson.CanEditPlan ||
-            lesson.LocalLessonId <= 0 ||
+            (!lesson.NeedsPlan && lesson.LocalLessonId <= 0) ||
             lesson.PlanCatalogId <= 0)
         {
             return;
@@ -1143,10 +1221,13 @@ public sealed class MainWindowViewModel : ViewModelBase
         {
             while (pendingPlanCatalogIds.Remove(lesson, out var requestedPlanCatalogId))
             {
-                var result = await lessonEditorService.UpdatePlanAsync(
-                    lesson.LocalLessonId,
-                    requestedPlanCatalogId,
-                    CancellationToken.None);
+                var result = lesson.NeedsPlan
+                    ? await lessonEditorService.LinkToPlanAsync(
+                        new LessonRecord(0, lesson.StudentId ?? 0, lesson.StudentShortName, 0, string.Empty,
+                            lesson.StartsAt, 0, lesson.State, lesson.Id, null, lesson.HasKnownStartTime),
+                        requestedPlanCatalogId, CancellationToken.None)
+                    : await lessonEditorService.UpdatePlanAsync(
+                        lesson.LocalLessonId, requestedPlanCatalogId, CancellationToken.None);
                 if (!result.Succeeded)
                 {
                     if (lesson.PlanCatalogId == requestedPlanCatalogId)
@@ -1248,12 +1329,10 @@ public sealed class MainWindowViewModel : ViewModelBase
     private bool CanNavigateStudents() =>
         !IsBusy && studentNavigationEntries.Length > 1;
 
-    private bool CanPopulateCalendar() =>
-        !IsBusy &&
-        CurrentStudentShortName is not null;
+    private bool CanScheduleLessons() => !IsBusy && isCalendarAvailable && CurrentStudentShortName is not null;
 
     private bool CanStartWriteInvoice() =>
-        !IsBusy || IsActivationRefreshRunning();
+        CurrentStudentShortName is not null && (!IsBusy || IsActivationRefreshRunning());
 
     private bool IsActivationRefreshRunning() =>
         activationRefreshTask is { IsCompleted: false };
@@ -1278,6 +1357,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         ToggleInvoicePaymentStatusCommand.RaiseCanExecuteChanged();
         OpenCalendarCommand.RaiseCanExecuteChanged();
         WriteInvoiceCommand.RaiseCanExecuteChanged();
+        ResumeInvoiceCommand.RaiseCanExecuteChanged();
         OpenInvoiceCommand.RaiseCanExecuteChanged();
         OpenInvoicePdfCommand.RaiseCanExecuteChanged();
         OpenManageStudentsCommand.RaiseCanExecuteChanged();

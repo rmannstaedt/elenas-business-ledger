@@ -4,6 +4,7 @@ using ElenasBusinessLedger.App.Views;
 
 namespace ElenasBusinessLedger.App.Services;
 
+// Opens the Economy window with the reporting, export, and PDF actions it needs.
 public sealed class EconomyOverviewWindowLauncher : IEconomyOverviewLauncher
 {
     private readonly IEconomyOverviewService economyOverviewService;
@@ -26,6 +27,7 @@ public sealed class EconomyOverviewWindowLauncher : IEconomyOverviewLauncher
         this.clock = clock;
     }
 
+    // Loads the Economy window in the current session mode so manual overrides are offered only in Admin Mode.
     public async Task ShowEconomyOverviewAsync(bool isAdminMode, CancellationToken cancellationToken)
     {
         var viewModel = new EconomyOverviewViewModel(

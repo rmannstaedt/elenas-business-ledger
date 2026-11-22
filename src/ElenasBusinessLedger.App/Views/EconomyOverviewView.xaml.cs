@@ -9,6 +9,7 @@ using ElenasBusinessLedger.App.ViewModels;
 
 namespace ElenasBusinessLedger.App.Views;
 
+// Handles grid focus, keyboard behavior, and window sizing for the Economy view model.
 public partial class EconomyOverviewView : Window
 {
     private const double NormalMinHeight = 720d;

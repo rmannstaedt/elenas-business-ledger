@@ -1,9 +1,11 @@
 using ElenasBusinessLedger.Core.Calendar;
 using ElenasBusinessLedger.Core.Common;
+using ElenasBusinessLedger.Core.Lessons;
 using ElenasBusinessLedger.Core.Ports;
 
 namespace ElenasBusinessLedger.Core.UseCases.Lessons;
 
+// Records an acknowledged calendar move in the billing ledger before requesting a refreshed lesson list.
 public sealed class EditLessonUseCase
 {
     private readonly IGoogleCalendarGateway calendarGateway;
@@ -17,15 +19,26 @@ public sealed class EditLessonUseCase
         this.lessonRepository = lessonRepository;
     }
 
+    // Moves the appointment and records its new time before refreshing the dashboard.
     public async Task<OperationResult<IReadOnlyList<CalendarLesson>>> ExecuteAsync(
         LessonEditRequest request,
         DateOnly refreshMonth,
         CancellationToken cancellationToken)
     {
-        var calendarResult = await calendarGateway.UpdateLessonAsync(request, refreshMonth, cancellationToken);
-        if (!calendarResult.Succeeded)
+        var claimed = await lessonRepository.ClaimCalendarMutationAsync(request.LessonId, CalendarMutationKind.Move, cancellationToken);
+        if (!claimed.Succeeded)
         {
-            return calendarResult;
+            return OperationResult<IReadOnlyList<CalendarLesson>>.Failure(claimed.Errors.ToArray());
+        }
+
+        var calendarResult = await calendarGateway.UpdateWithoutRefreshAsync(request, refreshMonth, cancellationToken);
+        if (calendarResult.State != CalendarWriteState.Acknowledged)
+        {
+            if (calendarResult.State == CalendarWriteState.Rejected)
+            {
+                await lessonRepository.ClearCalendarMutationAsync(request.LessonId, CalendarMutationKind.Move, cancellationToken);
+            }
+            return OperationResult<IReadOnlyList<CalendarLesson>>.Failure(calendarResult.Errors.ToArray());
         }
 
         try
@@ -37,15 +50,15 @@ public sealed class EditLessonUseCase
                 cancellationToken);
             if (updated is null)
             {
-                return LocalLedgerFailure(calendarResult.Value!);
+                return LocalLedgerFailure(calendarResult.RefreshedLessons ?? []);
             }
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            return LocalLedgerFailure(calendarResult.Value!);
+            return LocalLedgerFailure(calendarResult.RefreshedLessons ?? []);
         }
 
-        return calendarResult;
+        return await CalendarRefreshAfterWrite.LoadAsync(calendarGateway, calendarResult, refreshMonth, cancellationToken);
     }
 
     private static OperationResult<IReadOnlyList<CalendarLesson>> LocalLedgerFailure(

@@ -2,6 +2,7 @@ using System.Windows;
 
 namespace ElenasBusinessLedger.App.Services;
 
+// Presents the installed application name and version from the dashboard's About command.
 public sealed class AboutDialogLauncher : IAboutDialogLauncher
 {
     public Task ShowAboutAsync(CancellationToken cancellationToken)

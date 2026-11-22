@@ -4,6 +4,7 @@ using ElenasBusinessLedger.Core.UseCases.Students;
 
 namespace ElenasBusinessLedger.App.Services;
 
+// Maps saved students into editor fields and delegates validation and persistence to Core.
 public sealed class CoreStudentEditorService : IStudentEditorService
 {
     private readonly IStudentRepository studentRepository;
@@ -15,6 +16,7 @@ public sealed class CoreStudentEditorService : IStudentEditorService
         saveStudentUseCase = new SaveStudentUseCase(studentRepository);
     }
 
+    // Copies the stored student's fields, plan periods, and schedule into the shape used by the details form.
     public async Task<StudentEditorSnapshot?> LoadAsync(string shortName, CancellationToken cancellationToken)
     {
         var student = await studentRepository.GetByShortNameAsync(shortName, cancellationToken);
@@ -45,6 +47,7 @@ public sealed class CoreStudentEditorService : IStudentEditorService
                 student.Schedule.Select(schedule => new StudentScheduleInput(schedule.Weekday, schedule.StartsAt)).ToArray());
     }
 
+    // Validates and saves the edited student, returning the saved label for the selection refresh.
     public async Task<OperationResult<string>> SaveAsync(SaveStudentRequest request, CancellationToken cancellationToken)
     {
         var result = await saveStudentUseCase.ExecuteAsync(request, cancellationToken);

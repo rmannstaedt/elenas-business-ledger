@@ -8,6 +8,9 @@
         MinHeight="735"
         MinWidth="1080"
         ResizeMode="CanMinimize">
+    <Window.InputBindings>
+        <KeyBinding Key="Escape" Command="{Binding CancelStudentCommand}" />
+    </Window.InputBindings>
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter" />
         <Style x:Key="PaneHeaderStyle" TargetType="TextBlock">
@@ -64,6 +67,15 @@
             <Grid x:Name="StudentDetailsColumns"
                   Grid.Column="0"
                   Visibility="{Binding HasSelectedStudentEditor, Converter={StaticResource BooleanToVisibilityConverter}}">
+                <Grid.Style>
+                    <Style TargetType="Grid">
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsBusy}" Value="True">
+                                <Setter Property="IsEnabled" Value="False" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Grid.Style>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="252" />
                     <ColumnDefinition Width="18" />
@@ -352,10 +364,10 @@
                     MinWidth="84"
                     Height="30"
                     Margin="0,0,8,0" />
-            <Button Content="Close"
+            <Button Content="Cancel"
+                    Command="{Binding CancelStudentCommand}"
                     MinWidth="84"
-                    Height="30"
-                    Click="OnClose" />
+                    Height="30" />
         </StackPanel>
     </Grid>
 </Window>

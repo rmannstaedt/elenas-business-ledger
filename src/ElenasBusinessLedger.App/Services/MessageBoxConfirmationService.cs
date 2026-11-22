@@ -3,6 +3,7 @@ using ElenasBusinessLedger.App.ViewModels;
 
 namespace ElenasBusinessLedger.App.Services;
 
+// Abstracts the WPF message box so confirmation behavior can be checked without showing a real dialog.
 public interface IMessageBoxPresenter
 {
     MessageBoxResult Show(
@@ -14,6 +15,7 @@ public interface IMessageBoxPresenter
         MessageBoxResult defaultResult);
 }
 
+// Implements confirmation prompts with the native WPF message box.
 public sealed class WpfMessageBoxPresenter : IMessageBoxPresenter
 {
     public MessageBoxResult Show(
@@ -28,6 +30,7 @@ public sealed class WpfMessageBoxPresenter : IMessageBoxPresenter
             : MessageBox.Show(owner, messageBoxText, caption, button, icon, defaultResult);
 }
 
+// Presents dashboard confirmations with the relevant lesson or invoice details.
 public sealed class MessageBoxConfirmationService : IConfirmationService
 {
     private readonly Func<Window?> ownerProvider;
@@ -59,6 +62,15 @@ public sealed class MessageBoxConfirmationService : IConfirmationService
             MessageBoxResult.No);
 
         return Task.FromResult(result == MessageBoxResult.Yes);
+    }
+
+    public Task<bool> ConfirmCalendarRemovalAsync(LessonDisplayModel lesson, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var answer = MessageBox.Show(
+            $"Check the original calendar for the lesson for {lesson.StudentShortName} on {lesson.StartsAtText}, including moved appointments. Close any other copy of the Ledger before continuing. Have you confirmed the appointment was removed?",
+            "Review calendar change", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
+        return Task.FromResult(answer == MessageBoxResult.Yes);
     }
 
     public Task<bool> ConfirmDeleteLessonAsync(

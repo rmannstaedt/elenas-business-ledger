@@ -4,6 +4,7 @@ using ElenasBusinessLedger.App.ViewModels;
 
 namespace ElenasBusinessLedger.App.Views;
 
+// Presents plan management and gives the view model a chance to resolve unsaved changes before closing.
 public partial class PlanCatalogView : Window
 {
     private bool closeWasConfirmed;

@@ -1,5 +1,6 @@
 namespace ElenasBusinessLedger.App.ViewModels;
 
+// Formats one recurring lesson time for display in the student schedule.
 public sealed class ScheduleEntryDisplayModel
 {
     public ScheduleEntryDisplayModel(DayOfWeek weekday, TimeOnly startsAt)

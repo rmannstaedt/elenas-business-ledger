@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Security.Cryptography;
 using System.Text;
 using ElenasBusinessLedger.Core.Common;
 using ElenasBusinessLedger.Core.Invoices;
@@ -6,6 +7,7 @@ using ElenasBusinessLedger.Core.Ports;
 
 namespace ElenasBusinessLedger.Infrastructure.Invoices.Pdf;
 
+// Stages invoice PDFs beside their destination so the saved checkpoint can drive a safe move or retry.
 public sealed class LocalInvoiceFileStore : IInvoiceFileStore
 {
     private static readonly byte[] PdfHeader = "%PDF"u8.ToArray();
@@ -24,6 +26,7 @@ public sealed class LocalInvoiceFileStore : IInvoiceFileStore
         stagingFolderPath = Path.GetFullPath(Path.Combine(invoiceFolderPath, ".staging"));
     }
 
+    // Allocates a unique path under the invoice folder's staging directory for each PDF attempt.
     public Task<OperationResult<string>> CreateStagingPathAsync(
         InvoiceDraft draft,
         InvoiceNumber invoiceNumber,
@@ -46,6 +49,7 @@ public sealed class LocalInvoiceFileStore : IInvoiceFileStore
         }
     }
 
+    // Checks the PDF signature and minimum size before recording a publication checkpoint.
     public async Task<OperationResult<string>> VerifyStagedPdfAsync(string stagingPath, CancellationToken cancellationToken)
     {
         if (!File.Exists(stagingPath))
@@ -71,36 +75,82 @@ public sealed class LocalInvoiceFileStore : IInvoiceFileStore
         return OperationResult<string>.Success(stagingPath);
     }
 
-    public Task<OperationResult<string>> PublishAsync(
-        string stagingPath,
-        InvoiceDraft draft,
-        InvoiceNumber invoiceNumber,
-        CancellationToken cancellationToken)
+    // Computes the final filename and a checksum so recovery can identify the staged PDF after a move.
+    public async Task<OperationResult<InvoicePdfPublication>> PreparePublicationAsync(
+        string stagingPath, InvoiceDraft draft, InvoiceNumber invoiceNumber, CancellationToken cancellationToken)
     {
-        if (!File.Exists(stagingPath))
-        {
-            return Task.FromResult(Failure("InvoicePdf.StagedFileMissing", "The staged invoice PDF was not found."));
-        }
-
         try
         {
-            Directory.CreateDirectory(invoiceFolderPath);
             var finalPath = Path.Combine(invoiceFolderPath, CreateFinalFileName(draft, invoiceNumber));
-
-            if (File.Exists(finalPath))
-            {
-                return Task.FromResult(Failure("InvoicePdf.FinalFileAlreadyExists", "An invoice PDF with the same final file name already exists."));
-            }
-
-            File.Move(stagingPath, finalPath, overwrite: false);
-            return Task.FromResult(OperationResult<string>.Success(finalPath));
+            var checksum = await ReadChecksumAsync(stagingPath, cancellationToken);
+            return OperationResult<InvoicePdfPublication>.Success(new InvoicePdfPublication(stagingPath, finalPath, checksum));
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            return Task.FromResult(Failure("InvoicePdf.PublishFailed", "Could not publish the invoice PDF to the invoice folder."));
+            return OperationResult<InvoicePdfPublication>.Failure(
+                new ValidationError("InvoicePdf.PrepareFailed", "Could not read the staged invoice PDF for publication."));
         }
     }
 
+    // Publishes the saved PDF or verifies that the same file already occupies its destination.
+    public async Task<OperationResult<string>> CompletePublicationAsync(
+        InvoicePdfPublication publication, CancellationToken cancellationToken)
+    {
+        var (stagedPath, finalPath, checksum) = publication;
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            // Follow the folder saved in the checkpoint, even if the configured invoice folder has changed.
+            var finalDirectory = Path.GetDirectoryName(finalPath);
+            if (!Path.IsPathFullyQualified(stagedPath) || !Path.IsPathFullyQualified(finalPath) ||
+                finalDirectory is null ||
+                !string.Equals(Path.GetDirectoryName(stagedPath), Path.Combine(finalDirectory, ".staging"),
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                return Failure("InvoicePdf.InvalidPublicationPaths", "The saved invoice PDF paths are invalid.");
+            }
+
+            if (!File.Exists(finalPath))
+            {
+                if (!File.Exists(stagedPath))
+                {
+                    return Failure("InvoicePdf.StagedFileMissing", "The saved invoice PDF is missing from both invoice folders.");
+                }
+
+                if (!string.Equals(await ReadChecksumAsync(stagedPath, cancellationToken), checksum, StringComparison.Ordinal))
+                {
+                    return Failure("InvoicePdf.StagedFileChanged", "The staged invoice PDF differs from the saved checkpoint.");
+                }
+
+                try
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    File.Move(stagedPath, finalPath, overwrite: false);
+                }
+                catch (IOException) when (File.Exists(finalPath))
+                {
+                    // Another retry may have promoted this same staged file.
+                }
+            }
+
+            return string.Equals(await ReadChecksumAsync(finalPath, cancellationToken), checksum, StringComparison.Ordinal)
+                ? OperationResult<string>.Success(finalPath)
+                : Failure("InvoicePdf.FinalFileAlreadyExists",
+                    "A different invoice PDF already occupies the saved destination. Review the existing file before retrying.");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return Failure("InvoicePdf.PublishFailed", "Could not publish or verify the saved invoice PDF.");
+        }
+    }
+
+    private static async Task<string> ReadChecksumAsync(string path, CancellationToken cancellationToken)
+    {
+        await using var stream = File.OpenRead(path);
+        return Convert.ToHexString(await SHA256.HashDataAsync(stream, cancellationToken));
+    }
+
+    // Removes a staged file only within the configured staging folder after an abandoned attempt.
     public Task<OperationResult<string>> DiscardStagingPathAsync(string stagingPath, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -128,6 +178,7 @@ public sealed class LocalInvoiceFileStore : IInvoiceFileStore
         }
     }
 
+    // Removes a published file in the invoice folder when the caller explicitly requests cleanup.
     public Task<OperationResult<string>> DiscardPublishedPathAsync(string publishedPath, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();

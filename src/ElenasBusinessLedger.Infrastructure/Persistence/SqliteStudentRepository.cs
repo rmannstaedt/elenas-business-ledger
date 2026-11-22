@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ElenasBusinessLedger.Infrastructure.Persistence;
 
+// Persists student details, plan periods, and schedules while protecting stable identity and short-name uniqueness.
 public sealed class SqliteStudentRepository : IStudentRepository
 {
     private readonly Func<LedgerDbContext> createContext;
@@ -15,6 +16,7 @@ public sealed class SqliteStudentRepository : IStudentRepository
         this.createContext = createContext;
     }
 
+    // Loads active and inactive students with their plans and schedules for Manage Students.
     public async Task<IReadOnlyList<StudentRecord>> ListStudentsAsync(CancellationToken cancellationToken)
     {
         await using var context = createContext();
@@ -29,6 +31,7 @@ public sealed class SqliteStudentRepository : IStudentRepository
         return students.Select(ToDomain).ToArray();
     }
 
+    // Loads the active students that the dashboard can match to calendar appointments.
     public async Task<IReadOnlyList<StudentRecord>> ListActiveStudentsAsync(CancellationToken cancellationToken)
     {
         await using var context = createContext();
@@ -44,6 +47,19 @@ public sealed class SqliteStudentRepository : IStudentRepository
         return students.Select(ToDomain).ToArray();
     }
 
+    // Loads the student record by stable identity so a rename does not affect the lookup.
+    public async Task<StudentRecord?> GetByIdAsync(int studentId, CancellationToken cancellationToken)
+    {
+        await using var context = createContext();
+        var student = await context.Students.AsNoTracking()
+            .Include(entity => entity.PlanPeriods)
+            .ThenInclude(plan => plan.PlanCatalog)
+            .Include(entity => entity.ScheduleEntries)
+            .SingleOrDefaultAsync(entity => entity.Id == studentId, cancellationToken);
+        return student is null ? null : ToDomain(student);
+    }
+
+    // Loads the exact stored short name for callers that do not have the student's ID.
     public async Task<StudentRecord?> GetByShortNameAsync(string shortName, CancellationToken cancellationToken)
     {
         await using var context = createContext();
@@ -57,9 +73,11 @@ public sealed class SqliteStudentRepository : IStudentRepository
         return student is null ? null : ToDomain(student);
     }
 
+    // Saves the student, schedule, and plan periods together and checks whether a new short name conflicts.
     public async Task<OperationResult<StudentRecord>> SaveAsync(StudentRecord student, CancellationToken cancellationToken)
     {
         await using var context = createContext();
+        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
         var entityQuery = context.Students
             .Include(storedStudent => storedStudent.PlanPeriods)
             .Include(storedStudent => storedStudent.ScheduleEntries);
@@ -72,6 +90,19 @@ public sealed class SqliteStudentRepository : IStudentRepository
         {
             return OperationResult<StudentRecord>.Failure(
                 new ValidationError("Student.NotFound", "Student was not found."));
+        }
+
+        var nameChanged = entity is null || !string.Equals(entity.ShortName, student.Student.ShortName, StringComparison.Ordinal);
+        if (nameChanged)
+        {
+            var names = await context.Students.AsNoTracking().Where(other => other.Id != student.Id)
+                .Select(other => other.ShortName).ToArrayAsync(cancellationToken);
+            var requestedKey = StudentShortNameKey.From(student.Student.ShortName);
+            if (names.Any(name => StudentShortNameKey.From(name) == requestedKey))
+            {
+                return OperationResult<StudentRecord>.Failure(new ValidationError(
+                    "Student.ShortNameInUse", "Another student already uses this short name. Choose a distinct short name."));
+            }
         }
 
         if (entity is null)
@@ -119,6 +150,7 @@ public sealed class SqliteStudentRepository : IStudentRepository
         }
 
         await context.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
         return OperationResult<StudentRecord>.Success(ToDomain(entity));
     }
 

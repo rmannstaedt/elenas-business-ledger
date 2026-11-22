@@ -4,6 +4,7 @@
 
 namespace ElenasBusinessLedger.Infrastructure.Persistence.Migrations
 {
+    // Adds payment instructions to both current company settings and saved invoice snapshots.
     /// <inheritdoc />
     public partial class AddInvoicePaymentInstructions : Migration
     {

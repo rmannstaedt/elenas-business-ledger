@@ -13,6 +13,7 @@ using WpfTextBox = System.Windows.Controls.TextBox;
 
 namespace ElenasBusinessLedger.Tests.App.ViewModels;
 
+// Checks plan editor state, draft saves, lifecycle commands, and prompts about unsaved changes.
 public sealed class PlanCatalogViewModelTests
 {
     [Fact]
@@ -397,6 +398,7 @@ public sealed class PlanCatalogViewModelTests
             RetireOn: null,
             state);
 
+    // Provides an in-memory catalog and records edits so tests can assert the view model's command order.
     private sealed class FakePlanCatalogService : IPlanCatalogService
     {
         private readonly List<PlanCatalogItem> plans = [];
@@ -523,6 +525,7 @@ public sealed class PlanCatalogViewModelTests
         }
     }
 
+    // Returns scripted decisions for unsaved plan changes and records when the editor asks.
     private sealed class FakePlanCatalogInteractionService : IPlanCatalogInteractionService
     {
         public PlanCatalogAddPlanChoice NextAddPlanChoice { get; init; } = PlanCatalogAddPlanChoice.Discard;

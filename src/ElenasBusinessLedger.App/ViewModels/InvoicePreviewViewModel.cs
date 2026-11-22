@@ -9,6 +9,7 @@ using ElenasBusinessLedger.Core.UseCases.Invoices;
 
 namespace ElenasBusinessLedger.App.ViewModels;
 
+// Owns draft line selection and adjustments, then shows the separate outcomes of issuance and printing.
 public sealed class InvoicePreviewViewModel : ViewModelBase
 {
     private static readonly TimeSpan DefaultExtendedIssueWaitPromptDelay = TimeSpan.FromSeconds(7);
@@ -17,25 +18,30 @@ public sealed class InvoicePreviewViewModel : ViewModelBase
     private readonly Func<CancellationToken, Task<bool>>? ensureInvoicePrinterConfiguredAsync;
     private readonly Func<CancellationToken, Task<bool>> confirmContinueWaitingAsync;
     private readonly TimeSpan extendedIssueWaitPromptDelay;
+    private readonly Func<PendingInvoiceRecovery, CancellationToken, Task<InvoiceRecoveryChoice>>? chooseRecovery;
     private readonly InvoicePreviewResult preview;
     private string priceAdjustmentAmountText = string.Empty;
     private string priceAdjustmentReason = string.Empty;
     private InvoiceTotals totals;
     private string? errorMessage;
     private bool isBusy;
+    private bool isChoosingRecovery;
+    private InvoiceNumber? issuedInvoiceNumber;
 
     public InvoicePreviewViewModel(
         IInvoiceWorkflowService invoiceWorkflowService,
         InvoicePreviewResult preview,
         Func<CancellationToken, Task<bool>>? ensureInvoicePrinterConfiguredAsync = null,
         Func<CancellationToken, Task<bool>>? confirmContinueWaitingAsync = null,
-        TimeSpan? extendedIssueWaitPromptDelay = null)
+        TimeSpan? extendedIssueWaitPromptDelay = null,
+        Func<PendingInvoiceRecovery, CancellationToken, Task<InvoiceRecoveryChoice>>? chooseRecovery = null)
     {
         this.invoiceWorkflowService = invoiceWorkflowService;
         this.ensureInvoicePrinterConfiguredAsync = ensureInvoicePrinterConfiguredAsync;
         this.confirmContinueWaitingAsync = confirmContinueWaitingAsync ?? (_ => Task.FromResult(true));
         this.extendedIssueWaitPromptDelay = extendedIssueWaitPromptDelay ?? DefaultExtendedIssueWaitPromptDelay;
         this.preview = preview;
+        this.chooseRecovery = chooseRecovery;
         totals = preview.Totals;
 
         foreach (var line in preview.Draft.Lines)
@@ -127,12 +133,17 @@ public sealed class InvoicePreviewViewModel : ViewModelBase
         }
     }
 
-    public bool WasIssued { get; private set; }
+    public bool WasIssued => issuedInvoiceNumber is not null;
+
+    public string PrintActionText => WasIssued ? "Reprint invoice" : "Save & Print Invoice";
+
+    public bool CanEditDraft => !WasIssued;
 
     public AsyncRelayCommand PrintInvoiceCommand { get; }
 
     public event EventHandler<bool?>? CloseRequested;
 
+    // Keeps the invoice window open during issuance so the user can see the save and print outcomes.
     public Task<bool> RequestDismissAsync()
     {
         if (CanDismiss)
@@ -144,6 +155,7 @@ public sealed class InvoicePreviewViewModel : ViewModelBase
         return Task.FromResult(false);
     }
 
+    // Updates the displayed amounts from the valid draft as the user edits the invoice.
     public async Task RefreshTotalsAsync()
     {
         var draft = BuildDraft(showErrors: false);
@@ -169,6 +181,12 @@ public sealed class InvoicePreviewViewModel : ViewModelBase
         IsBusy = true;
         try
         {
+            if (issuedInvoiceNumber is { } number)
+            {
+                await ReprintAsync(number);
+                return;
+            }
+
             var draft = BuildDraft(showErrors: true);
             if (draft is null)
             {
@@ -189,8 +207,11 @@ public sealed class InvoicePreviewViewModel : ViewModelBase
                 return;
             }
 
-            WasIssued = true;
-            if (!issue.Value!.PrintSucceeded)
+            issuedInvoiceNumber = issue.Value!.Invoice.InvoiceNumber;
+            OnPropertyChanged(nameof(WasIssued));
+            OnPropertyChanged(nameof(PrintActionText));
+            OnPropertyChanged(nameof(CanEditDraft));
+            if (!issue.Value.PrintSucceeded || issue.Value.PrintErrors.Count > 0)
             {
                 ErrorMessage = issue.Value.PrintErrors.FirstOrDefault()?.Message ??
                     "The invoice PDF was saved, but the print request failed.";
@@ -206,9 +227,30 @@ public sealed class InvoicePreviewViewModel : ViewModelBase
         }
     }
 
+    private async Task ReprintAsync(InvoiceNumber number)
+    {
+        if (ensureInvoicePrinterConfiguredAsync is not null &&
+            !await ensureInvoicePrinterConfiguredAsync(CancellationToken.None))
+        {
+            ErrorMessage = "Choose an invoice printer before printing the invoice.";
+            return;
+        }
+
+        var result = await invoiceWorkflowService.ReprintAsync(number, CancellationToken.None);
+        if (!result.Succeeded || !result.Value!.PrintSucceeded)
+        {
+            ErrorMessage = result.Errors.FirstOrDefault()?.Message ?? result.Value?.PrintErrors.FirstOrDefault()?.Message
+                ?? "The invoice is issued. The reprint request failed.";
+            return;
+        }
+
+        ErrorMessage = null;
+        CloseRequested?.Invoke(this, true);
+    }
+
     private async Task<OperationResult<IssueInvoiceResult>> IssueWithExtendedWaitPromptAsync(InvoiceDraft draft)
     {
-        var issueTask = invoiceWorkflowService.IssueAsync(draft, CancellationToken.None);
+        var issueTask = invoiceWorkflowService.IssueAsync(draft, CancellationToken.None, ChooseRecoveryAsync);
         while (true)
         {
             var completedTask = await Task.WhenAny(
@@ -219,12 +261,36 @@ public sealed class InvoicePreviewViewModel : ViewModelBase
                 return await issueTask;
             }
 
+            if (isChoosingRecovery)
+            {
+                continue;
+            }
+
             var keepWaiting = await confirmContinueWaitingAsync(CancellationToken.None);
             if (!keepWaiting)
             {
                 ErrorMessage =
                     "The invoice is still being written and printed. It cannot be safely cancelled from this window.";
             }
+        }
+    }
+
+    private async Task<InvoiceRecoveryChoice> ChooseRecoveryAsync(
+        PendingInvoiceRecovery recovery, CancellationToken cancellationToken)
+    {
+        if (chooseRecovery is null)
+        {
+            return InvoiceRecoveryChoice.Cancel;
+        }
+
+        isChoosingRecovery = true;
+        try
+        {
+            return await chooseRecovery(recovery, cancellationToken);
+        }
+        finally
+        {
+            isChoosingRecovery = false;
         }
     }
 

@@ -6,6 +6,7 @@ using MoneyAmount = ElenasBusinessLedger.Core.Money.Money;
 
 namespace ElenasBusinessLedger.Tests.Core.UseCases;
 
+// Covers report aggregation, legacy cutover rules, and conflicts between issued and manual amounts.
 public sealed class EconomyOverviewQueryTests
 {
     [Fact]
@@ -300,7 +301,8 @@ public sealed class EconomyOverviewQueryTests
         Assert.Contains("2026-05", result.Errors[0].Message);
     }
 
-    private sealed class FakeInvoiceRepository : IInvoiceRepository
+    // Supplies issued rows for requested years so the report can be checked without a database.
+    private sealed class FakeInvoiceRepository : IEconomyInvoiceReader
     {
         public Dictionary<int, IReadOnlyList<EconomyInvoiceRecord>> OverviewRowsByYear { get; } = [];
 
@@ -313,81 +315,9 @@ public sealed class EconomyOverviewQueryTests
             RequestedYears.Add(periodYear);
             return Task.FromResult(OverviewRowsByYear.TryGetValue(periodYear, out var rows) ? rows : []);
         }
-
-        public Task<IReadOnlyList<InvoiceLessonStatus>> ListLessonStatusesAsync(
-            DateOnly from,
-            DateOnly to,
-            CancellationToken cancellationToken) =>
-            throw new NotImplementedException();
-
-        public Task<IReadOnlyList<IssuedInvoiceSummary>> ListInvoicesForStudentAsync(
-            string studentShortName,
-            CancellationToken cancellationToken) =>
-            throw new NotImplementedException();
-
-        public Task<bool> HasInvoiceForStudentInMonthAsync(
-            string studentShortName,
-            DateOnly month,
-            CancellationToken cancellationToken) =>
-            throw new NotImplementedException();
-
-        public Task<InvoiceNumber> GetNextInvoiceNumberAsync(CancellationToken cancellationToken) =>
-            throw new NotImplementedException();
-
-        public Task<OperationResult<IssuedInvoice>> ReserveInvoiceAsync(
-            InvoiceDraft draft,
-            InvoiceTotals totals,
-            CancellationToken cancellationToken) =>
-            throw new NotImplementedException();
-
-        public Task<OperationResult<IssuedInvoice>> FinalizeIssuedInvoiceWithLessonLocksAsync(
-            InvoiceNumber invoiceNumber,
-            string pdfFilePath,
-            IReadOnlyList<int> lessonIds,
-            CancellationToken cancellationToken) =>
-            throw new NotImplementedException();
-
-        public Task<OperationResult<IssuedInvoice>> MarkInvoicePdfPublishedAsync(
-            InvoiceNumber invoiceNumber,
-            string pdfFilePath,
-            CancellationToken cancellationToken) =>
-            throw new NotImplementedException();
-
-        public Task ReleaseInvoiceReservationAsync(
-            InvoiceNumber invoiceNumber,
-            CancellationToken cancellationToken) =>
-            throw new NotImplementedException();
-
-        public Task<OperationResult<IssuedInvoice>> UpdatePrintStatusAsync(
-            InvoiceNumber invoiceNumber,
-            InvoicePrintStatus printStatus,
-            DateTimeOffset? printedAt,
-            string? lastPrintError,
-            CancellationToken cancellationToken) =>
-            throw new NotImplementedException();
-
-        public Task<IssuedInvoice?> GetIssuedInvoiceAsync(
-            InvoiceNumber invoiceNumber,
-            CancellationToken cancellationToken) =>
-            throw new NotImplementedException();
-
-        public Task<IssuedInvoice?> GetIssuingInvoiceAsync(
-            InvoiceNumber invoiceNumber,
-            CancellationToken cancellationToken) =>
-            throw new NotImplementedException();
-
-        public Task<PaymentStatus> GetPaymentStatusAsync(
-            InvoiceNumber invoiceNumber,
-            CancellationToken cancellationToken) =>
-            throw new NotImplementedException();
-
-        public Task SavePaymentStatusAsync(
-            InvoiceNumber invoiceNumber,
-            PaymentStatus paymentStatus,
-            CancellationToken cancellationToken) =>
-            throw new NotImplementedException();
     }
 
+    // Supplies the reporting cutover and manual amounts and records the range requested by Economy.
     private sealed class FakeEconomyRepository : IEconomyRepository
     {
         public EconomySettings? Settings { get; init; }

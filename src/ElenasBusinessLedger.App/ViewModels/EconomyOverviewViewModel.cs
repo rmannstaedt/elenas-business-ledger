@@ -9,6 +9,7 @@ using ElenasBusinessLedger.Core.UseCases.Economy;
 
 namespace ElenasBusinessLedger.App.ViewModels;
 
+// Manages report navigation, export, invoice opening, and the session controls for legacy month edits.
 public sealed class EconomyOverviewViewModel : ViewModelBase
 {
     private static readonly CultureInfo DanishCulture = CultureInfo.GetCultureInfo("da-DK");
@@ -422,6 +423,7 @@ public sealed class EconomyOverviewViewModel : ViewModelBase
         return true;
     }
 
+    // Formats a saved invoice row while keeping its number and PDF path available to the overview.
     public sealed class EconomyOverviewInvoiceDisplayModel
     {
         public EconomyOverviewInvoiceDisplayModel(EconomyOverviewInvoiceRow row)
@@ -450,6 +452,7 @@ public sealed class EconomyOverviewViewModel : ViewModelBase
         public string TotalText { get; }
     }
 
+    // Formats quarter or year totals for the read-only Economy grids.
     public sealed class EconomyOverviewPeriodTotalDisplayModel
     {
         public EconomyOverviewPeriodTotalDisplayModel(string label, Money? net, Money? vat, Money? total)
@@ -469,6 +472,7 @@ public sealed class EconomyOverviewViewModel : ViewModelBase
         public string TotalText { get; }
     }
 
+    // Tracks a month's displayed amounts and whether the current session can edit its manual values.
     public sealed class EconomyOverviewMonthDisplayModel : ViewModelBase
     {
         private string netText;

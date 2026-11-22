@@ -1,0 +1,62 @@
+<Window x:Class="ElenasBusinessLedger.App.Views.InvoiceRecoveryDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Width="640"
+        Height="510"
+        MinWidth="530"
+        MinHeight="420"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterScreen">
+    <DockPanel Margin="16">
+        <StackPanel DockPanel.Dock="Bottom" Margin="0,14,0,0">
+            <CheckBox x:Name="LegacyConfirmation"
+                      Margin="0,0,0,12"
+                      Checked="OnLegacyConfirmationChanged"
+                      Unchecked="OnLegacyConfirmationChanged">
+                <TextBlock Text="I checked the original invoice folder and confirmed there is no PDF for this invoice."
+                           TextWrapping="Wrap" />
+            </CheckBox>
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button x:Name="ResumeButton" Content="_Resume saved invoice" Click="OnResume"
+                        Padding="12,6" Margin="0,0,8,0" />
+                <Button x:Name="ReviseButton" Content="_Use current preview" Click="OnRevise"
+                        Padding="12,6" Margin="0,0,8,0" />
+                <Button x:Name="DiscardButton" Content="_Discard reservation" Click="OnDiscard"
+                        Visibility="Collapsed" Padding="12,6" Margin="0,0,8,0" />
+                <Button Content="Cancel" IsCancel="True" IsDefault="True" MinWidth="80" Padding="12,6" />
+            </StackPanel>
+        </StackPanel>
+
+        <ScrollViewer VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+                <TextBlock x:Name="Instructions" TextWrapping="Wrap" Margin="0,0,0,16" />
+                <TextBlock Text="Saved invoice" FontSize="18" FontWeight="SemiBold" />
+                <TextBlock Text="{Binding SavedInvoice.Student.FullName}" Margin="0,8,0,0" />
+                <TextBlock Text="{Binding SavedInvoice.Student.Address}" TextWrapping="Wrap" />
+                <TextBlock Text="{Binding SavedInvoice.Company.Name}" TextWrapping="Wrap" Margin="0,6,0,0" />
+                <TextBlock x:Name="SavedDates" Margin="0,6,0,0" />
+                <ItemsControl ItemsSource="{Binding SavedInvoice.Lines}" Margin="0,10,0,0">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Margin="0,2">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="100" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="{Binding LessonDateTime, StringFormat=d}" />
+                                <TextBlock Grid.Column="1" Text="{Binding PlanName}" TextWrapping="Wrap" />
+                                <TextBlock Grid.Column="2" Text="{Binding PriceWithoutVat.Amount, StringFormat=N2}"
+                                           Margin="8,0,5,0" />
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock x:Name="SavedAdjustment" TextWrapping="Wrap" Margin="0,8,0,0" />
+                <TextBlock x:Name="SavedTotal" FontWeight="SemiBold" Margin="0,8,0,0" />
+                <TextBlock x:Name="CurrentTotal" FontWeight="SemiBold" Margin="0,8,0,0" />
+                <TextBlock x:Name="CurrentAdjustment" TextWrapping="Wrap" Margin="0,4,0,0" />
+            </StackPanel>
+        </ScrollViewer>
+    </DockPanel>
+</Window>

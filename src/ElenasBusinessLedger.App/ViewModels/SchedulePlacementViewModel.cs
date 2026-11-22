@@ -1,10 +1,12 @@
 namespace ElenasBusinessLedger.App.ViewModels;
 
+// Maps a schedule dropdown label to its weekday, including an unspecified choice for unused slots.
 public sealed record WeekdayOption(string Label, DayOfWeek? Weekday)
 {
     public static WeekdayOption Unspecified { get; } = new("Unspecified", null);
 }
 
+// Holds one editable weekday and time slot for the student schedule form.
 public sealed class SchedulePlacementViewModel : ViewModelBase
 {
     private static readonly IReadOnlyList<string> DefaultTimeOptions = CreateTimeOptions();

@@ -37,6 +37,7 @@ using AppMainWindow = ElenasBusinessLedger.App.MainWindow;
 
 namespace ElenasBusinessLedger.Tests.App.ViewModels;
 
+// Exercises dashboard commands, selection, activation refresh, and key WPF interactions.
 public sealed class MainWindowViewModelTests
 {
     [Fact]
@@ -1370,6 +1371,37 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task SwitchingBetweenStudentsWithConflictingLabelsPreservesEachDraftById()
+    {
+        var first = new StudentChoice(1, "Mira");
+        var second = new StudentChoice(2, "mira");
+        var dashboard = new FakeDashboardService { NextResult = ForStudent(first) };
+        var viewModel = CreateViewModel(dashboard: dashboard);
+        await viewModel.LoadAsync();
+        await viewModel.AddLessonCommand.ExecuteAsync();
+        var firstDraft = Assert.Single(viewModel.Lessons);
+
+        dashboard.NextResult = ForStudent(second);
+        await viewModel.SelectStudentCommand.ExecuteAsync(second);
+        Assert.Empty(viewModel.Lessons);
+        await viewModel.AddLessonCommand.ExecuteAsync();
+        var secondDraft = Assert.Single(viewModel.Lessons);
+
+        dashboard.NextResult = ForStudent(first);
+        await viewModel.SelectStudentCommand.ExecuteAsync(first);
+        Assert.Same(firstDraft, Assert.Single(viewModel.Lessons));
+        dashboard.NextResult = ForStudent(second);
+        await viewModel.SelectStudentCommand.ExecuteAsync(second);
+        Assert.Same(secondDraft, Assert.Single(viewModel.Lessons));
+
+        OperationResult<StartupDashboardResult> ForStudent(StudentChoice student) =>
+            OperationResult<StartupDashboardResult>.Success(new StartupDashboardResult(
+                student.ShortName, [first.ShortName, second.ShortName], [], [], false, [],
+                [new DashboardPlanOption(42, "Standard")], CurrentStudentId: student.StudentId,
+                StudentChoices: [first, second]));
+    }
+
+    [Fact]
     public async Task StudentDropdownSelectionRefreshesDashboardWithoutSelectingLesson()
     {
         var dashboard = new FakeDashboardService { StudentShortNames = ["Bo", "Anna"] };
@@ -1402,6 +1434,53 @@ public sealed class MainWindowViewModelTests
         await viewModel.RefreshAfterActivationAsync();
 
         Assert.Equal(2, dashboard.LoadCount);
+    }
+
+    [Fact]
+    public async Task DisconnectedDashboardAppliesLocalStudentChoicesAndKeepsCalendarSchedulingUnavailable()
+    {
+        var mira = new StudentChoice(1, "Mira");
+        var noah = new StudentChoice(2, "Noah");
+        var invoice = new IssuedInvoiceSummary(
+            new InvoiceNumber(1), "Mira", new DateOnly(2026, 6, 16),
+            PaymentStatus.Outstanding, string.Empty);
+        var warning = new ValidationError("Calendar.RefreshFailed", "Google Calendar is not configured.");
+        var miraDashboard = ForStudent(mira) with { Invoices = [invoice] };
+        var service = new FakeDashboardService
+        {
+            NextResult = OperationResult<StartupDashboardResult>.Failure(miraDashboard, warning)
+        };
+        var viewModel = CreateViewModel(dashboard: service);
+
+        await viewModel.LoadAsync();
+
+        Assert.Equal("Mira", viewModel.CurrentStudentShortName);
+        Assert.Equal(noah, Assert.Single(viewModel.SelectableStudents));
+        Assert.Single(viewModel.Invoices);
+        Assert.Equal(warning.Message, viewModel.ErrorMessage);
+        Assert.True(viewModel.OpenStudentDetailsCommand.CanExecute(null));
+        Assert.False(viewModel.AddLessonCommand.CanExecute(null));
+        Assert.False(viewModel.PopulateCalendarCommand.CanExecute(null));
+
+        var noahDashboard = ForStudent(noah);
+        service.NextResult = OperationResult<StartupDashboardResult>.Failure(noahDashboard, warning);
+        await viewModel.SelectStudentCommand.ExecuteAsync(noah);
+
+        Assert.Equal("Noah", viewModel.CurrentStudentShortName);
+        Assert.Equal(mira, Assert.Single(viewModel.SelectableStudents));
+        Assert.Empty(viewModel.Invoices);
+        Assert.Equal(warning.Message, viewModel.ErrorMessage);
+
+        service.NextResult = OperationResult<StartupDashboardResult>.Success(noahDashboard);
+        await viewModel.RefreshCommand.ExecuteAsync();
+
+        Assert.Null(viewModel.ErrorMessage);
+        Assert.True(viewModel.AddLessonCommand.CanExecute(null));
+        Assert.True(viewModel.PopulateCalendarCommand.CanExecute(null));
+
+        StartupDashboardResult ForStudent(StudentChoice student) =>
+            new(student.ShortName, ["Mira", "Noah"], [], [], true, [],
+                CurrentStudentId: student.StudentId, StudentChoices: [mira, noah]);
     }
 
     [Fact]
@@ -1521,23 +1600,42 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
-    public async Task WriteInvoicePassesCurrentStudentToWorkflow()
+    public async Task WriteInvoiceUsesSelectedStudentIdAndDisplayedMonth()
+    {
+        var mira = new StudentChoice(21, "Mira");
+        var other = new StudentChoice(22, "mira");
+        var dashboard = new FakeDashboardService { LessonIsInvoiced = false, InvoiceSummaries = [] };
+        var invoices = new FakeInvoiceWorkflowLauncher();
+        var viewModel = CreateViewModel(dashboard: dashboard, invoiceWorkflowLauncher: invoices);
+        await viewModel.LoadAsync();
+        var previousMonth = viewModel.DisplayMonth.AddMonths(-1);
+        await viewModel.PreviousMonthCommand.ExecuteAsync();
+        dashboard.NextResult = OperationResult<StartupDashboardResult>.Success(
+            new StartupDashboardResult(other.ShortName, [mira.ShortName, other.ShortName], [], [], false, [],
+                CurrentStudentId: other.StudentId, StudentChoices: [mira, other]));
+
+        await viewModel.SelectStudentCommand.ExecuteAsync(other);
+        await viewModel.WriteInvoiceCommand.ExecuteAsync();
+
+        Assert.Equal(other, invoices.LastWriteStudent);
+        Assert.Equal(previousMonth, invoices.LastWriteMonth);
+    }
+
+    [Fact]
+    public async Task WriteInvoiceIsUnavailableWhenNoStudentIsSelected()
     {
         var dashboard = new FakeDashboardService
         {
-            StudentShortNames = ["Anna", "Mira"],
-            LessonIsInvoiced = false,
-            LessonPaymentStatus = null,
-            InvoiceSummaries = []
+            NextResult = OperationResult<StartupDashboardResult>.Success(
+                new StartupDashboardResult(null, [], [], [], false, []))
         };
         var invoices = new FakeInvoiceWorkflowLauncher();
         var viewModel = CreateViewModel(dashboard: dashboard, invoiceWorkflowLauncher: invoices);
         await viewModel.LoadAsync();
 
-        await viewModel.SelectStudentCommand.ExecuteAsync("Mira");
+        Assert.False(viewModel.WriteInvoiceCommand.CanExecute(null));
         await viewModel.WriteInvoiceCommand.ExecuteAsync();
-
-        Assert.Equal("Mira", invoices.LastWriteInitialStudentShortName);
+        Assert.False(invoices.WriteWasShown);
     }
 
     [Fact]
@@ -1690,9 +1788,9 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public void ApplicationInfoUsesAppAssemblyVersion()
     {
-        Assert.Equal("1.3.2", ApplicationInfo.Version);
+        Assert.Equal("1.4.2", ApplicationInfo.Version);
         Assert.Contains("Elena's Business Ledger", ApplicationInfo.AboutText);
-        Assert.Contains("Version 1.3.2", ApplicationInfo.AboutText);
+        Assert.Contains("Version 1.4.2", ApplicationInfo.AboutText);
     }
 
     [Fact]
@@ -2127,7 +2225,7 @@ public sealed class MainWindowViewModelTests
         draft.StartsOnDate = startsAt.Date;
         draft.PlanCatalogId = 77;
 
-        await EventuallyAsync(() => lessonEditor.AddWasCalled);
+        await EventuallyAsync(() => viewModel.SelectedLesson is { Id: "new-lesson", LocalLessonId: 19 } && !viewModel.IsBusy);
         var lesson = Assert.Single(viewModel.Lessons, lesson => lesson.Id == "new-lesson");
         Assert.False(lesson.IsDraft);
         Assert.Equal(77, lessonEditor.LastAddRequest?.PlanCatalogId);
@@ -2885,6 +2983,7 @@ public sealed class MainWindowViewModelTests
         Assert.True(condition());
     }
 
+    // Supplies scripted dashboard rows and tracks loads so tests can inspect refresh and selection behavior.
     private sealed class FakeDashboardService : IStartupDashboardService
     {
         public int LoadCount { get; private set; }
@@ -2926,7 +3025,7 @@ public sealed class MainWindowViewModelTests
         public Task<OperationResult<StartupDashboardResult>> LoadAsync(
             DateOnly month,
             string? selectedStudentShortName,
-            CancellationToken cancellationToken) =>
+            CancellationToken cancellationToken, int? studentId = null) =>
             LoadCoreAsync(month, selectedStudentShortName);
 
         private async Task<OperationResult<StartupDashboardResult>> LoadCoreAsync(
@@ -3001,6 +3100,7 @@ public sealed class MainWindowViewModelTests
         Assert.True(condition());
     }
 
+    // Captures which invoice and confirmation flag the dashboard sends when toggling payment.
     private sealed class FakePaymentService : IInvoicePaymentStatusService
     {
         public InvoiceNumber LastInvoiceNumber { get; private set; }
@@ -3026,6 +3126,7 @@ public sealed class MainWindowViewModelTests
         }
     }
 
+    // Scripts confirmation choices and records prompts so dashboard command branches can be asserted.
     private sealed class FakeConfirmationService : IConfirmationService
     {
         public bool NextAnswer { get; init; } = true;
@@ -3062,6 +3163,7 @@ public sealed class MainWindowViewModelTests
         }
     }
 
+    // Records whether the dashboard opens the external calendar without launching a browser.
     private sealed class FakeCalendarLauncher : ICalendarLauncher
     {
         public bool WasOpened { get; private set; }
@@ -3073,6 +3175,7 @@ public sealed class MainWindowViewModelTests
         }
     }
 
+    // Scripts list and Details selections so the dashboard's selection synchronization can be tested.
     private sealed class FakeStudentOverviewLauncher : IStudentOverviewLauncher
     {
         public bool WasShown { get; private set; }
@@ -3140,6 +3243,7 @@ public sealed class MainWindowViewModelTests
         }
     }
 
+    // Records whether the dashboard opens a standalone add or edit lesson window.
     private sealed class FakeLessonEditorLauncher : ILessonEditorLauncher
     {
         public bool AddWasShown { get; private set; }
@@ -3166,6 +3270,7 @@ public sealed class MainWindowViewModelTests
         }
     }
 
+    // Captures dashboard lesson writes and allows tests to control operation order and outcomes.
     private sealed class FakeLessonEditorService : ILessonEditorService
     {
         public bool AddWasCalled => AddCount > 0;
@@ -3219,7 +3324,8 @@ public sealed class MainWindowViewModelTests
         public Task<OperationResult<PopulateCalendarResult>> PopulateCalendarAsync(
             string studentShortName,
             DateOnly displayMonth,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            int? studentId = null)
         {
             LastPopulateStudentShortName = studentShortName;
             LastPopulateDisplayMonth = displayMonth;
@@ -3285,6 +3391,7 @@ public sealed class MainWindowViewModelTests
             GoogleCalendarEventId: "lesson-1",
             InvoiceNumber: null);
 
+    // Records lesson state transitions without updating the calendar or the local ledger.
     private sealed class FakeLessonStateService : ILessonStateService
     {
         public string? LastLessonId { get; private set; }
@@ -3311,25 +3418,31 @@ public sealed class MainWindowViewModelTests
         }
     }
 
+    // Captures issue and viewer requests and controls whether the dashboard sees a completed issuance.
     private sealed class FakeInvoiceWorkflowLauncher : IInvoiceWorkflowLauncher
     {
         public bool NextWriteResult { get; init; }
 
         public bool WriteWasShown { get; private set; }
 
-        public string? LastWriteInitialStudentShortName { get; private set; }
+        public StudentChoice? LastWriteStudent { get; private set; }
+
+        public DateOnly? LastWriteMonth { get; private set; }
 
         public InvoiceNumber? LastViewedInvoiceNumber { get; private set; }
 
         public Task<bool> ShowWriteInvoiceAsync(
             DateOnly displayMonth,
-            string? initialStudentShortName,
+            StudentChoice student,
             CancellationToken cancellationToken)
         {
             WriteWasShown = true;
-            LastWriteInitialStudentShortName = initialStudentShortName;
+            LastWriteStudent = student;
+            LastWriteMonth = displayMonth;
             return Task.FromResult(NextWriteResult);
         }
+
+        public Task<bool> ShowResumeInvoiceAsync(CancellationToken cancellationToken) => Task.FromResult(false);
 
         public Task ShowInvoiceViewerAsync(InvoiceNumber invoiceNumber, CancellationToken cancellationToken)
         {
@@ -3338,6 +3451,7 @@ public sealed class MainWindowViewModelTests
         }
     }
 
+    // Records which stored PDF the dashboard asked Windows to open.
     private sealed class FakeInvoicePdfLauncher : IInvoicePdfLauncher
     {
         public string? LastOpenedPdfFilePath { get; private set; }
@@ -3349,6 +3463,7 @@ public sealed class MainWindowViewModelTests
         }
     }
 
+    // Controls the settings dialog result so tests can verify how the dashboard updates Admin Mode.
     private sealed class FakeSettingsLauncher : ISettingsLauncher
     {
         public SettingsDialogResult NextResult { get; init; } = new(false, false);
@@ -3365,6 +3480,7 @@ public sealed class MainWindowViewModelTests
         }
     }
 
+    // Records whether the dashboard dispatched the plan catalog command.
     private sealed class FakePlanCatalogLauncher : IPlanCatalogLauncher
     {
         public bool WasShown { get; private set; }
@@ -3376,6 +3492,7 @@ public sealed class MainWindowViewModelTests
         }
     }
 
+    // Records the dashboard's request to open Economy and the Admin Mode passed to it.
     private sealed class FakeEconomyOverviewLauncher : IEconomyOverviewLauncher
     {
         public bool WasShown { get; private set; }
@@ -3390,6 +3507,7 @@ public sealed class MainWindowViewModelTests
         }
     }
 
+    // Records whether the dashboard requests About without opening a modal dialog.
     private sealed class FakeAboutDialogLauncher : IAboutDialogLauncher
     {
         public bool WasShown { get; private set; }
@@ -3401,6 +3519,7 @@ public sealed class MainWindowViewModelTests
         }
     }
 
+    // Supplies controlled time for the dashboard's month, selection, and activation logic.
     private sealed class FakeUiClock : IUiClock
     {
         public FakeUiClock(DateTimeOffset now)

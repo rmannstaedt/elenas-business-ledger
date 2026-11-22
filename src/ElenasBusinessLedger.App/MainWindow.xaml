@@ -265,6 +265,9 @@
                 <MenuItem Header="_Manage Plans"
                           Command="{Binding OpenManagePlansCommand}" />
             </MenuItem>
+            <MenuItem Header="_Invoice">
+                <MenuItem Header="_Resume Invoice" Command="{Binding ResumeInvoiceCommand}" />
+            </MenuItem>
             <MenuItem Header="_Economy">
                 <MenuItem Header="_Overview"
                           Command="{Binding OpenEconomyOverviewCommand}" />
@@ -312,7 +315,7 @@
                                 AutomationProperties.Name="Choose student">
                             <Button.ContextMenu>
                                 <ContextMenu DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}"
-                                             ItemsSource="{Binding SelectableStudentShortNames}">
+                                             ItemsSource="{Binding SelectableStudents}">
                                     <ContextMenu.ItemContainerStyle>
                                         <Style TargetType="{x:Type MenuItem}">
                                             <Setter Property="Header" Value="{Binding}" />

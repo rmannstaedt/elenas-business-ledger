@@ -9,6 +9,7 @@ using ElenasBusinessLedger.App.ViewModels;
 
 namespace ElenasBusinessLedger.App;
 
+// Connects the dashboard's WPF events, focus, and grid interactions to the main view model.
 public partial class MainWindow : Window
 {
     private static readonly Color PickerBorderColor = Color.FromRgb(0xC7, 0xD3, 0xE1);

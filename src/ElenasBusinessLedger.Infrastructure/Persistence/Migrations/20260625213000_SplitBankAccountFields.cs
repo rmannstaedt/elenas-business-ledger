@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace ElenasBusinessLedger.Infrastructure.Persistence.Migrations
 {
+    // Splits the bank registration and account fields so settings and invoices can store them separately.
     /// <inheritdoc />
     [DbContext(typeof(LedgerDbContext))]
     [Migration("20260625213000_SplitBankAccountFields")]

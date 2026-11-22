@@ -3,17 +3,15 @@ using ElenasBusinessLedger.Core.Invoices;
 
 namespace ElenasBusinessLedger.Core.Ports;
 
+// Provides invoice persistence, recovery, payment tracking, and lesson status to the ledger workflows.
 public interface IInvoiceRepository
 {
-    Task<IReadOnlyList<InvoiceLessonStatus>> ListLessonStatusesAsync(DateOnly from, DateOnly to, CancellationToken cancellationToken);
+    Task<IReadOnlyList<InvoiceLessonStatus>> ListLessonStatusesAsync(
+        DateOnly from, DateOnly to, CancellationToken cancellationToken, IReadOnlyList<int>? includeLessonIds = null);
 
-    Task<IReadOnlyList<IssuedInvoiceSummary>> ListInvoicesForStudentAsync(string studentShortName, CancellationToken cancellationToken);
+    Task<IReadOnlyList<IssuedInvoiceSummary>> ListInvoicesForStudentAsync(int studentId, CancellationToken cancellationToken);
 
-    Task<IReadOnlyList<EconomyInvoiceRecord>> ListIssuedInvoiceOverviewRowsAsync(
-        int periodYear,
-        CancellationToken cancellationToken);
-
-    Task<bool> HasInvoiceForStudentInMonthAsync(string studentShortName, DateOnly month, CancellationToken cancellationToken);
+    Task<bool> HasInvoiceForStudentInMonthAsync(int studentId, DateOnly month, CancellationToken cancellationToken);
 
     Task<InvoiceNumber> GetNextInvoiceNumberAsync(CancellationToken cancellationToken);
 
@@ -33,7 +31,14 @@ public interface IInvoiceRepository
         string pdfFilePath,
         CancellationToken cancellationToken);
 
-    Task ReleaseInvoiceReservationAsync(InvoiceNumber invoiceNumber, CancellationToken cancellationToken);
+    Task<OperationResult<IssuedInvoice>> ReviseInvoiceReservationAsync(
+        IssuedInvoice savedInvoice, InvoiceDraft draft, InvoiceTotals totals, CancellationToken cancellationToken);
+
+    Task<OperationResult<IssuedInvoice>> PrepareInvoicePublicationAsync(
+        IssuedInvoice savedInvoice, InvoicePdfPublication publication, CancellationToken cancellationToken);
+
+    Task ReleaseInvoiceReservationAsync(
+        InvoiceNumber invoiceNumber, CancellationToken cancellationToken, string? expectedRevision = null);
 
     Task<OperationResult<IssuedInvoice>> UpdatePrintStatusAsync(
         InvoiceNumber invoiceNumber,
@@ -45,6 +50,11 @@ public interface IInvoiceRepository
     Task<IssuedInvoice?> GetIssuedInvoiceAsync(InvoiceNumber invoiceNumber, CancellationToken cancellationToken);
 
     Task<IssuedInvoice?> GetIssuingInvoiceAsync(InvoiceNumber invoiceNumber, CancellationToken cancellationToken);
+
+    Task<IssuedInvoice?> GetOldestPendingAsync(CancellationToken cancellationToken);
+
+    Task<OperationResult<InvoiceNumber>> DiscardPendingAsync(
+        IssuedInvoice savedInvoice, CancellationToken cancellationToken);
 
     Task<PaymentStatus> GetPaymentStatusAsync(InvoiceNumber invoiceNumber, CancellationToken cancellationToken);
 

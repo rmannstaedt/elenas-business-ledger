@@ -8,6 +8,7 @@ using ElenasBusinessLedger.Core.UseCases.Students;
 
 namespace ElenasBusinessLedger.App.ViewModels;
 
+// Manages profile, plan period, and schedule inputs and reports whether saving succeeded.
 public sealed class StudentEditorViewModel : ViewModelBase
 {
     private readonly IStudentEditorService studentEditorService;
@@ -54,6 +55,7 @@ public sealed class StudentEditorViewModel : ViewModelBase
 
     public event EventHandler<bool?>? CloseRequested;
 
+    // Starts a student draft and requires a catalog plan so the new student can be scheduled and billed.
     public static StudentEditorViewModel CreateNew(
         IStudentEditorService studentEditorService,
         IReadOnlyList<PlanCatalogItem>? assignablePlans = null,
@@ -66,6 +68,7 @@ public sealed class StudentEditorViewModel : ViewModelBase
         return viewModel;
     }
 
+    // Restores a saved student and their plan details into the editor while keeping the original student ID.
     public static StudentEditorViewModel FromSnapshot(
         IStudentEditorService studentEditorService,
         StudentEditorSnapshot snapshot,
@@ -346,6 +349,7 @@ public sealed class StudentEditorViewModel : ViewModelBase
 
     private async Task SaveAsync()
     {
+        WasSaved = false;
         var request = CreateRequest();
         if (request is null)
         {

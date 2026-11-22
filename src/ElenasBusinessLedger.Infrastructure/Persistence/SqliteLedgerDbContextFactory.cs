@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ElenasBusinessLedger.Infrastructure.Persistence;
 
+// Creates contexts with the ledger's database path and connection settings for use by repositories.
 public static class SqliteLedgerDbContextFactory
 {
     public static Func<LedgerDbContext> Create(string databasePath, bool pooling = true)

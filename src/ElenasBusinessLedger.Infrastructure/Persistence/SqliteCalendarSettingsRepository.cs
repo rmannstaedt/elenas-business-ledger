@@ -1,7 +1,9 @@
+using ElenasBusinessLedger.Core.Calendar;
 using Microsoft.EntityFrameworkCore;
 
 namespace ElenasBusinessLedger.Infrastructure.Persistence;
 
+// Stores the selected calendar and Google account so the app can reconnect on a later launch.
 public sealed class SqliteCalendarSettingsRepository
 {
     private const int SingletonId = 1;
@@ -27,6 +29,12 @@ public sealed class SqliteCalendarSettingsRepository
     public async Task SaveAsync(CalendarSettings settings, CancellationToken cancellationToken)
     {
         await using var context = createContext();
+        await SetAsync(context, settings, cancellationToken);
+        await context.SaveChangesAsync(cancellationToken);
+    }
+
+    internal static async Task SetAsync(LedgerDbContext context, CalendarSettings settings, CancellationToken cancellationToken)
+    {
         var entity = await context.CalendarSettings
             .SingleOrDefaultAsync(storedSettings => storedSettings.Id == SingletonId, cancellationToken);
 
@@ -38,7 +46,5 @@ public sealed class SqliteCalendarSettingsRepository
 
         entity.SelectedCalendarId = settings.SelectedCalendarId;
         entity.GoogleAccountEmail = settings.GoogleAccountEmail;
-
-        await context.SaveChangesAsync(cancellationToken);
     }
 }

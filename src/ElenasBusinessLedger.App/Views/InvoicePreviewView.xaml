@@ -16,7 +16,7 @@
                     Orientation="Horizontal"
                     HorizontalAlignment="Right"
                     Margin="0,14,0,0">
-            <Button Content="Save &amp; Print Invoice"
+            <Button Content="{Binding PrintActionText}"
                     Command="{Binding PrintInvoiceCommand}"
                     MinWidth="110"
                     Height="32"
@@ -101,7 +101,7 @@
                                             Width="70">
                         <DataGridTemplateColumn.CellTemplate>
                             <DataTemplate>
-                                <CheckBox IsChecked="{Binding IsIncluded, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                <CheckBox IsEnabled="{Binding DataContext.CanEditDraft, RelativeSource={RelativeSource AncestorType=DataGrid}}" IsChecked="{Binding IsIncluded, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
                                           AutomationProperties.Name="{Binding IncludeAutomationName}"
                                           HorizontalAlignment="Center"
                                           VerticalAlignment="Center"
@@ -139,8 +139,8 @@
                             <ColumnDefinition Width="8" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
-                        <TextBox Text="{Binding PriceAdjustmentAmountText, UpdateSourceTrigger=PropertyChanged}" />
-                        <TextBox Grid.Column="2"
+                        <TextBox IsEnabled="{Binding CanEditDraft}" Text="{Binding PriceAdjustmentAmountText, UpdateSourceTrigger=PropertyChanged}" />
+                        <TextBox Grid.Column="2" IsEnabled="{Binding CanEditDraft}"
                                  Text="{Binding PriceAdjustmentReason, UpdateSourceTrigger=PropertyChanged}" />
                     </Grid>
                 </StackPanel>

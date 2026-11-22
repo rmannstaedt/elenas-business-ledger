@@ -4,6 +4,7 @@ using ElenasBusinessLedger.Core.Ports;
 
 namespace ElenasBusinessLedger.Core.UseCases.Plans;
 
+// Sets or clears the date used by scheduled plan retirement.
 public sealed class UpdatePlanRetireOnUseCase
 {
     private readonly IPlanCatalogRepository planCatalogRepository;
@@ -13,6 +14,7 @@ public sealed class UpdatePlanRetireOnUseCase
         this.planCatalogRepository = planCatalogRepository;
     }
 
+    // Changes when a catalog plan should stop being offered for new assignments.
     public async Task<OperationResult<PlanCatalogItem>> ExecuteAsync(
         int planId,
         DateTimeOffset? retireOn,

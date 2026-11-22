@@ -1,8 +1,9 @@
 using ElenasBusinessLedger.App.Services;
-using ElenasBusinessLedger.Infrastructure.Persistence;
+using ElenasBusinessLedger.Core.Calendar;
 
 namespace ElenasBusinessLedger.Tests.App.Services;
 
+// Verifies calendar browser URLs with and without a configured account hint.
 public sealed class ExternalBrowserCalendarLauncherTests
 {
     [Fact]

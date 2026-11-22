@@ -5,6 +5,7 @@ using ElenasBusinessLedger.Core.Students;
 
 namespace ElenasBusinessLedger.Core.UseCases.Students;
 
+// Validates and normalizes student edits before saving the profile, plan periods, and recurring schedule together.
 public sealed class SaveStudentUseCase
 {
     private readonly IStudentRepository studentRepository;
@@ -14,6 +15,7 @@ public sealed class SaveStudentUseCase
         this.studentRepository = studentRepository;
     }
 
+    // Normalizes the student, schedule, and plan periods before saving them as one student record.
     public Task<OperationResult<StudentRecord>> ExecuteAsync(
         SaveStudentRequest request,
         CancellationToken cancellationToken)

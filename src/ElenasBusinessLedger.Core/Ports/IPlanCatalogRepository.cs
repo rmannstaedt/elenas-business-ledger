@@ -3,6 +3,7 @@ using ElenasBusinessLedger.Core.Plans;
 
 namespace ElenasBusinessLedger.Core.Ports;
 
+// Supplies and updates reusable plan terms so assignment and catalog management share the same records.
 public interface IPlanCatalogRepository
 {
     Task<IReadOnlyList<PlanCatalogItem>> ListAllAsync(CancellationToken cancellationToken);

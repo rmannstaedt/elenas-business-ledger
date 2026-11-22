@@ -4,6 +4,7 @@ using ElenasBusinessLedger.Core.UseCases.Plans;
 
 namespace ElenasBusinessLedger.App.Services;
 
+// Supplies plan choices and lifecycle commands to catalog and student editors.
 public interface IPlanCatalogService
 {
     Task<IReadOnlyList<PlanCatalogItem>> ListAsync(CancellationToken cancellationToken);

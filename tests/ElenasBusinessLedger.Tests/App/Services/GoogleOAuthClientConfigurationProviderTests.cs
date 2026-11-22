@@ -2,6 +2,7 @@ using ElenasBusinessLedger.App.Services;
 
 namespace ElenasBusinessLedger.Tests.App.Services;
 
+// Checks accepted desktop configuration and safe failure for missing, malformed, or unsupported OAuth files.
 public sealed class GoogleOAuthClientConfigurationProviderTests
 {
     [Fact]

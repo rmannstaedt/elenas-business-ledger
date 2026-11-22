@@ -4,6 +4,7 @@ using ElenasBusinessLedger.App.ViewModels;
 
 namespace ElenasBusinessLedger.App.Views;
 
+// Displays an issued invoice and its print information from the read-only viewer model.
 public partial class InvoiceViewerView : Window
 {
     public InvoiceViewerView(InvoiceViewerViewModel viewModel)

@@ -2,6 +2,7 @@ using System.Windows.Input;
 
 namespace ElenasBusinessLedger.App.Commands;
 
+// Adapts asynchronous operations to WPF commands while preventing concurrent executions of the same command.
 public sealed class AsyncRelayCommand : ICommand
 {
     private readonly Func<object?, Task> execute;
@@ -31,6 +32,7 @@ public sealed class AsyncRelayCommand : ICommand
 
     public Task ExecuteAsync() => ExecuteAsync(null);
 
+    // Runs a command once at a time and updates WPF command availability around the asynchronous work.
     public async Task ExecuteAsync(object? parameter)
     {
         if (!CanExecute(parameter))

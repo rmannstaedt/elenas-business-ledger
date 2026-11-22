@@ -11,6 +11,7 @@ using ElenasBusinessLedger.Infrastructure.Persistence;
 
 namespace ElenasBusinessLedger.App.Startup;
 
+// Assembles production repositories, adapters, and use cases in one place for the WPF host.
 internal sealed class ApplicationServiceGraph
 {
     private static readonly TimeSpan DefaultLessonDuration = TimeSpan.FromMinutes(60);
@@ -32,6 +33,7 @@ internal sealed class ApplicationServiceGraph
         IInvoiceWorkflowService invoiceWorkflowService,
         IInvoiceWorkflowLauncher invoiceWorkflowLauncher,
         IAppSettingsService settingsService,
+        IGoogleCalendarAuthorizationService calendarAuthorization,
         IGoogleCalendarGateway calendarGateway,
         SystemUiClock systemClock)
     {
@@ -51,6 +53,7 @@ internal sealed class ApplicationServiceGraph
         InvoiceWorkflowService = invoiceWorkflowService;
         InvoiceWorkflowLauncher = invoiceWorkflowLauncher;
         SettingsService = settingsService;
+        CalendarAuthorization = calendarAuthorization;
         CalendarGateway = calendarGateway;
         SystemClock = systemClock;
     }
@@ -87,10 +90,13 @@ internal sealed class ApplicationServiceGraph
 
     public IAppSettingsService SettingsService { get; }
 
+    public IGoogleCalendarAuthorizationService CalendarAuthorization { get; }
+
     public IGoogleCalendarGateway CalendarGateway { get; }
 
     public SystemUiClock SystemClock { get; }
 
+    // Wires the production repositories and adapters that the WPF startup code uses to build the main window.
     public static ApplicationServiceGraph Create(AppPaths appPaths, Func<LedgerDbContext> createContext)
     {
         var studentRepository = new SqliteStudentRepository(createContext);
@@ -126,11 +132,9 @@ internal sealed class ApplicationServiceGraph
             new EditLessonUseCase(calendarGateway, lessonRepository),
             new DeleteLessonUseCase(calendarGateway, lessonRepository),
             new PopulateCalendarUseCase(studentRepository, calendarGateway, TimeZoneInfo.Local, lessonRepository),
-            new UpdateLessonPlanUseCase(lessonRepository, planCatalogRepository));
+            new UpdateLessonPlanUseCase(lessonRepository, planCatalogRepository),
+            new ReviewCalendarMutationUseCase(calendarGateway, lessonRepository));
         var invoiceWorkflowService = new CoreInvoiceWorkflowService(
-            new InvoiceCandidateSelectionUseCase(
-                studentRepository,
-                lessonRepository),
             new InvoicePreviewUseCase(
                 studentRepository,
                 companyProfileRepository,
@@ -138,15 +142,22 @@ internal sealed class ApplicationServiceGraph
                 planCatalogRepository),
             companyProfileRepository,
             invoiceRepository,
+            folder => new LocalInvoiceFileStore(new InvoiceFileStoreOptions(folder)),
             new QuestPdfInvoicePdfWriter(),
             new SavedPdfPrinter(new ShellPrintProcessLauncher(), new WindowsPrinterCatalog()),
             systemClock);
+        var calendarAuthorization = new GoogleCalendarAuthorizationService(
+            googleOAuthClientConfigurationProvider,
+            googleCalendarClientFactory.CreateForConnectionAsync,
+            account => WindowsProtectedFileDataStore.ContainsStoredKey(appPaths.GoogleTokenFolderPath, account),
+            () => new WindowsProtectedFileDataStore(appPaths.GoogleTokenFolderPath).ClearAsync());
         var settingsService = new CoreAppSettingsService(
             companyProfileRepository,
-            calendarSettingsRepository,
+            calendarSettingsRepository.GetAsync,
+            new SqliteAppSettingsWriter(createContext),
             appPaths,
-            googleOAuthClientConfigurationProvider,
-            googleCalendarClientFactory,
+            calendarAuthorization.GetStatus,
+            new WindowsPrinterCatalog(),
             economyRepository);
         var printerConfigurationService = new InvoicePrinterConfigurationService(
             settingsService,
@@ -173,6 +184,7 @@ internal sealed class ApplicationServiceGraph
             invoiceWorkflowService,
             invoiceWorkflowLauncher,
             settingsService,
+            calendarAuthorization,
             calendarGateway,
             systemClock);
     }

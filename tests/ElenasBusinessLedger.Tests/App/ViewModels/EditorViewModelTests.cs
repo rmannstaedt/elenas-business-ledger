@@ -10,6 +10,7 @@ using ElenasBusinessLedger.Core.UseCases.Students;
 
 namespace ElenasBusinessLedger.Tests.App.ViewModels;
 
+// Verifies how student and lesson editors load, validate, and submit their state.
 public sealed class EditorViewModelTests
 {
     [Fact]
@@ -372,6 +373,7 @@ public sealed class EditorViewModelTests
     private static StudentEditorViewModel CreateNewStudentEditorWithActivePlan(FakeStudentEditorService service) =>
         StudentEditorViewModel.CreateNew(service, [CreateCatalogPlan("Standard", PlanCatalogState.Active)]);
 
+    // Captures the student save request and returns a scripted result so editor states can be tested.
     private sealed class FakeStudentEditorService : IStudentEditorService
     {
         public OperationResult<string> SaveResult { get; init; } =
@@ -389,6 +391,7 @@ public sealed class EditorViewModelTests
         }
     }
 
+    // Records lesson edits and reports a controlled result so tests can inspect the editor's request.
     private sealed class FakeLessonEditorService : ILessonEditorService
     {
         public bool EditCalled { get; private set; }
@@ -409,7 +412,8 @@ public sealed class EditorViewModelTests
         public Task<OperationResult<PopulateCalendarResult>> PopulateCalendarAsync(
             string studentShortName,
             DateOnly displayMonth,
-            CancellationToken cancellationToken) =>
+            CancellationToken cancellationToken,
+            int? studentId = null) =>
             Task.FromResult(OperationResult<PopulateCalendarResult>.Success(new PopulateCalendarResult(0, 0, [])));
 
         public Task<OperationResult<IReadOnlyList<CalendarLesson>>> EditAsync(

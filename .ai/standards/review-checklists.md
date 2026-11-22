@@ -28,6 +28,9 @@ Treat as advisory: cosmetic preferences, style nits covered by formatting, low-v
 
 - Is the change scoped to the task?
 - Are names accurate about behavior and guarantees?
+- Do added or changed types and public methods follow the [commenting guidance](coding-standards.md#comments-and-xml-documentation)?
+- Do affected comments and data-flow descriptions still match the implementation?
+- Were concrete SOLID issues found during the work reported to the maintainer with the type, principle, and practical impact?
 - Are contracts explicit about success, failure, partial success, cancellation, and unsupported input?
 - Are bounded states typed rather than internal strings?
 - Are nullability annotations honest?

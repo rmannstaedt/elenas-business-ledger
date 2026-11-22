@@ -4,6 +4,7 @@ using ElenasBusinessLedger.App.ViewModels;
 
 namespace ElenasBusinessLedger.App.Views;
 
+// Presents the separate lesson editor and connects its completion result to WPF dialog closing.
 public partial class LessonEditorView : Window
 {
     public LessonEditorView(LessonEditorViewModel viewModel)

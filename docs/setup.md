@@ -4,9 +4,9 @@ You can use the Windows x64 installer or run the application from source. For a 
 
 ## Install or run the application
 
-**Windows installer.** Close any running copy of the Ledger and run `ElenasBusinessLedger-1.3.2-Setup.exe` from your normal Windows account. The installer includes the .NET runtime and installs per user. Open **Elena's Business Ledger** from the Start menu, then check **Application > About Elena's Business Ledger** for version **1.3.2**. The installer is unsigned, so Windows may show a SmartScreen prompt.
+**Windows installer.** Close any running copy of the Ledger and run `ElenasBusinessLedger-1.4.2-Setup.exe` from your normal Windows account. The installer includes the .NET runtime and installs per user. Open **Elena's Business Ledger** from the Start menu, then check **Application > About Elena's Business Ledger** for version **1.4.2**. The installer is unsigned, so Windows may show a SmartScreen prompt.
 
-If you have an earlier version, run this installer over the existing installation. Version **1.3.2** follows the release whose installer was numbered **1.31.0**. The installer uses the existing installation identity and replaces application files in place. The database, Settings, and Google authorization stay in the existing app data folder. [Inno Setup upgrade behavior](https://jrsoftware.org/inno-setup/faq)
+If you have an earlier version, run this installer over the existing installation. The installer uses the existing installation identity and replaces application files in place. The database, Settings, and Google authorization stay in the existing app data folder. [Inno Setup upgrade behavior](https://jrsoftware.org/inno-setup/faq)
 
 **Source build.** On Windows, install the .NET 11 SDK. Open `ElenasBusinessLedger.sln` in Visual Studio 18.12 or later with the .NET desktop development workload and select `ElenasBusinessLedger.App` as the startup project. You can also start it from the repository root in PowerShell.
 
@@ -59,8 +59,15 @@ Use this section for an unconfigured build or to authorize through a Google Clou
 | Google refuses sign-in or says access is blocked | Check the active Cloud project and its audience. For an external app in Testing, add the signing-in account to **Test users**. If a bundled client is restricted to other accounts, configure a client in your own project. |
 | The calendar worked earlier and now asks to reconnect | In Settings, use **Connect Google Calendar**. If the app keeps picking up an old authorization, choose **Forget Google sign-in** first. Authorization for an external app in Testing expires after seven days. [Google OAuth audience and testing](https://support.google.com/cloud/answer/15549945?hl=en) |
 | The connection fails or the calendar is empty | Verify the owning account, selected calendar ID, enabled Calendar API, and displayed month. For a manually added lesson, use a title such as `$ Mira` and confirm that `Mira` matches an active student's short name. |
+| The Ledger reports a pending invoice | Open **Invoice > Resume Invoice** from the main window. Review the saved student, number, and total. Choose **Resume saved invoice** to finish issuing it. **Discard reservation** is available only before the PDF publication checkpoint. The invoice preview may also offer **Use current preview** when it can still update the pending details. |
+| **Review needed** appears on a lesson | Open the lesson's review action. Confirm the result against the same Google calendar before approving removal if the appointment is missing. The lesson is held out of billing until you resolve the review. |
+| **Plan needed** appears on a lesson | Choose an active plan from that lesson's plan selector. The Ledger then links the appointment and can include it in billing when it meets the other eligibility rules. |
 | The PDF exists and the print request failed | The invoice is already issued. Check the configured printer and Windows PDF association, then open the issued invoice and use **Reprint**. |
+
+Deleting an appointment outside the Ledger leaves its local billing row in place. Review the selected lessons in the invoice preview before issuing.
 
 ## Where the Ledger stores data
 
 **Application > Settings** shows the database location and app data folder. By default, `%APPDATA%\visualtech.dk\MySmallBusinessLedger` contains the SQLite database `ledger.db`, Windows user-protected Google authorization files under `GoogleTokens`, and saved window and grid layouts. Invoice PDFs are stored separately in the **Invoice folder** you selected. Installer upgrades and uninstall leave those data locations in place. To back up the ledger, close the application and copy the app data folder and the invoice folder.
+
+Starting with version 1.4.0, the Ledger creates a verified SQLite backup in the app data folder under `Backups` before applying a schema upgrade. This backup covers the database. Continue to keep a copy of the separate invoice folder.

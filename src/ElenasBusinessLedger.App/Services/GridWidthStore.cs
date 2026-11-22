@@ -7,6 +7,7 @@ using System.Windows.Controls;
 
 namespace ElenasBusinessLedger.App.Services;
 
+// Saves and restores grid widths for windows that let users adjust their column layout.
 internal static class GridWidthStore
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
@@ -24,6 +25,7 @@ internal static class GridWidthStore
 
     private static string StorePath => StorePathOverride ?? DefaultStorePath;
 
+    // Restores and saves grid widths across window sessions so a user's layout choices are retained.
     public static void Attach(Window window, string key, DataGrid[] grids, ColumnDefinition? pane = null)
     {
         window.SourceInitialized += (_, _) => Restore(key, grids, pane);

@@ -4,6 +4,7 @@ using ElenasBusinessLedger.App.ViewModels;
 
 namespace ElenasBusinessLedger.App.Views;
 
+// Presents the student list and coordinates closing with the shared editor's unsaved changes.
 public partial class StudentOverviewView : Window
 {
     private bool closeWasConfirmed;
@@ -24,7 +25,18 @@ public partial class StudentOverviewView : Window
 
     private async void OnClosing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
-        if (closeWasConfirmed || DataContext is not StudentOverviewViewModel viewModel || !viewModel.HasUnsavedStudentChanges)
+        if (closeWasConfirmed || DataContext is not StudentOverviewViewModel viewModel)
+        {
+            return;
+        }
+
+        if (viewModel.IsBusy)
+        {
+            e.Cancel = true;
+            return;
+        }
+
+        if (!viewModel.HasUnsavedStudentChanges)
         {
             return;
         }

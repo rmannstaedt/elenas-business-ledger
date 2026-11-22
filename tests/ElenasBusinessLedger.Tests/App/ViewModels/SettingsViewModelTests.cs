@@ -4,12 +4,13 @@ using ElenasBusinessLedger.App.Views;
 using ElenasBusinessLedger.Core.Common;
 using ElenasBusinessLedger.Core.Company;
 using ElenasBusinessLedger.Core.Ports;
-using ElenasBusinessLedger.Infrastructure.Persistence;
+using ElenasBusinessLedger.Core.Calendar;
 using System.Windows;
 using System.Windows.Controls;
 
 namespace ElenasBusinessLedger.Tests.App.ViewModels;
 
+// Checks Settings defaults, field mapping, save behavior, and Google authorization actions.
 public sealed class SettingsViewModelTests
 {
     [Fact]
@@ -17,7 +18,7 @@ public sealed class SettingsViewModelTests
     {
         RunOnStaThread(() =>
         {
-            var viewModel = new SettingsViewModel(new FakeAppSettingsService());
+            var viewModel = CreateViewModel(new FakeAppSettingsService());
             var window = new SettingsView(viewModel);
 
             Assert.Equal("Application Settings", window.Title);
@@ -55,7 +56,7 @@ public sealed class SettingsViewModelTests
     [Fact]
     public void DefaultsCalendarIdToPrimaryAndExplainsWhereToFindAnotherCalendar()
     {
-        var viewModel = new SettingsViewModel(new FakeAppSettingsService());
+        var viewModel = CreateViewModel(new FakeAppSettingsService());
 
         Assert.Equal("primary", viewModel.CalendarId);
         Assert.Contains("primary", viewModel.CalendarIdHelpText);
@@ -65,7 +66,7 @@ public sealed class SettingsViewModelTests
     [Fact]
     public void DefaultsPaymentInstructionsToDueOnReceipt()
     {
-        var viewModel = new SettingsViewModel(new FakeAppSettingsService());
+        var viewModel = CreateViewModel(new FakeAppSettingsService());
 
         Assert.True(viewModel.IsPaymentDueOnReceipt);
         Assert.False(viewModel.IsPaymentDueIn8Days);
@@ -98,7 +99,7 @@ public sealed class SettingsViewModelTests
                 AppDataFolderPath: @"C:\Users\ExampleUser\AppData\Roaming\visualtech.dk\MySmallBusinessLedger",
                 DatabasePath: @"C:\Users\ExampleUser\AppData\Roaming\visualtech.dk\MySmallBusinessLedger\ledger.db")
         };
-        var viewModel = new SettingsViewModel(service);
+        var viewModel = CreateViewModel(service);
 
         await viewModel.LoadAsync();
 
@@ -137,7 +138,7 @@ public sealed class SettingsViewModelTests
                 null,
                 GoogleOAuthClientConfigurationStatus.Ready)
         };
-        var viewModel = new SettingsViewModel(service);
+        var viewModel = CreateViewModel(service);
 
         await viewModel.LoadAsync();
 
@@ -166,7 +167,7 @@ public sealed class SettingsViewModelTests
                 GoogleOAuthClientConfigurationStatus.Ready,
                 AvailablePrinterNames: ["Office Printer", "PDF Writer"])
         };
-        var viewModel = new SettingsViewModel(service);
+        var viewModel = CreateViewModel(service);
 
         await viewModel.LoadAsync();
 
@@ -192,7 +193,7 @@ public sealed class SettingsViewModelTests
                 null,
                 GoogleOAuthClientConfigurationStatus.Ready)
         };
-        var viewModel = new SettingsViewModel(service);
+        var viewModel = CreateViewModel(service);
 
         await viewModel.LoadAsync();
 
@@ -204,7 +205,7 @@ public sealed class SettingsViewModelTests
     public async Task SaveCombinesCompanyAddressLines()
     {
         var service = new FakeAppSettingsService();
-        var viewModel = new SettingsViewModel(service)
+        var viewModel = new SettingsViewModel(service, service)
         {
             CompanyName = "Maple Key Studio",
             CompanyAddress = "18 Example Lane",
@@ -235,7 +236,7 @@ public sealed class SettingsViewModelTests
                 GoogleOAuthClientConfigurationStatus.Ready,
                 HasGoogleAuthorizationTokens: true)
         };
-        var viewModel = new SettingsViewModel(service);
+        var viewModel = CreateViewModel(service);
 
         await viewModel.LoadAsync();
 
@@ -254,7 +255,7 @@ public sealed class SettingsViewModelTests
                 new CalendarSettings("", "studio@example.test"),
                 GoogleOAuthClientConfigurationStatus.Ready)
         };
-        var viewModel = new SettingsViewModel(service);
+        var viewModel = CreateViewModel(service);
 
         await viewModel.LoadAsync();
 
@@ -266,7 +267,7 @@ public sealed class SettingsViewModelTests
     public async Task SavePersistsCompanyAndCalendarSettings()
     {
         var service = new FakeAppSettingsService();
-        var viewModel = new SettingsViewModel(service)
+        var viewModel = new SettingsViewModel(service, service)
         {
             CompanyName = "Maple Key Studio",
             CompanyAddress = "Musikvej 1",
@@ -301,7 +302,7 @@ public sealed class SettingsViewModelTests
     public async Task SavePersistsCustomPaymentInstructions()
     {
         var service = new FakeAppSettingsService();
-        var viewModel = new SettingsViewModel(service)
+        var viewModel = new SettingsViewModel(service, service)
         {
             CompanyName = "Maple Key Studio",
             CompanyAddress = "Musikvej 1",
@@ -324,7 +325,7 @@ public sealed class SettingsViewModelTests
     public async Task SavePersistsConfiguredInvoicePrinter()
     {
         var service = new FakeAppSettingsService();
-        var viewModel = new SettingsViewModel(service)
+        var viewModel = new SettingsViewModel(service, service)
         {
             CompanyName = "Maple Key Studio",
             CompanyAddress = "Musikvej 1",
@@ -346,7 +347,7 @@ public sealed class SettingsViewModelTests
     public async Task SavePersistsEconomyCutOverOnlyWhenAdminModeIsEnabled()
     {
         var service = new FakeAppSettingsService();
-        var viewModel = new SettingsViewModel(service, isAdminMode: true)
+        var viewModel = new SettingsViewModel(service, service, isAdminMode: true)
         {
             CompanyName = "Maple Key Studio",
             CompanyAddress = "Musikvej 1",
@@ -368,7 +369,8 @@ public sealed class SettingsViewModelTests
     [Fact]
     public void FirstApplicationInvoiceMonthNormalizesSelectedDayImmediately()
     {
-        var viewModel = new SettingsViewModel(new FakeAppSettingsService(), isAdminMode: true)
+        var service = new FakeAppSettingsService();
+        var viewModel = new SettingsViewModel(service, service, isAdminMode: true)
         {
             FirstApplicationInvoiceMonthDate = new DateTime(2026, 6, 18)
         };
@@ -380,7 +382,7 @@ public sealed class SettingsViewModelTests
     public async Task SaveRequiresFirstApplicationMonthWhenAdminModeIsEnabled()
     {
         var service = new FakeAppSettingsService();
-        var viewModel = new SettingsViewModel(service, isAdminMode: true)
+        var viewModel = new SettingsViewModel(service, service, isAdminMode: true)
         {
             CompanyName = "Maple Key Studio",
             CompanyAddress = "Musikvej 1",
@@ -400,7 +402,8 @@ public sealed class SettingsViewModelTests
     [Fact]
     public async Task ClearInvoicePrinterCommandClearsRememberedPrinter()
     {
-        var viewModel = new SettingsViewModel(new FakeAppSettingsService())
+        var service = new FakeAppSettingsService();
+        var viewModel = new SettingsViewModel(service, service)
         {
             ConfiguredInvoicePrinterName = "Office Printer"
         };
@@ -414,7 +417,7 @@ public sealed class SettingsViewModelTests
     public async Task SaveDoesNotPassGoogleOAuthJsonPath()
     {
         var service = new FakeAppSettingsService();
-        var viewModel = new SettingsViewModel(service)
+        var viewModel = new SettingsViewModel(service, service)
         {
             CompanyName = "Maple Key Studio",
             CompanyAddress = "Musikvej 1",
@@ -435,7 +438,7 @@ public sealed class SettingsViewModelTests
     public async Task ConnectGoogleCalendarUsesPrimaryWhenCalendarIdIsBlank()
     {
         var service = new FakeAppSettingsService();
-        var viewModel = new SettingsViewModel(service)
+        var viewModel = new SettingsViewModel(service, service)
         {
             CalendarId = "",
             GoogleAccountEmail = "studio@example.test"
@@ -452,7 +455,7 @@ public sealed class SettingsViewModelTests
     public async Task ConnectGoogleCalendarReportsMissingGoogleAccountEmail()
     {
         var service = new FakeAppSettingsService();
-        var viewModel = new SettingsViewModel(service)
+        var viewModel = new SettingsViewModel(service, service)
         {
             CalendarId = "",
             GoogleAccountEmail = ""
@@ -469,7 +472,7 @@ public sealed class SettingsViewModelTests
     public async Task ForgetGoogleAuthorizationClearsTokenStoreAndReportsNextAuthorization()
     {
         var service = new FakeAppSettingsService();
-        var viewModel = new SettingsViewModel(service);
+        var viewModel = CreateViewModel(service);
 
         await viewModel.ForgetGoogleAuthorizationCommand.ExecuteAsync();
 
@@ -484,7 +487,7 @@ public sealed class SettingsViewModelTests
     public async Task ConnectGoogleCalendarReportsSuccessfulAuthorization()
     {
         var service = new FakeAppSettingsService();
-        var viewModel = new SettingsViewModel(service)
+        var viewModel = new SettingsViewModel(service, service)
         {
             CalendarId = "primary",
             GoogleAccountEmail = "studio@example.test"
@@ -502,7 +505,7 @@ public sealed class SettingsViewModelTests
     public async Task SaveRequiresCompanyNameAndInvoiceFolder()
     {
         var service = new FakeAppSettingsService();
-        var viewModel = new SettingsViewModel(service)
+        var viewModel = new SettingsViewModel(service, service)
         {
             CompanyName = "",
             InvoiceFolderPath = ""
@@ -514,7 +517,11 @@ public sealed class SettingsViewModelTests
         Assert.Contains("Company name", viewModel.ErrorMessage);
     }
 
-    private sealed class FakeAppSettingsService : IAppSettingsService
+    private static SettingsViewModel CreateViewModel(FakeAppSettingsService service) =>
+        new(service, service);
+
+    // Supplies saved preferences and captures the Settings form's save and connection requests.
+    private sealed class FakeAppSettingsService : IAppSettingsService, IGoogleCalendarAuthorizationService
     {
         public AppSettingsSnapshot Snapshot { get; init; } = new(null, null, GoogleOAuthClientConfigurationStatus.Missing);
 

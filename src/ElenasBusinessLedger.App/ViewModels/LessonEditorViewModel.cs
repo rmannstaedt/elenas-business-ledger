@@ -6,6 +6,7 @@ using ElenasBusinessLedger.Core.UseCases.Lessons;
 
 namespace ElenasBusinessLedger.App.ViewModels;
 
+// Presents the standalone add or edit form and translates its values into lesson commands.
 public sealed class LessonEditorViewModel : ViewModelBase
 {
     private const string DateFormat = "dd-MM-yyyy";

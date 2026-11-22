@@ -3,8 +3,10 @@ using ElenasBusinessLedger.Core.Plans;
 
 namespace ElenasBusinessLedger.Core.UseCases.Plans;
 
+// Keeps draft and publication rules together so incomplete plans can be edited before going live.
 internal static class PlanCatalogValidation
 {
+    // Checks fields that a draft must already have while allowing publication-only values to be filled in later.
     public static IReadOnlyList<ValidationError> ValidateDraft(PlanDraftInput input)
     {
         var errors = new List<ValidationError>();
@@ -41,6 +43,7 @@ internal static class PlanCatalogValidation
         return errors;
     }
 
+    // Requires a price and payment terms in addition to valid lesson details before a plan becomes assignable.
     public static IReadOnlyList<ValidationError> ValidatePublish(PlanCatalogItem plan)
     {
         var errors = new List<ValidationError>();

@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace ElenasBusinessLedger.Infrastructure.Persistence.Migrations
 {
+    // Establishes the starting SQLite schema that later upgrades can build on for new and existing ledgers.
     /// <inheritdoc />
     public partial class Baseline : Migration
     {

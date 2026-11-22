@@ -1,8 +1,10 @@
 using System.Windows;
+using ElenasBusinessLedger.App.Services;
 using ElenasBusinessLedger.App.Startup;
 
 namespace ElenasBusinessLedger.App;
 
+// Starts the WPF application and hands initialization to the bootstrapper before showing the main window.
 public partial class App : Application
 {
     protected override async void OnStartup(StartupEventArgs e)
@@ -35,6 +37,11 @@ public partial class App : Application
         }
 
         MainWindow = startupResult.MainWindow;
-        startupResult.MainWindow.Show();
+        if (AppPaths.IsUserTestLaunch)
+        {
+            MainWindow.Title = $"{MainWindow.Title} [TEST DATA]";
+        }
+
+        MainWindow.Show();
     }
 }

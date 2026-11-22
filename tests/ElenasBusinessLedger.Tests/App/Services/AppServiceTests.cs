@@ -5,33 +5,62 @@ using ElenasBusinessLedger.Core.Company;
 using ElenasBusinessLedger.Core.Invoices;
 using ElenasBusinessLedger.Core.Lessons;
 using ElenasBusinessLedger.Core.Ports;
+using ElenasBusinessLedger.Core.Students;
 using ElenasBusinessLedger.Core.Time;
 using ElenasBusinessLedger.Core.UseCases.Lessons;
 using ElenasBusinessLedger.Core.UseCases.Startup;
 using ElenasBusinessLedger.Infrastructure.Calendar;
+using ElenasBusinessLedger.Infrastructure.Invoices.Printing;
 using ElenasBusinessLedger.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 
 namespace ElenasBusinessLedger.Tests.App.Services;
 
+// Checks dashboard failures, Google authorization status, and Settings behavior at the app service boundary.
 public sealed class AppServiceTests
 {
     [Fact]
-    public async Task StartupDashboardServiceReturnsFailureInsteadOfSampleRowsWhenCalendarIsNotConfigured()
+    public async Task StartupDashboardServiceKeepsSavedStudentChoicesWhenCalendarIsNotConfigured()
     {
-        var query = new StartupDashboardQuery(
-            new EmptyStudentRepository(),
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var database = await TestDatabase.CreateAsync();
+        var students = new SqliteStudentRepository(database.CreateContext);
+        foreach (var name in new[] { "Mira", "Noah" })
+        {
+            var record = new StudentRecord(0,
+                new Student(name, $"{name} Example", "Example Lane", "", "", AgeBracket.Standard, null, true),
+                [], [new StudentScheduleEntry(DayOfWeek.Wednesday, new TimeOnly(16, 0))]);
+            var save = await students.SaveAsync(record, cancellationToken);
+            Assert.True(save.Succeeded);
+        }
+
+        var month = new DateOnly(2026, 6, 1);
+        var service = new CoreStartupDashboardService(new LoadDashboardUseCase(
+            students,
             new ThrowingCalendarGateway("Google Calendar is not configured."),
             new EmptyInvoiceRepository(),
             new FixedClock(),
-            new EmptyLessonRepository());
-        var service = new CoreStartupDashboardService(query);
+            new EmptyLessonRepository()));
 
-        var result = await service.LoadAsync(new DateOnly(2026, 6, 1), null, CancellationToken.None);
+        var result = await service.LoadAsync(month, null, cancellationToken);
 
         Assert.False(result.Succeeded);
-        Assert.Contains(result.Errors, error => error.Code == "Dashboard.RefreshFailed");
-        Assert.Contains("Google Calendar is not configured.", result.Errors[0].Message);
+        var warning = Assert.Single(result.Errors);
+        Assert.Equal("Calendar.RefreshFailed", warning.Code);
+        Assert.Equal("Google Calendar is not configured.", warning.Message);
+        var dashboard = Assert.IsType<StartupDashboardResult>(result.Value);
+        Assert.Equal("Mira", dashboard.CurrentStudentShortName);
+        Assert.Empty(dashboard.Lessons);
+        Assert.NotEmpty(dashboard.StudentNavigationEntries);
+        Assert.All(dashboard.StudentNavigationEntries, entry => Assert.False(entry.HasCalendarLesson));
+        var choices = Assert.IsAssignableFrom<IReadOnlyList<StudentChoice>>(dashboard.StudentChoices);
+        Assert.Equal(new[] { "Mira", "Noah" }, choices.Select(choice => choice.ShortName));
+
+        var noah = choices.Single(choice => choice.ShortName == "Noah");
+        var selected = await service.LoadAsync(month, "Mira", cancellationToken, noah.StudentId);
+
+        Assert.Equal(noah.StudentId, selected.Value?.CurrentStudentId);
+        Assert.Equal("Noah", selected.Value?.CurrentStudentShortName);
     }
 
     [Fact]
@@ -62,11 +91,7 @@ public sealed class AppServiceTests
             Path.Combine(appPaths.GoogleTokenFolderPath, "token.bin"),
             [1, 2, 3],
             TestContext.Current.CancellationToken);
-        var service = new CoreAppSettingsService(
-            new SqliteCompanyProfileRepository(database.CreateContext),
-            new SqliteCalendarSettingsRepository(database.CreateContext),
-            appPaths,
-            new GoogleOAuthClientConfigurationProvider(Path.Combine(appData.Path, "missing-google-oauth-client.json")));
+        var service = CreateSettingsService(database, new SqliteCalendarSettingsRepository(database.CreateContext), appPaths);
 
         var snapshot = await service.LoadAsync(CancellationToken.None);
 
@@ -90,11 +115,7 @@ public sealed class AppServiceTests
             CancellationToken.None);
         var tokenStore = new WindowsProtectedFileDataStore(appPaths.GoogleTokenFolderPath);
         await tokenStore.StoreAsync("elena@example.test", new StoredToken("saved-token"));
-        var service = new CoreAppSettingsService(
-            new SqliteCompanyProfileRepository(database.CreateContext),
-            calendarSettingsRepository,
-            appPaths,
-            new GoogleOAuthClientConfigurationProvider(Path.Combine(appData.Path, "missing-google-oauth-client.json")));
+        var service = CreateSettingsService(database, calendarSettingsRepository, appPaths);
 
         var snapshot = await service.LoadAsync(CancellationToken.None);
 
@@ -122,11 +143,7 @@ public sealed class AppServiceTests
         File.Move(
             hashedFile,
             Path.Combine(appPaths.GoogleTokenFolderPath, LegacyEscapedFileName("elena@example.test")));
-        var service = new CoreAppSettingsService(
-            new SqliteCompanyProfileRepository(database.CreateContext),
-            calendarSettingsRepository,
-            appPaths,
-            new GoogleOAuthClientConfigurationProvider(Path.Combine(appData.Path, "missing-google-oauth-client.json")));
+        var service = CreateSettingsService(database, calendarSettingsRepository, appPaths);
 
         var snapshot = await service.LoadAsync(CancellationToken.None);
 
@@ -143,12 +160,8 @@ public sealed class AppServiceTests
         await economyRepository.SaveSettingsAsync(
             new EconomySettings(new DateOnly(2026, 7, 15)),
             CancellationToken.None);
-        var service = new CoreAppSettingsService(
-            new SqliteCompanyProfileRepository(database.CreateContext),
-            new SqliteCalendarSettingsRepository(database.CreateContext),
-            appPaths,
-            new GoogleOAuthClientConfigurationProvider(Path.Combine(appData.Path, "missing-google-oauth-client.json")),
-            economyRepository: economyRepository);
+        var service = CreateSettingsService(database, new SqliteCalendarSettingsRepository(database.CreateContext),
+            appPaths, economyRepository);
 
         var snapshot = await service.LoadAsync(CancellationToken.None);
         var save = await service.SaveAsync(
@@ -172,35 +185,39 @@ public sealed class AppServiceTests
         Assert.Equal(new DateOnly(2026, 8, 1), savedEconomySettings?.FirstApplicationInvoiceMonth);
     }
 
-    private sealed class EmptyStudentRepository : IStudentRepository
+    private static CoreAppSettingsService CreateSettingsService(
+        TestDatabase database,
+        SqliteCalendarSettingsRepository calendars,
+        AppPaths paths,
+        IEconomyRepository? economyRepository = null)
     {
-        public Task<IReadOnlyList<StudentRecord>> ListStudentsAsync(CancellationToken cancellationToken) =>
-            Task.FromResult<IReadOnlyList<StudentRecord>>([]);
-
-        public Task<IReadOnlyList<StudentRecord>> ListActiveStudentsAsync(CancellationToken cancellationToken) =>
-            Task.FromResult<IReadOnlyList<StudentRecord>>([]);
-
-        public Task<StudentRecord?> GetByShortNameAsync(string shortName, CancellationToken cancellationToken) =>
-            Task.FromResult<StudentRecord?>(null);
-
-        public Task<OperationResult<StudentRecord>> SaveAsync(StudentRecord student, CancellationToken cancellationToken) =>
-            Task.FromResult(OperationResult<StudentRecord>.Success(student));
+        var authorization = new GoogleCalendarAuthorizationService(
+            new GoogleOAuthClientConfigurationProvider(Path.Combine(paths.AppDataFolderPath, "missing-google-oauth-client.json")),
+            (_, _) => Task.FromResult<ConfiguredGoogleCalendarClient?>(null),
+            account => WindowsProtectedFileDataStore.ContainsStoredKey(paths.GoogleTokenFolderPath, account),
+            () => new WindowsProtectedFileDataStore(paths.GoogleTokenFolderPath).ClearAsync());
+        return new CoreAppSettingsService(
+            new SqliteCompanyProfileRepository(database.CreateContext),
+            calendars.GetAsync,
+            new SqliteAppSettingsWriter(database.CreateContext),
+            paths,
+            authorization.GetStatus,
+            new WindowsPrinterCatalog(),
+            economyRepository);
     }
 
+
+    // Supplies empty invoice reads so dashboard service tests run without billing records.
     private sealed class EmptyInvoiceRepository : IInvoiceRepository
     {
-        public Task<IReadOnlyList<InvoiceLessonStatus>> ListLessonStatusesAsync(DateOnly from, DateOnly to, CancellationToken cancellationToken) =>
+        public Task<IReadOnlyList<InvoiceLessonStatus>> ListLessonStatusesAsync(DateOnly from, DateOnly to, CancellationToken cancellationToken,
+            IReadOnlyList<int>? includeLessonIds = null) =>
             Task.FromResult<IReadOnlyList<InvoiceLessonStatus>>([]);
 
-        public Task<IReadOnlyList<IssuedInvoiceSummary>> ListInvoicesForStudentAsync(string studentShortName, CancellationToken cancellationToken) =>
+        public Task<IReadOnlyList<IssuedInvoiceSummary>> ListInvoicesForStudentAsync(int studentId, CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<IssuedInvoiceSummary>>([]);
 
-        public Task<IReadOnlyList<EconomyInvoiceRecord>> ListIssuedInvoiceOverviewRowsAsync(
-            int periodYear,
-            CancellationToken cancellationToken) =>
-            Task.FromResult<IReadOnlyList<EconomyInvoiceRecord>>([]);
-
-        public Task<bool> HasInvoiceForStudentInMonthAsync(string studentShortName, DateOnly month, CancellationToken cancellationToken) =>
+        public Task<bool> HasInvoiceForStudentInMonthAsync(int studentId, DateOnly month, CancellationToken cancellationToken) =>
             Task.FromResult(false);
 
         public Task<InvoiceNumber> GetNextInvoiceNumberAsync(CancellationToken cancellationToken) =>
@@ -234,7 +251,16 @@ public sealed class AppServiceTests
             Task.FromResult(OperationResult<IssuedInvoice>.Failure(
                 new ValidationError("Invoice.NotConfigured", "Invoice PDF publication is not configured.")));
 
-        public Task ReleaseInvoiceReservationAsync(InvoiceNumber invoiceNumber, CancellationToken cancellationToken) =>
+        public Task<OperationResult<IssuedInvoice>> ReviseInvoiceReservationAsync(
+            IssuedInvoice savedInvoice, InvoiceDraft draft, InvoiceTotals totals, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
+        public Task<OperationResult<IssuedInvoice>> PrepareInvoicePublicationAsync(
+            IssuedInvoice savedInvoice, InvoicePdfPublication publication, CancellationToken cancellationToken) =>
+            throw new NotSupportedException();
+
+        public Task ReleaseInvoiceReservationAsync(
+            InvoiceNumber invoiceNumber, CancellationToken cancellationToken, string? expectedRevision = null) =>
             Task.CompletedTask;
 
         public Task<OperationResult<IssuedInvoice>> UpdatePrintStatusAsync(
@@ -249,6 +275,12 @@ public sealed class AppServiceTests
         public Task<IssuedInvoice?> GetIssuedInvoiceAsync(InvoiceNumber invoiceNumber, CancellationToken cancellationToken) =>
             Task.FromResult<IssuedInvoice?>(null);
 
+        public Task<IssuedInvoice?> GetOldestPendingAsync(CancellationToken cancellationToken) =>
+            Task.FromResult<IssuedInvoice?>(null);
+
+        public Task<OperationResult<InvoiceNumber>> DiscardPendingAsync(
+            IssuedInvoice savedInvoice, CancellationToken cancellationToken) => throw new NotSupportedException();
+
         public Task<IssuedInvoice?> GetIssuingInvoiceAsync(InvoiceNumber invoiceNumber, CancellationToken cancellationToken) =>
             Task.FromResult<IssuedInvoice?>(null);
 
@@ -259,6 +291,7 @@ public sealed class AppServiceTests
             Task.CompletedTask;
     }
 
+    // Supplies empty lesson reads so service tests do not need a populated billing ledger.
     private sealed class EmptyLessonRepository : ILessonRepository
     {
         public Task<LessonRecord> SaveAsync(LessonRecord lesson, CancellationToken cancellationToken) =>
@@ -267,7 +300,8 @@ public sealed class AppServiceTests
         public Task<IReadOnlyList<LessonRecord>> ListForStudentMonthAsync(
             string studentShortName,
             DateOnly month,
-            CancellationToken cancellationToken) =>
+            CancellationToken cancellationToken,
+            int? studentId = null) =>
             Task.FromResult<IReadOnlyList<LessonRecord>>([]);
 
         public Task<IReadOnlyList<LessonRecord>> ListForWindowAsync(
@@ -302,10 +336,11 @@ public sealed class AppServiceTests
             CancellationToken cancellationToken) =>
             Task.FromResult(false);
 
-        public Task DeleteUninvoicedAsync(IReadOnlyList<int> lessonIds, CancellationToken cancellationToken) =>
-            Task.CompletedTask;
+        public Task<IReadOnlyList<LessonRecord>> ListByGoogleCalendarEventIdsAsync(
+            IReadOnlyList<string> eventIds, CancellationToken cancellationToken) => Task.FromResult<IReadOnlyList<LessonRecord>>([]);
     }
 
+    // Simulates a calendar exception so the dashboard's failure result can be asserted.
     private sealed class ThrowingCalendarGateway(string message) : IGoogleCalendarGateway
     {
         public Task<IReadOnlyList<CalendarLesson>> ListLessonsAsync(DateOnly from, DateOnly to, CancellationToken cancellationToken) =>
@@ -339,11 +374,13 @@ public sealed class AppServiceTests
             Task.FromResult(OperationResult<LessonState>.Failure(state, new ValidationError("Calendar.NotConfigured", message)));
     }
 
+    // Gives dashboard tests a stable date without depending on the system clock.
     private sealed class FixedClock : IClock
     {
         public DateTimeOffset Now => new(2026, 6, 16, 15, 0, 0, TimeSpan.Zero);
     }
 
+    // Creates a disposable SQLite ledger so Settings tests exercise the real repositories.
     private sealed class TestDatabase : IDisposable
     {
         private readonly string directory;
@@ -375,6 +412,7 @@ public sealed class AppServiceTests
         }
     }
 
+    // Provides an isolated location for token and configuration fixtures and removes it after the test.
     private sealed class TemporaryDirectory : IDisposable
     {
         public TemporaryDirectory()
@@ -391,6 +429,7 @@ public sealed class AppServiceTests
         }
     }
 
+    // Supplies minimal credential data for tests of saved authorization detection.
     private sealed record StoredToken(string AccessToken);
 
     private static string LegacyEscapedFileName(string key) =>

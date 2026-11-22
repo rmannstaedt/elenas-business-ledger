@@ -15,6 +15,7 @@ using ElenasBusinessLedger.Core.UseCases.Students;
 
 namespace ElenasBusinessLedger.Tests.App.Services;
 
+// Verifies that selecting a student reopens Details after the previous window was closed.
 public sealed class StudentOverviewWindowLauncherTests
 {
     [Fact]
@@ -171,6 +172,7 @@ public sealed class StudentOverviewWindowLauncherTests
         }
     }
 
+    // Supplies student records for testing the relationship between the list and Details windows.
     private sealed class FakeStudentOverviewService : IStudentOverviewService
     {
         private readonly IReadOnlyList<StudentOverviewSnapshot> snapshots;
@@ -190,6 +192,7 @@ public sealed class StudentOverviewWindowLauncherTests
             throw new NotSupportedException();
     }
 
+    // Satisfies the Details editor dependency so launcher tests can focus on window lifetime.
     private sealed class FakeStudentEditorService : IStudentEditorService
     {
         public Task<StudentEditorSnapshot?> LoadAsync(string shortName, CancellationToken cancellationToken) =>
@@ -199,6 +202,7 @@ public sealed class StudentOverviewWindowLauncherTests
             Task.FromResult(OperationResult<string>.Success(request.ShortName));
     }
 
+    // Supplies assignable plans to keep the student windows usable during the launcher test.
     private sealed class FakePlanCatalogService : IPlanCatalogService
     {
         public Task<IReadOnlyList<PlanCatalogItem>> ListAsync(CancellationToken cancellationToken) =>
@@ -238,18 +242,22 @@ public sealed class StudentOverviewWindowLauncherTests
             throw new NotSupportedException();
     }
 
+    // Keeps invoice dialogs out of tests that exercise student window lifetime.
     private sealed class FakeInvoiceWorkflowLauncher : IInvoiceWorkflowLauncher
     {
         public Task<bool> ShowWriteInvoiceAsync(
             DateOnly displayMonth,
-            string? initialStudentShortName,
+            StudentChoice student,
             CancellationToken cancellationToken) =>
             Task.FromResult(false);
+
+        public Task<bool> ShowResumeInvoiceAsync(CancellationToken cancellationToken) => Task.FromResult(false);
 
         public Task ShowInvoiceViewerAsync(InvoiceNumber invoiceNumber, CancellationToken cancellationToken) =>
             Task.CompletedTask;
     }
 
+    // Pins the date used to initialize the student windows in launcher tests.
     private sealed class FakeUiClock : IUiClock
     {
         public FakeUiClock(DateTimeOffset now)

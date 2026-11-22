@@ -3,14 +3,16 @@ using ElenasBusinessLedger.App.Commands;
 using ElenasBusinessLedger.App.Services;
 using ElenasBusinessLedger.Core.Company;
 using ElenasBusinessLedger.Core.Ports;
-using ElenasBusinessLedger.Infrastructure.Persistence;
+using ElenasBusinessLedger.Core.Calendar;
 
 namespace ElenasBusinessLedger.App.ViewModels;
 
+// Holds editable preferences and connection status so the user can save Settings explicitly.
 public sealed class SettingsViewModel : ViewModelBase
 {
     private const string DefaultCalendarId = "primary";
     private readonly IAppSettingsService settingsService;
+    private readonly IGoogleCalendarAuthorizationService calendarAuthorization;
     private string companyName = string.Empty;
     private string companyAddress = string.Empty;
     private string companyAddressLine2 = string.Empty;
@@ -36,9 +38,13 @@ public sealed class SettingsViewModel : ViewModelBase
     private DateTime? firstApplicationInvoiceMonthDate;
     private string? errorMessage;
 
-    public SettingsViewModel(IAppSettingsService settingsService, bool isAdminMode = false)
+    public SettingsViewModel(
+        IAppSettingsService settingsService,
+        IGoogleCalendarAuthorizationService calendarAuthorization,
+        bool isAdminMode = false)
     {
         this.settingsService = settingsService;
+        this.calendarAuthorization = calendarAuthorization;
         this.isAdminMode = isAdminMode;
         SaveCommand = new AsyncRelayCommand(SaveAsync);
         ClearInvoicePrinterCommand = new AsyncRelayCommand(ClearInvoicePrinterAsync);
@@ -213,6 +219,7 @@ public sealed class SettingsViewModel : ViewModelBase
 
     public event EventHandler<bool?>? CloseRequested;
 
+    // Fills the settings form from saved values and shows the current printer and Google authorization state.
     public async Task LoadAsync()
     {
         var snapshot = await settingsService.LoadAsync(CancellationToken.None);
@@ -317,7 +324,7 @@ public sealed class SettingsViewModel : ViewModelBase
             return;
         }
 
-        var result = await settingsService.ConnectGoogleCalendarAsync(
+        var result = await calendarAuthorization.ConnectGoogleCalendarAsync(
             new CalendarSettings(CalendarId, GoogleAccountEmail.Trim()),
             CancellationToken.None);
         if (!result.Succeeded)
@@ -333,7 +340,7 @@ public sealed class SettingsViewModel : ViewModelBase
 
     private async Task ForgetGoogleAuthorizationAsync()
     {
-        var result = await settingsService.ForgetGoogleAuthorizationAsync(CancellationToken.None);
+        var result = await calendarAuthorization.ForgetGoogleAuthorizationAsync(CancellationToken.None);
         if (!result.Succeeded)
         {
             ErrorMessage = result.Errors.FirstOrDefault()?.Message ?? "Google authorization could not be cleared.";

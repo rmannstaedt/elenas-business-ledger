@@ -5,22 +5,24 @@ using MoneyAmount = ElenasBusinessLedger.Core.Money.Money;
 
 namespace ElenasBusinessLedger.App.Services;
 
+// Provides Economy reports and screens manual overrides against issued months before committing them.
 public sealed class CoreEconomyOverviewService : IEconomyOverviewService
 {
     private readonly EconomyOverviewQuery query;
     private readonly IEconomyRepository? economyRepository;
-    private readonly IInvoiceRepository? invoiceRepository;
+    private readonly IEconomyInvoiceReader? invoiceReader;
 
     public CoreEconomyOverviewService(
         EconomyOverviewQuery query,
         IEconomyRepository? economyRepository = null,
-        IInvoiceRepository? invoiceRepository = null)
+        IEconomyInvoiceReader? invoiceReader = null)
     {
         this.query = query;
         this.economyRepository = economyRepository;
-        this.invoiceRepository = invoiceRepository;
+        this.invoiceReader = invoiceReader;
     }
 
+    // Loads the report for the selected year and returns any errors the Economy window needs to display.
     public async Task<OperationResult<EconomyOverview>> LoadAsync(int year, CancellationToken cancellationToken)
     {
         try
@@ -34,6 +36,7 @@ public sealed class CoreEconomyOverviewService : IEconomyOverviewService
         }
     }
 
+    // Saves eligible legacy amounts and reloads the report so it reflects the committed overrides.
     public async Task<OperationResult<EconomyOverview>> SaveManualMonthOverridesAsync(
         int overviewYear,
         EconomySettings settings,
@@ -65,7 +68,7 @@ public sealed class CoreEconomyOverviewService : IEconomyOverviewService
         IReadOnlyList<EconomyManualMonthOverride> overrides,
         CancellationToken cancellationToken)
     {
-        if (invoiceRepository is null)
+        if (invoiceReader is null)
         {
             return overrides;
         }
@@ -84,7 +87,7 @@ public sealed class CoreEconomyOverviewService : IEconomyOverviewService
         var issuedMonths = new HashSet<(int Year, int Month)>();
         foreach (var year in yearsToInspect)
         {
-            var invoices = await invoiceRepository.ListIssuedInvoiceOverviewRowsAsync(year, cancellationToken);
+            var invoices = await invoiceReader.ListIssuedInvoiceOverviewRowsAsync(year, cancellationToken);
             foreach (var invoice in invoices)
             {
                 var monthStart = new DateOnly(invoice.Period.From.Year, invoice.Period.From.Month, 1);

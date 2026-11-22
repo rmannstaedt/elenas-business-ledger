@@ -6,6 +6,7 @@ using System.Globalization;
 
 namespace ElenasBusinessLedger.Infrastructure.Calendar;
 
+// Adapts Google event requests and paging to the operations used by the lesson gateway.
 public sealed class GoogleCalendarServiceEventClient : IGoogleCalendarEventClient
 {
     private readonly CalendarService calendarService;
@@ -47,6 +48,7 @@ public sealed class GoogleCalendarServiceEventClient : IGoogleCalendarEventClien
         this.eventInsert = eventInsert;
     }
 
+    // Collects all event pages so a calendar refresh also includes appointments beyond Google's first page.
     public async Task<IReadOnlyList<GoogleCalendarEvent>> ListEventsAsync(
         string calendarId,
         DateTimeOffset fromInclusive,
@@ -99,6 +101,7 @@ public sealed class GoogleCalendarServiceEventClient : IGoogleCalendarEventClien
         return await request.ExecuteAsync(cancellationToken);
     }
 
+    // Writes a timed or all-day appointment and returns the external ID used for local linking.
     public async Task<string> CreateLessonEventAsync(
         string calendarId,
         string summary,
@@ -127,6 +130,7 @@ public sealed class GoogleCalendarServiceEventClient : IGoogleCalendarEventClien
         return created.Id;
     }
 
+    // Moves the existing event, retaining its timed duration where known.
     public async Task MoveEventAsync(
         string calendarId,
         string eventId,
@@ -152,6 +156,7 @@ public sealed class GoogleCalendarServiceEventClient : IGoogleCalendarEventClien
     public Task DeleteEventAsync(string calendarId, string eventId, CancellationToken cancellationToken) =>
         calendarService.Events.Delete(calendarId, eventId).ExecuteAsync(cancellationToken);
 
+    // Updates the completion marker on the existing event summary so later refreshes see the new state.
     public async Task UpdateLessonStateAsync(
         string calendarId,
         string eventId,

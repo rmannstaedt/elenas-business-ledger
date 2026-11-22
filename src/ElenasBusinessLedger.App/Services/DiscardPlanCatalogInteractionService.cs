@@ -1,5 +1,6 @@
 namespace ElenasBusinessLedger.App.Services;
 
+// Resolves unsaved-plan prompts as discard when the view model runs without a dialog presenter.
 public sealed class DiscardPlanCatalogInteractionService : IPlanCatalogInteractionService
 {
     public Task<PlanCatalogAddPlanChoice> PromptAddPlanSaveChangesAsync(CancellationToken cancellationToken)

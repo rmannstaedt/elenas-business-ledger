@@ -8,6 +8,7 @@ using MoneyAmount = ElenasBusinessLedger.Core.Money.Money;
 
 namespace ElenasBusinessLedger.Tests.App.ViewModels;
 
+// Exercises report navigation, export, invoice opening, error display, and Admin Mode editing.
 public sealed class EconomyOverviewViewModelTests
 {
     [Fact]
@@ -341,6 +342,7 @@ public sealed class EconomyOverviewViewModelTests
                 .ToArray(),
             new DateOnly(year, 6, 1));
 
+    // Captures year loads and manual saves and supplies controlled report or error results.
     private sealed class FakeEconomyOverviewService : IEconomyOverviewService
     {
         public List<int> RequestedYears { get; } = [];
@@ -383,6 +385,7 @@ public sealed class EconomyOverviewViewModelTests
         }
     }
 
+    // Supplies test export paths and records the year requested by the view model.
     private sealed class FakeEconomyOverviewExportDialog : IEconomyOverviewExportDialog
     {
         public Queue<string?> Paths { get; init; } = [];
@@ -396,6 +399,7 @@ public sealed class EconomyOverviewViewModelTests
         }
     }
 
+    // Records requested export paths without writing real CSV files.
     private sealed class FakeEconomyOverviewCsvFileService : IEconomyOverviewCsvFileService
     {
         public List<string> SavedPaths { get; } = [];
@@ -410,6 +414,7 @@ public sealed class EconomyOverviewViewModelTests
         }
     }
 
+    // Captures the PDF path selected by the report without starting a viewer.
     private sealed class FakeInvoicePdfLauncher : IInvoicePdfLauncher
     {
         public string? LastOpenedPdfFilePath { get; private set; }
@@ -421,6 +426,7 @@ public sealed class EconomyOverviewViewModelTests
         }
     }
 
+    // Gives report navigation a stable starting year for date-based assertions.
     private sealed class FakeUiClock : IUiClock
     {
         public FakeUiClock(DateTimeOffset now)

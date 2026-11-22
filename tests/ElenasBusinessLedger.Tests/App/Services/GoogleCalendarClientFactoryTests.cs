@@ -1,9 +1,10 @@
 using ElenasBusinessLedger.App.Services;
 using ElenasBusinessLedger.Infrastructure.Calendar;
-using ElenasBusinessLedger.Infrastructure.Persistence;
+using ElenasBusinessLedger.Core.Calendar;
 
 namespace ElenasBusinessLedger.Tests.App.Services;
 
+// Checks when the factory can reuse authorization, request sign-in, or return no calendar client.
 public sealed class GoogleCalendarClientFactoryTests
 {
     [Fact]
@@ -61,7 +62,7 @@ public sealed class GoogleCalendarClientFactoryTests
     }
 
     [Fact]
-    public async Task CreateForConnectionAsyncInvokesInteractiveAuthorizationWithoutSavedToken()
+    public async Task ExplicitConnectionAuthorizesAndVerifiesTheSelectedCalendarWithoutSavedToken()
     {
         using var directory = new TemporaryDirectory();
         var configurationPath = WriteOAuthConfiguration(directory.Path);
@@ -82,13 +83,17 @@ public sealed class GoogleCalendarClientFactoryTests
                     new ConfiguredGoogleCalendarClient(settings.SelectedCalendarId, eventClient));
             });
 
-        var client = await factory.CreateForConnectionAsync(
-            new CalendarSettings("primary", "elena@example.test"),
+        var connection = new GoogleCalendarAuthorizationService(
+            new GoogleOAuthClientConfigurationProvider(configurationPath), factory.CreateForConnectionAsync,
+            _ => false, () => Task.CompletedTask);
+        var result = await connection.ConnectGoogleCalendarAsync(
+            new CalendarSettings("trial-calendar", "elena@example.test"),
             CancellationToken.None);
 
-        Assert.NotNull(client);
+        Assert.True(result.Succeeded);
         Assert.True(authorizationWasInvoked);
         Assert.True(sawInteractiveAuthorization);
+        Assert.Equal("trial-calendar", eventClient.ListedCalendarId);
     }
 
     private static string MissingConfigurationPath() =>
@@ -112,6 +117,7 @@ public sealed class GoogleCalendarClientFactoryTests
         return configurationPath;
     }
 
+    // Isolates the OAuth configuration and token files used to test calendar client creation.
     private sealed class TemporaryDirectory : IDisposable
     {
         public TemporaryDirectory()
@@ -131,14 +137,20 @@ public sealed class GoogleCalendarClientFactoryTests
         }
     }
 
+    // Stands in for an authorized event client so factory tests can inspect setup without Google requests.
     private sealed class FakeGoogleCalendarEventClient : IGoogleCalendarEventClient
     {
+        public string? ListedCalendarId { get; private set; }
+
         public Task<IReadOnlyList<GoogleCalendarEvent>> ListEventsAsync(
             string calendarId,
             DateTimeOffset fromInclusive,
             DateTimeOffset toExclusive,
-            CancellationToken cancellationToken) =>
-            Task.FromResult<IReadOnlyList<GoogleCalendarEvent>>([]);
+            CancellationToken cancellationToken)
+        {
+            ListedCalendarId = calendarId;
+            return Task.FromResult<IReadOnlyList<GoogleCalendarEvent>>([]);
+        }
 
         public Task<string> CreateLessonEventAsync(
             string calendarId,

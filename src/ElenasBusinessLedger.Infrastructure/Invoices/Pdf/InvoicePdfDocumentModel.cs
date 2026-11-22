@@ -5,6 +5,7 @@ using ElenasBusinessLedger.Core.Money;
 
 namespace ElenasBusinessLedger.Infrastructure.Invoices.Pdf;
 
+// Shapes the saved billing values into the service lines, lesson list, and payment details used by the PDF writer.
 public sealed record InvoicePdfDocumentModel(
     string InvoiceNumber,
     DateOnly InvoiceDate,
@@ -26,6 +27,7 @@ public sealed record InvoicePdfDocumentModel(
 {
     private static readonly CultureInfo DanishCulture = CultureInfo.GetCultureInfo("da-DK");
 
+    // Groups lessons by plan and price, then formats the saved billing values for the Danish PDF layout.
     public static InvoicePdfDocumentModel Create(
         InvoiceDraft draft,
         InvoiceTotals totals,
@@ -147,11 +149,14 @@ public sealed record InvoicePdfDocumentModel(
             .Replace('\r', '\n')
             .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
+    // Groups lessons only when both their plan label and unit price match for the PDF service table.
     private sealed record ServiceGroupKey(string PlanName, Money PriceWithoutVat);
 
+    // Carries the display title and detail line that the PDF writer uses for a grouped teaching service.
     private sealed record InvoicePdfServiceText(string Description, string Detail);
 }
 
+// Holds one grouped service's labels, quantities, and prices for the invoice PDF.
 public sealed record InvoicePdfServiceLine(
     string Description,
     string Detail,

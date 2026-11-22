@@ -2,6 +2,7 @@ using ElenasBusinessLedger.Core.Invoices;
 
 namespace ElenasBusinessLedger.Tests.Core.Invoices;
 
+// Checks payment transitions and the confirmation required to reopen a paid invoice.
 public sealed class PaymentStatusTests
 {
     [Fact]

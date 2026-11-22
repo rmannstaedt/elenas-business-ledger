@@ -1,5 +1,6 @@
 namespace ElenasBusinessLedger.Core.Plans;
 
+// Defines the supported plan payment terms so draft validation and editor choices agree.
 public static class PlanPaymentTerms
 {
     public const string PaidMonthlyInAdvance = "Paid monthly in advance";

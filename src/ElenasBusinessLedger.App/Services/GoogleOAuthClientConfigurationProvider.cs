@@ -11,6 +11,7 @@ public enum GoogleOAuthClientConfigurationStatus
     Ready
 }
 
+// Carries the configuration status and any usable OAuth credentials so Settings can explain connection problems.
 public sealed record GoogleOAuthClientConfigurationResult(
     GoogleOAuthClientConfigurationStatus Status,
     ClientSecrets? ClientSecrets,
@@ -35,6 +36,7 @@ public sealed record GoogleOAuthClientConfigurationResult(
             "Google sign-in app configuration is ready.");
 }
 
+// Reads the desktop OAuth client file and validates it before an authorization flow starts.
 public sealed class GoogleOAuthClientConfigurationProvider
 {
     private const string ConfigurationFolderName = "Configuration";
@@ -46,9 +48,11 @@ public sealed class GoogleOAuthClientConfigurationProvider
         this.configurationPath = configurationPath;
     }
 
+    // Resolves the desktop OAuth file beside the app so a source build and installer can use the same layout.
     public static string CreateDefaultConfigurationPath() =>
         Path.Combine(AppContext.BaseDirectory, ConfigurationFolderName, ConfigurationFileName);
 
+    // Loads the desktop OAuth configuration and reports whether Settings can offer a usable Google sign-in.
     public GoogleOAuthClientConfigurationResult Load()
     {
         if (!File.Exists(configurationPath))

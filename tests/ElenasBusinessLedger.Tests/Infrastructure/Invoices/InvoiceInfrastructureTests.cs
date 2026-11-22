@@ -5,6 +5,7 @@ using ElenasBusinessLedger.Infrastructure.Invoices.Printing;
 
 namespace ElenasBusinessLedger.Tests.Infrastructure.Invoices;
 
+// Verifies PDF staging, rendering, layout, and printer request behavior with isolated artifacts.
 public sealed class InvoiceInfrastructureTests
 {
     [Fact]
@@ -20,7 +21,9 @@ public sealed class InvoiceInfrastructureTests
         await File.WriteAllBytesAsync(stagingPath.Value!, "%PDF-1.7\ncontent"u8.ToArray(), TestContext.Current.CancellationToken);
 
         var verify = await fileStore.VerifyStagedPdfAsync(stagingPath.Value!, CancellationToken.None);
-        var publish = await fileStore.PublishAsync(stagingPath.Value!, draft, invoiceNumber, CancellationToken.None);
+        var prepared = await fileStore.PreparePublicationAsync(stagingPath.Value!, draft, invoiceNumber, CancellationToken.None);
+        Assert.True(prepared.Succeeded);
+        var publish = await fileStore.CompletePublicationAsync(prepared.Value!, CancellationToken.None);
 
         Assert.True(verify.Succeeded);
         Assert.True(publish.Succeeded);
@@ -43,7 +46,9 @@ public sealed class InvoiceInfrastructureTests
         Assert.True(stagingPath.Succeeded);
         await File.WriteAllBytesAsync(stagingPath.Value!, "%PDF-1.7\nnew"u8.ToArray(), TestContext.Current.CancellationToken);
 
-        var publish = await fileStore.PublishAsync(stagingPath.Value!, draft, invoiceNumber, CancellationToken.None);
+        var prepared = await fileStore.PreparePublicationAsync(stagingPath.Value!, draft, invoiceNumber, CancellationToken.None);
+        Assert.True(prepared.Succeeded);
+        var publish = await fileStore.CompletePublicationAsync(prepared.Value!, CancellationToken.None);
 
         Assert.False(publish.Succeeded);
         Assert.Contains(publish.Errors, error => error.Code == "InvoicePdf.FinalFileAlreadyExists");
@@ -348,6 +353,7 @@ public sealed class InvoiceInfrastructureTests
             System.Text.RegularExpressions.RegexOptions.CultureInvariant).Count;
     }
 
+    // Records the PDF path and printer sent to Windows without launching a real print request.
     private sealed class FakePrintProcessLauncher : IPrintProcessLauncher
     {
         public bool WasCalled { get; private set; }
@@ -365,12 +371,14 @@ public sealed class InvoiceInfrastructureTests
         }
     }
 
+    // Supplies available printer names for tests of invoice print validation.
     private sealed class FakePrinterCatalog(IReadOnlyList<string> printerNames) : IPrinterCatalog
     {
         public Task<IReadOnlyList<string>> ListPrinterNamesAsync(CancellationToken cancellationToken) =>
             Task.FromResult(printerNames);
     }
 
+    // Creates an isolated invoice directory for PDF tests and removes it after use.
     private sealed class TestInvoiceFolder : IDisposable
     {
         private TestInvoiceFolder(string path)

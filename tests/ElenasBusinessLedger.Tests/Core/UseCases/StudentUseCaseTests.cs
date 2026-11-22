@@ -6,6 +6,7 @@ using ElenasBusinessLedger.Core.UseCases.Students;
 
 namespace ElenasBusinessLedger.Tests.Core.UseCases;
 
+// Checks that student saves preserve plan and schedule data and reject overlapping periods.
 public sealed class StudentUseCaseTests
 {
     [Fact]
@@ -77,6 +78,7 @@ public sealed class StudentUseCaseTests
             EndsOn: endsOn,
             PlanCatalogId: planCatalogId);
 
+    // Captures the normalized student record before it would be written to the ledger.
     private sealed class FakeStudentRepository : IStudentRepository
     {
         public StudentRecord? SavedStudent { get; private set; }

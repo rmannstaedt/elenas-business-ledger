@@ -2,6 +2,7 @@ using System.Diagnostics;
 
 namespace ElenasBusinessLedger.Infrastructure.Invoices.Printing;
 
+// Passes the saved invoice PDF and target printer to the Windows shell's printto action.
 public sealed class ShellPrintProcessLauncher : IPrintProcessLauncher
 {
     public Task PrintAsync(string pdfFilePath, string printerName, CancellationToken cancellationToken)

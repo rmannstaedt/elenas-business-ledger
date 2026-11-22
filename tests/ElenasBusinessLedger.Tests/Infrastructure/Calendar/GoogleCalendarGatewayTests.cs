@@ -13,8 +13,53 @@ using System.Text.Json;
 
 namespace ElenasBusinessLedger.Tests.Infrastructure.Calendar;
 
+// Covers calendar scoping, event formatting, refresh outcomes, and reuse of saved Google authorization.
 public sealed class GoogleCalendarGatewayTests
 {
+    [Fact]
+    public async Task CalendarOperationsUseOnlyIdsFromTheConfiguredSource()
+    {
+        var start = new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.Zero);
+        var token = TestContext.Current.CancellationToken;
+        var client = new FakeGoogleCalendarEventClient { Events = [new GoogleCalendarEvent("same-id", "$ Mira", start)] };
+        var gateway = new GoogleCalendarGateway(client, new GoogleCalendarGatewayOptions(
+            "test-calendar", TimeZoneInfo.Utc, TimeSpan.FromHours(1), "original"));
+        var date = new DateOnly(2026, 6, 16);
+        var lesson = Assert.Single(await gateway.ListLessonsAsync(date, date, token));
+        Assert.Equal("original:same-id", lesson.Id);
+        Assert.Equal("same-id", lesson.LegacyEventId);
+
+        var wrong = await gateway.DeleteLessonAsync("other:same-id", date, token);
+        Assert.False(wrong.Succeeded);
+        Assert.Null(client.DeletedEventId);
+        var right = await gateway.DeleteLessonAsync(lesson.Id, date, token);
+        Assert.True(right.Succeeded);
+        Assert.Equal("same-id", client.DeletedEventId);
+    }
+
+    [Fact]
+    public async Task PopulatePersistsAnAcknowledgedEventBeforeTheNextCreateFails()
+    {
+        var client = new FakeGoogleCalendarEventClient { FailCreateNumber = 2 };
+        var gateway = new GoogleCalendarGateway(client, new GoogleCalendarGatewayOptions("trial", TimeZoneInfo.Utc, TimeSpan.FromHours(1)));
+        var date = new DateTimeOffset(2026, 6, 16, 15, 0, 0, TimeSpan.Zero);
+        var receipts = new List<(int Index, string EventId)>();
+        var result = await gateway.PopulateWithReceiptsAsync(
+            [new LessonAddRequest("Mira", date, 1), new LessonAddRequest("Mira", date.AddDays(7), 2)],
+            new DateOnly(2026, 6, 1),
+            (index, created, _) =>
+            {
+                Assert.Single(client.CreatedEvents);
+                receipts.Add((index, created.Id));
+                return Task.FromResult<ValidationError?>(null);
+            },
+            TestContext.Current.CancellationToken);
+
+        Assert.False(result.Succeeded);
+        Assert.Equal((0, "created"), Assert.Single(receipts));
+        Assert.Equal("created", Assert.Single(result.Value!).Id);
+    }
+
     [Fact]
     public void CredentialFactoryRequestsOwnedCalendarEventScopeOnly()
     {
@@ -581,11 +626,13 @@ public sealed class GoogleCalendarGatewayTests
             TimeZone: TimeZoneInfo.FindSystemTimeZoneById("Romance Standard Time"),
             DefaultLessonDuration: defaultLessonDuration ?? TimeSpan.FromHours(1));
 
+    // Provides a minimal token fixture so credential tests do not need a real Google account.
     private sealed record StoredToken(string AccessToken);
 
     private static string LegacyEscapedFileName(string key) =>
         $"{Uri.EscapeDataString(key).Replace("%", "_")}.bin";
 
+    // Stores OAuth fixtures in memory so credential reuse can be tested without protected files.
     private sealed class InMemoryDataStore : IDataStore
     {
         private readonly Dictionary<string, object?> values = [];
@@ -616,11 +663,14 @@ public sealed class GoogleCalendarGatewayTests
         }
     }
 
+    // Records Google event requests and simulates API failures without a network call.
     private sealed class FakeGoogleCalendarEventClient : IGoogleCalendarEventClient
     {
         public IReadOnlyList<GoogleCalendarEvent> Events { get; init; } = [];
 
         public Exception? WriteException { get; init; }
+
+        public int? FailCreateNumber { get; init; }
 
         public Exception? ListException { get; init; }
 
@@ -682,6 +732,11 @@ public sealed class GoogleCalendarGatewayTests
                 throw WriteException;
             }
 
+            if (CreatedEvents.Count + 1 == FailCreateNumber)
+            {
+                throw new InvalidOperationException("Simulated calendar failure");
+            }
+
             CreatedSummary = summary;
             CreatedStartsAt = startsAt;
             CreatedHasKnownStartTime = hasKnownStartTime;
@@ -739,6 +794,7 @@ public sealed class GoogleCalendarGatewayTests
         }
     }
 
+    // Captures created event values so tests can verify calendar titles, timing, and duration.
     private sealed record CreatedCalendarEvent(
         string Summary,
         DateTimeOffset StartsAt,

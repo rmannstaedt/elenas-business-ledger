@@ -116,7 +116,9 @@ Relevant Google Calendar entries are identified by their first line, which may b
 
 Google Calendar entries that are *NOT* identified as relevant by their first line are *ALWAYS* ignored.
 
-Student short-name matching against saved active Students is case-insensitive. After a marker is matched, the application uses the stored Student short-name casing for dashboard filtering, local lesson reconciliation, and invoice-list lookups.
+Calendar titles match trimmed Student short names without regard to case. New or renamed Students must have distinct short names under that same rule. The Ledger warns about duplicate labels in older databases and leaves ambiguous appointments unlinked. Each Student remains selectable by ID, and an existing calendar link retains its Student ID when the label changes. Calendar linkage combines the configured calendar identity and the external event ID. Refresh preserves local billing rows when events are outside the current calendar results. Use the Ledger's explicit delete action to remove an uninvoiced lesson. Legacy event IDs are adopted when the observed event, existing student marker and lesson time agree.
+
+Dashboard refresh resolves observed events to local lessons before building the view. The reconciliation step saves eligible lesson updates for the selected student and supplies the saved records to the dashboard projection. The projection uses those records and issued invoice facts to build lesson rows and navigation choices.
 
 The first line remains the ownership/matching marker. A completed uninvoiced lesson may additionally contain this later line in the Google Calendar entry:
   Status: Completed
@@ -127,7 +129,9 @@ When an Invoice is issued, it is added to the Invoice table with its issued invo
 
 Issued invoice lines are authoritative for invoice-to-lesson lineage. The lesson row may keep an invoice-number cache for locking and display, but that cache must be maintained by the invoice finalization transaction and must never replace the issued invoice line's exact local Lesson ID as the durable reference.
 
-During schema upgrades from older data, the application must not invent Lesson IDs for issued invoice lines. If an old invoice line cannot be safely linked to a saved local lesson, the migration skips that line, records a startup warning, and keeps the invoice header plus any safely linkable lines so the application can continue starting.
+Invoice history uses the invoice's Student ID. Names and addresses on an invoice are snapshots of the original recipient. The upgrade links an existing invoice to a student when its saved lesson links all identify one student. Invoices with unknown ownership remain available through the Economy overview.
+
+An upgrade archives older invoice lines that lack a valid unique lesson link in `ArchivedInvoiceLines` before rebuilding the active line table. The invoice header, its totals, the original PDF, and any valid lesson links are retained. The one-time startup warning reports the number of lines excluded from active lesson links. Upgrades that ran under earlier versions require an older backup to recover any lines already removed.
 
 Invoice, completion, and payment state must only be applied to a lesson through that lesson's durable local identity and invoice link. The application must never infer that a lesson is invoiced, completed, or paid merely because it has the same student, date, time, or plan as an issued invoice line; a separate lesson on the same date remains separate and uninvoiced until it is explicitly included in an invoice.
 
@@ -137,7 +141,7 @@ Issued Invoice lines store the catalog Plan identity for lineage/reporting and a
 
 ### Application Startup
 
-Before the main window is shown, the application creates the app-data folder if needed and applies pending EF Core migrations to the local SQLite database. Startup then composes the local repositories, Google Calendar gateway, invoice PDF/printing services, and WPF view models through the App-layer bootstrapper. Schema changes must be represented as EF migrations, not ad hoc startup table/column mutation.
+Before the main window is shown, the application creates the app-data folder if needed. When an existing SQLite database has pending migrations, startup first creates and verifies a database backup under `Backups` in the app data folder. A failed backup stops the upgrade. Startup then applies pending EF Core migrations. Startup then composes the local repositories, Google Calendar gateway, invoice PDF/printing services, and WPF view models through the App-layer bootstrapper. Schema changes must be represented as EF migrations, not ad hoc startup table/column mutation.
 
 Upon startup the application displays a window containing the current student short name and a list of lessons for:
   * previous month
@@ -166,7 +170,7 @@ There are also Previous / Next buttons for the month, to switch the display back
 The application contains a Student menu with this entry:
   * Manage Students
 
-Manage Students opens two coordinated windows: a Students list window and a fixed-size Student Details window. The main window also has a Student Details button that opens the same Student Details window for the currently displayed Student. The Students list includes all known Students, including inactive Students. Selecting a Student in the list updates the Student Details window, which shows Student fields, Active flag, current assigned Plan snapshot, plan assignment selector, schedule fields, and issued Invoices. Add Student creates a new draft in the details window. Changes are explicit: Save persists the edited Student data and keeps the Student Details window open; Close prompts the user to save, discard, or cancel the close when unsaved changes exist. Selecting an Active catalog Plan copies the Plan fields into the Student's plan period. Changing the Active flag, plan period dates, or schedule only persists when Save is pressed. Double-clicking an Invoice in the selected Student's invoice list opens it in the Invoice Viewer. Selecting a Student in Manage Students immediately refreshes the main window around that Student; closing Manage Students or a dashboard-opened Student Details window applies the final selected Student again. The Student Details window remembers position but uses fixed pane and invoice column widths.
+Manage Students opens two coordinated windows: a Students list window and a fixed-size Student Details window. The main window also has a Student Details button that opens the same Student Details window for the currently displayed Student. The Students list includes all known Students, including inactive Students. Selecting a Student in the list updates the Student Details window, which shows Student fields, Active flag, current assigned Plan snapshot, plan assignment selector, schedule fields, and issued Invoices. Add Student creates a new draft in the details window. **Save** persists the edited Student data and closes Student Details after a successful save. **Cancel** discards the edits and closes Student Details. The window's title-bar close button still prompts when there are unsaved changes. Selecting an Active catalog Plan copies the Plan fields into the Student's plan period. Changing the Active flag, plan period dates, or schedule only persists when Save is pressed. Double-clicking an Invoice in the selected Student's invoice list opens it in the Invoice Viewer. Selecting a Student in Manage Students immediately refreshes the main window around that Student; closing Manage Students or a dashboard-opened Student Details window applies the final selected Student again. The Student Details window remembers position but uses fixed pane and invoice column widths.
 
 The application contains a Plan menu with:
   * Manage Plans
@@ -216,27 +220,19 @@ The planned and invoiced:no entries in the lesson list may be edited directly in
 
 Lesson date editing uses a date selector. Lesson date and lesson plan are required for a new lesson to be saved. Lesson time is optional: a lesson without a known time is saved as an all-day Google Calendar event, displays without a time in the lesson list, and prints without a time on invoices. Lesson time editing provides a no-time option plus a time selector from 08:00 through 20:00 in 15-minute increments while still allowing typed time input. Lesson cancellation uses an explicit delete action with a confirmation prompt.
 
-Schedule changes to the lessons in the lesson list are saved directly in Google Calendar and to the matching uninvoiced local lesson row before the operation reports success.
-If the update of Google Calendar fails, the user is notified immediately so they can take corrective action.
-If Google Calendar is updated but the matching local billing row cannot be created, updated, or removed, the operation reports failure rather than pretending the invoice source is already consistent. Refresh/reconciliation remains a recovery path, not the normal correctness mechanism for app-driven lesson changes.
+Before changing or cancelling a linked lesson, the Ledger places a local hold on the lesson so it cannot be invoiced concurrently. Acknowledged Google Calendar writes update the local lesson before the next dashboard refresh. A rejected change releases the hold. If Google Calendar's result is uncertain or the local write cannot be completed, the lesson shows **Review needed** and stays out of billing. Use that action to reconcile the original event or confirm its removal after checking the configured Google calendar.
 
 When adding a new lesson, Google Calendar event creation and local lesson persistence must preserve the exact selected plan. The main window uses the created Google Calendar event id to select the saved lesson. If Google Calendar creates the event but the follow-up refresh fails, the local lesson must still be saved with the selected plan identity and created Google Calendar event id. If local persistence fails after the Google Calendar event was created, the application must attempt to remove that created Google Calendar event and report the local-save failure instead of leaving a calendar-only lesson that can later be reconstructed with the wrong default plan.
 
-When populating lessons from a saved schedule, if Google Calendar creates events but the follow-up refresh fails, the local lessons for those created event ids must still be saved before the refresh failure is reported.
+When populating lessons from a saved schedule, the Ledger saves the event ID and plan for each acknowledged creation before attempting the next appointment. If a later creation fails, earlier successes remain saved. Reopening Populate Calendar reads the current calendar and skips the earlier appointments it finds. Check the calendar before retrying an uncertain creation.
+
+A calendar appointment linked to an unambiguous Student but lacking an applicable plan appears as **Plan needed** alongside the other lessons. The appointment stays out of billing until the user chooses an active plan for it.
 
 ### Write and Print an Invoice
 
-Invoices are written by the press of a button in the main application window: "Write Invoice"
+Choose **Write Invoice** in the main window to open the editable preview for the selected Student and the displayed month. Select another Student in the main window to invoice them. The button is unavailable until a Student is selected.
 
-Before the invoice is written, the system will display a dialogue with student short names.
-The dialogue will list all students with local uninvoiced lessons in the selected period. A student may appear even if another invoice already exists for that same month, provided later lessons remain uninvoiced.
-When opened from the main window, the dialogue will preselect the currently displayed Student if that Student is still in the all-students list.
-If the currently displayed Student is not available, the dialogue will preselect the Student who has a lesson at the current time/date.
-If neither of those choices is available, the dialogue falls back to the first listed candidate/all-student entry so the visible selection remains explicit before Continue.
-The dialogue will also allow the user to choose from all students in the database.
-
-Once a student has been selected, the application will display the invoice on screen as a pre-filled, partially editable form.
-The form will contain the proposed final invoice layout and information.
+The preview includes the selected Student’s local uninvoiced lessons for the displayed month, including when an earlier invoice exists for the same month. If the dashboard resolves an already issued invoice for the current view, the button opens that invoice in the viewer. Issued invoices are also accessible under **Student Invoices**.
 
 The Invoice will contain the Company information.
 The Invoice will contain the Student information.
@@ -267,18 +263,20 @@ The user may Cancel the edit before pressing "Save & Print Invoice".
 If the user Cancels before printing starts, the invoice is not saved and no data are updated in the system.
 
 Once the invoice has been edited, the user may press the "Save & Print Invoice" button on the Invoice form.
-The "Save & Print Invoice" button does the following:
-  - Reserves the Invoice in the local database as an in-progress issue operation.
-  - Saves a PDF copy of the invoice in the company invoice folder path through a staging, verification, and publish flow.
-    -- note: the final PDF file name uses the invoice number, invoice period, and Student full name, e.g. `Invoice 001 Juni 2026 - Mira Vale.pdf`.
-    -- note: if PDF staging, writing, verification, or publish fails before the final PDF is published, any staged PDF is discarded and the reserved Invoice number is released; the Invoice is not shown as issued, later actions are *not* performed, and the user is notified of the failure. Retrying must reuse that Invoice number rather than skipping to the next one.
-    -- note: if the final PDF has been published but finalizing the Invoice data fails, the application keeps the in-progress `Issuing` reservation and published PDF path for retry/support recovery; the Invoice is not shown as issued, later actions are *not* performed, and the user is notified of the failure.
+The ledger allows one unresolved invoice reservation at a time. If an older database already contains several, resolve the oldest first. Open **Invoice > Resume Invoice** to recover a reservation independently of the current Student, month, or lesson selection. A safely unpublished tail reservation can be discarded and its number reused. An earlier reservation from a legacy backlog is recorded as void when discarded, preserving the historical number. Historical gaps are reported during startup for review.
+
+The **Save & Print Invoice** action runs these steps.
+
+  - Reserves the invoice number and saves the invoice snapshot, including the adjustment and reason, in SQLite. PDF generation uses the saved amounts, lesson lines, and billing details.
+  - When a retry with the same lesson selection differs from the pending invoice, shows the saved invoice and the current preview total. **Resume saved invoice** uses the saved details. **Use current preview** updates the pending snapshot under the same number while PDF publication is still pending.
+  - Stages and verifies the PDF. Before moving it, saves the staged path, final path, and checksum in SQLite. The final file name includes the number, invoice period, and student's invoice-time name, for example `Invoice 001 Juni 2026 - Mira Vale.pdf`.
+  - If a staging, writing, or verification error happens before the publication checkpoint is saved, discards the staging file and releases the reservation. After saving the checkpoint, retains the reservation and verifies the staged or final PDF on retry. A different file at the final path is preserved and reported.
   - Finalizes the Invoice data in the Invoice table as issued.
   - Sends a print request to the configured invoice printer, if one is configured and available.
     -- note: a print failure does not undo the issued Invoice or delete the PDF; the Invoice remains issued and can be reprinted from the Invoice Viewer.
     -- note: while writing/printing is in progress, the Invoice form stays open and Cancel/window close do not hide the in-progress result; if the operation takes longer than expected, the user is asked whether to keep waiting.
   - Closes the Invoice form and returns to the main view only when the Invoice was issued and the print request was launched successfully.
-  - Keeps the Invoice form open with an error message if the Invoice was issued but the print request failed.
+  - Shows a print warning in the open Invoice form if the Invoice was issued and the print request failed. **Reprint** uses the saved PDF and issued number.
   - When an Invoice is issued and returning to the main view, the displayed data in the main view are updated with any changes.
   
 Once an Invoice has been *successfully* saved, it can no longer be edited.
@@ -286,9 +284,31 @@ Issued Invoices show payment and print status in the main/student invoice lists.
 
 The invoice printer is selected from Application Settings during setup. If no invoice printer has been selected when printing or reprinting is first attempted, the app opens the printer selection dialog directly, lets the user choose a printer, and remembers that printer before continuing. The selected printer is remembered for subsequent invoice printing and can later be changed or cleared from Application Settings. When the app records an Invoice as Printed, that means the configured printer existed and Windows accepted the print request launch; the app does not verify physical paper output or Windows spooler completion.
 
+### Invoice data flow
+
+The preview copies billing details and prices into an `InvoiceDraft`. Each line keeps its local lesson ID so the ledger can lock the exact lesson when issuing the invoice. Confirming the preview saves those values and the invoice number as an `Issuing` snapshot.
+
+```mermaid
+flowchart LR
+    lessons["Local lessons and plan prices"] --> draft["InvoiceDraft in the WPF preview"]
+    draft --> reservation["Issuing snapshot in SQLite"]
+    reservation --> staged["Staged PDF"]
+    staged --> checkpoint["Saved PDF paths and checksum"]
+    checkpoint --> pdf["Published PDF"]
+    pdf --> issued["Issued snapshot and lesson locks"]
+    issued --> economy["Economy totals"]
+    issued --> print["Print the saved PDF"]
+```
+
+**Resume Invoice** starts at the saved snapshot. The publication checkpoint lets the file store recognize a PDF already moved to its final path. Recovery follows the saved paths and checksum even if the default invoice folder changes. Economy reads the issued totals from SQLite. A failed print request can be retried using the published PDF.
+
+## Settings saves
+
+One **Save** commits the company profile, calendar preferences, and Economy settings together in SQLite, including any removal of obsolete Economy overrides. If the transaction fails, the previous values remain in effect. Printer selection saves through the same preferences workflow. **Connect Google Calendar** and **Forget Google sign-in** use the separate authorization workflow.
+
 ## Limitations
 
-### Version 1.3.2
+### Version 1.4.2
 
   * VAT exemptions for individual students are outside the current scope.
   * No formal VAT return or bookkeeping-system VAT report; Economy Overview summarizes issued invoice net/VAT totals plus explicit manual legacy month overrides only.
@@ -296,5 +316,5 @@ The invoice printer is selected from Application Settings during setup. If no in
   * No support for credit notes/correction invoices.
   * No integration with MobilePay/Bank for payment registration.
   * No tax reserve estimate.
-  * No automated backup.
+  * No scheduled backups of the database or invoice folder. The Ledger backs up the database before upgrading its schema.
   * No calendar conflict detection for `Populate Calendar` beyond exact duplicate same-student same-date/time skipping.

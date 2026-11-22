@@ -1,9 +1,11 @@
 using System.Windows;
 using ElenasBusinessLedger.App.ViewModels;
 using ElenasBusinessLedger.App.Views;
+using ElenasBusinessLedger.Core.Students;
 
 namespace ElenasBusinessLedger.App.Services;
 
+// Coordinates the student list and details windows and returns selection changes to the dashboard.
 public sealed class StudentOverviewWindowLauncher : IStudentOverviewLauncher
 {
     private readonly IStudentOverviewService studentOverviewService;
@@ -29,9 +31,16 @@ public sealed class StudentOverviewWindowLauncher : IStudentOverviewLauncher
     public async Task<string?> ShowStudentOverviewAsync(
         string? selectedStudentShortName,
         Func<string?, CancellationToken, Task> selectedStudentChangedAsync,
+        CancellationToken cancellationToken) =>
+        (await ShowStudentOverviewForAsync(selectedStudentShortName is null ? null : new StudentChoice(0, selectedStudentShortName),
+            (choice, token) => selectedStudentChangedAsync(choice?.ShortName, token), cancellationToken))?.ShortName;
+
+    // Keeps the Students list and its owned Details window on the same selection and reports changes to the dashboard.
+    public async Task<StudentChoice?> ShowStudentOverviewForAsync(
+        StudentChoice? selectedStudent, Func<StudentChoice?, CancellationToken, Task> selectionChanged,
         CancellationToken cancellationToken)
     {
-        var viewModel = await CreateViewModelAsync(selectedStudentShortName);
+        var viewModel = await CreateViewModelAsync(selectedStudent);
         var window = new StudentOverviewView(viewModel)
         {
             Owner = Application.Current?.MainWindow
@@ -56,19 +65,19 @@ public sealed class StudentOverviewWindowLauncher : IStudentOverviewLauncher
         try
         {
             window.ShowDialog();
-            return viewModel.SelectedStudent?.ShortName;
+            return viewModel.SelectedStudent?.Choice;
         }
         finally
         {
             viewModel.SelectedStudentChanged -= OnSelectedStudentChanged;
         }
 
-        async void OnSelectedStudentChanged(object? sender, string? selectedShortName)
+        async void OnSelectedStudentChanged(object? sender, StudentChoice? choice)
         {
             try
             {
                 ShowDetailsWindow();
-                await selectedStudentChangedAsync(selectedShortName, cancellationToken);
+                await selectionChanged(choice, cancellationToken);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -108,19 +117,24 @@ public sealed class StudentOverviewWindowLauncher : IStudentOverviewLauncher
 
     public async Task<string?> ShowStudentDetailsAsync(
         string? selectedStudentShortName,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken) =>
+        (await ShowStudentDetailsForAsync(selectedStudentShortName is null ? null : new StudentChoice(0, selectedStudentShortName),
+            cancellationToken))?.ShortName;
+
+    // Opens Student Details for a dashboard selection and returns the final selected student.
+    public async Task<StudentChoice?> ShowStudentDetailsForAsync(StudentChoice? selectedStudent, CancellationToken cancellationToken)
     {
-        var viewModel = await CreateViewModelAsync(selectedStudentShortName);
+        var viewModel = await CreateViewModelAsync(selectedStudent);
         var window = new StudentDetailsView(viewModel)
         {
             Owner = Application.Current?.MainWindow
         };
 
         window.ShowDialog();
-        return viewModel.SelectedStudent?.ShortName;
+        return viewModel.SelectedStudent?.Choice;
     }
 
-    private async Task<StudentOverviewViewModel> CreateViewModelAsync(string? selectedStudentShortName)
+    private async Task<StudentOverviewViewModel> CreateViewModelAsync(StudentChoice? choice)
     {
         var viewModel = new StudentOverviewViewModel(
             studentOverviewService,
@@ -129,7 +143,7 @@ public sealed class StudentOverviewWindowLauncher : IStudentOverviewLauncher
             invoiceWorkflowLauncher,
             clock,
             new MessageBoxStudentOverviewInteractionService());
-        await viewModel.LoadAsync(selectedStudentShortName);
+        await viewModel.LoadAsync(choice?.ShortName, choice?.StudentId);
         return viewModel;
     }
 }

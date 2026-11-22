@@ -3,6 +3,7 @@ using ElenasBusinessLedger.Core.Money;
 
 namespace ElenasBusinessLedger.Tests.Core.Invoices;
 
+// Verifies draft validation and the billing details captured when an invoice snapshot is created.
 public sealed class InvoiceDraftTests
 {
     [Fact]

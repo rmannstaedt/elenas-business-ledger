@@ -6,6 +6,7 @@ using Google.Apis.Util.Store;
 
 namespace ElenasBusinessLedger.Infrastructure.Calendar;
 
+// Persists OAuth credentials encrypted for the current Windows user so later refreshes can reuse authorization.
 [SupportedOSPlatform("windows")]
 public sealed class WindowsProtectedFileDataStore : IDataStore
 {
@@ -24,6 +25,7 @@ public sealed class WindowsProtectedFileDataStore : IDataStore
         Directory.CreateDirectory(directoryPath);
     }
 
+    // Encrypts the Google credential for the current Windows user and writes it under the hashed key.
     public Task StoreAsync<T>(string key, T value)
     {
         var json = JsonSerializer.Serialize(value);
@@ -34,6 +36,7 @@ public sealed class WindowsProtectedFileDataStore : IDataStore
         return Task.CompletedTask;
     }
 
+    // Removes both filename variants so a deleted credential cannot be loaded through the legacy path.
     public Task DeleteAsync<T>(string key)
     {
         DeleteFileIfExists(GetHashedFilePath(key));
@@ -42,6 +45,7 @@ public sealed class WindowsProtectedFileDataStore : IDataStore
         return Task.CompletedTask;
     }
 
+    // Reads a saved credential and migrates its legacy filename when it is first accessed.
     public Task<T> GetAsync<T>(string key)
     {
         var filePath = GetHashedFilePath(key);
@@ -62,6 +66,10 @@ public sealed class WindowsProtectedFileDataStore : IDataStore
         return Task.FromResult(Read<T>(filePath));
     }
 
+    // Checks whether a token already exists without creating its directory just to report Settings status.
+    public static bool ContainsStoredKey(string directoryPath, string key) =>
+        Directory.Exists(directoryPath) && new WindowsProtectedFileDataStore(directoryPath).ContainsKey(key);
+
     public bool ContainsKey(string key) =>
         File.Exists(GetHashedFilePath(key)) ||
         File.Exists(GetLegacyFilePath(key));
@@ -74,6 +82,7 @@ public sealed class WindowsProtectedFileDataStore : IDataStore
         return JsonSerializer.Deserialize<T>(json)!;
     }
 
+    // Clears the credential store so Google sign-in can start again without saved tokens.
     public Task ClearAsync()
     {
         foreach (var file in Directory.GetFiles(directoryPath))

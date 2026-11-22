@@ -2,6 +2,7 @@ using System.Windows;
 
 namespace ElenasBusinessLedger.App.Services;
 
+// Prompts to save, discard, or keep editing before a student switch or a window close.
 public sealed class MessageBoxStudentOverviewInteractionService : IStudentOverviewInteractionService
 {
     public Task<StudentEditSaveChangesChoice> PromptSaveChangesAsync(CancellationToken cancellationToken)

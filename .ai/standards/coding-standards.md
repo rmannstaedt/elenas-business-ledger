@@ -212,9 +212,8 @@ These rules apply when a workflow distinguishes attempted, copied, queued, verif
 
 ## Comments and XML documentation
 
-- Keep comments selective and useful.
-- Explain invariants, safety decisions, framework pitfalls, non-obvious intent, and architectural boundaries.
-- Prefer comments that explain why, not comments that narrate obvious code.
-- Remove or correct stale comments.
-- Public contracts should have XML documentation when the guarantee is non-obvious, safety-relevant, durable, or relied on by other layers.
-- XML documentation must not promise behavior the implementation does not provide.
+- Give each authored C# class, interface, enum, and record a short `//` header explaining its responsibility and why it exists. Include nested types, authored migrations, and test helpers.
+- Put a short `//` comment above a public method when its purpose or caller expectations need explanation. Cover meaningful side effects and guarantees. A trivial method with a clear name and body can stand on its own.
+- Use inline comments to explain non-obvious algorithms, transformations, invariants, data ownership, and ordering decisions. Explain which constraint a future change needs to preserve and why.
+- Use concise XML documentation when IntelliSense or generated API documentation needs to expose an important public contract or safety guarantee.
+- Review affected comments and data-flow descriptions whenever behavior, data ownership, or sequencing changes. Update or remove stale explanations in the same change.

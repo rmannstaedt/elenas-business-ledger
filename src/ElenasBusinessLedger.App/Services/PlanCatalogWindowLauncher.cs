@@ -4,6 +4,7 @@ using ElenasBusinessLedger.App.Views;
 
 namespace ElenasBusinessLedger.App.Services;
 
+// Loads the plan editor and opens it as an owned window from the dashboard.
 public sealed class PlanCatalogWindowLauncher : IPlanCatalogLauncher
 {
     private readonly IPlanCatalogService planCatalogService;

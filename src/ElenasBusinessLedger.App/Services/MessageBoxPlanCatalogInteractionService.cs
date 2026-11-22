@@ -2,6 +2,7 @@ using System.Windows;
 
 namespace ElenasBusinessLedger.App.Services;
 
+// Asks whether to save, discard, or keep editing when plan navigation would leave changed fields behind.
 public sealed class MessageBoxPlanCatalogInteractionService : IPlanCatalogInteractionService
 {
     public Task<PlanCatalogAddPlanChoice> PromptAddPlanSaveChangesAsync(CancellationToken cancellationToken)
