@@ -1,6 +1,6 @@
 # Handoff
 
-Date: 2026-11-21
+Date: 2026-11-22
 
 ## Current State
 
@@ -10,7 +10,7 @@ Date: 2026-11-21
 
 - The architecture review fixes are tracked in `.ai/implementation-plans/completed/2026-11-21-ledger-integrity.md`. The revised source uses stable invoice ownership, scoped calendar links, and non-destructive calendar reconciliation.
 
-- Active plans include Student Overview Management, Local Lessons Ledger, Google OAuth Startup Token Reuse, UI Review Fixes, and Economy Manual Month Overrides. Several are awaiting final user checks.
+- Active plans include Local Lessons Ledger, UI Review Fixes, and Economy Manual Month Overrides. The maintainer completed the [Student Overview Management user test](../implementation-plans/completed/2026-06-20-student-overview-management.md) and the [Google OAuth Startup Token Reuse pilot](../implementation-plans/completed/2026-06-27-google-oauth-startup-token-reuse.md).
 - The maintainer accepted the v1.31 Populate Calendar and invoice issue, print, and reprint checks on 2026-11-21. See `.ai/implementation-plans/completed/2026-06-23-populate-calendar-from-student-schedule.md` and `.ai/implementation-plans/completed/2026-06-22-invoice-issue-finalization-and-print-status.md`.
 - The EF migrations and startup bootstrapper plan is completed under `.ai/implementation-plans/completed/2026-06-22-ef-migrations-and-startup-bootstrapper.md`.
 - The app is now a real WPF/Core/Infrastructure local-first pilot build, not sample-backed.
@@ -162,14 +162,14 @@ Date: 2026-11-21
 - Full build passed on 2026-06-20 after invoice plan-lineage implementation: `dotnet build MySmallBusinessLedger.sln -nodeReuse:false` with 0 warnings and 0 errors.
 - Full test suite passed on 2026-06-20 after invoice plan-lineage implementation: `dotnet test MySmallBusinessLedger.sln -nodeReuse:false` with 174/174 tests passing.
 - Focused Plan catalog tests passed on 2026-06-17: Stage 1 Core plan tests 9/9, Stage 2 SQLite persistence tests 10/10, Stage 3 Manage Plans tests 10/10, Stage 4 student assignment/editor/persistence tests 23/23.
-- Real browser OAuth consent reached Google's "Received verification code" page in a maintainer test; Stage 6 remains open for app-side dashboard/settings verification after these follow-up fixes.
+- On 2026-11-22, the maintainer confirmed completion of the pilot using testing OAuth, the Student Overview user test, and the invoice PDF and WPF dialog visual review.
 - `dotnet format MySmallBusinessLedger.sln --verify-no-changes --no-restore` may still report broad line-ending/whitespace issues across existing files; avoid a sweeping format rewrite unless the maintainer explicitly wants that cleanup.
 
 ## Recommended Next Actions
 
-1. Place the real publisher OAuth Desktop JSON at `src\ElenasBusinessLedger.App\Configuration\google-oauth-client.json`.
-2. Complete pilot setup through `Application > Settings`, then use Connect Google Calendar.
-3. Run the Student overview final user test from `.ai/implementation-plans/active/2026-06-20-student-overview-management.md`.
-4. Run the remaining OAuth/calendar pilot test against a safe Google Calendar/test invoice folder.
-5. Visually review the invoice PDF layout and WPF dialogs; PDF layout polish is intentionally deferred.
-6. Create follow-up plans for broader administration views, multi-period student plan history editing, backup/export, VAT reporting, and invoice layout touch-ups.
+1. **Open.** Place the publisher OAuth Desktop JSON at `src\ElenasBusinessLedger.App\Configuration\google-oauth-client.json`.
+2. **Complete.** Pilot setup and Google Calendar connection through `Application > Settings` used testing OAuth.
+3. **Complete.** The maintainer finished the Student Overview final user test.
+4. **Complete.** The maintainer finished the OAuth and Calendar pilot using testing OAuth.
+5. **Complete.** The maintainer finished the visual review of the invoice PDF and WPF dialogs.
+6. **Complete.** The maintainer confirmed follow-up planning for broader administration views, multi-period student plan history editing, backup/export, VAT reporting, and invoice layout touch-ups.

@@ -1,8 +1,8 @@
 # Implementation Plan: Google OAuth Startup Token Reuse
 
-Status: Active - implementation complete, awaiting user acceptance
+Status: Completed
 Created: 2026-06-27
-Last updated: 2026-06-27
+Last updated: 2026-11-22
 Owner/context: Ruben and Codex, after diagnosing an unexpected Google OAuth browser prompt at app startup.
 
 ## Related Docs And Standards
@@ -365,3 +365,5 @@ Cleanup/reset instructions:
     - Tests passed, 341/341.
   - Deviations: None.
   - Risks/open questions: Manual app startup smoke test remains the post-completion user test.
+
+- 2026-11-22. The maintainer confirmed completion of the OAuth and Calendar pilot using the testing OAuth configuration.

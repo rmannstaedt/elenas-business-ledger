@@ -1,8 +1,8 @@
 # Implementation Plan: Student Overview Management
 
-Status: Implemented; awaiting final user test
+Status: Completed
 Created: 2026-06-20
-Last updated: 2026-06-27
+Last updated: 2026-11-22
 Owner/context: Ruben and Codex; Ruben wants a comprehensive student management view similar in spirit to Manage Plans, with panes for students, selected student details, current plan, and invoices.
 
 ## Related Docs And Standards
@@ -332,3 +332,5 @@ Expected result: Student overview supports list/detail/current-plan/invoices and
   - Tests/verification run: `dotnet test ElenasBusinessLedger.sln --filter "FullyQualifiedName~MainWindowViewModelTests" -nodeReuse:false`; `dotnet build ElenasBusinessLedger.sln -nodeReuse:false`; `dotnet test ElenasBusinessLedger.sln -nodeReuse:false`.
   - Results: Focused main-window tests passed 82/82; full build passed with 0 warnings and 0 errors; full solution tests passed 348/348.
   - Risks/open questions: Manual confirmation should click the new main-window `Student Details` button and verify it opens the expected student.
+
+- 2026-11-22. The maintainer confirmed completion of the Student Overview final user test in the Ledger pilot with testing OAuth.
