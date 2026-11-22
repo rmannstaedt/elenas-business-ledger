@@ -1,4 +1,5 @@
 using System.Windows;
+using ElenasBusinessLedger.App.Services;
 using ElenasBusinessLedger.App.Startup;
 
 namespace ElenasBusinessLedger.App;
@@ -36,6 +37,11 @@ public partial class App : Application
         }
 
         MainWindow = startupResult.MainWindow;
-        startupResult.MainWindow.Show();
+        if (AppPaths.IsUserTestLaunch)
+        {
+            MainWindow.Title = $"{MainWindow.Title} [TEST DATA]";
+        }
+
+        MainWindow.Show();
     }
 }

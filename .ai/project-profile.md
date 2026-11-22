@@ -6,7 +6,7 @@ Working name: Elena's Business Ledger
 
 A Windows app for managing student lessons, invoices, and payments.
 
-Current app version: 1.4.0
+Current app version: 1.4.1
 
 Internal namespace/project prefix:
 ElenasBusinessLedger
@@ -17,7 +17,7 @@ Target framework: .NET 11. IDE builds require Visual Studio 18.12 or later.
 Platform: Windows desktop
 UI: WPF
 Architecture: local-first desktop app
-Installer/distribution: single-file Inno Setup installer with a self-contained .NET 11 build for Windows x64. The `scripts\build-installer.ps1` script creates `artifacts\installer\ElenasBusinessLedger-1.4.0-Setup.exe`. The installer build stages each attempt separately and replaces the same-named output only after a successful Inno compilation and candidate check. The per-user installer installs to `%LOCALAPPDATA%\Programs\MySmallBusinessLedger`, creates a Start menu shortcut, offers an optional desktop shortcut, has no auto-update behavior, and must preserve `%APPDATA%\visualtech.dk\MySmallBusinessLedger` during install, replacement, and uninstall.
+Installer/distribution: single-file Inno Setup installer with a self-contained .NET 11 build for Windows x64. The `scripts\build-installer.ps1` script creates `artifacts\installer\ElenasBusinessLedger-1.4.1-Setup.exe`. The installer build stages each attempt separately and replaces the same-named output only after a successful Inno compilation and candidate check. The per-user installer installs to `%LOCALAPPDATA%\Programs\MySmallBusinessLedger`, creates a Start menu shortcut, offers an optional desktop shortcut, has no auto-update behavior, and must preserve `%APPDATA%\visualtech.dk\MySmallBusinessLedger` during install, replacement, and uninstall.
 
 ## Solution shape
 

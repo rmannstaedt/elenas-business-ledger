@@ -5,6 +5,7 @@ using ElenasBusinessLedger.Core.Company;
 using ElenasBusinessLedger.Core.Invoices;
 using ElenasBusinessLedger.Core.Lessons;
 using ElenasBusinessLedger.Core.Ports;
+using ElenasBusinessLedger.Core.Students;
 using ElenasBusinessLedger.Core.Time;
 using ElenasBusinessLedger.Core.UseCases.Lessons;
 using ElenasBusinessLedger.Core.UseCases.Startup;
@@ -19,21 +20,47 @@ namespace ElenasBusinessLedger.Tests.App.Services;
 public sealed class AppServiceTests
 {
     [Fact]
-    public async Task StartupDashboardServiceReturnsFailureInsteadOfSampleRowsWhenCalendarIsNotConfigured()
+    public async Task StartupDashboardServiceKeepsSavedStudentChoicesWhenCalendarIsNotConfigured()
     {
-        var query = new LoadDashboardUseCase(
-            new EmptyStudentRepository(),
+        var cancellationToken = TestContext.Current.CancellationToken;
+        using var database = await TestDatabase.CreateAsync();
+        var students = new SqliteStudentRepository(database.CreateContext);
+        foreach (var name in new[] { "Mira", "Noah" })
+        {
+            var record = new StudentRecord(0,
+                new Student(name, $"{name} Example", "Example Lane", "", "", AgeBracket.Standard, null, true),
+                [], [new StudentScheduleEntry(DayOfWeek.Wednesday, new TimeOnly(16, 0))]);
+            var save = await students.SaveAsync(record, cancellationToken);
+            Assert.True(save.Succeeded);
+        }
+
+        var month = new DateOnly(2026, 6, 1);
+        var service = new CoreStartupDashboardService(new LoadDashboardUseCase(
+            students,
             new ThrowingCalendarGateway("Google Calendar is not configured."),
             new EmptyInvoiceRepository(),
             new FixedClock(),
-            new EmptyLessonRepository());
-        var service = new CoreStartupDashboardService(query);
+            new EmptyLessonRepository()));
 
-        var result = await service.LoadAsync(new DateOnly(2026, 6, 1), null, CancellationToken.None);
+        var result = await service.LoadAsync(month, null, cancellationToken);
 
         Assert.False(result.Succeeded);
-        Assert.Contains(result.Errors, error => error.Code == "Dashboard.RefreshFailed");
-        Assert.Contains("Google Calendar is not configured.", result.Errors[0].Message);
+        var warning = Assert.Single(result.Errors);
+        Assert.Equal("Calendar.RefreshFailed", warning.Code);
+        Assert.Equal("Google Calendar is not configured.", warning.Message);
+        var dashboard = Assert.IsType<StartupDashboardResult>(result.Value);
+        Assert.Equal("Mira", dashboard.CurrentStudentShortName);
+        Assert.Empty(dashboard.Lessons);
+        Assert.NotEmpty(dashboard.StudentNavigationEntries);
+        Assert.All(dashboard.StudentNavigationEntries, entry => Assert.False(entry.HasCalendarLesson));
+        var choices = Assert.IsAssignableFrom<IReadOnlyList<StudentChoice>>(dashboard.StudentChoices);
+        Assert.Equal(new[] { "Mira", "Noah" }, choices.Select(choice => choice.ShortName));
+
+        var noah = choices.Single(choice => choice.ShortName == "Noah");
+        var selected = await service.LoadAsync(month, "Mira", cancellationToken, noah.StudentId);
+
+        Assert.Equal(noah.StudentId, selected.Value?.CurrentStudentId);
+        Assert.Equal("Noah", selected.Value?.CurrentStudentShortName);
     }
 
     [Fact]
@@ -179,21 +206,6 @@ public sealed class AppServiceTests
             economyRepository);
     }
 
-    // Supplies an empty student catalog so dashboard tests isolate the behavior of calendar failures.
-    private sealed class EmptyStudentRepository : IStudentRepository
-    {
-        public Task<IReadOnlyList<StudentRecord>> ListStudentsAsync(CancellationToken cancellationToken) =>
-            Task.FromResult<IReadOnlyList<StudentRecord>>([]);
-
-        public Task<IReadOnlyList<StudentRecord>> ListActiveStudentsAsync(CancellationToken cancellationToken) =>
-            Task.FromResult<IReadOnlyList<StudentRecord>>([]);
-
-        public Task<StudentRecord?> GetByShortNameAsync(string shortName, CancellationToken cancellationToken) =>
-            Task.FromResult<StudentRecord?>(null);
-
-        public Task<OperationResult<StudentRecord>> SaveAsync(StudentRecord student, CancellationToken cancellationToken) =>
-            Task.FromResult(OperationResult<StudentRecord>.Success(student));
-    }
 
     // Supplies empty invoice reads so dashboard service tests run without billing records.
     private sealed class EmptyInvoiceRepository : IInvoiceRepository

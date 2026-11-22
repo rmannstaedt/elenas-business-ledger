@@ -1437,6 +1437,53 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public async Task DisconnectedDashboardAppliesLocalStudentChoicesAndKeepsCalendarSchedulingUnavailable()
+    {
+        var mira = new StudentChoice(1, "Mira");
+        var noah = new StudentChoice(2, "Noah");
+        var invoice = new IssuedInvoiceSummary(
+            new InvoiceNumber(1), "Mira", new DateOnly(2026, 6, 16),
+            PaymentStatus.Outstanding, string.Empty);
+        var warning = new ValidationError("Calendar.RefreshFailed", "Google Calendar is not configured.");
+        var miraDashboard = ForStudent(mira) with { Invoices = [invoice] };
+        var service = new FakeDashboardService
+        {
+            NextResult = OperationResult<StartupDashboardResult>.Failure(miraDashboard, warning)
+        };
+        var viewModel = CreateViewModel(dashboard: service);
+
+        await viewModel.LoadAsync();
+
+        Assert.Equal("Mira", viewModel.CurrentStudentShortName);
+        Assert.Equal(noah, Assert.Single(viewModel.SelectableStudents));
+        Assert.Single(viewModel.Invoices);
+        Assert.Equal(warning.Message, viewModel.ErrorMessage);
+        Assert.True(viewModel.OpenStudentDetailsCommand.CanExecute(null));
+        Assert.False(viewModel.AddLessonCommand.CanExecute(null));
+        Assert.False(viewModel.PopulateCalendarCommand.CanExecute(null));
+
+        var noahDashboard = ForStudent(noah);
+        service.NextResult = OperationResult<StartupDashboardResult>.Failure(noahDashboard, warning);
+        await viewModel.SelectStudentCommand.ExecuteAsync(noah);
+
+        Assert.Equal("Noah", viewModel.CurrentStudentShortName);
+        Assert.Equal(mira, Assert.Single(viewModel.SelectableStudents));
+        Assert.Empty(viewModel.Invoices);
+        Assert.Equal(warning.Message, viewModel.ErrorMessage);
+
+        service.NextResult = OperationResult<StartupDashboardResult>.Success(noahDashboard);
+        await viewModel.RefreshCommand.ExecuteAsync();
+
+        Assert.Null(viewModel.ErrorMessage);
+        Assert.True(viewModel.AddLessonCommand.CanExecute(null));
+        Assert.True(viewModel.PopulateCalendarCommand.CanExecute(null));
+
+        StartupDashboardResult ForStudent(StudentChoice student) =>
+            new(student.ShortName, ["Mira", "Noah"], [], [], true, [],
+                CurrentStudentId: student.StudentId, StudentChoices: [mira, noah]);
+    }
+
+    [Fact]
     public async Task ManualRefreshShowsCalendarErrorWithoutClearingExistingRows()
     {
         var dashboard = new FakeDashboardService();
@@ -1722,9 +1769,9 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public void ApplicationInfoUsesAppAssemblyVersion()
     {
-        Assert.Equal("1.4.0", ApplicationInfo.Version);
+        Assert.Equal("1.4.1", ApplicationInfo.Version);
         Assert.Contains("Elena's Business Ledger", ApplicationInfo.AboutText);
-        Assert.Contains("Version 1.4.0", ApplicationInfo.AboutText);
+        Assert.Contains("Version 1.4.1", ApplicationInfo.AboutText);
     }
 
     [Fact]

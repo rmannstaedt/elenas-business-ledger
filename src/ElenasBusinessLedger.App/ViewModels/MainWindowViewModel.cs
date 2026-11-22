@@ -50,6 +50,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private DashboardStudentLessonDefaults? currentStudentLessonDefaults;
     private Task? activationRefreshTask;
     private bool isBusy;
+    private bool isCalendarAvailable = true;
     private int activationRefreshSuspendCount;
     private LessonDisplayModel? selectedLesson;
     private InvoiceDisplayModel? selectedInvoice;
@@ -129,8 +130,8 @@ public sealed class MainWindowViewModel : ViewModelBase
         OpenManagePlansCommand = new AsyncRelayCommand(OpenManagePlansAsync, () => !IsBusy);
         OpenEconomyOverviewCommand = new AsyncRelayCommand(OpenEconomyOverviewAsync, () => !IsBusy);
         OpenAboutCommand = new AsyncRelayCommand(OpenAboutAsync);
-        AddLessonCommand = new AsyncRelayCommand(AddLessonAsync, () => !IsBusy && CurrentStudentShortName is not null);
-        PopulateCalendarCommand = new AsyncRelayCommand(PopulateCalendarAsync, CanPopulateCalendar);
+        AddLessonCommand = new AsyncRelayCommand(AddLessonAsync, CanScheduleLessons);
+        PopulateCalendarCommand = new AsyncRelayCommand(PopulateCalendarAsync, CanScheduleLessons);
         SaveLessonCommand = new AsyncRelayCommand(
             parameter => SaveLessonAsync((LessonDisplayModel)parameter!),
             parameter => parameter is LessonDisplayModel && !IsBusy);
@@ -309,20 +310,21 @@ public sealed class MainWindowViewModel : ViewModelBase
         try
         {
             var result = await dashboardService.LoadAsync(DisplayMonth, CurrentStudentShortName, CancellationToken.None, currentStudentId);
-            if (!result.Succeeded)
-            {
-                ErrorMessage = result.Errors.FirstOrDefault()?.Message ?? "Could not refresh dashboard.";
-                return;
-            }
-
             if (shouldApply is not null && !shouldApply())
             {
                 return;
             }
 
-            ApplyDashboard(result.Value!, lessonIdToSelect);
-            ErrorMessage = null;
-            lastRefreshAt = clock.Now;
+            ErrorMessage = result.Succeeded
+                ? null
+                : result.Errors.FirstOrDefault()?.Message ?? "Could not refresh dashboard.";
+            // A failed calendar read can still return a fresh projection from the local ledger.
+            if (result.Value is { } dashboard)
+            {
+                isCalendarAvailable = result.Succeeded;
+                ApplyDashboard(dashboard, lessonIdToSelect);
+                lastRefreshAt = clock.Now;
+            }
         }
         finally
         {
@@ -1328,9 +1330,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private bool CanNavigateStudents() =>
         !IsBusy && studentNavigationEntries.Length > 1;
 
-    private bool CanPopulateCalendar() =>
-        !IsBusy &&
-        CurrentStudentShortName is not null;
+    private bool CanScheduleLessons() => !IsBusy && isCalendarAvailable && CurrentStudentShortName is not null;
 
     private bool CanStartWriteInvoice() =>
         !IsBusy || IsActivationRefreshRunning();

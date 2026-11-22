@@ -49,7 +49,19 @@ public sealed class LoadDashboardUseCase
         var from = selectedMonth.AddMonths(-1).WithDay(1);
         var to = selectedMonth.AddMonths(2).WithDay(1).AddDays(-1);
         var students = await studentRepository.ListActiveStudentsAsync(cancellationToken);
-        var calendarLessons = await calendarGateway.ListLessonsAsync(from, to, cancellationToken);
+        IReadOnlyList<CalendarLesson> calendarLessons;
+        ValidationError? calendarError = null;
+        try
+        {
+            calendarLessons = await calendarGateway.ListLessonsAsync(from, to, cancellationToken);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // Keep the local ledger available when there are no verified calendar observations to reconcile.
+            calendarLessons = [];
+            calendarError = new ValidationError("Calendar.RefreshFailed", ex.Message);
+        }
+
         var studentsById = students.Where(student => student.Id > 0).ToDictionary(student => student.Id);
         var uniqueNames = students.GroupBy(student => StudentShortNameKey.From(student.Student.ShortName))
             .Where(group => group.Count() == 1).ToDictionary(group => group.Key, group => group.Single());
@@ -141,8 +153,11 @@ public sealed class LoadDashboardUseCase
         var studentNavigationEntries = projection.CreateStudentNavigationEntries(selectedMonth, knownCalendarLessons, students);
         var planOptions = await CreatePlanOptionsAsync(students, cancellationToken);
 
-        return OperationResult<StartupDashboardResult>.Success(
-            DashboardProjection.Create(selectedStudent, students, selectedLessons, invoices, studentNavigationEntries, planOptions));
+        var dashboard = DashboardProjection.Create(
+            selectedStudent, students, selectedLessons, invoices, studentNavigationEntries, planOptions);
+        return calendarError is null
+            ? OperationResult<StartupDashboardResult>.Success(dashboard)
+            : OperationResult<StartupDashboardResult>.Failure(dashboard, calendarError);
     }
 
     private async Task<IReadOnlyList<DashboardPlanOption>> CreatePlanOptionsAsync(

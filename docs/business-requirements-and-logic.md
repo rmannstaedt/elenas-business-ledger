@@ -316,7 +316,7 @@ One **Save** commits the company profile, calendar preferences, and Economy sett
 
 ## Limitations
 
-### Version 1.4.0
+### Version 1.4.1
 
   * VAT exemptions for individual students are outside the current scope.
   * No formal VAT return or bookkeeping-system VAT report; Economy Overview summarizes issued invoice net/VAT totals plus explicit manual legacy month overrides only.

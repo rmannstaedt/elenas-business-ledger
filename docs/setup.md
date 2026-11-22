@@ -4,7 +4,7 @@ You can use the Windows x64 installer or run the application from source. For a 
 
 ## Install or run the application
 
-**Windows installer.** Close any running copy of the Ledger and run `ElenasBusinessLedger-1.4.0-Setup.exe` from your normal Windows account. The installer includes the .NET runtime and installs per user. Open **Elena's Business Ledger** from the Start menu, then check **Application > About Elena's Business Ledger** for version **1.4.0**. The installer is unsigned, so Windows may show a SmartScreen prompt.
+**Windows installer.** Close any running copy of the Ledger and run `ElenasBusinessLedger-1.4.1-Setup.exe` from your normal Windows account. The installer includes the .NET runtime and installs per user. Open **Elena's Business Ledger** from the Start menu, then check **Application > About Elena's Business Ledger** for version **1.4.1**. The installer is unsigned, so Windows may show a SmartScreen prompt.
 
 If you have an earlier version, run this installer over the existing installation. The installer uses the existing installation identity and replaces application files in place. The database, Settings, and Google authorization stay in the existing app data folder. [Inno Setup upgrade behavior](https://jrsoftware.org/inno-setup/faq)
 
@@ -70,4 +70,4 @@ Deleting an appointment outside the Ledger leaves its local billing row in place
 
 **Application > Settings** shows the database location and app data folder. By default, `%APPDATA%\visualtech.dk\MySmallBusinessLedger` contains the SQLite database `ledger.db`, Windows user-protected Google authorization files under `GoogleTokens`, and saved window and grid layouts. Invoice PDFs are stored separately in the **Invoice folder** you selected. Installer upgrades and uninstall leave those data locations in place. To back up the ledger, close the application and copy the app data folder and the invoice folder.
 
-Version 1.4.0 also creates a verified SQLite backup in the app data folder under `Backups` before applying a schema upgrade. This backup covers the database. Continue to keep a copy of the separate invoice folder.
+Starting with version 1.4.0, the Ledger creates a verified SQLite backup in the app data folder under `Backups` before applying a schema upgrade. This backup covers the database. Continue to keep a copy of the separate invoice folder.
