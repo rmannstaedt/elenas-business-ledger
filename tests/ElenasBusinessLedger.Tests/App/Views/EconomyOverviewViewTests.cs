@@ -27,7 +27,7 @@ public sealed class EconomyOverviewViewTests
     [Fact]
     public void ToolbarUsesQuietArrowIconsAndRightAlignedExport()
     {
-        RunOnStaThread(() =>
+        WpfTestThread.Run(() =>
         {
             var view = new EconomyOverviewView(CreateViewModel());
             var buttons = FindChildren<Button>(view);
@@ -50,7 +50,7 @@ public sealed class EconomyOverviewViewTests
     [Fact]
     public void EconomyTablesDoNotExposeResizableOrDoubleBorderChrome()
     {
-        RunOnStaThread(() =>
+        WpfTestThread.Run(() =>
         {
             var view = new EconomyOverviewView(CreateViewModel());
 
@@ -94,7 +94,7 @@ public sealed class EconomyOverviewViewTests
     [Fact]
     public void AdminModeShowsManualControlsAndEditableMonthColumns()
     {
-        RunOnStaThread(() =>
+        WpfTestThread.Run(() =>
         {
             var normalView = new EconomyOverviewView(CreateViewModel());
             ProcessDataBindings(normalView);
@@ -123,7 +123,7 @@ public sealed class EconomyOverviewViewTests
     [Fact]
     public void CloseButtonDoesNotCloseWindowOnEscapeInAdminMode()
     {
-        RunOnStaThread(() =>
+        WpfTestThread.Run(() =>
         {
             var normalView = new EconomyOverviewView(CreateViewModel());
             ProcessDataBindings(normalView);
@@ -142,7 +142,7 @@ public sealed class EconomyOverviewViewTests
     [Fact]
     public void CloseButtonStillClosesWindowInAdminMode()
     {
-        RunOnStaThread(() =>
+        WpfTestThread.Run(() =>
         {
             var storePath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.json");
             WindowPlacementStore.StorePathOverride = storePath;
@@ -175,7 +175,7 @@ public sealed class EconomyOverviewViewTests
     [Fact]
     public void EnterInEditableMonthAmountFocusesSameColumnOnNextEditableRow()
     {
-        RunOnStaThread(() =>
+        WpfTestThread.Run(() =>
         {
             var storePath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.json");
             WindowPlacementStore.StorePathOverride = storePath;
@@ -232,7 +232,7 @@ public sealed class EconomyOverviewViewTests
     [Fact]
     public void BlockingErrorUsesWrappedStatusAreaAndExpandsWindow()
     {
-        RunOnStaThread(() =>
+        WpfTestThread.Run(() =>
         {
             var normalViewModel = CreateViewModel();
             var normalView = new EconomyOverviewView(normalViewModel);
@@ -371,27 +371,6 @@ public sealed class EconomyOverviewViewTests
         }
 
         return matches;
-    }
-
-    private static void RunOnStaThread(Action action)
-    {
-        ExceptionDispatchInfo? capturedException = null;
-        var thread = new Thread(() =>
-        {
-            try
-            {
-                action();
-            }
-            catch (Exception ex)
-            {
-                capturedException = ExceptionDispatchInfo.Capture(ex);
-            }
-        });
-
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        thread.Join();
-        capturedException?.Throw();
     }
 
     // Supplies a known report or error so the real WPF view can be exercised without loading SQLite.

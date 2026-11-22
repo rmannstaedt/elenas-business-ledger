@@ -60,7 +60,11 @@ public sealed class AddLessonUseCase
                 new ValidationError("Lesson.PlanNotAssignable", "The selected plan cannot be assigned to a lesson."));
         }
 
-        request = request with { StudentShortName = student.Student.ShortName };
+        request = request with
+        {
+            StudentShortName = student.Student.ShortName,
+            DurationMinutes = plan.DurationMinutes
+        };
         var addResult = await calendarGateway.AddLessonAsync(request, refreshMonth, cancellationToken);
         if (addResult.Value is not { } calendarResult || string.IsNullOrWhiteSpace(calendarResult.CreatedLesson.Id))
         {

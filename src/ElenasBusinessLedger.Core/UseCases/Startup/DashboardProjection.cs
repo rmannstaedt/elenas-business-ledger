@@ -91,7 +91,7 @@ internal sealed class DashboardProjection(TimeZoneInfo lessonTimeZone)
         }
 
         var defaultEntries = students
-            .SelectMany(student => CreateScheduledStarts(student.Schedule, fallbackFrom, fallbackTo)
+            .SelectMany(student => StudentScheduleOccurrences.Between(student.Schedule, fallbackFrom, fallbackTo, lessonTimeZone)
                 .Select(startsAt => new DashboardStudentNavigationEntry(
                     student.Student.ShortName,
                     startsAt,
@@ -113,25 +113,5 @@ internal sealed class DashboardProjection(TimeZoneInfo lessonTimeZone)
     {
         var date = DateOnly.FromDateTime(startsAt.DateTime);
         return date >= from && date <= to;
-    }
-
-    private IEnumerable<DateTimeOffset> CreateScheduledStarts(
-        IReadOnlyList<StudentScheduleEntry> schedule,
-        DateOnly from,
-        DateOnly to)
-    {
-        for (var date = from; date <= to; date = date.AddDays(1))
-        {
-            foreach (var entry in schedule)
-            {
-                if (entry.Weekday != date.DayOfWeek)
-                {
-                    continue;
-                }
-
-                var localDateTime = date.ToDateTime(entry.StartsAt);
-                yield return new DateTimeOffset(localDateTime, lessonTimeZone.GetUtcOffset(localDateTime));
-            }
-        }
     }
 }

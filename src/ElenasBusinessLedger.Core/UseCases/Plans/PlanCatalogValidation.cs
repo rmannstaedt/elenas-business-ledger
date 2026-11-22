@@ -6,93 +6,55 @@ namespace ElenasBusinessLedger.Core.UseCases.Plans;
 // Keeps draft and publication rules together so incomplete plans can be edited before going live.
 internal static class PlanCatalogValidation
 {
-    // Checks fields that a draft must already have while allowing publication-only values to be filled in later.
-    public static IReadOnlyList<ValidationError> ValidateDraft(PlanDraftInput input)
-    {
-        var errors = new List<ValidationError>();
-        if (input.PriceWithoutVat < 0m)
-        {
-            errors.Add(new ValidationError("Plan.PriceInvalid", "Plan price cannot be negative."));
-        }
+    // Checks the lesson terms that both drafts and published plans must satisfy.
+    public static IReadOnlyList<ValidationError> ValidateDraft(PlanDraftInput input) =>
+        PresentErrors(
+            ValidatePrice(input.PriceWithoutVat),
+            ValidateFrequency(input.LessonsPerWeek),
+            ValidateDuration(input.DurationMinutes),
+            ValidateFlexibility(input.Flexibility),
+            ValidateStudentCount(input.NumberOfStudents),
+            ValidatePaymentTerms(input.PaymentTerms?.Trim()));
 
-        if (!Enum.IsDefined(input.LessonsPerWeek))
-        {
-            errors.Add(new ValidationError("Plan.LessonsPerWeekInvalid", "Lessons per week is invalid."));
-        }
+    // Adds required-field checks before a draft can become assignable.
+    public static IReadOnlyList<ValidationError> ValidatePublish(PlanCatalogItem plan) =>
+        PresentErrors(
+            string.IsNullOrWhiteSpace(plan.Name)
+                ? new ValidationError("Plan.NameRequired", "Plan name is required.")
+                : null,
+            plan.PriceWithoutVat is null
+                ? new ValidationError("Plan.PriceRequired", "Plan price is required.")
+                : ValidatePrice(plan.PriceWithoutVat),
+            ValidateFrequency(plan.LessonsPerWeek),
+            ValidateDuration(plan.DurationMinutes),
+            ValidateStudentCount(plan.NumberOfStudents),
+            ValidateFlexibility(plan.Flexibility),
+            string.IsNullOrWhiteSpace(plan.PaymentTerms)
+                ? new ValidationError("Plan.PaymentTermsRequired", "Plan payment terms are required.")
+                : ValidatePaymentTerms(plan.PaymentTerms));
 
-        if (input.DurationMinutes <= 0)
-        {
-            errors.Add(new ValidationError("Plan.DurationInvalid", "Plan duration must be greater than zero."));
-        }
+    private static ValidationError? ValidatePrice(decimal? price) =>
+        price < 0m ? new("Plan.PriceInvalid", "Plan price cannot be negative.") : null;
 
-        if (!Enum.IsDefined(input.Flexibility))
-        {
-            errors.Add(new ValidationError("Plan.FlexibilityInvalid", "Plan flexibility is invalid."));
-        }
+    private static ValidationError? ValidateFrequency(LessonsPerWeek frequency) =>
+        !Enum.IsDefined(frequency) ? new("Plan.LessonsPerWeekInvalid", "Lessons per week is invalid.") : null;
 
-        if (input.NumberOfStudents <= 0)
-        {
-            errors.Add(new ValidationError("Plan.NumberOfStudentsInvalid", "Number of students must be greater than zero."));
-        }
+    private static ValidationError? ValidateDuration(int minutes) =>
+        minutes <= 0 ? new("Plan.DurationInvalid", "Plan duration must be greater than zero.") : null;
 
-        if (!string.IsNullOrWhiteSpace(input.PaymentTerms) && !PlanPaymentTerms.IsSupported(input.PaymentTerms.Trim()))
-        {
-            errors.Add(new ValidationError("Plan.PaymentTermsInvalid", "Plan payment terms are invalid."));
-        }
+    private static ValidationError? ValidateFlexibility(PlanFlexibility flexibility) =>
+        !Enum.IsDefined(flexibility) ? new("Plan.FlexibilityInvalid", "Plan flexibility is invalid.") : null;
 
-        return errors;
-    }
+    private static ValidationError? ValidateStudentCount(int count) =>
+        count <= 0 ? new("Plan.NumberOfStudentsInvalid", "Number of students must be greater than zero.") : null;
 
-    // Requires a price and payment terms in addition to valid lesson details before a plan becomes assignable.
-    public static IReadOnlyList<ValidationError> ValidatePublish(PlanCatalogItem plan)
-    {
-        var errors = new List<ValidationError>();
-        if (string.IsNullOrWhiteSpace(plan.Name))
-        {
-            errors.Add(new ValidationError("Plan.NameRequired", "Plan name is required."));
-        }
+    private static ValidationError? ValidatePaymentTerms(string? terms) =>
+        !string.IsNullOrWhiteSpace(terms) && !PlanPaymentTerms.IsSupported(terms)
+            ? new("Plan.PaymentTermsInvalid", "Plan payment terms are invalid.")
+            : null;
 
-        if (plan.PriceWithoutVat is null)
-        {
-            errors.Add(new ValidationError("Plan.PriceRequired", "Plan price is required."));
-        }
-        else if (plan.PriceWithoutVat < 0m)
-        {
-            errors.Add(new ValidationError("Plan.PriceInvalid", "Plan price cannot be negative."));
-        }
-
-        if (!Enum.IsDefined(plan.LessonsPerWeek))
-        {
-            errors.Add(new ValidationError("Plan.LessonsPerWeekInvalid", "Lessons per week is invalid."));
-        }
-
-        if (plan.DurationMinutes <= 0)
-        {
-            errors.Add(new ValidationError("Plan.DurationInvalid", "Plan duration must be greater than zero."));
-        }
-
-        if (plan.NumberOfStudents <= 0)
-        {
-            errors.Add(new ValidationError("Plan.NumberOfStudentsInvalid", "Number of students must be greater than zero."));
-        }
-
-        if (!Enum.IsDefined(plan.Flexibility))
-        {
-            errors.Add(new ValidationError("Plan.FlexibilityInvalid", "Plan flexibility is invalid."));
-        }
-
-        if (string.IsNullOrWhiteSpace(plan.PaymentTerms))
-        {
-            errors.Add(new ValidationError("Plan.PaymentTermsRequired", "Plan payment terms are required."));
-        }
-        else if (!PlanPaymentTerms.IsSupported(plan.PaymentTerms))
-        {
-            errors.Add(new ValidationError("Plan.PaymentTermsInvalid", "Plan payment terms are invalid."));
-        }
-
-        return errors;
-    }
-
+    private static IReadOnlyList<ValidationError> PresentErrors(params ValidationError?[] errors) =>
+        errors.OfType<ValidationError>().ToArray();
     public static PlanCatalogItem CreateDraft(PlanDraftInput input) =>
         new(
             Id: 0,

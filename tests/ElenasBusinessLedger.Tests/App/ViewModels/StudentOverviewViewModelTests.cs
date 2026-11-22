@@ -32,7 +32,7 @@ public sealed class StudentOverviewViewModelTests
     [Fact]
     public void ViewInitializesWithOverviewSurface()
     {
-        RunOnStaThread(() =>
+        WpfTestThread.Run(() =>
         {
             var viewModel = new StudentOverviewViewModel(
                 new FakeStudentOverviewService([CreateSnapshot("Anna", isActive: true)]),
@@ -53,7 +53,7 @@ public sealed class StudentOverviewViewModelTests
     [Fact]
     public void CloseButtonIsCompactAndRightAligned()
     {
-        RunOnStaThread(() =>
+        WpfTestThread.Run(() =>
         {
             var viewModel = new StudentOverviewViewModel(
                 new FakeStudentOverviewService([CreateSnapshot("Anna", isActive: true)]),
@@ -77,7 +77,7 @@ public sealed class StudentOverviewViewModelTests
     [Fact]
     public void StudentOverviewHeadingsNamePaneContext()
     {
-        RunOnStaThread(() =>
+        WpfTestThread.Run(() =>
         {
             var viewModel = new StudentOverviewViewModel(
                 new FakeStudentOverviewService([CreateSnapshot("Anna", isActive: true)]),
@@ -112,7 +112,7 @@ public sealed class StudentOverviewViewModelTests
     [Fact]
     public void StudentOverviewKeepsAddStudentActionNearListHeading()
     {
-        RunOnStaThread(() =>
+        WpfTestThread.Run(() =>
         {
             var viewModel = new StudentOverviewViewModel(
                 new FakeStudentOverviewService([CreateSnapshot("Anna", isActive: true)]),
@@ -144,7 +144,7 @@ public sealed class StudentOverviewViewModelTests
     [Fact]
     public void StudentDetailsLayoutUsesFixedColumnsWithoutResizeSplitter()
     {
-        RunOnStaThread(() =>
+        WpfTestThread.Run(() =>
         {
             var viewModel = new StudentOverviewViewModel(
                 new FakeStudentOverviewService([CreateSnapshot("Anna", isActive: true)]),
@@ -187,7 +187,7 @@ public sealed class StudentOverviewViewModelTests
     [Fact]
     public void StudentDetailsFixedSizeLayoutDoesNotNeedScrollBars()
     {
-        RunOnStaThread(() =>
+        WpfTestThread.Run(() =>
         {
             var viewModel = new StudentOverviewViewModel(
                 new FakeStudentOverviewService([CreateSnapshot("Anna", isActive: true)]),
@@ -220,7 +220,7 @@ public sealed class StudentOverviewViewModelTests
     [Fact]
     public void StudentDetailsRestoresPositionWithoutRestoringOversizedWindowSize()
     {
-        RunOnStaThread(() =>
+        WpfTestThread.Run(() =>
         {
             var storeDirectory = Path.Combine(
                 Path.GetTempPath(),
@@ -282,7 +282,7 @@ public sealed class StudentOverviewViewModelTests
     [Fact]
     public void StudentDetailsFieldInputsUseConsistentHeight()
     {
-        RunOnStaThread(() =>
+        WpfTestThread.Run(() =>
         {
             var viewModel = new StudentOverviewViewModel(
                 new FakeStudentOverviewService([CreateSnapshot("Anna", isActive: true)]),
@@ -304,7 +304,7 @@ public sealed class StudentOverviewViewModelTests
     [Fact]
     public void StudentDetailsPlanFieldsShareStudentFieldRowRhythm()
     {
-        RunOnStaThread(() =>
+        WpfTestThread.Run(() =>
         {
             var viewModel = new StudentOverviewViewModel(
                 new FakeStudentOverviewService([CreateSnapshot("Anna", isActive: true)]),
@@ -345,7 +345,7 @@ public sealed class StudentOverviewViewModelTests
     [Fact]
     public void StudentDetailsActionsAreBottomLeftWithSaveAndCancel()
     {
-        RunOnStaThread(() =>
+        WpfTestThread.Run(() =>
         {
             var viewModel = new StudentOverviewViewModel(
                 new FakeStudentOverviewService([CreateSnapshot("Anna", isActive: true)]),
@@ -385,7 +385,7 @@ public sealed class StudentOverviewViewModelTests
     [InlineData("Cancel", false, true)]
     public void StudentDetailsActionsCloseOnlyWhenSavedOrCancelled(string action, bool saveFails, bool newStudent)
     {
-        RunOnStaThread(() =>
+        WpfTestThread.Run(() =>
         {
             var interactions = new FakeStudentOverviewInteractionService();
             var editor = new FakeStudentEditorService { SaveFails = saveFails };
@@ -443,7 +443,7 @@ public sealed class StudentOverviewViewModelTests
     [Fact]
     public void StudentOverviewAndDetailsWindowsShareSelectedStudent()
     {
-        RunOnStaThread(() =>
+        WpfTestThread.Run(() =>
         {
             var viewModel = new StudentOverviewViewModel(
                 new FakeStudentOverviewService(
@@ -794,31 +794,6 @@ public sealed class StudentOverviewViewModelTests
             "Paid monthly in advance",
             RetireOn: null,
             PlanCatalogState.Active);
-
-    private static void RunOnStaThread(Action action)
-    {
-        Exception? exception = null;
-        var thread = new Thread(() =>
-        {
-            try
-            {
-                action();
-            }
-            catch (Exception ex)
-            {
-                exception = ex;
-            }
-        });
-
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        thread.Join();
-
-        if (exception is not null)
-        {
-            throw exception;
-        }
-    }
 
     private static IReadOnlyList<T> FindChildren<T>(DependencyObject root)
         where T : DependencyObject

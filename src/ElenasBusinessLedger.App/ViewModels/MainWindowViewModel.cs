@@ -32,8 +32,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private readonly IAboutDialogLauncher aboutDialogLauncher;
     private readonly IUiClock clock;
     private readonly TimeZoneInfo lessonTimeZone;
-    private readonly Dictionary<LessonDisplayModel, int> autoSaveDraftVersions = [];
-    private readonly HashSet<LessonDisplayModel> savingDraftLessons = [];
+    private readonly DraftLessonAutosave draftAutosave;
     private readonly List<LessonDisplayModel> draftLessonRows = [];
     private readonly HashSet<LessonDisplayModel> savingPlanLessons = [];
     private readonly Dictionary<LessonDisplayModel, int> pendingPlanCatalogIds = [];
@@ -91,6 +90,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         this.aboutDialogLauncher = aboutDialogLauncher;
         this.clock = clock;
         this.lessonTimeZone = lessonTimeZone ?? TimeZoneInfo.Local;
+        draftAutosave = new DraftLessonAutosave(SaveDraftLessonAsync);
         displayMonth = new DateOnly(clock.Now.Year, clock.Now.Month, 1);
 
         RefreshCommand = new AsyncRelayCommand(() => RefreshAsync(), () => !IsBusy);
@@ -638,11 +638,6 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     private async Task SaveLessonAsync(LessonDisplayModel lesson)
     {
-        await SaveLessonAsync(lesson, initiatedByAutoSave: false);
-    }
-
-    private async Task SaveLessonAsync(LessonDisplayModel lesson, bool initiatedByAutoSave)
-    {
         if (!lesson.CanEdit)
         {
             ErrorMessage = lesson.State == LessonState.Completed
@@ -651,19 +646,9 @@ public sealed class MainWindowViewModel : ViewModelBase
             return;
         }
 
-        if (lesson.IsDraft && savingDraftLessons.Contains(lesson))
+        if (lesson.IsDraft)
         {
-            return;
-        }
-
-        if (!initiatedByAutoSave && lesson.IsDraft && autoSaveDraftVersions.TryGetValue(lesson, out var version))
-        {
-            autoSaveDraftVersions[lesson] = version + 1;
-        }
-
-        if (lesson.IsDraft && lesson.PlanCatalogId <= 0)
-        {
-            ErrorMessage = null;
+            await draftAutosave.SaveNowAsync(lesson);
             return;
         }
 
@@ -672,22 +657,6 @@ public sealed class MainWindowViewModel : ViewModelBase
             ErrorMessage = null;
             return;
         }
-
-        if (lesson.IsDraft)
-        {
-            savingDraftLessons.Add(lesson);
-            try
-            {
-                await SaveDraftLessonAsync(lesson, startsAt, hasKnownStartTime);
-            }
-            finally
-            {
-                savingDraftLessons.Remove(lesson);
-                autoSaveDraftVersions.Remove(lesson);
-            }
-            return;
-        }
-
         if (!lesson.HasDateTimeChange)
         {
             ErrorMessage = null;
@@ -709,9 +678,15 @@ public sealed class MainWindowViewModel : ViewModelBase
         await RefreshAsync();
     }
 
-    private async Task SaveDraftLessonAsync(LessonDisplayModel lesson, DateTimeOffset startsAt, bool hasKnownStartTime)
+    private async Task SaveDraftLessonAsync(LessonDisplayModel lesson)
     {
         var requestedPlanCatalogId = lesson.PlanCatalogId;
+        if (requestedPlanCatalogId <= 0 || !lesson.TryGetStartsAt(out var startsAt, out var hasKnownStartTime))
+        {
+            ErrorMessage = null;
+            return;
+        }
+
         var result = await lessonEditorService.AddAsync(
             new LessonAddRequest(lesson.StudentShortName, startsAt, requestedPlanCatalogId, hasKnownStartTime, lesson.StudentId),
             DisplayMonth,
@@ -1150,6 +1125,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private void RemoveLessonRow(LessonDisplayModel lesson)
     {
         lesson.PropertyChanged -= OnLessonPropertyChanged;
+        draftAutosave.CancelPending(lesson);
         draftLessonRows.Remove(lesson);
         Lessons.Remove(lesson);
     }
@@ -1183,7 +1159,7 @@ public sealed class MainWindowViewModel : ViewModelBase
 
             if (lesson.IsDraft)
             {
-                TryAutoSaveCompleteDraftLesson(lesson);
+                draftAutosave.Schedule(lesson);
                 return;
             }
 
@@ -1192,7 +1168,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         }
 
         SortLessonsPreservingSelection(lesson);
-        TryAutoSaveCompleteDraftLesson(lesson);
+        draftAutosave.Schedule(lesson);
     }
 
     private void TrySaveLessonPlanChange(LessonDisplayModel lesson)
@@ -1283,47 +1259,6 @@ public sealed class MainWindowViewModel : ViewModelBase
         SelectedLesson = selected is not null && Lessons.Contains(selected)
             ? selected
             : null;
-    }
-
-    private void TryAutoSaveCompleteDraftLesson(LessonDisplayModel lesson)
-    {
-        if (!lesson.IsDraft ||
-            lesson.PlanCatalogId <= 0 ||
-            !lesson.TryGetStartsAt(out _))
-        {
-            return;
-        }
-
-        var version = autoSaveDraftVersions.TryGetValue(lesson, out var currentVersion)
-            ? currentVersion + 1
-            : 1;
-        autoSaveDraftVersions[lesson] = version;
-        _ = AutoSaveCompleteDraftLessonAsync(lesson, version);
-    }
-
-    private async Task AutoSaveCompleteDraftLessonAsync(LessonDisplayModel lesson, int version)
-    {
-        await Task.Delay(250);
-        if (!lesson.IsDraft ||
-            !autoSaveDraftVersions.TryGetValue(lesson, out var latestVersion) ||
-            latestVersion != version ||
-            savingDraftLessons.Contains(lesson))
-        {
-            return;
-        }
-
-        try
-        {
-            await SaveLessonAsync(lesson, initiatedByAutoSave: true);
-        }
-        finally
-        {
-            if (autoSaveDraftVersions.TryGetValue(lesson, out latestVersion) &&
-                latestVersion == version)
-            {
-                autoSaveDraftVersions.Remove(lesson);
-            }
-        }
     }
 
     private bool CanNavigateStudents() =>

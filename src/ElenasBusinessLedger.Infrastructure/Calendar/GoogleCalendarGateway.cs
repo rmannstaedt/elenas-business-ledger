@@ -63,13 +63,7 @@ public sealed class GoogleCalendarGateway : IGoogleCalendarGateway
         string createdLessonId;
         try
         {
-            createdLessonId = await eventClient.CreateLessonEventAsync(
-                options.CalendarId,
-                $"$ {request.StudentShortName}",
-                request.StartsAt,
-                request.HasKnownStartTime,
-                options.DefaultLessonDuration,
-                cancellationToken);
+            createdLessonId = await CreateLessonEventAsync(request, cancellationToken);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -127,13 +121,7 @@ public sealed class GoogleCalendarGateway : IGoogleCalendarGateway
             string createdLessonId;
             try
             {
-                createdLessonId = await eventClient.CreateLessonEventAsync(
-                    options.CalendarId,
-                    $"$ {request.StudentShortName}",
-                    request.StartsAt,
-                    request.HasKnownStartTime,
-                    options.DefaultLessonDuration,
-                    cancellationToken);
+                createdLessonId = await CreateLessonEventAsync(request, cancellationToken);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -154,6 +142,15 @@ public sealed class GoogleCalendarGateway : IGoogleCalendarGateway
 
         return await RefreshAfterSuccessfulPopulateAsync(refreshMonth, createdLessons, cancellationToken);
     }
+
+    private Task<string> CreateLessonEventAsync(LessonAddRequest request, CancellationToken cancellationToken) =>
+        eventClient.CreateLessonEventAsync(
+            options.CalendarId,
+            $"$ {request.StudentShortName}",
+            request.StartsAt,
+            request.HasKnownStartTime,
+            request.DurationMinutes is { } minutes ? TimeSpan.FromMinutes(minutes) : options.DefaultLessonDuration,
+            cancellationToken);
 
     public async Task<OperationResult<IReadOnlyList<CalendarLesson>>> UpdateLessonAsync(
         LessonEditRequest request,

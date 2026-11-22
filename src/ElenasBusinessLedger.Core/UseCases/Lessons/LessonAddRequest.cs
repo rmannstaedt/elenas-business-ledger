@@ -6,4 +6,5 @@ public sealed record LessonAddRequest(
     DateTimeOffset StartsAt,
     int PlanCatalogId,
     bool HasKnownStartTime = true,
-    int? StudentId = null);
+    int? StudentId = null,
+    int? DurationMinutes = null);

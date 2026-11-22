@@ -93,11 +93,45 @@ public sealed class InvoicePdfDocumentModelTests
             Assert.Single(model.PlanChangeNotes));
     }
 
-    private static InvoiceLineDraft CreateLine(int year, int month, int day, string planName) =>
+    [Fact]
+    public void CreateNotesBothPlanChangesWhenTheStudentReturnsToTheFirstPlan()
+    {
+        var model = ProjectPlanChanges(
+            CreateLine(2026, 6, 1, "Piano A", planId: 1),
+            CreateLine(2026, 6, 8, "Piano B", planId: 2),
+            CreateLine(2026, 6, 15, "Piano A", planId: 1));
+
+        Assert.Equal(
+            ["Plan skiftede fra Piano A til Piano B den 08-06-2026.",
+             "Plan skiftede fra Piano B til Piano A den 15-06-2026."],
+            model.PlanChangeNotes);
+    }
+
+    [Fact]
+    public void CreateNotesChangeBetweenDifferentPlansWithTheSameLabel()
+    {
+        var model = ProjectPlanChanges(
+            CreateLine(2026, 6, 1, "Piano", planId: 1),
+            CreateLine(2026, 6, 8, "Piano", planId: 2));
+
+        Assert.Equal("Plan skiftede til en anden plan med navnet Piano den 08-06-2026.",
+            Assert.Single(model.PlanChangeNotes));
+    }
+
+    private static InvoicePdfDocumentModel ProjectPlanChanges(params InvoiceLineDraft[] lines)
+    {
+        var draft = InvoiceDraft.Create(new DateOnly(2026, 6, 23),
+            new CompanySnapshot("Maple Key Studio", "18 Example Lane", null, ""),
+            new StudentSnapshot("Mira", "Mira Vale", "42 Sample Lane"), lines, priceAdjustment: null);
+        var net = Money.Dkk(350m * lines.Length);
+        return InvoicePdfDocumentModel.Create(draft, new InvoiceTotals(net, Money.Dkk(0m), net), new InvoiceNumber(2));
+    }
+
+    private static InvoiceLineDraft CreateLine(int year, int month, int day, string planName, int? planId = null) =>
         new(
             new DateTimeOffset(year, month, day, 14, 0, 0, TimeSpan.FromHours(2)),
             planName,
             Money.Dkk(350m),
-            planName.Contains('1', StringComparison.Ordinal) ? 1 : 2,
+            planId ?? (planName.Contains('1', StringComparison.Ordinal) ? 1 : 2),
             year * 10000 + month * 100 + day);
 }

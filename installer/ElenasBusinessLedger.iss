@@ -1,6 +1,8 @@
 #define MyAppName "Elena's Business Ledger"
 #define MyAppDescription "A Windows app for managing student lessons, invoices, and payments."
-#define MyAppVersion "1.4.2"
+#ifndef MyAppVersion
+#error Use scripts/build-installer.ps1 to supply the app version.
+#endif
 #define MyAppPublisher "visualtech.dk"
 #define MyAppExeName "ElenasBusinessLedger.App.exe"
 ; Replace the prior launcher in place so existing Windows shortcuts keep working.
@@ -25,7 +27,7 @@ DefaultGroupName={#MyAppName}
 UsePreviousGroup=no
 DisableProgramGroupPage=yes
 OutputDir={#OutputDir}
-OutputBaseFilename=ElenasBusinessLedger-1.4.2-Setup
+OutputBaseFilename=ElenasBusinessLedger-{#MyAppVersion}-Setup
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern

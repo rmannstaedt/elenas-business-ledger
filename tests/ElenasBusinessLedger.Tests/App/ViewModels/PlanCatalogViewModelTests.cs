@@ -302,7 +302,7 @@ public sealed class PlanCatalogViewModelTests
     [Fact]
     public void PlanCatalogViewInitializesWithStateAwareControls()
     {
-        RunOnStaThread(() =>
+        WpfTestThread.Run(() =>
         {
             var viewModel = new PlanCatalogViewModel(new FakePlanCatalogService());
             var window = new PlanCatalogView(viewModel);
@@ -546,30 +546,6 @@ public sealed class PlanCatalogViewModelTests
         {
             PromptClosePlanSaveChangesCount++;
             return Task.FromResult(NextClosePlanChoice);
-        }
-    }
-
-    private static void RunOnStaThread(Action action)
-    {
-        Exception? exception = null;
-        var thread = new Thread(() =>
-        {
-            try
-            {
-                action();
-            }
-            catch (Exception ex)
-            {
-                exception = ex;
-            }
-        });
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        thread.Join();
-
-        if (exception is not null)
-        {
-            throw exception;
         }
     }
 

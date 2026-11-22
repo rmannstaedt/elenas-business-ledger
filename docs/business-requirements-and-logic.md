@@ -16,7 +16,7 @@
     name
     price (without VAT)
     lessons per week: 1 / 2 / by appointment
-    duration: 30 / 60
+    duration in minutes
     flexibility: none / move or cancel by agreement
     number of students: 1 / 2
     effective date: <date/time>
@@ -202,7 +202,7 @@ The application also contains a button:
 The lesson toolbar contains a `Populate Calendar` action for the selected Student and displayed month. This action seeds Google Calendar immediately from the selected Student's saved standard schedule:
   * The action checks the full displayed month from the first day through the last, including dates earlier than today. Each scheduled occurrence uses the Student's assigned Plan in effect on that date.
   * The action writes the resulting lesson entries to Google Calendar immediately and saves the created local billing lesson rows before reporting success; there is no separate save operation.
-  * Exact same-Student date/time matches in Google Calendar are skipped. An invoice-locked local lesson also occupies its original slot if its calendar event was moved or removed.
+  * New timed events use the plan duration in effect on the occurrence date. Exact same-Student date/time matches in Google Calendar are skipped. An invoice-locked local lesson also occupies its original slot if its calendar event was moved or removed.
   * Version 1 does not detect or handle other calendar conflicts. Conflicts must be resolved manually by the user in Google Calendar.
 
 Lessons that are completed or invoiced:yes CAN NOT be edited or deleted in the main lesson list.
@@ -218,7 +218,7 @@ The planned and invoiced:no entries in the lesson list may be edited directly in
 
 `Add Lesson` starts a planned row dated today in the current month or on the first day of another displayed month. It uses the Student's first saved schedule slot for that weekday, or the first saved slot if the weekday has none. The Student's assigned Plan in effect on the draft date is selected if it can be assigned to new lessons. The button saves immediately when the date and plan are available. If the assigned plan is unavailable, selecting a plan in the draft saves it. If no Active plan exists, the application shows `Create or publish an active plan first.` Later edits to date, time, plan, or state are also saved immediately. Rapid changes to an editable lesson's plan must preserve and save the final selected plan.
 
-Lesson date editing uses a date selector. Lesson date and lesson plan are required for a new lesson to be saved. Lesson time is optional: a lesson without a known time is saved as an all-day Google Calendar event, displays without a time in the lesson list, and prints without a time on invoices. Lesson time editing provides a no-time option plus a time selector from 08:00 through 20:00 in 15-minute increments while still allowing typed time input. Lesson cancellation uses an explicit delete action with a confirmation prompt.
+Lesson date editing uses a date selector. Lesson date and lesson plan are required for a new lesson to be saved. Timed events created by Add Lesson use the selected plan duration. A lesson without a known time is saved as an all-day Google Calendar event, displays without a time in the lesson list, and prints without a time on invoices. Lesson time editing provides a no-time option plus a time selector from 08:00 through 20:00 in 15-minute increments while still allowing typed time input. Lesson cancellation uses an explicit delete action with a confirmation prompt.
 
 Before changing or cancelling a linked lesson, the Ledger places a local hold on the lesson so it cannot be invoiced concurrently. Acknowledged Google Calendar writes update the local lesson before the next dashboard refresh. A rejected change releases the hold. If Google Calendar's result is uncertain or the local write cannot be completed, the lesson shows **Review needed** and stays out of billing. Use that action to reconcile the original event or confirm its removal after checking the configured Google calendar.
 
@@ -239,7 +239,7 @@ The Invoice will contain the Student information.
 The Invoice will contain the period/month it is written for.
 The Invoice will contain grouped service lines summarizing lessons by issued lesson plan and price.
 The Invoice will contain a single clear list of local uninvoiced lessons selected for that Student.
-If the invoice covers lessons under more than one Plan, the explanatory text lists the plan change with the cut-over date.
+The invoice notes list each change between consecutive plan IDs, in lesson order. Each note uses the saved plan names and the date of the first lesson under the new plan.
 The Invoice will contain VAT information, if currently relevant.
 VAT applicability is based on the invoice period start date, not the invoice issue/print date.
 The Invoice will contain price information.

@@ -153,7 +153,7 @@ public sealed class GoogleCalendarGatewayTests
     }
 
     [Fact]
-    public async Task AddLessonCreatesMarkedEventWithConfiguredDurationThenRefreshesMonth()
+    public async Task AddLessonCreatesMarkedEventWithPlanDurationThenRefreshesMonth()
     {
         var client = new FakeGoogleCalendarEventClient
         {
@@ -163,9 +163,9 @@ public sealed class GoogleCalendarGatewayTests
             ]
         };
 
-        var gateway = new GoogleCalendarGateway(client, CreateOptions(defaultLessonDuration: TimeSpan.FromMinutes(45)));
+        var gateway = new GoogleCalendarGateway(client, CreateOptions());
         var result = await gateway.AddLessonAsync(
-            new LessonAddRequest("Anna", new DateTimeOffset(2026, 6, 20, 15, 0, 0, TimeSpan.FromHours(2)), PlanCatalogId: 42),
+            new LessonAddRequest("Anna", new DateTimeOffset(2026, 6, 20, 15, 0, 0, TimeSpan.FromHours(2)), PlanCatalogId: 42, DurationMinutes: 45),
             new DateOnly(2026, 6, 1),
             CancellationToken.None);
 
@@ -205,7 +205,7 @@ public sealed class GoogleCalendarGatewayTests
     }
 
     [Fact]
-    public async Task PopulateLessonsCreatesMarkedEventsWithConfiguredDurationThenRefreshesMonth()
+    public async Task PopulateLessonsCreatesMarkedEventsWithEachPlanDurationThenRefreshesMonth()
     {
         var client = new FakeGoogleCalendarEventClient
         {
@@ -216,11 +216,11 @@ public sealed class GoogleCalendarGatewayTests
             ]
         };
 
-        var gateway = new GoogleCalendarGateway(client, CreateOptions(defaultLessonDuration: TimeSpan.FromMinutes(45)));
+        var gateway = new GoogleCalendarGateway(client, CreateOptions());
         var result = await gateway.PopulateLessonsAsync(
             [
-                new LessonAddRequest("Anna", new DateTimeOffset(2026, 6, 23, 15, 0, 0, TimeSpan.FromHours(2)), PlanCatalogId: 42),
-                new LessonAddRequest("Anna", new DateTimeOffset(2026, 6, 30, 15, 0, 0, TimeSpan.FromHours(2)), PlanCatalogId: 42)
+                new LessonAddRequest("Anna", new DateTimeOffset(2026, 6, 23, 15, 0, 0, TimeSpan.FromHours(2)), PlanCatalogId: 42, DurationMinutes: 45),
+                new LessonAddRequest("Anna", new DateTimeOffset(2026, 6, 30, 15, 0, 0, TimeSpan.FromHours(2)), PlanCatalogId: 43, DurationMinutes: 75)
             ],
             new DateOnly(2026, 6, 1),
             CancellationToken.None);
@@ -233,7 +233,7 @@ public sealed class GoogleCalendarGatewayTests
                 new DateTimeOffset(2026, 6, 30, 15, 0, 0, TimeSpan.FromHours(2))
             ],
             client.CreatedEvents.Select(created => created.StartsAt));
-        Assert.All(client.CreatedEvents, created => Assert.Equal(TimeSpan.FromMinutes(45), created.Duration));
+        Assert.Equal([TimeSpan.FromMinutes(45), TimeSpan.FromMinutes(75)], client.CreatedEvents.Select(created => created.Duration));
         Assert.Equal(new DateTimeOffset(2026, 6, 1, 0, 0, 0, TimeSpan.FromHours(2)), client.LastListFromInclusive);
         Assert.Equal(new DateTimeOffset(2026, 7, 1, 0, 0, 0, TimeSpan.FromHours(2)), client.LastListToExclusive);
         Assert.Equal(["created-1", "created-2"], result.Value!.Select(lesson => lesson.Id));

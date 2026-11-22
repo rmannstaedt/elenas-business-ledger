@@ -23,7 +23,7 @@ public sealed class InvoiceViewModelTests
     [Fact]
     public void WriteInvoiceOpensPreviewDirectlyAndCancelDoesNotIssue()
     {
-        RunOnStaThread(() =>
+        WpfTestThread.Run(() =>
         {
             var workflow = new FakeInvoiceWorkflowService();
             var clock = new FixedInvoiceClock(new DateTimeOffset(2026, 11, 22, 12, 0, 0, TimeSpan.Zero));
@@ -216,7 +216,7 @@ public sealed class InvoiceViewModelTests
     [Fact]
     public void PreviewIncludeCheckboxPreviewClickTogglesLine()
     {
-        RunOnStaThread(() =>
+        WpfTestThread.Run(() =>
         {
             var viewModel = new InvoicePreviewViewModel(new FakeInvoiceWorkflowService(), CreatePreview());
             var window = new InvoicePreviewView(viewModel);
@@ -243,7 +243,7 @@ public sealed class InvoiceViewModelTests
     [Fact]
     public void PreviewIncludeCheckboxHasLessonSpecificAccessibleName()
     {
-        RunOnStaThread(() =>
+        WpfTestThread.Run(() =>
         {
             var viewModel = new InvoicePreviewViewModel(new FakeInvoiceWorkflowService(), CreatePreview());
             var window = new InvoicePreviewView(viewModel);
@@ -401,31 +401,6 @@ public sealed class InvoiceViewModelTests
             printStatus,
             printedAt,
             lastPrintError);
-    }
-
-    private static void RunOnStaThread(Action action)
-    {
-        Exception? exception = null;
-        var thread = new Thread(() =>
-        {
-            try
-            {
-                action();
-            }
-            catch (Exception ex)
-            {
-                exception = ex;
-            }
-        });
-
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        thread.Join();
-
-        if (exception is not null)
-        {
-            throw exception;
-        }
     }
 
     private static IReadOnlyList<T> FindVisualChildren<T>(DependencyObject root)

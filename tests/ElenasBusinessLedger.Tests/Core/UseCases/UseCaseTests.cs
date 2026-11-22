@@ -634,7 +634,7 @@ public sealed class UseCaseTests
     }
 
     [Fact]
-    public async Task AddingUninvoicedLessonRefreshesFromCalendarAfterCalendarAddSucceeds()
+    public async Task AddingUninvoicedLessonUsesSelectedPlanDurationAndRefreshesMonth()
     {
         var addedLesson = new CalendarLesson("lesson-2", "Anna", new DateTimeOffset(2026, 6, 24, 15, 0, 0, TimeSpan.Zero));
         var calendar = new FakeCalendarGateway([addedLesson]);
@@ -642,7 +642,7 @@ public sealed class UseCaseTests
         var useCase = new AddLessonUseCase(
             calendar,
             new FakeStudentRepository([CreateStudentRecord("Anna")]),
-            new FakePlanCatalogRepository([CreatePlanCatalogItem(77, "Proevetime", 250m)]),
+            new FakePlanCatalogRepository([CreatePlanCatalogItem(77, "Proevetime", 250m) with { DurationMinutes = 45 }]),
             lessons);
 
         var result = await useCase.ExecuteAsync(
@@ -654,6 +654,8 @@ public sealed class UseCaseTests
         Assert.Equal(addedLesson, result.Value!.CreatedLesson);
         Assert.Contains(addedLesson, result.Value.Lessons);
         var savedLesson = Assert.Single(lessons.SavedLessons);
+        Assert.Equal(45, calendar.LastAddRequest?.DurationMinutes);
+        Assert.Equal(45, savedLesson.DurationMinutes);
         Assert.Equal(77, savedLesson.PlanCatalogId);
         Assert.Equal("Proevetime", savedLesson.PlanName);
         Assert.Equal("lesson-2", savedLesson.GoogleCalendarEventId);
@@ -756,10 +758,10 @@ public sealed class UseCaseTests
     }
 
     [Fact]
-    public async Task PopulateCalendarSavesCreatedLessonsToLocalLedgerBeforeReportingSuccess()
+    public async Task PopulateCalendarUsesPlanDurationAndSavesCreatedLessonsBeforeReportingSuccess()
     {
         var timeZone = TimeZoneInfo.FindSystemTimeZoneById("Romance Standard Time");
-        var students = new FakeStudentRepository([CreateStudentRecord("Anna")]);
+        var students = new FakeStudentRepository([CreateStudentRecord("Anna", durationMinutes: 75)]);
         var calendar = new FakeCalendarGateway([]);
         var lessons = new FakeLessonRepository();
         var useCase = new PopulateCalendarUseCase(students, calendar, timeZone, lessons);
@@ -770,10 +772,12 @@ public sealed class UseCaseTests
 
         Assert.True(result.Succeeded);
         Assert.Equal(result.Value!.CreatedCount, lessons.SavedLessons.Count);
+        Assert.All(calendar.PopulatedRequests, request => Assert.Equal(75, request.DurationMinutes));
         Assert.All(lessons.SavedLessons, lesson =>
         {
             Assert.Equal("Anna", lesson.StudentShortName);
             Assert.Equal(42, lesson.PlanCatalogId);
+            Assert.Equal(75, lesson.DurationMinutes);
             Assert.Equal("Standard", lesson.PlanName);
             Assert.False(string.IsNullOrWhiteSpace(lesson.GoogleCalendarEventId));
         });
@@ -1800,7 +1804,8 @@ public sealed class UseCaseTests
 
     private static StudentRecord CreateStudentRecord(
         string shortName,
-        IReadOnlyList<StudentScheduleEntry>? schedule = null)
+        IReadOnlyList<StudentScheduleEntry>? schedule = null,
+        int durationMinutes = 60)
     {
         var student = Student.Create(
             shortName,
@@ -1816,7 +1821,7 @@ public sealed class UseCaseTests
             "Standard",
             priceWithoutVat: 400m,
             LessonsPerWeek.One,
-            durationMinutes: 60,
+            durationMinutes: durationMinutes,
             PlanFlexibility.MoveOrCancelByAgreement,
             numberOfStudents: 1,
             effectiveFrom: new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
@@ -2061,6 +2066,8 @@ public sealed class UseCaseTests
 
         public OperationResult<LessonAddResult>? AddResult { get; init; }
 
+        public LessonAddRequest? LastAddRequest { get; private set; }
+
         public bool UpdateCalled { get; private set; }
 
         public List<LessonState> SavedLessonStates { get; } = [];
@@ -2101,6 +2108,7 @@ public sealed class UseCaseTests
             DateOnly refreshMonth,
             CancellationToken cancellationToken)
         {
+            LastAddRequest = request;
             if (AddResult is not null)
             {
                 return Task.FromResult(AddResult);
