@@ -190,11 +190,9 @@ Manual editing is available only after Admin Mode has been checked and saved fro
 
 Invoices and displayed month totals are grouped by the invoice period start date: Jan-Mar is Q1, Apr-Jun is Q2, Jul-Sep is Q3, and Oct-Dec is Q4. The window shows invoice number, PDF filename only, net amount, VAT amount, and total amount; month and quarter rows with no displayed total stay visible with blank amount cells. The Years table shows the selected invoice-period year and previous four years, with blank amounts for years without displayed totals. Double-clicking an invoice opens the stored PDF. The displayed data can be exported to one CSV file with `Section`, `Year`, `Label`, `InvoiceNumber`, `Filename`, `Net`, `VAT`, `Total`, and `Source` columns; amount fields use machine-friendly invariant decimals such as `1234.50`.
 
-The application window also displays a pane with Student Invoices.
-Each Invoice in the list has a flag: Paid / Outstanding
-Clicking on an 'Outstanding' flag toggles it to 'Paid'.
-Clicking on a 'Paid' flag opens a dialog asking the User to confirm if the Invoice actually should be toggled to 'Unpaid'.
-Double-clicking on an Invoice opens it in the Invoice Viewer.
+The **Student Invoices** pane shows the selected student's issued invoices. Clicking **Outstanding** marks an issued invoice **Paid**. Clicking **Paid** asks for confirmation before marking it **Outstanding**. Double-clicking an issued invoice opens its saved PDF.
+
+The reservation that is blocking new invoices appears as **Pending** at the top of its student's list. Click **Pending** to open the recovery dialog. When another student is selected, a notice in the pane identifies the reservation and points to **Invoice > Resume Invoice**.
 
 The application also contains a button:
   * Write Invoice
@@ -230,9 +228,9 @@ A calendar appointment linked to an unambiguous Student but lacking an applicabl
 
 ### Write and Print an Invoice
 
-Choose **Write Invoice** in the main window to open the editable preview for the selected Student and the displayed month. Select another Student in the main window to invoice them. The button is unavailable until a Student is selected.
+Choose **Write Invoice** in the main window to open the editable preview for the selected Student and the displayed month. Select another Student in the main window to invoice them. The button requires a selected Student and is disabled while an invoice reservation is pending. Resolve the reservation through **Pending** in the invoice list or **Invoice > Resume Invoice**.
 
-The preview includes the selected Student’s local uninvoiced lessons for the displayed month, including when an earlier invoice exists for the same month. If the dashboard resolves an already issued invoice for the current view, the button opens that invoice in the viewer. Issued invoices are also accessible under **Student Invoices**.
+The preview lists eligible local lessons for the selected Student and month, including when an earlier invoice exists for the same month. A pending reservation holds its exact saved lesson IDs out of any new draft. If the dashboard resolves an already issued invoice for the current view, the button opens that invoice in the viewer. Issued invoices are also accessible under **Student Invoices**.
 
 The Invoice will contain the Company information.
 The Invoice will contain the Student information.
@@ -263,12 +261,12 @@ The user may Cancel the edit before pressing "Save & Print Invoice".
 If the user Cancels before printing starts, the invoice is not saved and no data are updated in the system.
 
 Once the invoice has been edited, the user may press the "Save & Print Invoice" button on the Invoice form.
-The ledger allows one unresolved invoice reservation at a time. If an older database already contains several, resolve the oldest first. Open **Invoice > Resume Invoice** to recover a reservation independently of the current Student, month, or lesson selection. A safely unpublished tail reservation can be discarded and its number reused. An earlier reservation from a legacy backlog is recorded as void when discarded, preserving the historical number. Historical gaps are reported during startup for review.
+The ledger allows one unresolved invoice reservation at a time. If an older database already contains several, resolve the oldest first. The **Invoice** menu appears while a reservation is pending. Open **Invoice > Resume Invoice** to recover it from any Student or month. A safely unpublished tail reservation can be discarded and its number reused. An earlier reservation from a legacy backlog is recorded as void when discarded, preserving the historical number. Historical gaps are reported during startup for review.
 
 The **Save & Print Invoice** action runs these steps.
 
   - Reserves the invoice number and saves the invoice snapshot, including the adjustment and reason, in SQLite. PDF generation uses the saved amounts, lesson lines, and billing details.
-  - When a retry with the same lesson selection differs from the pending invoice, shows the saved invoice and the current preview total. **Resume saved invoice** uses the saved details. **Use current preview** updates the pending snapshot under the same number while PDF publication is still pending.
+  - When an already open preview retries the same lesson selection with different details, shows the saved invoice and the current preview total. **Resume saved invoice** uses the saved details. **Use current preview** updates the pending snapshot under the same number while PDF publication is still pending.
   - Stages and verifies the PDF. Before moving it, saves the staged path, final path, and checksum in SQLite. The final file name includes the number, invoice period, and student's invoice-time name, for example `Invoice 001 Juni 2026 - Mira Vale.pdf`.
   - If a staging, writing, or verification error happens before the publication checkpoint is saved, discards the staging file and releases the reservation. After saving the checkpoint, retains the reservation and verifies the staged or final PDF on retry. A different file at the final path is preserved and reported.
   - Finalizes the Invoice data in the Invoice table as issued.

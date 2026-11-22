@@ -53,6 +53,8 @@ public sealed class MainWindowViewModel : ViewModelBase
     private int activationRefreshSuspendCount;
     private LessonDisplayModel? selectedLesson;
     private InvoiceDisplayModel? selectedInvoice;
+    private bool hasPendingInvoice;
+    private string? pendingInvoiceNotice;
     private bool isAdminMode;
     private string? errorMessage;
 
@@ -110,7 +112,7 @@ public sealed class MainWindowViewModel : ViewModelBase
             }));
         ToggleInvoicePaymentStatusCommand = new AsyncRelayCommand(
             parameter => ToggleInvoicePaymentStatusAsync((InvoiceDisplayModel)parameter!),
-            parameter => parameter is InvoiceDisplayModel && !IsBusy);
+            parameter => parameter is InvoiceDisplayModel { IsPending: false } && !IsBusy);
         OpenCalendarCommand = new AsyncRelayCommand(
             () => calendarLauncher.OpenAsync(CancellationToken.None),
             () => !IsBusy);
@@ -118,10 +120,10 @@ public sealed class MainWindowViewModel : ViewModelBase
         ResumeInvoiceCommand = new AsyncRelayCommand(ResumeInvoiceAsync, () => !IsBusy);
         OpenInvoiceCommand = new AsyncRelayCommand(
             parameter => OpenInvoiceAsync((InvoiceDisplayModel)parameter!),
-            parameter => parameter is InvoiceDisplayModel && !IsBusy);
+            parameter => parameter is InvoiceDisplayModel { IsPending: false } && !IsBusy);
         OpenInvoicePdfCommand = new AsyncRelayCommand(
             parameter => OpenInvoicePdfAsync((InvoiceDisplayModel)parameter!),
-            parameter => parameter is InvoiceDisplayModel && !IsBusy);
+            parameter => parameter is InvoiceDisplayModel { IsPending: false } && !IsBusy);
         OpenManageStudentsCommand = new AsyncRelayCommand(OpenManageStudentsAsync, () => !IsBusy);
         OpenStudentDetailsCommand = new AsyncRelayCommand(
             OpenStudentDetailsAsync,
@@ -170,6 +172,18 @@ public sealed class MainWindowViewModel : ViewModelBase
         set => SetProperty(ref selectedInvoice, value);
     }
 
+    public bool HasPendingInvoice
+    {
+        get => hasPendingInvoice;
+        private set => SetProperty(ref hasPendingInvoice, value);
+    }
+
+    public string? PendingInvoiceNotice
+    {
+        get => pendingInvoiceNotice;
+        private set => SetProperty(ref pendingInvoiceNotice, value);
+    }
+
     public string? CurrentStudentShortName
     {
         get => currentStudentShortName;
@@ -188,7 +202,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         }
     }
 
-    public string DisplayMonthText => DisplayMonth.ToString("MMMM yyyy", CultureInfo.CurrentCulture);
+    public string DisplayMonthText => DisplayMonth.ToString("MMMM yyyy", CultureInfo.InvariantCulture);
 
     public bool IsBusy
     {
@@ -493,7 +507,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     {
         await WaitForActivationRefreshAsync();
 
-        if (IsBusy || CurrentStudentChoice() is not { } student)
+        if (IsBusy || HasPendingInvoice || CurrentStudentChoice() is not { } student)
         {
             return;
         }
@@ -506,11 +520,11 @@ public sealed class MainWindowViewModel : ViewModelBase
                 return;
             }
 
-            var issued = await invoiceWorkflowLauncher.ShowWriteInvoiceAsync(
+            var refreshRequired = await invoiceWorkflowLauncher.ShowWriteInvoiceAsync(
                 DisplayMonth,
                 student,
                 CancellationToken.None);
-            if (issued)
+            if (refreshRequired)
             {
                 await RefreshAsync();
             }
@@ -960,8 +974,16 @@ public sealed class MainWindowViewModel : ViewModelBase
             SelectedLesson = null;
         }
 
+        HasPendingInvoice = dashboard.PendingInvoiceForAnotherStudent is not null ||
+            dashboard.Invoices.Any(invoice => invoice.IssueStatus == InvoiceIssueStatus.Issuing);
+        PendingInvoiceNotice = dashboard.PendingInvoiceForAnotherStudent is { } pending
+            ? $"Invoice {pending.InvoiceNumber} for {pending.StudentShortName} is pending. Use Resume Invoice in the Invoice menu before issuing another invoice."
+            : null;
+
         Invoices.Clear();
-        foreach (var invoice in dashboard.Invoices.OrderByDescending(invoice => invoice.InvoiceDate))
+        foreach (var invoice in dashboard.Invoices
+            .OrderByDescending(invoice => invoice.IssueStatus == InvoiceIssueStatus.Issuing)
+            .ThenByDescending(invoice => invoice.InvoiceDate))
         {
             Invoices.Add(new InvoiceDisplayModel(invoice));
         }
@@ -1007,7 +1029,7 @@ public sealed class MainWindowViewModel : ViewModelBase
             return Invoices.FirstOrDefault(invoice => invoice.InvoiceNumber == invoiceNumber);
         }
 
-        return Lessons.Count == 0 ? SelectedInvoice : null;
+        return Lessons.Count == 0 && SelectedInvoice is { IsPending: false } ? SelectedInvoice : null;
     }
 
     private void RefreshSelectableStudentShortNames()
@@ -1267,7 +1289,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private bool CanScheduleLessons() => !IsBusy && isCalendarAvailable && CurrentStudentShortName is not null;
 
     private bool CanStartWriteInvoice() =>
-        CurrentStudentShortName is not null && (!IsBusy || IsActivationRefreshRunning());
+        !HasPendingInvoice && CurrentStudentShortName is not null && (!IsBusy || IsActivationRefreshRunning());
 
     private bool IsActivationRefreshRunning() =>
         activationRefreshTask is { IsCompleted: false };

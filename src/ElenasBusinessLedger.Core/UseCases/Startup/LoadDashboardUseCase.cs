@@ -147,6 +147,7 @@ public sealed class LoadDashboardUseCase
 
         var selectedLessons = lessonSources.Where(source =>
             MatchesCurrentStudent(source.Record.StudentShortName, source.Record.StudentId, selectedStudent));
+        var pendingInvoice = await invoiceRepository.GetOldestPendingAsync(cancellationToken);
         var invoices = selectedStudent is null
             ? []
             : await invoiceRepository.ListInvoicesForStudentAsync(selectedStudent.Id, cancellationToken);
@@ -154,7 +155,7 @@ public sealed class LoadDashboardUseCase
         var planOptions = await CreatePlanOptionsAsync(students, cancellationToken);
 
         var dashboard = DashboardProjection.Create(
-            selectedStudent, students, selectedLessons, invoices, studentNavigationEntries, planOptions);
+            selectedStudent, students, selectedLessons, invoices, studentNavigationEntries, planOptions, pendingInvoice);
         return calendarError is null
             ? OperationResult<StartupDashboardResult>.Success(dashboard)
             : OperationResult<StartupDashboardResult>.Failure(dashboard, calendarError);

@@ -15,7 +15,8 @@ internal sealed class DashboardProjection(TimeZoneInfo lessonTimeZone)
         IEnumerable<(LessonRecord Record, InvoiceLessonStatus? InvoiceStatus)> lessonSources,
         IReadOnlyList<IssuedInvoiceSummary> invoices,
         IReadOnlyList<DashboardStudentNavigationEntry> navigationEntries,
-        IReadOnlyList<DashboardPlanOption> planOptions)
+        IReadOnlyList<DashboardPlanOption> planOptions,
+        IssuedInvoice? pendingInvoice)
     {
         var lessons = lessonSources
             .OrderBy(source => source.Record.StartsAt)
@@ -29,6 +30,29 @@ internal sealed class DashboardProjection(TimeZoneInfo lessonTimeZone)
             ? null
             : new DashboardStudentLessonDefaults(selectedStudent.Student.ShortName, selectedStudent.Schedule, selectedStudent.PlanPeriods);
 
+        IssuedInvoiceSummary? pendingInvoiceForAnotherStudent = null;
+        // The reservation may have finalized between the pending and issued history reads.
+        if (pendingInvoice is not null && !invoices.Any(invoice => invoice.InvoiceNumber == pendingInvoice.InvoiceNumber))
+        {
+            var pendingRow = new IssuedInvoiceSummary(
+                pendingInvoice.InvoiceNumber,
+                pendingInvoice.Student.ShortName,
+                pendingInvoice.InvoiceDate,
+                PaymentStatus.Outstanding,
+                string.Empty,
+                pendingInvoice.IssueStatus,
+                Period: pendingInvoice.Period);
+
+            if (selectedStudent is { Id: > 0 } && selectedStudent.Id == pendingInvoice.Student.StudentId)
+            {
+                invoices = [pendingRow, .. invoices];
+            }
+            else
+            {
+                pendingInvoiceForAnotherStudent = pendingRow;
+            }
+        }
+
         return new StartupDashboardResult(
             selectedStudent?.Student.ShortName,
             shortNames,
@@ -39,7 +63,8 @@ internal sealed class DashboardProjection(TimeZoneInfo lessonTimeZone)
             planOptions,
             lessonDefaults,
             selectedStudent is { Id: > 0 } ? selectedStudent.Id : null,
-            students.Select(student => new StudentChoice(student.Id, student.Student.ShortName)).ToArray());
+            students.Select(student => new StudentChoice(student.Id, student.Student.ShortName)).ToArray(),
+            pendingInvoiceForAnotherStudent);
     }
 
     private static DashboardLesson CreateDashboardLesson(

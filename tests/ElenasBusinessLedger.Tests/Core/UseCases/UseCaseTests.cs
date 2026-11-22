@@ -60,6 +60,63 @@ public sealed class UseCaseTests
         Assert.Contains(result.Value.Invoices, invoice => invoice.InvoiceNumber.Value == 1);
     }
 
+    [Theory]
+    [InlineData(21, false)]
+    [InlineData(22, false)]
+    [InlineData(21, true)]
+    public async Task StartupDashboardShowsPendingInvoiceOnlyInItsOwnersHistory(int selectedStudentId, bool calendarUnavailable)
+    {
+        var originalStudent = CreateStudentRecord("Miri") with { Id = 21 };
+        var replacementStudent = CreateStudentRecord("Mira") with { Id = 22 };
+        var students = new FakeStudentRepository([originalStudent, replacementStudent]);
+        var calendar = new FakeCalendarGateway([])
+        {
+            BeforeList = (_, _) =>
+            {
+                if (calendarUnavailable)
+                {
+                    throw new InvalidOperationException("Calendar unavailable.");
+                }
+            }
+        };
+        var baseDraft = CreateInvoiceDraft();
+        var draft = InvoiceDraft.Create(
+            baseDraft.InvoiceDate, baseDraft.Company,
+            new StudentSnapshot("Mira", "Mira Vale", "42 Sample Lane", originalStudent.Id),
+            baseDraft.Lines, baseDraft.PriceAdjustment, baseDraft.Period);
+        var pendingNumber = new InvoiceNumber(3);
+        var invoices = new FakeInvoiceRepository
+        {
+            PendingInvoiceToReturn = draft.Issue(
+                pendingNumber, draft.CalculateTotals(CreateCompanyProfile()),
+                "pending.pdf", InvoiceIssueStatus.Issuing)
+        };
+        var query = new LoadDashboardUseCase(
+            students, calendar, invoices, new FakeClock(new DateTimeOffset(2026, 6, 16, 12, 0, 0, TimeSpan.Zero)),
+            new FakeLessonRepository());
+
+        var result = await query.ExecuteAsync(new DateOnly(2026, 6, 1), null, CancellationToken.None, selectedStudentId);
+
+        Assert.Equal(!calendarUnavailable, result.Succeeded);
+        var dashboard = Assert.IsType<StartupDashboardResult>(result.Value);
+        Assert.Equal(selectedStudentId, dashboard.CurrentStudentId);
+        if (selectedStudentId == originalStudent.Id)
+        {
+            var pending = Assert.Single(dashboard.Invoices);
+            Assert.Equal(pendingNumber, pending.InvoiceNumber);
+            Assert.Equal(InvoiceIssueStatus.Issuing, pending.IssueStatus);
+            Assert.Equal(draft.Period, pending.Period);
+            Assert.Empty(pending.PdfFilePath);
+            Assert.Null(dashboard.PendingInvoiceForAnotherStudent);
+        }
+        else
+        {
+            Assert.Empty(dashboard.Invoices);
+            Assert.Equal(pendingNumber, dashboard.PendingInvoiceForAnotherStudent?.InvoiceNumber);
+            Assert.Equal("Mira", dashboard.PendingInvoiceForAnotherStudent?.StudentShortName);
+        }
+    }
+
     [Fact]
     public async Task StartupDashboardDoesNotCompleteUninvoicedLessonsByDate()
     {
@@ -1919,7 +1976,8 @@ public sealed class UseCaseTests
             string studentShortName,
             DateOnly month,
             CancellationToken cancellationToken,
-            int? studentId = null) =>
+            int? studentId = null,
+            bool excludeReservedLessons = false) =>
             Task.FromResult<IReadOnlyList<LessonRecord>>(
                 lessons
                     .Where(lesson => lesson.StudentShortName == studentShortName)
@@ -2208,6 +2266,8 @@ public sealed class UseCaseTests
 
         public IssuedInvoice? ReservedInvoiceToReturn { get; init; }
 
+        public IssuedInvoice? PendingInvoiceToReturn { get; init; }
+
         public int? LastStudentInvoiceLookup { get; private set; }
 
         public bool ReserveCalled { get; private set; }
@@ -2415,7 +2475,7 @@ public sealed class UseCaseTests
             Task.FromResult(IssuedInvoiceToReturn);
 
         public Task<IssuedInvoice?> GetOldestPendingAsync(CancellationToken cancellationToken) =>
-            Task.FromResult<IssuedInvoice?>(null);
+            Task.FromResult(PendingInvoiceToReturn);
 
         public Task<OperationResult<InvoiceNumber>> DiscardPendingAsync(
             IssuedInvoice savedInvoice, CancellationToken cancellationToken) => throw new NotSupportedException();

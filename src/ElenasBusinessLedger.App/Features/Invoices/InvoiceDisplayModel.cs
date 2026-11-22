@@ -13,6 +13,7 @@ public sealed class InvoiceDisplayModel : ViewModelBase
     public InvoiceDisplayModel(IssuedInvoiceSummary invoice)
     {
         InvoiceNumber = invoice.InvoiceNumber;
+        IsPending = invoice.IssueStatus == InvoiceIssueStatus.Issuing;
         StudentShortName = invoice.StudentShortName;
         InvoiceDate = invoice.InvoiceDate;
         period = invoice.Period ?? CreateInvoiceDateFallbackPeriod(invoice.InvoiceDate);
@@ -22,6 +23,8 @@ public sealed class InvoiceDisplayModel : ViewModelBase
     }
 
     public InvoiceNumber InvoiceNumber { get; }
+
+    public bool IsPending { get; }
 
     public string StudentShortName { get; }
 
@@ -35,6 +38,7 @@ public sealed class InvoiceDisplayModel : ViewModelBase
             if (SetProperty(ref paymentStatus, value))
             {
                 OnPropertyChanged(nameof(PaymentStatusText));
+                OnPropertyChanged(nameof(StatusText));
             }
         }
     }
@@ -49,7 +53,9 @@ public sealed class InvoiceDisplayModel : ViewModelBase
 
     public string PaymentStatusText => PaymentStatus == PaymentStatus.Paid ? "Paid" : "Outstanding";
 
-    public string PrintStatusText => printStatus switch
+    public string StatusText => IsPending ? "Pending" : PaymentStatusText;
+
+    public string PrintStatusText => IsPending ? string.Empty : printStatus switch
     {
         InvoicePrintStatus.Printed => "Printed",
         InvoicePrintStatus.PrintFailed => "Print failed",

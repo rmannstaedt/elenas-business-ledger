@@ -8,6 +8,7 @@ using ElenasBusinessLedger.Core.Plans;
 using ElenasBusinessLedger.Core.Students;
 using ElenasBusinessLedger.Core.UseCases.Lessons;
 using ElenasBusinessLedger.Core.UseCases.Startup;
+using System.Globalization;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Automation.Peers;
@@ -40,6 +41,24 @@ namespace ElenasBusinessLedger.Tests.App.ViewModels;
 // Exercises dashboard commands, selection, activation refresh, and key WPF interactions.
 public sealed class MainWindowViewModelTests
 {
+    [Fact]
+    public void DisplayMonthUsesEnglishNamesWithDanishRegionalSettings()
+    {
+        var originalCulture = CultureInfo.CurrentCulture;
+        try
+        {
+            CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("da-DK");
+            var clock = new FakeUiClock(new DateTimeOffset(2026, 9, 22, 12, 0, 0, TimeSpan.Zero));
+            var viewModel = CreateViewModel(clock: clock);
+
+            Assert.Equal("September 2026", viewModel.DisplayMonthText);
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = originalCulture;
+        }
+    }
+
     [Fact]
     public void MainWindowInitializesWithDashboardSurface()
     {
@@ -1578,6 +1597,85 @@ public sealed class MainWindowViewModelTests
         await viewModel.OpenCalendarCommand.ExecuteAsync();
 
         Assert.True(calendar.WasOpened);
+    }
+
+    [Fact]
+    public void PendingInvoiceStatusButtonOpensRecoveryAndRefreshesAfterResolution()
+    {
+        WpfTestThread.Run(() =>
+        {
+            var pending = new IssuedInvoiceSummary(
+                new InvoiceNumber(3), "Anna", new DateOnly(2026, 6, 16),
+                PaymentStatus.Outstanding, string.Empty, InvoiceIssueStatus.Issuing);
+            var dashboard = new FakeDashboardService { InvoiceSummaries = [pending] };
+            var invoices = new FakeInvoiceWorkflowLauncher { NextResumeResult = true };
+            var payments = new FakePaymentService();
+            var viewModel = CreateViewModel(dashboard: dashboard, payments: payments, invoiceWorkflowLauncher: invoices);
+
+            var window = new AppMainWindow(viewModel);
+            try
+            {
+                window.Show();
+                PumpUntil(() => !viewModel.IsBusy && viewModel.Invoices.Count == 1);
+                var pendingButton = FindButton(window, "Pending");
+                var writeButton = FindButton(window, "Write invoice");
+                var invoiceMenu = Assert.Single(FindChildren<WpfMenuItem>(window), item => Equals(item.Header, "_Invoice"));
+                var row = Assert.Single(viewModel.Invoices);
+
+                Assert.True(invoiceMenu.IsVisible);
+
+                Assert.False(writeButton.IsEnabled);
+                Assert.Contains("Resume Invoice", Assert.IsType<string>(writeButton.ToolTip));
+                Assert.True(pendingButton.IsEnabled);
+                Assert.Same(viewModel.ResumeInvoiceCommand, pendingButton.Command);
+                Assert.False(viewModel.ToggleInvoicePaymentStatusCommand.CanExecute(row));
+                Assert.False(viewModel.OpenInvoiceCommand.CanExecute(row));
+                Assert.False(viewModel.OpenInvoicePdfCommand.CanExecute(row));
+
+                dashboard.NextResult = OperationResult<StartupDashboardResult>.Success(
+                    new StartupDashboardResult("Anna", ["Anna"], [], [], false, []));
+                RaisePreviewLeftClick(pendingButton);
+                PumpUntil(() => invoices.ResumeCount == 1 && viewModel.Invoices.Count == 0 && writeButton.IsEnabled);
+
+                Assert.Equal(Visibility.Collapsed, invoiceMenu.Visibility);
+                Assert.Equal(default, payments.LastInvoiceNumber);
+                Assert.Null(viewModel.PendingInvoiceNotice);
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
+    [Fact]
+    public async Task DashboardExplainsWhenAnotherStudentsPendingInvoiceBlocksIssuance()
+    {
+        var pending = new IssuedInvoiceSummary(
+            new InvoiceNumber(3), "Mira", new DateOnly(2026, 6, 16),
+            PaymentStatus.Outstanding, string.Empty, InvoiceIssueStatus.Issuing);
+        var issued = new IssuedInvoiceSummary(
+            new InvoiceNumber(2), "Anna", new DateOnly(2026, 6, 15),
+            PaymentStatus.Outstanding, "issued.pdf");
+        var dashboard = new FakeDashboardService
+        {
+            NextResult = OperationResult<StartupDashboardResult>.Success(
+                new StartupDashboardResult("Anna", ["Anna", "Mira"], [], [issued], false, [],
+                    PendingInvoiceForAnotherStudent: pending))
+        };
+        var viewModel = CreateViewModel(dashboard: dashboard);
+
+        await viewModel.LoadAsync();
+
+        Assert.Equal(issued.InvoiceNumber, Assert.Single(viewModel.Invoices).InvoiceNumber);
+        Assert.Contains($"Invoice {pending.InvoiceNumber} for Mira is pending.", viewModel.PendingInvoiceNotice);
+        Assert.False(viewModel.WriteInvoiceCommand.CanExecute(null));
+        Assert.True(viewModel.ResumeInvoiceCommand.CanExecute(null));
+
+        await viewModel.RefreshCommand.ExecuteAsync();
+
+        Assert.Null(viewModel.PendingInvoiceNotice);
+        Assert.True(viewModel.WriteInvoiceCommand.CanExecute(null));
     }
 
     [Fact]
@@ -3378,6 +3476,10 @@ public sealed class MainWindowViewModelTests
     {
         public bool NextWriteResult { get; init; }
 
+        public bool NextResumeResult { get; init; }
+
+        public int ResumeCount { get; private set; }
+
         public bool WriteWasShown { get; private set; }
 
         public StudentChoice? LastWriteStudent { get; private set; }
@@ -3397,7 +3499,11 @@ public sealed class MainWindowViewModelTests
             return Task.FromResult(NextWriteResult);
         }
 
-        public Task<bool> ShowResumeInvoiceAsync(CancellationToken cancellationToken) => Task.FromResult(false);
+        public Task<bool> ShowResumeInvoiceAsync(CancellationToken cancellationToken)
+        {
+            ResumeCount++;
+            return Task.FromResult(NextResumeResult);
+        }
 
         public Task ShowInvoiceViewerAsync(InvoiceNumber invoiceNumber, CancellationToken cancellationToken)
         {

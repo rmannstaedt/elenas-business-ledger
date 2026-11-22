@@ -44,13 +44,13 @@ public sealed class InvoiceViewModelTests
                 return windows.Select(window => window.Title).ToArray();
             }, DispatcherPriority.ApplicationIdle);
 
-            var issued = launcher.ShowWriteInvoiceAsync(new DateOnly(2026, 10, 15), student, CancellationToken.None)
+            var issueAttempted = launcher.ShowWriteInvoiceAsync(new DateOnly(2026, 10, 15), student, CancellationToken.None)
                 .GetAwaiter().GetResult();
 
             Assert.Equal("Invoice Preview", Assert.Single(shownWindows.Task.GetAwaiter().GetResult()));
             Assert.Equal((student.ShortName, (int?)student.StudentId, new DateOnly(2026, 11, 22),
                 new DateOnly(2026, 10, 1), new DateOnly(2026, 10, 31)), workflow.PreviewRequest);
-            Assert.False(issued);
+            Assert.False(issueAttempted);
             Assert.False(workflow.IssueCalled);
         });
     }
@@ -88,6 +88,23 @@ public sealed class InvoiceViewModelTests
         Assert.True(service.IssueCalled);
         Assert.True(viewModel.WasIssued);
         Assert.True(closed);
+    }
+
+    [Fact]
+    public async Task PreviewRecordsAnIssueAttemptEvenWhenIssuanceFails()
+    {
+        var service = new FakeInvoiceWorkflowService
+        {
+            IssueResult = OperationResult<IssueInvoiceResult>.Failure(
+                new ValidationError("Invoice.PublicationFailed", "The reservation was saved."))
+        };
+        var viewModel = new InvoicePreviewViewModel(service, CreatePreview());
+
+        await viewModel.PrintInvoiceCommand.ExecuteAsync();
+
+        Assert.True(viewModel.WasIssueAttempted);
+        Assert.False(viewModel.WasIssued);
+        Assert.Equal("The reservation was saved.", viewModel.ErrorMessage);
     }
 
     [Fact]

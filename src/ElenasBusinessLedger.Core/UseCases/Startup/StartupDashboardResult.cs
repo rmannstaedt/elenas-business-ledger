@@ -14,4 +14,5 @@ public sealed record StartupDashboardResult(
     IReadOnlyList<DashboardPlanOption>? PlanOptions = null,
     DashboardStudentLessonDefaults? LessonDefaults = null,
     int? CurrentStudentId = null,
-    IReadOnlyList<StudentChoice>? StudentChoices = null);
+    IReadOnlyList<StudentChoice>? StudentChoices = null,
+    IssuedInvoiceSummary? PendingInvoiceForAnotherStudent = null);

@@ -301,7 +301,8 @@ public sealed class AppServiceTests
             string studentShortName,
             DateOnly month,
             CancellationToken cancellationToken,
-            int? studentId = null) =>
+            int? studentId = null,
+            bool excludeReservedLessons = false) =>
             Task.FromResult<IReadOnlyList<LessonRecord>>([]);
 
         public Task<IReadOnlyList<LessonRecord>> ListForWindowAsync(
