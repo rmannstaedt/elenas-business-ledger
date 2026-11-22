@@ -16,7 +16,7 @@
     name
     price (without VAT)
     lessons per week: 1 / 2 / by appointment
-    duration: 30 / 60
+    duration in minutes
     flexibility: none / move or cancel by agreement
     number of students: 1 / 2
     effective date: <date/time>
@@ -190,11 +190,9 @@ Manual editing is available only after Admin Mode has been checked and saved fro
 
 Invoices and displayed month totals are grouped by the invoice period start date: Jan-Mar is Q1, Apr-Jun is Q2, Jul-Sep is Q3, and Oct-Dec is Q4. The window shows invoice number, PDF filename only, net amount, VAT amount, and total amount; month and quarter rows with no displayed total stay visible with blank amount cells. The Years table shows the selected invoice-period year and previous four years, with blank amounts for years without displayed totals. Double-clicking an invoice opens the stored PDF. The displayed data can be exported to one CSV file with `Section`, `Year`, `Label`, `InvoiceNumber`, `Filename`, `Net`, `VAT`, `Total`, and `Source` columns; amount fields use machine-friendly invariant decimals such as `1234.50`.
 
-The application window also displays a pane with Student Invoices.
-Each Invoice in the list has a flag: Paid / Outstanding
-Clicking on an 'Outstanding' flag toggles it to 'Paid'.
-Clicking on a 'Paid' flag opens a dialog asking the User to confirm if the Invoice actually should be toggled to 'Unpaid'.
-Double-clicking on an Invoice opens it in the Invoice Viewer.
+The **Student Invoices** pane shows the selected student's issued invoices. Clicking **Outstanding** marks an issued invoice **Paid**. Clicking **Paid** asks for confirmation before marking it **Outstanding**. Double-clicking an issued invoice opens its saved PDF.
+
+The reservation that is blocking new invoices appears as **Pending** at the top of its student's list. Click **Pending** to open the recovery dialog. When another student is selected, a notice in the pane identifies the reservation and points to **Invoice > Resume Invoice**.
 
 The application also contains a button:
   * Write Invoice
@@ -202,7 +200,7 @@ The application also contains a button:
 The lesson toolbar contains a `Populate Calendar` action for the selected Student and displayed month. This action seeds Google Calendar immediately from the selected Student's saved standard schedule:
   * The action checks the full displayed month from the first day through the last, including dates earlier than today. Each scheduled occurrence uses the Student's assigned Plan in effect on that date.
   * The action writes the resulting lesson entries to Google Calendar immediately and saves the created local billing lesson rows before reporting success; there is no separate save operation.
-  * Exact same-Student date/time matches in Google Calendar are skipped. An invoice-locked local lesson also occupies its original slot if its calendar event was moved or removed.
+  * New timed events use the plan duration in effect on the occurrence date. Exact same-Student date/time matches in Google Calendar are skipped. An invoice-locked local lesson also occupies its original slot if its calendar event was moved or removed.
   * Version 1 does not detect or handle other calendar conflicts. Conflicts must be resolved manually by the user in Google Calendar.
 
 Lessons that are completed or invoiced:yes CAN NOT be edited or deleted in the main lesson list.
@@ -218,7 +216,7 @@ The planned and invoiced:no entries in the lesson list may be edited directly in
 
 `Add Lesson` starts a planned row dated today in the current month or on the first day of another displayed month. It uses the Student's first saved schedule slot for that weekday, or the first saved slot if the weekday has none. The Student's assigned Plan in effect on the draft date is selected if it can be assigned to new lessons. The button saves immediately when the date and plan are available. If the assigned plan is unavailable, selecting a plan in the draft saves it. If no Active plan exists, the application shows `Create or publish an active plan first.` Later edits to date, time, plan, or state are also saved immediately. Rapid changes to an editable lesson's plan must preserve and save the final selected plan.
 
-Lesson date editing uses a date selector. Lesson date and lesson plan are required for a new lesson to be saved. Lesson time is optional: a lesson without a known time is saved as an all-day Google Calendar event, displays without a time in the lesson list, and prints without a time on invoices. Lesson time editing provides a no-time option plus a time selector from 08:00 through 20:00 in 15-minute increments while still allowing typed time input. Lesson cancellation uses an explicit delete action with a confirmation prompt.
+Lesson date editing uses a date selector. Lesson date and lesson plan are required for a new lesson to be saved. Timed events created by Add Lesson use the selected plan duration. A lesson without a known time is saved as an all-day Google Calendar event, displays without a time in the lesson list, and prints without a time on invoices. Lesson time editing provides a no-time option plus a time selector from 08:00 through 20:00 in 15-minute increments while still allowing typed time input. Lesson cancellation uses an explicit delete action with a confirmation prompt.
 
 Before changing or cancelling a linked lesson, the Ledger places a local hold on the lesson so it cannot be invoiced concurrently. Acknowledged Google Calendar writes update the local lesson before the next dashboard refresh. A rejected change releases the hold. If Google Calendar's result is uncertain or the local write cannot be completed, the lesson shows **Review needed** and stays out of billing. Use that action to reconcile the original event or confirm its removal after checking the configured Google calendar.
 
@@ -230,16 +228,16 @@ A calendar appointment linked to an unambiguous Student but lacking an applicabl
 
 ### Write and Print an Invoice
 
-Choose **Write Invoice** in the main window to open the editable preview for the selected Student and the displayed month. Select another Student in the main window to invoice them. The button is unavailable until a Student is selected.
+Choose **Write Invoice** in the main window to open the editable preview for the selected Student and the displayed month. Select another Student in the main window to invoice them. The button requires a selected Student and is disabled while an invoice reservation is pending. Resolve the reservation through **Pending** in the invoice list or **Invoice > Resume Invoice**.
 
-The preview includes the selected Student’s local uninvoiced lessons for the displayed month, including when an earlier invoice exists for the same month. If the dashboard resolves an already issued invoice for the current view, the button opens that invoice in the viewer. Issued invoices are also accessible under **Student Invoices**.
+The preview lists eligible local lessons for the selected Student and month, including when an earlier invoice exists for the same month. A pending reservation holds its exact saved lesson IDs out of any new draft. If the dashboard resolves an already issued invoice for the current view, the button opens that invoice in the viewer. Issued invoices are also accessible under **Student Invoices**.
 
 The Invoice will contain the Company information.
 The Invoice will contain the Student information.
 The Invoice will contain the period/month it is written for.
 The Invoice will contain grouped service lines summarizing lessons by issued lesson plan and price.
 The Invoice will contain a single clear list of local uninvoiced lessons selected for that Student.
-If the invoice covers lessons under more than one Plan, the explanatory text lists the plan change with the cut-over date.
+The invoice notes list each change between consecutive plan IDs, in lesson order. Each note uses the saved plan names and the date of the first lesson under the new plan.
 The Invoice will contain VAT information, if currently relevant.
 VAT applicability is based on the invoice period start date, not the invoice issue/print date.
 The Invoice will contain price information.
@@ -263,12 +261,12 @@ The user may Cancel the edit before pressing "Save & Print Invoice".
 If the user Cancels before printing starts, the invoice is not saved and no data are updated in the system.
 
 Once the invoice has been edited, the user may press the "Save & Print Invoice" button on the Invoice form.
-The ledger allows one unresolved invoice reservation at a time. If an older database already contains several, resolve the oldest first. Open **Invoice > Resume Invoice** to recover a reservation independently of the current Student, month, or lesson selection. A safely unpublished tail reservation can be discarded and its number reused. An earlier reservation from a legacy backlog is recorded as void when discarded, preserving the historical number. Historical gaps are reported during startup for review.
+The ledger allows one unresolved invoice reservation at a time. If an older database already contains several, resolve the oldest first. The **Invoice** menu appears while a reservation is pending. Open **Invoice > Resume Invoice** to recover it from any Student or month. A safely unpublished tail reservation can be discarded and its number reused. An earlier reservation from a legacy backlog is recorded as void when discarded, preserving the historical number. Historical gaps are reported during startup for review.
 
 The **Save & Print Invoice** action runs these steps.
 
   - Reserves the invoice number and saves the invoice snapshot, including the adjustment and reason, in SQLite. PDF generation uses the saved amounts, lesson lines, and billing details.
-  - When a retry with the same lesson selection differs from the pending invoice, shows the saved invoice and the current preview total. **Resume saved invoice** uses the saved details. **Use current preview** updates the pending snapshot under the same number while PDF publication is still pending.
+  - When an already open preview retries the same lesson selection with different details, shows the saved invoice and the current preview total. **Resume saved invoice** uses the saved details. **Use current preview** updates the pending snapshot under the same number while PDF publication is still pending.
   - Stages and verifies the PDF. Before moving it, saves the staged path, final path, and checksum in SQLite. The final file name includes the number, invoice period, and student's invoice-time name, for example `Invoice 001 Juni 2026 - Mira Vale.pdf`.
   - If a staging, writing, or verification error happens before the publication checkpoint is saved, discards the staging file and releases the reservation. After saving the checkpoint, retains the reservation and verifies the staged or final PDF on retry. A different file at the final path is preserved and reported.
   - Finalizes the Invoice data in the Invoice table as issued.
@@ -308,7 +306,7 @@ One **Save** commits the company profile, calendar preferences, and Economy sett
 
 ## Limitations
 
-### Version 1.4.2
+### Version 1.4.3
 
   * VAT exemptions for individual students are outside the current scope.
   * No formal VAT return or bookkeeping-system VAT report; Economy Overview summarizes issued invoice net/VAT totals plus explicit manual legacy month overrides only.

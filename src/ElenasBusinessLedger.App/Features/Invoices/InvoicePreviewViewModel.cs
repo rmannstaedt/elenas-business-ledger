@@ -135,6 +135,8 @@ public sealed class InvoicePreviewViewModel : ViewModelBase
 
     public bool WasIssued => issuedInvoiceNumber is not null;
 
+    internal bool WasIssueAttempted { get; private set; }
+
     public string PrintActionText => WasIssued ? "Reprint invoice" : "Save & Print Invoice";
 
     public bool CanEditDraft => !WasIssued;
@@ -250,6 +252,7 @@ public sealed class InvoicePreviewViewModel : ViewModelBase
 
     private async Task<OperationResult<IssueInvoiceResult>> IssueWithExtendedWaitPromptAsync(InvoiceDraft draft)
     {
+        WasIssueAttempted = true;
         var issueTask = invoiceWorkflowService.IssueAsync(draft, CancellationToken.None, ChooseRecoveryAsync);
         while (true)
         {

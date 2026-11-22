@@ -23,7 +23,7 @@ public sealed class InvoiceViewModelTests
     [Fact]
     public void WriteInvoiceOpensPreviewDirectlyAndCancelDoesNotIssue()
     {
-        RunOnStaThread(() =>
+        WpfTestThread.Run(() =>
         {
             var workflow = new FakeInvoiceWorkflowService();
             var clock = new FixedInvoiceClock(new DateTimeOffset(2026, 11, 22, 12, 0, 0, TimeSpan.Zero));
@@ -44,13 +44,13 @@ public sealed class InvoiceViewModelTests
                 return windows.Select(window => window.Title).ToArray();
             }, DispatcherPriority.ApplicationIdle);
 
-            var issued = launcher.ShowWriteInvoiceAsync(new DateOnly(2026, 10, 15), student, CancellationToken.None)
+            var issueAttempted = launcher.ShowWriteInvoiceAsync(new DateOnly(2026, 10, 15), student, CancellationToken.None)
                 .GetAwaiter().GetResult();
 
             Assert.Equal("Invoice Preview", Assert.Single(shownWindows.Task.GetAwaiter().GetResult()));
             Assert.Equal((student.ShortName, (int?)student.StudentId, new DateOnly(2026, 11, 22),
                 new DateOnly(2026, 10, 1), new DateOnly(2026, 10, 31)), workflow.PreviewRequest);
-            Assert.False(issued);
+            Assert.False(issueAttempted);
             Assert.False(workflow.IssueCalled);
         });
     }
@@ -88,6 +88,23 @@ public sealed class InvoiceViewModelTests
         Assert.True(service.IssueCalled);
         Assert.True(viewModel.WasIssued);
         Assert.True(closed);
+    }
+
+    [Fact]
+    public async Task PreviewRecordsAnIssueAttemptEvenWhenIssuanceFails()
+    {
+        var service = new FakeInvoiceWorkflowService
+        {
+            IssueResult = OperationResult<IssueInvoiceResult>.Failure(
+                new ValidationError("Invoice.PublicationFailed", "The reservation was saved."))
+        };
+        var viewModel = new InvoicePreviewViewModel(service, CreatePreview());
+
+        await viewModel.PrintInvoiceCommand.ExecuteAsync();
+
+        Assert.True(viewModel.WasIssueAttempted);
+        Assert.False(viewModel.WasIssued);
+        Assert.Equal("The reservation was saved.", viewModel.ErrorMessage);
     }
 
     [Fact]
@@ -216,7 +233,7 @@ public sealed class InvoiceViewModelTests
     [Fact]
     public void PreviewIncludeCheckboxPreviewClickTogglesLine()
     {
-        RunOnStaThread(() =>
+        WpfTestThread.Run(() =>
         {
             var viewModel = new InvoicePreviewViewModel(new FakeInvoiceWorkflowService(), CreatePreview());
             var window = new InvoicePreviewView(viewModel);
@@ -243,7 +260,7 @@ public sealed class InvoiceViewModelTests
     [Fact]
     public void PreviewIncludeCheckboxHasLessonSpecificAccessibleName()
     {
-        RunOnStaThread(() =>
+        WpfTestThread.Run(() =>
         {
             var viewModel = new InvoicePreviewViewModel(new FakeInvoiceWorkflowService(), CreatePreview());
             var window = new InvoicePreviewView(viewModel);
@@ -256,6 +273,29 @@ public sealed class InvoiceViewModelTests
                 Assert.Equal(
                     "Include lesson 16-06-2026 15:00 Standard",
                     AutomationProperties.GetName(includeCheckBox));
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
+    [Fact]
+    public void ViewerOpensTheSavedInvoiceWindow()
+    {
+        WpfTestThread.Run(() =>
+        {
+            var invoice = CreateIssuedInvoice();
+            var viewModel = new InvoiceViewerViewModel(invoice, new FakeInvoiceWorkflowService());
+            var window = new InvoiceViewerView(viewModel) { ShowActivated = false };
+            try
+            {
+                window.Show();
+
+                Assert.True(window.IsVisible);
+                Assert.Equal(invoice.InvoiceNumber.ToString(), viewModel.InvoiceNumberText);
+                Assert.NotNull(window.FindName("InvoiceLinesGrid"));
             }
             finally
             {
@@ -401,31 +441,6 @@ public sealed class InvoiceViewModelTests
             printStatus,
             printedAt,
             lastPrintError);
-    }
-
-    private static void RunOnStaThread(Action action)
-    {
-        Exception? exception = null;
-        var thread = new Thread(() =>
-        {
-            try
-            {
-                action();
-            }
-            catch (Exception ex)
-            {
-                exception = ex;
-            }
-        });
-
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        thread.Join();
-
-        if (exception is not null)
-        {
-            throw exception;
-        }
     }
 
     private static IReadOnlyList<T> FindVisualChildren<T>(DependencyObject root)

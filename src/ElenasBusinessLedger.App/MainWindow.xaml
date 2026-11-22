@@ -157,6 +157,8 @@
             </Style.Triggers>
         </Style>
         <Style x:Key="InvoiceStatusButtonStyle" TargetType="{x:Type Button}">
+            <Setter Property="Command" Value="{Binding DataContext.ToggleInvoicePaymentStatusCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}" />
+            <Setter Property="ToolTip" Value="Toggle invoice payment status" />
             <Setter Property="Background" Value="#F8FAFC" />
             <Setter Property="BorderBrush" Value="#64748B" />
             <Setter Property="BorderThickness" Value="1" />
@@ -194,6 +196,13 @@
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsPending}" Value="True">
+                    <Setter Property="Command" Value="{Binding DataContext.ResumeInvoiceCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}" />
+                    <Setter Property="ToolTip" Value="Resume pending invoice" />
+                    <Setter Property="AutomationProperties.HelpText" Value="Resolve this invoice before issuing another." />
+                </DataTrigger>
+            </Style.Triggers>
         </Style>
         <Style x:Key="LessonCellButtonStyle" TargetType="{x:Type Button}">
             <Setter Property="Background" Value="Transparent" />
@@ -265,7 +274,8 @@
                 <MenuItem Header="_Manage Plans"
                           Command="{Binding OpenManagePlansCommand}" />
             </MenuItem>
-            <MenuItem Header="_Invoice">
+            <MenuItem Header="_Invoice"
+                      Visibility="{Binding HasPendingInvoice, Converter={StaticResource BooleanToVisibilityConverter}}">
                 <MenuItem Header="_Resume Invoice" Command="{Binding ResumeInvoiceCommand}" />
             </MenuItem>
             <MenuItem Header="_Economy">
@@ -412,7 +422,19 @@
                             Command="{Binding WriteInvoiceCommand}"
                             MinWidth="112"
                             Height="34"
-                            AutomationProperties.Name="Write invoice" />
+                            ToolTipService.ShowOnDisabled="True"
+                            AutomationProperties.Name="Write invoice">
+                        <Button.Style>
+                            <Style TargetType="{x:Type Button}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding HasPendingInvoice}" Value="True">
+                                        <Setter Property="ToolTip" Value="Resolve the pending invoice using Invoice > Resume Invoice." />
+                                        <Setter Property="AutomationProperties.HelpText" Value="Resolve the pending invoice using Resume Invoice in the Invoice menu." />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Button.Style>
+                    </Button>
                 </StackPanel>
             </Grid>
 
@@ -646,13 +668,27 @@
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
 
-                    <Grid Height="32"
-                          Margin="0,0,0,10">
-                        <TextBlock Text="Student Invoices"
-                                   FontSize="18"
-                                   FontWeight="SemiBold"
-                                   VerticalAlignment="Center" />
-                    </Grid>
+                    <StackPanel Margin="0,0,0,10">
+                        <Grid Height="32">
+                            <TextBlock Text="Student Invoices"
+                                       FontSize="18"
+                                       FontWeight="SemiBold"
+                                       VerticalAlignment="Center" />
+                        </Grid>
+                        <TextBlock Text="{Binding PendingInvoiceNotice}"
+                                   TextWrapping="Wrap"
+                                   AutomationProperties.LiveSetting="Polite">
+                            <TextBlock.Style>
+                                <Style TargetType="{x:Type TextBlock}">
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding PendingInvoiceNotice}" Value="{x:Null}">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </StackPanel>
                     <DataGrid x:Name="InvoicesGrid"
                               Grid.Row="1"
                               ItemsSource="{Binding Invoices}"
@@ -698,8 +734,7 @@
                                                     Width="1.2*">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
-                                        <Button Content="{Binding PaymentStatusText}"
-                                                Command="{Binding DataContext.ToggleInvoicePaymentStatusCommand, RelativeSource={RelativeSource AncestorType=DataGrid}}"
+                                        <Button Content="{Binding StatusText}"
                                                 CommandParameter="{Binding}"
                                                 PreviewMouseLeftButtonDown="OnCommandButtonPreviewMouseLeftButtonDown"
                                                 MinWidth="104"
@@ -707,8 +742,7 @@
                                                 Margin="6,0"
                                                 VerticalAlignment="Center"
                                                 Style="{StaticResource InvoiceStatusButtonStyle}"
-                                                ToolTip="Toggle invoice payment status"
-                                                AutomationProperties.Name="{Binding PaymentStatusText}" />
+                                                AutomationProperties.Name="{Binding StatusText}" />
                                     </DataTemplate>
                                 </DataGridTemplateColumn.CellTemplate>
                             </DataGridTemplateColumn>

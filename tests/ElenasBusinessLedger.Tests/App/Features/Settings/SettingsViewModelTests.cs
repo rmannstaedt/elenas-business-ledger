@@ -16,7 +16,7 @@ public sealed class SettingsViewModelTests
     [Fact]
     public void SettingsViewInitializesWithReadOnlyPathBindings()
     {
-        RunOnStaThread(() =>
+        WpfTestThread.Run(() =>
         {
             var viewModel = CreateViewModel(new FakeAppSettingsService());
             var window = new SettingsView(viewModel);
@@ -566,30 +566,6 @@ public sealed class SettingsViewModelTests
         {
             ForgetGoogleAuthorizationWasCalled = true;
             return Task.FromResult(OperationResult<bool>.Success(true));
-        }
-    }
-
-    private static void RunOnStaThread(Action action)
-    {
-        Exception? exception = null;
-        var thread = new Thread(() =>
-        {
-            try
-            {
-                action();
-            }
-            catch (Exception ex)
-            {
-                exception = ex;
-            }
-        });
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        thread.Join();
-
-        if (exception is not null)
-        {
-            throw exception;
         }
     }
 

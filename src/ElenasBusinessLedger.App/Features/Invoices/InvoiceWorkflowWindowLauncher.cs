@@ -24,7 +24,7 @@ public sealed class InvoiceWorkflowWindowLauncher : IInvoiceWorkflowLauncher
         this.clock = clock;
     }
 
-    // Opens the selected student's preview and tells the dashboard whether the invoice was issued.
+    // Opens a new preview or asks the dashboard to reload if a reservation has blocked it.
     public async Task<bool> ShowWriteInvoiceAsync(
         DateOnly displayMonth,
         StudentChoice student,
@@ -43,7 +43,7 @@ public sealed class InvoiceWorkflowWindowLauncher : IInvoiceWorkflowLauncher
         if (!preview.Succeeded)
         {
             ShowWarning(preview.Errors.FirstOrDefault()?.Message ?? "Could not create the invoice preview.");
-            return false;
+            return preview.Errors.Any(error => error.Code == "Invoice.PendingExists");
         }
 
         var previewViewModel = new InvoicePreviewViewModel(
@@ -57,9 +57,8 @@ public sealed class InvoiceWorkflowWindowLauncher : IInvoiceWorkflowLauncher
             Owner = Application.Current?.MainWindow
         };
 
-        // A print warning can keep the dialog open even though the invoice has already been issued.
         previewWindow.ShowDialog();
-        return previewViewModel.WasIssued;
+        return previewViewModel.WasIssueAttempted;
     }
 
     // Opens the oldest pending reservation independently of the current dashboard selection.
@@ -90,7 +89,7 @@ public sealed class InvoiceWorkflowWindowLauncher : IInvoiceWorkflowLauncher
                     ShowWarning(result.Errors[0].Message);
                 }
 
-                return false;
+                return result.Succeeded;
             }
 
             if (dialog.Choice != InvoiceRecoveryChoice.Resume || !await EnsureInvoicePrinterConfiguredAsync(cancellationToken))

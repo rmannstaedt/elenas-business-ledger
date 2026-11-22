@@ -8,6 +8,7 @@ using ElenasBusinessLedger.Core.Plans;
 using ElenasBusinessLedger.Core.Students;
 using ElenasBusinessLedger.Core.UseCases.Lessons;
 using ElenasBusinessLedger.Core.UseCases.Startup;
+using System.Globalization;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Automation.Peers;
@@ -41,9 +42,27 @@ namespace ElenasBusinessLedger.Tests.App.ViewModels;
 public sealed class MainWindowViewModelTests
 {
     [Fact]
+    public void DisplayMonthUsesEnglishNamesWithDanishRegionalSettings()
+    {
+        var originalCulture = CultureInfo.CurrentCulture;
+        try
+        {
+            CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("da-DK");
+            var clock = new FakeUiClock(new DateTimeOffset(2026, 9, 22, 12, 0, 0, TimeSpan.Zero));
+            var viewModel = CreateViewModel(clock: clock);
+
+            Assert.Equal("September 2026", viewModel.DisplayMonthText);
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = originalCulture;
+        }
+    }
+
+    [Fact]
     public void MainWindowInitializesWithDashboardSurface()
     {
-        RunOnStaThread(() =>
+        WpfTestThread.Run(() =>
         {
             var viewModel = CreateViewModel();
             var window = new AppMainWindow(viewModel);
@@ -59,7 +78,7 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public void ApplicationMenuShowsSettingsAndAbout()
     {
-        RunOnStaThread(() =>
+        WpfTestThread.Run(() =>
         {
             var viewModel = CreateViewModel();
             var window = new AppMainWindow(viewModel);
@@ -81,7 +100,7 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public void StudentMenuOnlyShowsManageStudents()
     {
-        RunOnStaThread(() =>
+        WpfTestThread.Run(() =>
         {
             var viewModel = CreateViewModel();
             var window = new AppMainWindow(viewModel);
@@ -103,7 +122,7 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public void EconomyMenuShowsOverview()
     {
-        RunOnStaThread(() =>
+        WpfTestThread.Run(() =>
         {
             var viewModel = CreateViewModel();
             var window = new AppMainWindow(viewModel);
@@ -125,7 +144,7 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public void MainWindowStudentDetailsButtonOpensDetailsForCurrentStudent()
     {
-        RunOnStaThread(() =>
+        WpfTestThread.Run(() =>
         {
             var studentOverview = new FakeStudentOverviewLauncher();
             var viewModel = CreateViewModel(studentOverviewLauncher: studentOverview);
@@ -151,7 +170,7 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public void MainWindowAlignsLessonAndInvoiceTablesAndExposesPaneSplitter()
     {
-        RunOnStaThread(() =>
+        WpfTestThread.Run(() =>
         {
             var viewModel = CreateViewModel();
             var window = new AppMainWindow(viewModel);
@@ -186,7 +205,7 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public void MainWindowRestoresResizedColumnsAndDividerWhenReopened()
     {
-        RunOnStaThread(() =>
+        WpfTestThread.Run(() =>
         {
             const double windowWidth = 1480;
             var firstWindow = new AppMainWindow(CreateViewModel()) { Width = windowWidth, ShowActivated = false };
@@ -254,7 +273,7 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public void LessonDeleteButtonPreviewClickInvokesDeleteWorkflow()
     {
-        RunOnStaThread(() =>
+        WpfTestThread.Run(() =>
         {
             var lessonEditor = new FakeLessonEditorService();
             var viewModel = CreateViewModel(
@@ -290,7 +309,7 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public void LessonStateButtonPreviewClickInvokesToggleWorkflow()
     {
-        RunOnStaThread(() =>
+        WpfTestThread.Run(() =>
         {
             var lessonStates = new FakeLessonStateService();
             var viewModel = CreateViewModel(
@@ -324,7 +343,7 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public void InvoiceStatusButtonPreviewClickInvokesPaymentWorkflow()
     {
-        RunOnStaThread(() =>
+        WpfTestThread.Run(() =>
         {
             var payments = new FakePaymentService();
             var viewModel = CreateViewModel(payments: payments);
@@ -356,7 +375,7 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public void LessonDateButtonOpensInsideWindowCalendarPanel()
     {
-        RunOnStaThread(() =>
+        WpfTestThread.Run(() =>
         {
             var viewModel = CreateViewModel(
                 dashboard: new FakeDashboardService { LessonState = LessonState.Planned, LessonIsInvoiced = false, LessonPaymentStatus = null });
@@ -389,7 +408,7 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public void LessonCalendarSelectionUpdatesDateAndClosesPanel()
     {
-        RunOnStaThread(() =>
+        WpfTestThread.Run(() =>
         {
             var lessonEditor = new FakeLessonEditorService();
             var viewModel = CreateViewModel(
@@ -429,7 +448,7 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public void LessonDatePanelClosesWhenClickingOutsideSelector()
     {
-        RunOnStaThread(() =>
+        WpfTestThread.Run(() =>
         {
             var viewModel = CreateViewModel(
                 dashboard: new FakeDashboardService { LessonState = LessonState.Planned, LessonIsInvoiced = false, LessonPaymentStatus = null });
@@ -460,7 +479,7 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public void LessonTimeSelectorOpensInsideWindowWhenClickedAfterReceivingFocus()
     {
-        RunOnStaThread(() =>
+        WpfTestThread.Run(() =>
         {
             var viewModel = CreateViewModel(
                 dashboard: new FakeDashboardService { LessonState = LessonState.Planned, LessonIsInvoiced = false, LessonPaymentStatus = null });
@@ -493,7 +512,7 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public void LessonTimeSelectorClosesWhenClickingOutsideSelector()
     {
-        RunOnStaThread(() =>
+        WpfTestThread.Run(() =>
         {
             var viewModel = CreateViewModel(
                 dashboard: new FakeDashboardService { LessonState = LessonState.Planned, LessonIsInvoiced = false, LessonPaymentStatus = null });
@@ -525,7 +544,7 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public void LessonTimeSelectionUpdatesTimeAndClosesSelector()
     {
-        RunOnStaThread(() =>
+        WpfTestThread.Run(() =>
         {
             var lessonEditor = new FakeLessonEditorService();
             var viewModel = CreateViewModel(
@@ -562,7 +581,7 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public void LessonDatePanelOpensWhenTimeSelectorIsOpen()
     {
-        RunOnStaThread(() =>
+        WpfTestThread.Run(() =>
         {
             var viewModel = CreateViewModel(
                 dashboard: new FakeDashboardService { LessonState = LessonState.Planned, LessonIsInvoiced = false, LessonPaymentStatus = null });
@@ -597,7 +616,7 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public void LessonDatePanelClosesWhenWindowDeactivates()
     {
-        RunOnStaThread(() =>
+        WpfTestThread.Run(() =>
         {
             var viewModel = CreateViewModel(
                 dashboard: new FakeDashboardService { LessonState = LessonState.Planned, LessonIsInvoiced = false, LessonPaymentStatus = null });
@@ -634,7 +653,7 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public void LessonDatePanelClosesWhenApplicationDeactivates()
     {
-        RunOnStaThread(() =>
+        WpfTestThread.Run(() =>
         {
             var viewModel = CreateViewModel(
                 dashboard: new FakeDashboardService { LessonState = LessonState.Planned, LessonIsInvoiced = false, LessonPaymentStatus = null });
@@ -671,7 +690,7 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public void LessonTimeSelectorClosesWhenWindowDeactivates()
     {
-        RunOnStaThread(() =>
+        WpfTestThread.Run(() =>
         {
             var viewModel = CreateViewModel(
                 dashboard: new FakeDashboardService { LessonState = LessonState.Planned, LessonIsInvoiced = false, LessonPaymentStatus = null });
@@ -708,7 +727,7 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public void LessonTimeSelectorClosesWhenApplicationDeactivates()
     {
-        RunOnStaThread(() =>
+        WpfTestThread.Run(() =>
         {
             var viewModel = CreateViewModel(
                 dashboard: new FakeDashboardService { LessonState = LessonState.Planned, LessonIsInvoiced = false, LessonPaymentStatus = null });
@@ -745,7 +764,7 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public void LessonGridUsesBorderedTableColumns()
     {
-        RunOnStaThread(() =>
+        WpfTestThread.Run(() =>
         {
             var viewModel = CreateViewModel(
                 dashboard: new FakeDashboardService { LessonState = LessonState.Planned, LessonIsInvoiced = false, LessonPaymentStatus = null });
@@ -846,7 +865,7 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public void AddLessonButtonWorksAfterStudentNavigation()
     {
-        RunOnStaThread(() =>
+        WpfTestThread.Run(() =>
         {
             var dashboard = new FakeDashboardService
             {
@@ -889,7 +908,7 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public void AddLessonButtonSavesStudentDefaultsAndSelectsTheCreatedLessonAtAnOccupiedTime()
     {
-        RunOnStaThread(() =>
+        WpfTestThread.Run(() =>
         {
             var startsAt = new DateTimeOffset(2026, 6, 16, 14, 30, 0, TimeSpan.FromHours(2));
             var existingLesson = new CalendarLesson("existing-lesson", "Anna", startsAt);
@@ -947,7 +966,7 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public void AddLessonButtonPreviewClickWorksAfterStudentNavigation()
     {
-        RunOnStaThread(() =>
+        WpfTestThread.Run(() =>
         {
             var dashboard = new FakeDashboardService
             {
@@ -986,7 +1005,7 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public void AddLessonButtonPreviewClickCancelsPendingActivationRefresh()
     {
-        RunOnStaThread(() =>
+        WpfTestThread.Run(() =>
         {
             var activationRefreshStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var allowActivationRefreshToFinish = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -1042,7 +1061,7 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public void ActivationRefreshDoesNotDisableTheFirstReactivationCommandClick()
     {
-        RunOnStaThread(() =>
+        WpfTestThread.Run(() =>
         {
             var activationRefreshStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var allowRefreshToFinish = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -1102,7 +1121,7 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public void ActivationRefreshDoesNotClosePickerOpenedByTheFirstReactivationClick()
     {
-        RunOnStaThread(() =>
+        WpfTestThread.Run(() =>
         {
             var activationRefreshStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var allowRefreshToFinish = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -1250,7 +1269,7 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public void FirstPreviousStudentClickStartsFromTodaysDisplayedLesson()
     {
-        RunOnStaThread(() =>
+        WpfTestThread.Run(() =>
         {
             var earlierMonth = new DateTimeOffset(2026, 5, 28, 15, 0, 0, TimeSpan.FromHours(2));
             var previousLesson = new DateTimeOffset(2026, 6, 13, 14, 0, 0, TimeSpan.FromHours(2));
@@ -1581,6 +1600,85 @@ public sealed class MainWindowViewModelTests
     }
 
     [Fact]
+    public void PendingInvoiceStatusButtonOpensRecoveryAndRefreshesAfterResolution()
+    {
+        WpfTestThread.Run(() =>
+        {
+            var pending = new IssuedInvoiceSummary(
+                new InvoiceNumber(3), "Anna", new DateOnly(2026, 6, 16),
+                PaymentStatus.Outstanding, string.Empty, InvoiceIssueStatus.Issuing);
+            var dashboard = new FakeDashboardService { InvoiceSummaries = [pending] };
+            var invoices = new FakeInvoiceWorkflowLauncher { NextResumeResult = true };
+            var payments = new FakePaymentService();
+            var viewModel = CreateViewModel(dashboard: dashboard, payments: payments, invoiceWorkflowLauncher: invoices);
+
+            var window = new AppMainWindow(viewModel);
+            try
+            {
+                window.Show();
+                PumpUntil(() => !viewModel.IsBusy && viewModel.Invoices.Count == 1);
+                var pendingButton = FindButton(window, "Pending");
+                var writeButton = FindButton(window, "Write invoice");
+                var invoiceMenu = Assert.Single(FindChildren<WpfMenuItem>(window), item => Equals(item.Header, "_Invoice"));
+                var row = Assert.Single(viewModel.Invoices);
+
+                Assert.True(invoiceMenu.IsVisible);
+
+                Assert.False(writeButton.IsEnabled);
+                Assert.Contains("Resume Invoice", Assert.IsType<string>(writeButton.ToolTip));
+                Assert.True(pendingButton.IsEnabled);
+                Assert.Same(viewModel.ResumeInvoiceCommand, pendingButton.Command);
+                Assert.False(viewModel.ToggleInvoicePaymentStatusCommand.CanExecute(row));
+                Assert.False(viewModel.OpenInvoiceCommand.CanExecute(row));
+                Assert.False(viewModel.OpenInvoicePdfCommand.CanExecute(row));
+
+                dashboard.NextResult = OperationResult<StartupDashboardResult>.Success(
+                    new StartupDashboardResult("Anna", ["Anna"], [], [], false, []));
+                RaisePreviewLeftClick(pendingButton);
+                PumpUntil(() => invoices.ResumeCount == 1 && viewModel.Invoices.Count == 0 && writeButton.IsEnabled);
+
+                Assert.Equal(Visibility.Collapsed, invoiceMenu.Visibility);
+                Assert.Equal(default, payments.LastInvoiceNumber);
+                Assert.Null(viewModel.PendingInvoiceNotice);
+            }
+            finally
+            {
+                window.Close();
+            }
+        });
+    }
+
+    [Fact]
+    public async Task DashboardExplainsWhenAnotherStudentsPendingInvoiceBlocksIssuance()
+    {
+        var pending = new IssuedInvoiceSummary(
+            new InvoiceNumber(3), "Mira", new DateOnly(2026, 6, 16),
+            PaymentStatus.Outstanding, string.Empty, InvoiceIssueStatus.Issuing);
+        var issued = new IssuedInvoiceSummary(
+            new InvoiceNumber(2), "Anna", new DateOnly(2026, 6, 15),
+            PaymentStatus.Outstanding, "issued.pdf");
+        var dashboard = new FakeDashboardService
+        {
+            NextResult = OperationResult<StartupDashboardResult>.Success(
+                new StartupDashboardResult("Anna", ["Anna", "Mira"], [], [issued], false, [],
+                    PendingInvoiceForAnotherStudent: pending))
+        };
+        var viewModel = CreateViewModel(dashboard: dashboard);
+
+        await viewModel.LoadAsync();
+
+        Assert.Equal(issued.InvoiceNumber, Assert.Single(viewModel.Invoices).InvoiceNumber);
+        Assert.Contains($"Invoice {pending.InvoiceNumber} for Mira is pending.", viewModel.PendingInvoiceNotice);
+        Assert.False(viewModel.WriteInvoiceCommand.CanExecute(null));
+        Assert.True(viewModel.ResumeInvoiceCommand.CanExecute(null));
+
+        await viewModel.RefreshCommand.ExecuteAsync();
+
+        Assert.Null(viewModel.PendingInvoiceNotice);
+        Assert.True(viewModel.WriteInvoiceCommand.CanExecute(null));
+    }
+
+    [Fact]
     public async Task WriteInvoiceLaunchesWorkflowAndRefreshesAfterIssue()
     {
         var dashboard = new FakeDashboardService
@@ -1788,9 +1886,10 @@ public sealed class MainWindowViewModelTests
     [Fact]
     public void ApplicationInfoUsesAppAssemblyVersion()
     {
-        Assert.Equal("1.4.2", ApplicationInfo.Version);
+        var assemblyVersion = typeof(ApplicationInfo).Assembly.GetName().Version!.ToString(3);
+        Assert.Equal(assemblyVersion, ApplicationInfo.Version);
         Assert.Contains("Elena's Business Ledger", ApplicationInfo.AboutText);
-        Assert.Contains("Version 1.4.2", ApplicationInfo.AboutText);
+        Assert.Contains($"Version {assemblyVersion}", ApplicationInfo.AboutText);
     }
 
     [Fact]
@@ -2807,52 +2906,6 @@ public sealed class MainWindowViewModelTests
             clock ?? new FakeUiClock(new DateTimeOffset(2026, 6, 16, 12, 0, 0, TimeSpan.Zero)),
             lessonTimeZone);
 
-    private static void RunOnStaThread(Action action)
-    {
-        Exception? exception = null;
-        var thread = new Thread(() =>
-        {
-            var dispatcher = Dispatcher.CurrentDispatcher;
-            SynchronizationContext.SetSynchronizationContext(new DispatcherSynchronizationContext(dispatcher));
-            try
-            {
-                var preferenceDirectory = Directory.CreateTempSubdirectory("LedgerMainWindowTests-");
-                var windowPath = Path.Combine(preferenceDirectory.FullName, "windows.json");
-                var gridPath = Path.Combine(preferenceDirectory.FullName, "grids.json");
-                var previousWindowPath = WindowPlacementStore.StorePathOverride;
-                var previousGridPath = GridWidthStore.StorePathOverride;
-                WindowPlacementStore.StorePathOverride = windowPath;
-                GridWidthStore.StorePathOverride = gridPath;
-                try
-                {
-                    action();
-                }
-                finally
-                {
-                    dispatcher.InvokeShutdown();
-                    GridWidthStore.StorePathOverride = previousGridPath;
-                    WindowPlacementStore.StorePathOverride = previousWindowPath;
-                    File.Delete(windowPath);
-                    File.Delete(gridPath);
-                    preferenceDirectory.Delete();
-                }
-            }
-            catch (Exception ex)
-            {
-                exception = ex;
-            }
-        });
-
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        thread.Join();
-
-        if (exception is not null)
-        {
-            throw exception;
-        }
-    }
-
     private static IReadOnlyList<T> FindChildren<T>(DependencyObject root)
         where T : DependencyObject
     {
@@ -3423,6 +3476,10 @@ public sealed class MainWindowViewModelTests
     {
         public bool NextWriteResult { get; init; }
 
+        public bool NextResumeResult { get; init; }
+
+        public int ResumeCount { get; private set; }
+
         public bool WriteWasShown { get; private set; }
 
         public StudentChoice? LastWriteStudent { get; private set; }
@@ -3442,7 +3499,11 @@ public sealed class MainWindowViewModelTests
             return Task.FromResult(NextWriteResult);
         }
 
-        public Task<bool> ShowResumeInvoiceAsync(CancellationToken cancellationToken) => Task.FromResult(false);
+        public Task<bool> ShowResumeInvoiceAsync(CancellationToken cancellationToken)
+        {
+            ResumeCount++;
+            return Task.FromResult(NextResumeResult);
+        }
 
         public Task ShowInvoiceViewerAsync(InvoiceNumber invoiceNumber, CancellationToken cancellationToken)
         {

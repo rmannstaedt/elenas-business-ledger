@@ -21,7 +21,7 @@ public sealed class StudentOverviewWindowLauncherTests
     [Fact]
     public void SelectingStudentReopensDetailsWindowWhenUserClosedIt()
     {
-        RunOnStaThread(() =>
+        WpfTestThread.Run(() =>
         {
             Exception? dispatcherException = null;
             var launcher = new StudentOverviewWindowLauncher(
@@ -146,31 +146,6 @@ public sealed class StudentOverviewWindowLauncherTests
             PaymentTerms: "Paid monthly in advance",
             RetireOn: null,
             State: PlanCatalogState.Active);
-
-    private static void RunOnStaThread(Action action)
-    {
-        Exception? exception = null;
-        var thread = new Thread(() =>
-        {
-            try
-            {
-                action();
-            }
-            catch (Exception ex)
-            {
-                exception = ex;
-            }
-        });
-
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        thread.Join();
-
-        if (exception is not null)
-        {
-            throw exception;
-        }
-    }
 
     // Supplies student records for testing the relationship between the list and Details windows.
     private sealed class FakeStudentOverviewService : IStudentOverviewService

@@ -136,12 +136,13 @@ public sealed class SqliteLessonRepository : ILessonRepository
         return ToDomain(saved);
     }
 
-    // Reads one student's lessons in the local calendar month for previews and schedule checks.
+    // Reads the local calendar month and can omit the exact lesson IDs held by pending invoices.
     public async Task<IReadOnlyList<LessonRecord>> ListForStudentMonthAsync(
         string studentShortName,
         DateOnly month,
         CancellationToken cancellationToken,
-        int? studentId = null)
+        int? studentId = null,
+        bool excludeReservedLessons = false)
     {
         var firstDay = new DateOnly(month.Year, month.Month, 1);
         var from = firstDay.ToDateTime(TimeOnly.MinValue);
@@ -155,6 +156,8 @@ public sealed class SqliteLessonRepository : ILessonRepository
             .AsNoTracking()
             .Include(lesson => lesson.Student)
             .Where(lesson => studentId == null ? lesson.Student.ShortName == studentShortName : lesson.StudentId == studentId)
+            .Where(lesson => !excludeReservedLessons || !context.IssuedInvoiceLines.Any(line =>
+                line.LessonId == lesson.Id && line.Invoice.IssueStatus == InvoiceIssueStatus.Issuing))
             .ToArrayAsync(cancellationToken);
 
         return lessons

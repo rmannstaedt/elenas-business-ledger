@@ -92,37 +92,24 @@ public sealed record InvoicePdfDocumentModel(
 
     private static IReadOnlyList<string> CreatePlanChangeNotes(IReadOnlyList<InvoiceLineDraft> orderedLines)
     {
-        var orderedPlanRuns = orderedLines
-            .GroupBy(line => line.PlanName)
-            .Select(group => new
-            {
-                PlanName = group.Key,
-                FirstLesson = group.Min(line => line.LessonDateTime)
-            })
-            .OrderBy(group => group.FirstLesson)
-            .ToArray();
-
-        if (orderedPlanRuns.Length <= 1)
-        {
-            return [];
-        }
-
         var notes = new List<string>();
-        for (var index = 1; index < orderedPlanRuns.Length; index++)
+        for (var index = 1; index < orderedLines.Count; index++)
         {
-            notes.Add(
-                "Plan skiftede fra "
-                + orderedPlanRuns[index - 1].PlanName
-                + " til "
-                + orderedPlanRuns[index].PlanName
-                + " den "
-                + orderedPlanRuns[index].FirstLesson.ToString("dd-MM-yyyy", CultureInfo.InvariantCulture)
-                + ".");
+            var previous = orderedLines[index - 1];
+            var current = orderedLines[index];
+            if (previous.PlanCatalogId == current.PlanCatalogId)
+            {
+                continue;
+            }
+
+            var date = current.LessonDateTime.ToString("dd-MM-yyyy", CultureInfo.InvariantCulture);
+            notes.Add(string.Equals(previous.PlanName, current.PlanName, StringComparison.Ordinal)
+                ? $"Plan skiftede til en anden plan med navnet {current.PlanName} den {date}."
+                : $"Plan skiftede fra {previous.PlanName} til {current.PlanName} den {date}.");
         }
 
         return notes;
     }
-
     private static IReadOnlyList<string> CreateIncludedLessons(IReadOnlyList<InvoiceLineDraft> orderedLines) =>
         orderedLines
             .Select(line => line.HasKnownLessonTime

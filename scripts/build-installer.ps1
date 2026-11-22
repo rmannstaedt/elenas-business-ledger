@@ -32,11 +32,8 @@ $projectPath = Join-Path $repoRoot "src\ElenasBusinessLedger.App\ElenasBusinessL
 $innoScriptPath = Join-Path $repoRoot "installer\ElenasBusinessLedger.iss"
 $buildRoot = Join-Path $repoRoot "artifacts\installer-builds"
 $installerDir = Join-Path $repoRoot "artifacts\installer"
-$installerFileName = "ElenasBusinessLedger-1.4.2-Setup.exe"
-$installerPath = Join-Path $installerDir $installerFileName
-
 Assert-OwnedPath $repoRoot $buildRoot
-Assert-OwnedPath $repoRoot $installerPath
+Assert-OwnedPath $repoRoot $installerDir
 
 if (!(Test-Path -LiteralPath $InnoSetupCompiler -PathType Leaf)) {
     throw "Inno Setup compiler not found at '$InnoSetupCompiler'. Install Inno Setup 6 or pass -InnoSetupCompiler."
@@ -47,6 +44,21 @@ if (!(Test-Path -LiteralPath $projectPath -PathType Leaf)) {
 if (!(Test-Path -LiteralPath $innoScriptPath -PathType Leaf)) {
     throw "Inno Setup script not found at '$innoScriptPath'."
 }
+
+# Use the same SDK-style project version for the installer name and Inno version resources.
+[xml]$appProject = Get-Content -LiteralPath $projectPath -Raw
+$versionEntries = @($appProject.SelectNodes('/Project/PropertyGroup[not(@Condition)]/Version[not(@Condition)]'))
+if ($versionEntries.Count -ne 1) {
+    throw "Expected one unconditional app Version in '$projectPath'."
+}
+$version = $versionEntries[0].InnerText.Trim()
+if ($version -notmatch '^\d+\.\d+\.\d+$') {
+    throw "The app Version must use three numeric components in '$projectPath'."
+}
+
+$installerFileName = "ElenasBusinessLedger-$version-Setup.exe"
+$installerPath = Join-Path $installerDir $installerFileName
+Assert-OwnedPath $repoRoot $installerPath
 
 $stage = Join-Path $buildRoot ([Guid]::NewGuid().ToString("N"))
 $publishDir = Join-Path $stage "publish"
@@ -68,7 +80,7 @@ try {
     }
 
     Write-Host "Building installer with Inno Setup"
-    & $InnoSetupCompiler "/DPublishDir=$publishDir" "/DOutputDir=$candidateDir" $innoScriptPath
+    & $InnoSetupCompiler "/DMyAppVersion=$version" "/DPublishDir=$publishDir" "/DOutputDir=$candidateDir" $innoScriptPath
     if ($LASTEXITCODE -ne 0) {
         throw "Inno Setup compiler failed with exit code $LASTEXITCODE."
     }

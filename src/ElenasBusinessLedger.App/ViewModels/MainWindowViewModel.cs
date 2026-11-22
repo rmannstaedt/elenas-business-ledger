@@ -32,8 +32,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private readonly IAboutDialogLauncher aboutDialogLauncher;
     private readonly IUiClock clock;
     private readonly TimeZoneInfo lessonTimeZone;
-    private readonly Dictionary<LessonDisplayModel, int> autoSaveDraftVersions = [];
-    private readonly HashSet<LessonDisplayModel> savingDraftLessons = [];
+    private readonly DraftLessonAutosave draftAutosave;
     private readonly List<LessonDisplayModel> draftLessonRows = [];
     private readonly HashSet<LessonDisplayModel> savingPlanLessons = [];
     private readonly Dictionary<LessonDisplayModel, int> pendingPlanCatalogIds = [];
@@ -54,6 +53,8 @@ public sealed class MainWindowViewModel : ViewModelBase
     private int activationRefreshSuspendCount;
     private LessonDisplayModel? selectedLesson;
     private InvoiceDisplayModel? selectedInvoice;
+    private bool hasPendingInvoice;
+    private string? pendingInvoiceNotice;
     private bool isAdminMode;
     private string? errorMessage;
 
@@ -91,6 +92,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         this.aboutDialogLauncher = aboutDialogLauncher;
         this.clock = clock;
         this.lessonTimeZone = lessonTimeZone ?? TimeZoneInfo.Local;
+        draftAutosave = new DraftLessonAutosave(SaveDraftLessonAsync);
         displayMonth = new DateOnly(clock.Now.Year, clock.Now.Month, 1);
 
         RefreshCommand = new AsyncRelayCommand(() => RefreshAsync(), () => !IsBusy);
@@ -110,7 +112,7 @@ public sealed class MainWindowViewModel : ViewModelBase
             }));
         ToggleInvoicePaymentStatusCommand = new AsyncRelayCommand(
             parameter => ToggleInvoicePaymentStatusAsync((InvoiceDisplayModel)parameter!),
-            parameter => parameter is InvoiceDisplayModel && !IsBusy);
+            parameter => parameter is InvoiceDisplayModel { IsPending: false } && !IsBusy);
         OpenCalendarCommand = new AsyncRelayCommand(
             () => calendarLauncher.OpenAsync(CancellationToken.None),
             () => !IsBusy);
@@ -118,10 +120,10 @@ public sealed class MainWindowViewModel : ViewModelBase
         ResumeInvoiceCommand = new AsyncRelayCommand(ResumeInvoiceAsync, () => !IsBusy);
         OpenInvoiceCommand = new AsyncRelayCommand(
             parameter => OpenInvoiceAsync((InvoiceDisplayModel)parameter!),
-            parameter => parameter is InvoiceDisplayModel && !IsBusy);
+            parameter => parameter is InvoiceDisplayModel { IsPending: false } && !IsBusy);
         OpenInvoicePdfCommand = new AsyncRelayCommand(
             parameter => OpenInvoicePdfAsync((InvoiceDisplayModel)parameter!),
-            parameter => parameter is InvoiceDisplayModel && !IsBusy);
+            parameter => parameter is InvoiceDisplayModel { IsPending: false } && !IsBusy);
         OpenManageStudentsCommand = new AsyncRelayCommand(OpenManageStudentsAsync, () => !IsBusy);
         OpenStudentDetailsCommand = new AsyncRelayCommand(
             OpenStudentDetailsAsync,
@@ -170,6 +172,18 @@ public sealed class MainWindowViewModel : ViewModelBase
         set => SetProperty(ref selectedInvoice, value);
     }
 
+    public bool HasPendingInvoice
+    {
+        get => hasPendingInvoice;
+        private set => SetProperty(ref hasPendingInvoice, value);
+    }
+
+    public string? PendingInvoiceNotice
+    {
+        get => pendingInvoiceNotice;
+        private set => SetProperty(ref pendingInvoiceNotice, value);
+    }
+
     public string? CurrentStudentShortName
     {
         get => currentStudentShortName;
@@ -188,7 +202,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         }
     }
 
-    public string DisplayMonthText => DisplayMonth.ToString("MMMM yyyy", CultureInfo.CurrentCulture);
+    public string DisplayMonthText => DisplayMonth.ToString("MMMM yyyy", CultureInfo.InvariantCulture);
 
     public bool IsBusy
     {
@@ -493,7 +507,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     {
         await WaitForActivationRefreshAsync();
 
-        if (IsBusy || CurrentStudentChoice() is not { } student)
+        if (IsBusy || HasPendingInvoice || CurrentStudentChoice() is not { } student)
         {
             return;
         }
@@ -506,11 +520,11 @@ public sealed class MainWindowViewModel : ViewModelBase
                 return;
             }
 
-            var issued = await invoiceWorkflowLauncher.ShowWriteInvoiceAsync(
+            var refreshRequired = await invoiceWorkflowLauncher.ShowWriteInvoiceAsync(
                 DisplayMonth,
                 student,
                 CancellationToken.None);
-            if (issued)
+            if (refreshRequired)
             {
                 await RefreshAsync();
             }
@@ -638,11 +652,6 @@ public sealed class MainWindowViewModel : ViewModelBase
 
     private async Task SaveLessonAsync(LessonDisplayModel lesson)
     {
-        await SaveLessonAsync(lesson, initiatedByAutoSave: false);
-    }
-
-    private async Task SaveLessonAsync(LessonDisplayModel lesson, bool initiatedByAutoSave)
-    {
         if (!lesson.CanEdit)
         {
             ErrorMessage = lesson.State == LessonState.Completed
@@ -651,19 +660,9 @@ public sealed class MainWindowViewModel : ViewModelBase
             return;
         }
 
-        if (lesson.IsDraft && savingDraftLessons.Contains(lesson))
+        if (lesson.IsDraft)
         {
-            return;
-        }
-
-        if (!initiatedByAutoSave && lesson.IsDraft && autoSaveDraftVersions.TryGetValue(lesson, out var version))
-        {
-            autoSaveDraftVersions[lesson] = version + 1;
-        }
-
-        if (lesson.IsDraft && lesson.PlanCatalogId <= 0)
-        {
-            ErrorMessage = null;
+            await draftAutosave.SaveNowAsync(lesson);
             return;
         }
 
@@ -672,22 +671,6 @@ public sealed class MainWindowViewModel : ViewModelBase
             ErrorMessage = null;
             return;
         }
-
-        if (lesson.IsDraft)
-        {
-            savingDraftLessons.Add(lesson);
-            try
-            {
-                await SaveDraftLessonAsync(lesson, startsAt, hasKnownStartTime);
-            }
-            finally
-            {
-                savingDraftLessons.Remove(lesson);
-                autoSaveDraftVersions.Remove(lesson);
-            }
-            return;
-        }
-
         if (!lesson.HasDateTimeChange)
         {
             ErrorMessage = null;
@@ -709,9 +692,15 @@ public sealed class MainWindowViewModel : ViewModelBase
         await RefreshAsync();
     }
 
-    private async Task SaveDraftLessonAsync(LessonDisplayModel lesson, DateTimeOffset startsAt, bool hasKnownStartTime)
+    private async Task SaveDraftLessonAsync(LessonDisplayModel lesson)
     {
         var requestedPlanCatalogId = lesson.PlanCatalogId;
+        if (requestedPlanCatalogId <= 0 || !lesson.TryGetStartsAt(out var startsAt, out var hasKnownStartTime))
+        {
+            ErrorMessage = null;
+            return;
+        }
+
         var result = await lessonEditorService.AddAsync(
             new LessonAddRequest(lesson.StudentShortName, startsAt, requestedPlanCatalogId, hasKnownStartTime, lesson.StudentId),
             DisplayMonth,
@@ -985,8 +974,16 @@ public sealed class MainWindowViewModel : ViewModelBase
             SelectedLesson = null;
         }
 
+        HasPendingInvoice = dashboard.PendingInvoiceForAnotherStudent is not null ||
+            dashboard.Invoices.Any(invoice => invoice.IssueStatus == InvoiceIssueStatus.Issuing);
+        PendingInvoiceNotice = dashboard.PendingInvoiceForAnotherStudent is { } pending
+            ? $"Invoice {pending.InvoiceNumber} for {pending.StudentShortName} is pending. Use Resume Invoice in the Invoice menu before issuing another invoice."
+            : null;
+
         Invoices.Clear();
-        foreach (var invoice in dashboard.Invoices.OrderByDescending(invoice => invoice.InvoiceDate))
+        foreach (var invoice in dashboard.Invoices
+            .OrderByDescending(invoice => invoice.IssueStatus == InvoiceIssueStatus.Issuing)
+            .ThenByDescending(invoice => invoice.InvoiceDate))
         {
             Invoices.Add(new InvoiceDisplayModel(invoice));
         }
@@ -1032,7 +1029,7 @@ public sealed class MainWindowViewModel : ViewModelBase
             return Invoices.FirstOrDefault(invoice => invoice.InvoiceNumber == invoiceNumber);
         }
 
-        return Lessons.Count == 0 ? SelectedInvoice : null;
+        return Lessons.Count == 0 && SelectedInvoice is { IsPending: false } ? SelectedInvoice : null;
     }
 
     private void RefreshSelectableStudentShortNames()
@@ -1150,6 +1147,7 @@ public sealed class MainWindowViewModel : ViewModelBase
     private void RemoveLessonRow(LessonDisplayModel lesson)
     {
         lesson.PropertyChanged -= OnLessonPropertyChanged;
+        draftAutosave.CancelPending(lesson);
         draftLessonRows.Remove(lesson);
         Lessons.Remove(lesson);
     }
@@ -1183,7 +1181,7 @@ public sealed class MainWindowViewModel : ViewModelBase
 
             if (lesson.IsDraft)
             {
-                TryAutoSaveCompleteDraftLesson(lesson);
+                draftAutosave.Schedule(lesson);
                 return;
             }
 
@@ -1192,7 +1190,7 @@ public sealed class MainWindowViewModel : ViewModelBase
         }
 
         SortLessonsPreservingSelection(lesson);
-        TryAutoSaveCompleteDraftLesson(lesson);
+        draftAutosave.Schedule(lesson);
     }
 
     private void TrySaveLessonPlanChange(LessonDisplayModel lesson)
@@ -1285,54 +1283,13 @@ public sealed class MainWindowViewModel : ViewModelBase
             : null;
     }
 
-    private void TryAutoSaveCompleteDraftLesson(LessonDisplayModel lesson)
-    {
-        if (!lesson.IsDraft ||
-            lesson.PlanCatalogId <= 0 ||
-            !lesson.TryGetStartsAt(out _))
-        {
-            return;
-        }
-
-        var version = autoSaveDraftVersions.TryGetValue(lesson, out var currentVersion)
-            ? currentVersion + 1
-            : 1;
-        autoSaveDraftVersions[lesson] = version;
-        _ = AutoSaveCompleteDraftLessonAsync(lesson, version);
-    }
-
-    private async Task AutoSaveCompleteDraftLessonAsync(LessonDisplayModel lesson, int version)
-    {
-        await Task.Delay(250);
-        if (!lesson.IsDraft ||
-            !autoSaveDraftVersions.TryGetValue(lesson, out var latestVersion) ||
-            latestVersion != version ||
-            savingDraftLessons.Contains(lesson))
-        {
-            return;
-        }
-
-        try
-        {
-            await SaveLessonAsync(lesson, initiatedByAutoSave: true);
-        }
-        finally
-        {
-            if (autoSaveDraftVersions.TryGetValue(lesson, out latestVersion) &&
-                latestVersion == version)
-            {
-                autoSaveDraftVersions.Remove(lesson);
-            }
-        }
-    }
-
     private bool CanNavigateStudents() =>
         !IsBusy && studentNavigationEntries.Length > 1;
 
     private bool CanScheduleLessons() => !IsBusy && isCalendarAvailable && CurrentStudentShortName is not null;
 
     private bool CanStartWriteInvoice() =>
-        CurrentStudentShortName is not null && (!IsBusy || IsActivationRefreshRunning());
+        !HasPendingInvoice && CurrentStudentShortName is not null && (!IsBusy || IsActivationRefreshRunning());
 
     private bool IsActivationRefreshRunning() =>
         activationRefreshTask is { IsCompleted: false };

@@ -93,9 +93,9 @@ The following must remain unchanged unless this plan explicitly says otherwise:
 - App:
   - `src/ElenasBusinessLedger.App/MainWindow.xaml`
   - `src/ElenasBusinessLedger.App/ViewModels/MainWindowViewModel.cs`
-  - `src/ElenasBusinessLedger.App/ViewModels/EconomyOverviewViewModel.cs`
-  - `src/ElenasBusinessLedger.App/Views/EconomyOverviewView.xaml`
-  - `src/ElenasBusinessLedger.App/Services/*EconomyOverview*`
+  - `src/ElenasBusinessLedger.App/Features/Economy/EconomyOverviewViewModel.cs`
+  - `src/ElenasBusinessLedger.App/Features/Economy/EconomyOverviewView.xaml`
+  - `src/ElenasBusinessLedger.App/Features/Economy/`
   - startup composition
 - Tests:
   - core economy query tests

@@ -60,6 +60,63 @@ public sealed class UseCaseTests
         Assert.Contains(result.Value.Invoices, invoice => invoice.InvoiceNumber.Value == 1);
     }
 
+    [Theory]
+    [InlineData(21, false)]
+    [InlineData(22, false)]
+    [InlineData(21, true)]
+    public async Task StartupDashboardShowsPendingInvoiceOnlyInItsOwnersHistory(int selectedStudentId, bool calendarUnavailable)
+    {
+        var originalStudent = CreateStudentRecord("Miri") with { Id = 21 };
+        var replacementStudent = CreateStudentRecord("Mira") with { Id = 22 };
+        var students = new FakeStudentRepository([originalStudent, replacementStudent]);
+        var calendar = new FakeCalendarGateway([])
+        {
+            BeforeList = (_, _) =>
+            {
+                if (calendarUnavailable)
+                {
+                    throw new InvalidOperationException("Calendar unavailable.");
+                }
+            }
+        };
+        var baseDraft = CreateInvoiceDraft();
+        var draft = InvoiceDraft.Create(
+            baseDraft.InvoiceDate, baseDraft.Company,
+            new StudentSnapshot("Mira", "Mira Vale", "42 Sample Lane", originalStudent.Id),
+            baseDraft.Lines, baseDraft.PriceAdjustment, baseDraft.Period);
+        var pendingNumber = new InvoiceNumber(3);
+        var invoices = new FakeInvoiceRepository
+        {
+            PendingInvoiceToReturn = draft.Issue(
+                pendingNumber, draft.CalculateTotals(CreateCompanyProfile()),
+                "pending.pdf", InvoiceIssueStatus.Issuing)
+        };
+        var query = new LoadDashboardUseCase(
+            students, calendar, invoices, new FakeClock(new DateTimeOffset(2026, 6, 16, 12, 0, 0, TimeSpan.Zero)),
+            new FakeLessonRepository());
+
+        var result = await query.ExecuteAsync(new DateOnly(2026, 6, 1), null, CancellationToken.None, selectedStudentId);
+
+        Assert.Equal(!calendarUnavailable, result.Succeeded);
+        var dashboard = Assert.IsType<StartupDashboardResult>(result.Value);
+        Assert.Equal(selectedStudentId, dashboard.CurrentStudentId);
+        if (selectedStudentId == originalStudent.Id)
+        {
+            var pending = Assert.Single(dashboard.Invoices);
+            Assert.Equal(pendingNumber, pending.InvoiceNumber);
+            Assert.Equal(InvoiceIssueStatus.Issuing, pending.IssueStatus);
+            Assert.Equal(draft.Period, pending.Period);
+            Assert.Empty(pending.PdfFilePath);
+            Assert.Null(dashboard.PendingInvoiceForAnotherStudent);
+        }
+        else
+        {
+            Assert.Empty(dashboard.Invoices);
+            Assert.Equal(pendingNumber, dashboard.PendingInvoiceForAnotherStudent?.InvoiceNumber);
+            Assert.Equal("Mira", dashboard.PendingInvoiceForAnotherStudent?.StudentShortName);
+        }
+    }
+
     [Fact]
     public async Task StartupDashboardDoesNotCompleteUninvoicedLessonsByDate()
     {
@@ -634,7 +691,7 @@ public sealed class UseCaseTests
     }
 
     [Fact]
-    public async Task AddingUninvoicedLessonRefreshesFromCalendarAfterCalendarAddSucceeds()
+    public async Task AddingUninvoicedLessonUsesSelectedPlanDurationAndRefreshesMonth()
     {
         var addedLesson = new CalendarLesson("lesson-2", "Anna", new DateTimeOffset(2026, 6, 24, 15, 0, 0, TimeSpan.Zero));
         var calendar = new FakeCalendarGateway([addedLesson]);
@@ -642,7 +699,7 @@ public sealed class UseCaseTests
         var useCase = new AddLessonUseCase(
             calendar,
             new FakeStudentRepository([CreateStudentRecord("Anna")]),
-            new FakePlanCatalogRepository([CreatePlanCatalogItem(77, "Proevetime", 250m)]),
+            new FakePlanCatalogRepository([CreatePlanCatalogItem(77, "Proevetime", 250m) with { DurationMinutes = 45 }]),
             lessons);
 
         var result = await useCase.ExecuteAsync(
@@ -654,6 +711,8 @@ public sealed class UseCaseTests
         Assert.Equal(addedLesson, result.Value!.CreatedLesson);
         Assert.Contains(addedLesson, result.Value.Lessons);
         var savedLesson = Assert.Single(lessons.SavedLessons);
+        Assert.Equal(45, calendar.LastAddRequest?.DurationMinutes);
+        Assert.Equal(45, savedLesson.DurationMinutes);
         Assert.Equal(77, savedLesson.PlanCatalogId);
         Assert.Equal("Proevetime", savedLesson.PlanName);
         Assert.Equal("lesson-2", savedLesson.GoogleCalendarEventId);
@@ -756,10 +815,10 @@ public sealed class UseCaseTests
     }
 
     [Fact]
-    public async Task PopulateCalendarSavesCreatedLessonsToLocalLedgerBeforeReportingSuccess()
+    public async Task PopulateCalendarUsesPlanDurationAndSavesCreatedLessonsBeforeReportingSuccess()
     {
         var timeZone = TimeZoneInfo.FindSystemTimeZoneById("Romance Standard Time");
-        var students = new FakeStudentRepository([CreateStudentRecord("Anna")]);
+        var students = new FakeStudentRepository([CreateStudentRecord("Anna", durationMinutes: 75)]);
         var calendar = new FakeCalendarGateway([]);
         var lessons = new FakeLessonRepository();
         var useCase = new PopulateCalendarUseCase(students, calendar, timeZone, lessons);
@@ -770,10 +829,12 @@ public sealed class UseCaseTests
 
         Assert.True(result.Succeeded);
         Assert.Equal(result.Value!.CreatedCount, lessons.SavedLessons.Count);
+        Assert.All(calendar.PopulatedRequests, request => Assert.Equal(75, request.DurationMinutes));
         Assert.All(lessons.SavedLessons, lesson =>
         {
             Assert.Equal("Anna", lesson.StudentShortName);
             Assert.Equal(42, lesson.PlanCatalogId);
+            Assert.Equal(75, lesson.DurationMinutes);
             Assert.Equal("Standard", lesson.PlanName);
             Assert.False(string.IsNullOrWhiteSpace(lesson.GoogleCalendarEventId));
         });
@@ -1800,7 +1861,8 @@ public sealed class UseCaseTests
 
     private static StudentRecord CreateStudentRecord(
         string shortName,
-        IReadOnlyList<StudentScheduleEntry>? schedule = null)
+        IReadOnlyList<StudentScheduleEntry>? schedule = null,
+        int durationMinutes = 60)
     {
         var student = Student.Create(
             shortName,
@@ -1816,7 +1878,7 @@ public sealed class UseCaseTests
             "Standard",
             priceWithoutVat: 400m,
             LessonsPerWeek.One,
-            durationMinutes: 60,
+            durationMinutes: durationMinutes,
             PlanFlexibility.MoveOrCancelByAgreement,
             numberOfStudents: 1,
             effectiveFrom: new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero),
@@ -1914,7 +1976,8 @@ public sealed class UseCaseTests
             string studentShortName,
             DateOnly month,
             CancellationToken cancellationToken,
-            int? studentId = null) =>
+            int? studentId = null,
+            bool excludeReservedLessons = false) =>
             Task.FromResult<IReadOnlyList<LessonRecord>>(
                 lessons
                     .Where(lesson => lesson.StudentShortName == studentShortName)
@@ -2061,6 +2124,8 @@ public sealed class UseCaseTests
 
         public OperationResult<LessonAddResult>? AddResult { get; init; }
 
+        public LessonAddRequest? LastAddRequest { get; private set; }
+
         public bool UpdateCalled { get; private set; }
 
         public List<LessonState> SavedLessonStates { get; } = [];
@@ -2101,6 +2166,7 @@ public sealed class UseCaseTests
             DateOnly refreshMonth,
             CancellationToken cancellationToken)
         {
+            LastAddRequest = request;
             if (AddResult is not null)
             {
                 return Task.FromResult(AddResult);
@@ -2199,6 +2265,8 @@ public sealed class UseCaseTests
         public IssuedInvoice? IssuedInvoiceToReturn { get; init; }
 
         public IssuedInvoice? ReservedInvoiceToReturn { get; init; }
+
+        public IssuedInvoice? PendingInvoiceToReturn { get; init; }
 
         public int? LastStudentInvoiceLookup { get; private set; }
 
@@ -2407,7 +2475,7 @@ public sealed class UseCaseTests
             Task.FromResult(IssuedInvoiceToReturn);
 
         public Task<IssuedInvoice?> GetOldestPendingAsync(CancellationToken cancellationToken) =>
-            Task.FromResult<IssuedInvoice?>(null);
+            Task.FromResult(PendingInvoiceToReturn);
 
         public Task<OperationResult<InvoiceNumber>> DiscardPendingAsync(
             IssuedInvoice savedInvoice, CancellationToken cancellationToken) => throw new NotSupportedException();

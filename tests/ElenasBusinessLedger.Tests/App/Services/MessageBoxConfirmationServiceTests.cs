@@ -12,7 +12,7 @@ public sealed class MessageBoxConfirmationServiceTests
     [Fact]
     public void DeleteLessonConfirmationUsesMainWindowOwner()
     {
-        RunOnStaThread(async () =>
+        WpfTestThread.Run(async () =>
         {
             var owner = new Window();
             var presenter = new CapturingMessageBoxPresenter(MessageBoxResult.Yes);
@@ -35,31 +35,6 @@ public sealed class MessageBoxConfirmationServiceTests
             Assert.Equal(MessageBoxImage.Warning, presenter.Image);
             Assert.Equal(MessageBoxResult.No, presenter.DefaultResult);
         });
-    }
-
-    private static void RunOnStaThread(Func<Task> action)
-    {
-        Exception? exception = null;
-        var thread = new Thread(() =>
-        {
-            try
-            {
-                action().GetAwaiter().GetResult();
-            }
-            catch (Exception ex)
-            {
-                exception = ex;
-            }
-        });
-
-        thread.SetApartmentState(ApartmentState.STA);
-        thread.Start();
-        thread.Join();
-
-        if (exception is not null)
-        {
-            throw exception;
-        }
     }
 
     // Records confirmation arguments so tests can inspect ownership and button defaults without showing a message box.

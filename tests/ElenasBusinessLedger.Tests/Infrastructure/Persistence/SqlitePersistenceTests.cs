@@ -1670,6 +1670,51 @@ public sealed class SqlitePersistenceTests
         }
     }
 
+    [Fact]
+    public async Task PendingInvoiceBlocksNewPreviewsAndHoldsOnlyItsSavedLessonsUntilDiscarded()
+    {
+        using var database = await TestDatabase.CreateAsync();
+        var token = TestContext.Current.CancellationToken;
+        var invoices = new SqliteInvoiceRepository(database.CreateContext);
+        var company = await ConfigureInvoiceCompanyAsync(database, token);
+        var plans = new SqlitePlanCatalogRepository(database.CreateContext);
+        var plan = await SaveCatalogPlanAsync(plans, "Standard");
+        var may = new DateTimeOffset(2026, 5, 6, 16, 0, 0, TimeSpan.Zero);
+        var first = await SaveLessonAsync(database, "Mira", plan, may);
+        var second = await SaveLessonAsync(database, "Mira", plan, may.AddDays(7));
+        var third = await SaveLessonAsync(database, "Mira", plan, may.AddDays(14));
+        var fourth = await SaveLessonAsync(database, "Mira", plan, may.AddDays(21));
+        var from = new DateOnly(2026, 5, 1);
+        var to = from.AddMonths(1).AddDays(-1);
+        var students = new SqliteStudentRepository(database.CreateContext);
+        var lessons = new SqliteLessonRepository(database.CreateContext);
+        var preview = new InvoicePreviewUseCase(students, company, lessons, plans);
+        var workflow = CreateInvoiceWorkflow(database, company, invoices, new RecordingInvoicePdfWriter(), []);
+
+        var initial = await workflow.CreatePreviewAsync("Mira", to, from, to, token, first.StudentId);
+        Assert.True(initial.Succeeded);
+        var draft = initial.Value!.Draft;
+        var selected = draft.Lines.Where(line => line.LessonId != second.Id).ToArray();
+        var reservedDraft = InvoiceDraft.Create(draft.InvoiceDate, draft.Company, draft.Student, selected, null, draft.Period);
+        var reservation = await invoices.ReserveInvoiceAsync(
+            reservedDraft, reservedDraft.CalculateTotals(await company.GetAsync(token)), token);
+        Assert.True(reservation.Succeeded);
+
+        var blocked = await workflow.CreatePreviewAsync("Mira", to, from, to, token, first.StudentId);
+        Assert.Equal("Invoice.PendingExists", Assert.Single(blocked.Errors).Code);
+        var available = await preview.CreateAsync("Mira", to, from, to, token, first.StudentId);
+        Assert.True(available.Succeeded);
+        Assert.Equal(second.Id, Assert.Single(available.Value!.Draft.Lines).LessonId);
+        var saved = Assert.IsType<IssuedInvoice>(await workflow.GetOldestPendingAsync(token));
+        Assert.Equal([first.Id, third.Id, fourth.Id], saved.Lines.Select(line => line.LessonId));
+
+        var discarded = await workflow.DiscardPendingAsync(saved, token);
+        Assert.True(discarded.Succeeded);
+        var afterDiscard = await workflow.CreatePreviewAsync("Mira", to, from, to, token, first.StudentId);
+        Assert.True(afterDiscard.Succeeded);
+        Assert.Equal([first.Id, second.Id, third.Id, fourth.Id], afterDiscard.Value!.Draft.Lines.Select(line => line.LessonId));
+    }
+
     private static CoreInvoiceWorkflowService CreateInvoiceWorkflow(
         TestDatabase database,
         ICompanyProfileRepository company,

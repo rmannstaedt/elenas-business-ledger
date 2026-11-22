@@ -23,7 +23,8 @@ public interface ILessonRepository
         string studentShortName,
         DateOnly month,
         CancellationToken cancellationToken,
-        int? studentId = null);
+        int? studentId = null,
+        bool excludeReservedLessons = false);
 
     Task<IReadOnlyList<LessonRecord>> ListForWindowAsync(
         DateOnly from,

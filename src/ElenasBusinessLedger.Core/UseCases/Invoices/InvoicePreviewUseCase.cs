@@ -59,7 +59,9 @@ public sealed class InvoicePreviewUseCase
         CancellationToken cancellationToken)
     {
         var month = new DateOnly(from.Year, from.Month, 1);
-        var lessons = await lessonRepository.ListForStudentMonthAsync(student.Student.ShortName, month, cancellationToken, student.Id > 0 ? student.Id : null);
+        var lessons = await lessonRepository.ListForStudentMonthAsync(
+            student.Student.ShortName, month, cancellationToken, student.Id > 0 ? student.Id : null,
+            excludeReservedLessons: true);
         var matchingLessons = lessons
             .Where(lesson =>
             {

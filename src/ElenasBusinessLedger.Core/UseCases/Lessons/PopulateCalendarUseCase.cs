@@ -69,7 +69,7 @@ public sealed class PopulateCalendarUseCase
                 .Select(lesson => lesson.StartsAt))
             .ToHashSet();
 
-        var candidates = CreateScheduledStarts(student.Schedule, firstOfDisplayMonth, lastOfDisplayMonth)
+        var candidates = StudentScheduleOccurrences.Between(student.Schedule, firstOfDisplayMonth, lastOfDisplayMonth, lessonTimeZone)
             .Distinct()
             .Select(startsAt => new
             {
@@ -83,7 +83,8 @@ public sealed class PopulateCalendarUseCase
                 new LessonAddRequest(
                     studentShortName,
                     candidate.StartsAt,
-                    candidate.Plan!.PlanCatalogId),
+                    candidate.Plan!.PlanCatalogId,
+                    DurationMinutes: candidate.Plan.DurationMinutes),
                 candidate.Plan!))
             .ToArray();
         var requestsToCreate = candidates
@@ -145,26 +146,6 @@ public sealed class PopulateCalendarUseCase
                 return new ValidationError("Lesson.LocalSaveFailed", cleanup.State == CalendarWriteState.Acknowledged
                     ? "The new appointment could not be saved to the billing ledger and was removed from Google Calendar."
                     : "The new appointment could not be saved to the billing ledger. Check the exact appointment in Google Calendar before retrying.");
-            }
-        }
-    }
-
-    private IEnumerable<DateTimeOffset> CreateScheduledStarts(
-        IReadOnlyList<StudentScheduleEntry> schedule,
-        DateOnly from,
-        DateOnly to)
-    {
-        for (var date = from; date <= to; date = date.AddDays(1))
-        {
-            foreach (var entry in schedule)
-            {
-                if (entry.Weekday != date.DayOfWeek)
-                {
-                    continue;
-                }
-
-                var localDateTime = date.ToDateTime(entry.StartsAt);
-                yield return new DateTimeOffset(localDateTime, lessonTimeZone.GetUtcOffset(localDateTime));
             }
         }
     }

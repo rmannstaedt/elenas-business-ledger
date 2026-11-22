@@ -46,6 +46,14 @@ public sealed class CoreInvoiceWorkflowService : IInvoiceWorkflowService
     {
         try
         {
+            var pending = await invoiceRepository.GetOldestPendingAsync(cancellationToken);
+            if (pending is not null)
+            {
+                return OperationResult<InvoicePreviewResult>.Failure(new ValidationError(
+                    "Invoice.PendingExists",
+                    $"Invoice {pending.InvoiceNumber} is pending. Use Resume Invoice to resolve it first."));
+            }
+
             return await previewUseCase.CreateAsync(studentShortName, invoiceDate, from, to, cancellationToken, studentId);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)

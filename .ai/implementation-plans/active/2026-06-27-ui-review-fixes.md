@@ -77,16 +77,16 @@ Fix the UI review findings around invoice preview async truthfulness, stale less
 
 ## Affected Files, Projects, Commands, Docs, Schemas, Or Artifacts
 
-- `src/ElenasBusinessLedger.App/ViewModels/InvoicePreviewViewModel.cs`
-- `src/ElenasBusinessLedger.App/Views/InvoicePreviewView.xaml`
-- `src/ElenasBusinessLedger.App/Views/InvoicePreviewView.xaml.cs`
-- `src/ElenasBusinessLedger.App/Services/InvoiceWorkflowWindowLauncher.cs`
+- `src/ElenasBusinessLedger.App/Features/Invoices/InvoicePreviewViewModel.cs`
+- `src/ElenasBusinessLedger.App/Features/Invoices/InvoicePreviewView.xaml`
+- `src/ElenasBusinessLedger.App/Features/Invoices/InvoicePreviewView.xaml.cs`
+- `src/ElenasBusinessLedger.App/Features/Invoices/InvoiceWorkflowWindowLauncher.cs`
 - `src/ElenasBusinessLedger.App/ViewModels/MainWindowViewModel.cs`
-- `src/ElenasBusinessLedger.App/ViewModels/PlanCatalogViewModel.cs`
-- `src/ElenasBusinessLedger.App/Views/PlanCatalogView.xaml.cs`
-- `src/ElenasBusinessLedger.App/Services/IPlanCatalogInteractionService.cs`
-- `src/ElenasBusinessLedger.App/Services/MessageBoxPlanCatalogInteractionService.cs`
-- `src/ElenasBusinessLedger.App/Services/DiscardPlanCatalogInteractionService.cs`
+- `src/ElenasBusinessLedger.App/Features/Plans/PlanCatalogViewModel.cs`
+- `src/ElenasBusinessLedger.App/Features/Plans/PlanCatalogView.xaml.cs`
+- `src/ElenasBusinessLedger.App/Features/Plans/IPlanCatalogInteractionService.cs`
+- `src/ElenasBusinessLedger.App/Features/Plans/MessageBoxPlanCatalogInteractionService.cs`
+- `src/ElenasBusinessLedger.App/Features/Plans/DiscardPlanCatalogInteractionService.cs`
 - Relevant App ViewModel/WPF tests
 - `.ai/context/HANDOFF.md`
 - `.ai/implementation-plans/completed/2026-06-23-populate-calendar-from-student-schedule.md`
